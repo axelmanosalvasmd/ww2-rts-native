@@ -33,6 +33,9 @@ fn drain(hub: &mut Hub, receivers: &mut [mpsc::Receiver<Output>; 2], now: u64) -
                     messages.push(serde_json::from_str(&frame.json).unwrap());
                     hub.complete_snapshot(&frame, true, now);
                 }
+                Output::Watcher(_) => {
+                    panic!("unexpected spectator snapshot on a seated connection")
+                }
                 Output::Close(code, reason) => panic!("unexpected close {code}: {reason}"),
             }
         }
@@ -84,7 +87,11 @@ fn finish_ordinary_match(hub: &mut Hub, receivers: &mut [mpsc::Receiver<Output>;
         if status.ending_complete {
             assert_eq!(status.held, 120);
             assert!(frames.into_iter().all(|count| count >= 60));
-            for messages in delivered {
+            for (slot, messages) in delivered.into_iter().enumerate() {
+                if hub.rooms["ABC"].players[slot].ai {
+                    assert!(messages.is_empty(), "AI has no socket delivery");
+                    continue;
+                }
                 let lobby = messages
                     .iter()
                     .find(|message| message["t"] == "lobby")
@@ -402,4 +409,71 @@ fn net37_failed_restart_settles_old_writes_and_restores_replaced_seat_before_fin
     assert!(hub.native_status("ABC").unwrap().fault.is_none());
     hub.rooms.get_mut("ABC").unwrap().map = "default".into();
     finish_ordinary_match(&mut hub, &mut receivers, 150);
+}
+
+#[test]
+fn net37_failed_restart_with_ai_retains_pause_state_and_finishes_every_seat() {
+    let (mut hub, [host, guest], mut receivers) = room();
+    hub.disconnected("ABC", guest.id, 0);
+    hub.retire_connection(guest.id);
+    hub.message("ABC", &host, &mut true, json!({"t":"kick","slot":1}), 0);
+    hub.message("ABC", &host, &mut true, json!({"t":"addAi"}), 0);
+    hub.message(
+        "ABC",
+        &host,
+        &mut true,
+        json!({"t":"team","slot":1,"v":1}),
+        0,
+    );
+    assert!(hub.rooms["ABC"].players[1].ai);
+    assert!(hub.rooms["ABC"].players[1].connection.is_none());
+    drain(&mut hub, &mut receivers, 0);
+    hub.start_trusted("ABC", host.id, false, 0).unwrap();
+    drain(&mut hub, &mut receivers, 0);
+    for callback in 0..4 {
+        hub.poll_native(callback * 50, callback * 50_000_000);
+        drain(&mut hub, &mut receivers, callback * 50);
+    }
+    let before = hub.native_status("ABC").unwrap();
+    assert!(!before.paused);
+    let checkpoint = hub.rooms["ABC"]
+        .native
+        .as_ref()
+        .unwrap()
+        .runtime
+        .save_json()
+        .unwrap();
+    hub.rooms.get_mut("ABC").unwrap().map = "missing-authored-map".into();
+    let request = hub.claim_trusted_start("ABC", host.id, true).unwrap();
+    hub.poll_native(200, 200_000_000);
+    let generated = request.generate();
+    assert!(generated.is_err());
+    assert!(
+        hub.complete_trusted_start("ABC", request, generated, 200)
+            .is_err()
+    );
+    assert_eq!(hub.native_status("ABC").unwrap(), before);
+    assert_eq!(
+        hub.rooms["ABC"]
+            .native
+            .as_ref()
+            .unwrap()
+            .runtime
+            .save_json()
+            .unwrap(),
+        checkpoint
+    );
+    let [host_messages, ai_messages] = drain(&mut hub, &mut receivers, 200);
+    assert!(ai_messages.is_empty());
+    assert_eq!(
+        host_messages[0],
+        json!({"t":"deny","cmd":"start","reason":"scenario"})
+    );
+    assert!(
+        host_messages
+            .iter()
+            .all(|message| message["t"] != "pause" && message["t"] != "start")
+    );
+    hub.rooms.get_mut("ABC").unwrap().map = "default".into();
+    finish_ordinary_match(&mut hub, &mut receivers, 250);
 }

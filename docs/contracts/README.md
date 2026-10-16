@@ -8,7 +8,7 @@ These files reserve contract topics; no protocol or ABI is approved by their cre
 | --- | --- | --- | --- |
 | [start-cancellation.md](start-cancellation.md) | Julio | Axel | Identical prototype v0 pending-start cancellation and scenario-denial shapes; exact-head acknowledgement pending |
 | [ordinary-results.md](ordinary-results.md) | Julio | Axel | Identical prototype v0 ordinary mode/result fields; owner groups N/P recorded in #5 comment 6217590741; exact-head acknowledgement pending |
-| protocol.md | Julio | Axel | v0 draft; technical answers recorded (#5); three security corrections pending |
+| protocol.md | Julio | Axel | v0 draft; technical answers recorded (#5); spectator reference behavior and cached flag mask clarified 2026-10-16 |
 | terrain.md | Julio | Axel | v0 draft; technical answers recorded (#5) |
 | [save-format.md](save-format.md) | Julio | Axel | Private JSON v1 with optional elimination state; owner group I recorded in #5 comment 6217590741; implementation exact-head acknowledgement pending |
 | [startup-tables/README.md](startup-tables/README.md) | Julio | Axel | Content/schema v1 candidate explicitly accepted by both owners in PR #195 review; internal producer/platform proof integrated through PR #198 at `514e15f4`; transport #199 remains unagreed and unimplemented; Unreal adoption pending |

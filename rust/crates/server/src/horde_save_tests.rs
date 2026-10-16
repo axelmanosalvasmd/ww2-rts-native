@@ -34,6 +34,7 @@ fn messages(hub: &mut Hub, rx: &mut mpsc::Receiver<Output>) -> Vec<Value> {
                 result.push(serde_json::from_str(&frame.json).unwrap());
                 hub.complete_snapshot(&frame, true, 0);
             }
+            Output::Watcher(_) => panic!("unexpected watcher on seated connection"),
             Output::Close(code, reason) => panic!("unexpected close {code}: {reason}"),
         }
     }

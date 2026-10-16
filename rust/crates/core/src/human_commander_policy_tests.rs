@@ -1057,6 +1057,10 @@ fn ai63_planner_checkpoint_retains_full_memory_without_random_streams() {
     policy.tactics.cleared_sightings.insert(8, 19.);
     policy.tactics.node.insert(9, 2);
     policy.tactics.fort_steps.insert(10, 4);
+    policy.tactics.field.armor_seen = true;
+    policy.tactics.world.rail_at.insert(12, 75);
+    policy.tactics.world.fort_steps.insert(13, 2);
+    policy.tactics.world.field.armor_seen = true;
     policy.tactics.assault.cooldown = 8.;
     policy.tactics.assault.serial = u64::MAX;
     policy.tactics.assault.released.insert(11, 12.);
@@ -1111,6 +1115,34 @@ fn ai63_planner_checkpoint_retains_full_memory_without_random_streams() {
             "valid assault reason {reason}"
         );
     }
+    // Checkpoints written before field and World planner memories default only
+    // those new owners, while retaining every previously saved planner field.
+    let mut legacy = saved.clone();
+    let tactics = legacy[1]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|entry| entry[0] == json!(["string", "tactics"]))
+        .unwrap();
+    tactics[1][1].as_array_mut().unwrap().retain(|entry| {
+        entry[0] != json!(["string", "field"]) && entry[0] != json!(["string", "world"])
+    });
+    let mut legacy_restored = HumanPolicy::new(2, 999);
+    legacy_restored.restore_planner_memory(&legacy).unwrap();
+    assert_eq!(
+        legacy_restored.tactics.field,
+        crate::commander_field_policy::State::default()
+    );
+    assert_eq!(
+        legacy_restored.tactics.world,
+        crate::commander_world_policy::State::default()
+    );
+    let mut expected_legacy = policy.tactics.clone();
+    expected_legacy.field = Default::default();
+    expected_legacy.world = Default::default();
+    // The saved checkpoint precedes the later assault-reason variations above.
+    expected_legacy.assault.operation.as_mut().unwrap().reason = Some("regroup-blocked");
+    assert_eq!(legacy_restored.tactics, expected_legacy);
     let before = restored.clone();
     let foreign = HumanPolicy::new(1, 77).planner_memory_json().unwrap();
     assert!(restored.restore_planner_memory(&foreign).is_err());
@@ -1118,3 +1150,6 @@ fn ai63_planner_checkpoint_retains_full_memory_without_random_streams() {
     assert!(restored.restore_planner_memory(&json!([])).is_err());
     assert_eq!(restored, before);
 }
+
+#[path = "commander_field_live_tests.rs"]
+mod field_live_tests;

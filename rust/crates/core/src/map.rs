@@ -41,7 +41,9 @@ impl fmt::Display for MapError {
             Self::Invalid { field, .. } if field == "assaultTime" => {
                 f.write_str("assaultTime must be 300-3600 seconds")
             }
-            Self::Invalid { field, reason } if field == "rows" || field == "heights" => {
+            Self::Invalid { field, reason }
+                if field == "rows" || field == "heights" || field == "world.validation" =>
+            {
                 f.write_str(reason)
             }
             Self::Invalid { field, reason } if field == "structures" => write!(f, "{reason}"),

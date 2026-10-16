@@ -67,7 +67,7 @@ fn write(rx: &mut mpsc::Receiver<Output>) -> SnapshotWrite {
     loop {
         match rx.try_recv().unwrap() {
             Output::Snapshot(write) => return write,
-            Output::Json(_) => {}
+            Output::Json(_) | Output::Watcher(_) => {}
             Output::Close(_, _) => panic!("unexpected close"),
         }
     }
@@ -167,10 +167,11 @@ fn attached_roster_reconnects_in_place_and_stale_writes_only_drain_old_accounts(
     ] {
         h.message("ABC", &a, &mut true, command, 0);
     }
-    let (newcomer, _) = client(3);
+    let (newcomer, mut newcomer_rx) = client(3);
     join(&mut h, &newcomer, "new", 0);
     assert_eq!(h.rooms["ABC"].players.len(), 2);
-    assert!(h.rooms["ABC"].spectators.is_empty());
+    assert_eq!(h.rooms["ABC"].spectators.len(), 1);
+    while newcomer_rx.try_recv().is_ok() {}
     assert_eq!(h.rooms["ABC"].players[1].team, 1);
     assert_eq!(h.rooms["ABC"].players[0].faction, 0);
     h.poll_native(0, 0);

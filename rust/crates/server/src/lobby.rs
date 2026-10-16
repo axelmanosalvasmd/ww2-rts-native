@@ -49,6 +49,7 @@ pub(crate) struct SnapshotWrite {
 pub(crate) enum Output {
     Json(Value),
     Snapshot(SnapshotWrite),
+    Watcher(Arc<str>),
     Close(u16, &'static str),
 }
 
@@ -57,6 +58,7 @@ impl Output {
         match self {
             Self::Json(value) => value.to_string().len() as u64,
             Self::Snapshot(write) => write.json.len() as u64,
+            Self::Watcher(json) => json.len() as u64,
             Self::Close(_, reason) => 2 + reason.len() as u64,
         }
     }
@@ -67,11 +69,12 @@ impl Connection {
             id,
             tx,
             cancel,
-            buffered: None,
+            buffered: Some(Arc::new(AtomicU64::new(0))),
         }
     }
     pub(crate) fn enable_diagnostics(&mut self) {
-        self.buffered = Some(Arc::new(AtomicU64::new(0)));
+        self.buffered
+            .get_or_insert_with(|| Arc::new(AtomicU64::new(0)));
     }
     fn reserve_bytes(&self, bytes: u64) {
         if let Some(buffered) = &self.buffered {
@@ -213,6 +216,8 @@ struct AttachedRuntime {
     ingress: CommanderIngress,
     runtime: RoomRuntime,
     startup: crate::native_startup::NativeStartup,
+    watch_delivery: SnapshotDelivery,
+    watch_started: bool,
     // Complete R1 options/seeds are a host receipt, never a client envelope.
     receipt: Option<Value>,
     loaded_save: bool,
@@ -477,7 +482,7 @@ impl Room {
             person.last_match = Some(outcome);
         }
         let resume = native.runtime.resume(now);
-        for person in &self.players {
+        for person in self.people() {
             if let Some(connection) = &person.connection {
                 connection.send(resume.clone());
             }
@@ -656,7 +661,9 @@ impl Room {
             }
             return false;
         }
-        if self.starting.is_some() {
+        if self.starting.is_some()
+            || (seated.is_none() && (CommanderIngress::recognizes(t) || UNAVAILABLE.contains(&t)))
+        {
             return false;
         }
         if CommanderIngress::recognizes(t)
@@ -681,6 +688,10 @@ impl Room {
             if let Some(denial) = denial {
                 me.deny(t, denial.name(), now);
             }
+            return false;
+        }
+        // The prototype silently drops spectator army commands.
+        if seated.is_none() && self.native.is_some() {
             return false;
         }
         if t == "nextwave"
@@ -1091,8 +1102,10 @@ impl Hub {
         }
         let horde = room.mode == "horde" && state.options.mode == Mode::Horde;
         let count = room.players.len() + usize::from(horde);
-        if !room.spectators.is_empty() || room.players.is_empty() {
-            return Err("native attachment needs commander seats without spectators".into());
+        if room.players.is_empty() || (horde && !room.spectators.is_empty()) {
+            return Err(
+                "native attachment needs commander seats; Horde spectators remain guarded".into(),
+            );
         }
         if state.start.players.len() != count
             || state.options.players.len() != count
@@ -1172,6 +1185,8 @@ impl Hub {
                 ingress: CommanderIngress::default(),
                 runtime,
                 startup,
+                watch_delivery: SnapshotDelivery::default(),
+                watch_started: false,
                 receipt: None,
                 loaded_save: false,
                 diagnostics: crate::diagnostics::RoomDiagnostics::default(),
@@ -1217,6 +1232,33 @@ impl Hub {
             if let Some(connection) = &room.players[slot].connection {
                 connection.send(start);
                 self.accounts.get_mut(&connection.id).unwrap().full_terrain = false;
+            }
+        }
+        if !room.spectators.is_empty() {
+            let native = room.native.as_mut().unwrap();
+            let names = room
+                .players
+                .iter()
+                .map(|p| p.name.clone())
+                .collect::<Vec<_>>();
+            match native
+                .runtime
+                .collect_watcher_start(&native.startup, &names, epoch)
+            {
+                Ok(start) => {
+                    if native.watch_started {
+                        native.watch_delivery.request_full();
+                    }
+                    for person in &room.spectators {
+                        if let Some(connection) = &person.connection {
+                            connection.send(start.clone());
+                            if let Some(pause) = &pause {
+                                connection.send(pause.clone());
+                            }
+                        }
+                    }
+                }
+                Err(error) => native.runtime.fault_stop(error),
             }
         }
         if let Some(receipt) = &room.native.as_ref().unwrap().receipt {
@@ -1414,6 +1456,49 @@ impl Hub {
         let ping = room.players.iter().map(Person::ping).collect::<Vec<_>>();
         let native = room.native.as_mut()?;
         let began = Instant::now();
+        if kind == FrameKind::Scheduled {
+            let mut watching = Vec::new();
+            for person in &room.spectators {
+                if let Some(connection) = person.connection.as_ref().filter(|c| c.ready()) {
+                    if connection.buffered_bytes()
+                        > crate::snapshot_backpressure::WATCH_BUFFER_LIMIT
+                    {
+                        connection.close(1013, "too far behind");
+                        dropped.push((room.code.clone(), connection.id));
+                    } else {
+                        watching.push(connection);
+                    }
+                }
+            }
+            if !watching.is_empty() {
+                let message = native
+                    .runtime
+                    .collect_watcher_frame()
+                    .and_then(|mut message| {
+                        message["online"] = json!(online);
+                        message["ping"] = json!(ping);
+                        native
+                            .watch_delivery
+                            .trim(ListScope::Personal, message)
+                            .map_err(|e| e.to_string())
+                    });
+                match message
+                    .and_then(|message| serde_json::to_string(&message).map_err(|e| e.to_string()))
+                {
+                    Ok(json) => {
+                        native.watch_started = true;
+                        let shared: Arc<str> = json.into();
+                        for connection in watching {
+                            connection.output(Output::Watcher(shared.clone()));
+                        }
+                    }
+                    Err(error) => {
+                        native.runtime.fault_stop(error);
+                        return None;
+                    }
+                }
+            }
+        }
         let captured = match native.runtime.collect_frame(selected, kind) {
             Ok(captured) => captured,
             Err(error) => {
@@ -1584,7 +1669,7 @@ impl Hub {
                     }
                 };
                 if let Some(message) = pause.message {
-                    for person in &room.players {
+                    for person in room.people() {
                         if let Some(connection) = &person.connection {
                             connection.send(message.clone());
                         }
@@ -1840,7 +1925,13 @@ impl Hub {
             "start" | "restart" => self
                 .start_trusted(code, connection_id, command == "restart", now)
                 .map(|_| ()),
-            "spectate" | "sit" => Err("R1 does not admit spectators".into()),
+            "sit"
+                if self.rooms.get(code).is_some_and(|room| {
+                    room.players.len() >= if room.mode == "horde" { 5 } else { 2 }
+                }) =>
+            {
+                return true;
+            }
             _ => return false,
         };
         if let Err(error) = result {
@@ -1884,16 +1975,15 @@ impl Hub {
             .encode_utf16()
             .take(40)
             .collect::<Vec<_>>();
-        if token.is_empty()
-            || msg["spectate"] == true
-            || msg.get("role").is_some_and(|role| role != "commander")
-        {
-            return Err("trusted room requires a commander seat token");
+        if token.is_empty() || msg.get("role").is_some_and(|role| role != "commander") {
+            return Err("trusted room requires a nonempty token");
         }
+
         if let Some(room) = self.rooms.get(code)
-            && !room.players.iter().any(|p| p.token == token)
-            && (room.native.is_some()
-                || room.players.len() >= if room.mode == "horde" { 5 } else { 2 })
+            && room.native.is_none()
+            && msg["spectate"] != true
+            && !room.people().any(|p| p.token == token)
+            && room.players.len() >= if room.mode == "horde" { 5 } else { 2 }
         {
             return Err("trusted commander roster is fixed");
         }
@@ -1930,6 +2020,19 @@ impl Hub {
                 return;
             }
             if self.trusted_command(code, connection.id, &msg, now) {
+                return;
+            }
+            if msg["t"] == "resync"
+                && let Some(room) = self.rooms.get_mut(code)
+                && room
+                    .spectators
+                    .iter()
+                    .any(|p| p.connection.as_ref().is_some_and(|c| c.id == connection.id))
+                && let Some(native) = &mut room.native
+            {
+                if native.watch_started {
+                    native.watch_delivery.request_full();
+                }
                 return;
             }
             if msg["t"] == "resync"
@@ -2085,7 +2188,7 @@ impl Hub {
             p.name = name;
             p.disconnected = None;
         } else {
-            if room.native.is_some() || room.starting.is_some() {
+            if room.starting.is_some() || (room.mode == "horde" && room.native.is_some()) {
                 connection.send(json!({"t":"deny","cmd":"join","reason":"blocked"}));
                 connection.close(1008, "native roster fixed");
                 return;
@@ -2104,12 +2207,12 @@ impl Hub {
                 diagnostics: crate::diagnostics::PlayerDiagnostics::default(),
                 last_match: None,
             };
-            if room.has_seat(&self.maps) && msg["spectate"] != true {
+            if room.native.is_none() && room.has_seat(&self.maps) && msg["spectate"] != true {
                 room.add_seat(p);
             } else if room.spectators.len() < MAX_SPECTATORS {
                 room.spectators.push(p);
             } else {
-                connection.send(json!({"t":"full","reason":"seats"}));
+                connection.send(json!({"t":"full","reason":if room.native.is_some() { "started" } else { "seats" }}));
                 connection.close(1000, "");
                 return;
             }
@@ -2118,15 +2221,44 @@ impl Hub {
             let slot = room
                 .players
                 .iter()
-                .position(|p| p.connection.as_ref().is_some_and(|c| c.id == connection.id))
-                .unwrap();
-            SnapshotAccount::start_stream(
-                &mut self.accounts,
-                connection.id,
-                code,
-                native.epoch,
-                slot,
-            );
+                .position(|p| p.connection.as_ref().is_some_and(|c| c.id == connection.id));
+            if let Some(slot) = slot {
+                SnapshotAccount::start_stream(
+                    &mut self.accounts,
+                    connection.id,
+                    code,
+                    native.epoch,
+                    slot,
+                );
+            } else {
+                let names = room
+                    .players
+                    .iter()
+                    .map(|p| p.name.clone())
+                    .collect::<Vec<_>>();
+                match native
+                    .runtime
+                    .collect_watcher_start(&native.startup, &names, native.epoch)
+                {
+                    Ok(start) => {
+                        if native.watch_started {
+                            native.watch_delivery.request_full();
+                        }
+                        prepared_start = Some((
+                            start,
+                            native
+                                .runtime
+                                .paused()
+                                .then(|| native.runtime.pause_message(now)),
+                        ));
+                    }
+                    Err(error) => {
+                        native.runtime.fault_stop(error);
+                        connection.close(1008, "native start unavailable");
+                        return;
+                    }
+                }
+            }
         }
         *joined = true;
         room.empty_since = None;
@@ -2135,19 +2267,22 @@ impl Hub {
             if let Some(pause) = pause {
                 connection.send(pause);
             }
-            self.accounts.get_mut(&connection.id).unwrap().full_terrain = false;
-            let slot = returning.expect("admitted returning commander");
-            let native = room.native.as_mut().unwrap();
-            match native.runtime.resume_drop(slot, now) {
-                Ok(Some(resume)) => {
-                    for person in &room.players {
-                        if let Some(connection) = &person.connection {
-                            connection.send(resume.clone());
+            if let Some(account) = self.accounts.get_mut(&connection.id) {
+                account.full_terrain = false;
+            }
+            if let Some(slot) = returning {
+                let native = room.native.as_mut().unwrap();
+                match native.runtime.resume_drop(slot, now) {
+                    Ok(Some(resume)) => {
+                        for person in room.people() {
+                            if let Some(connection) = &person.connection {
+                                connection.send(resume.clone());
+                            }
                         }
                     }
+                    Ok(None) => {}
+                    Err(error) => native.runtime.fault_stop(error),
                 }
-                Ok(None) => {}
-                Err(error) => native.runtime.fault_stop(error),
             }
         }
         // Source hello does not await lobby's map-list read, so reconnect start
@@ -2658,6 +2793,10 @@ mod seat_lifecycle_tests;
 #[cfg(test)]
 #[path = "room_human_ai_tests.rs"]
 mod room_ai_tests;
+
+#[cfg(test)]
+#[path = "spectator_tests.rs"]
+mod spectator_tests;
 
 #[cfg(test)]
 #[path = "save_load_tests.rs"]

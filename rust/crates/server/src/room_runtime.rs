@@ -63,6 +63,7 @@ pub struct RoomRuntime {
     human_ai: ai::RoomAi,
     state: Match,
     delivery: DeliveryState,
+    watchers: ww2_core::recipient_snapshot::SpectatorDelivery,
     lists: RoomListCache,
     meter: TickMeter,
     batch: u64,
@@ -114,6 +115,29 @@ impl RoomRuntime {
         }
         Ok(messages)
     }
+    pub(crate) fn collect_watcher_start(
+        &self,
+        startup: &crate::native_startup::NativeStartup,
+        names: &[String],
+        match_id: u64,
+    ) -> Result<Value, String> {
+        self.running()?;
+        let envelope = startup.envelope(&self.state, names, match_id)?;
+        let mut fresh = ww2_core::recipient_snapshot::SpectatorDelivery::default();
+        let mut snapshot = fresh
+            .capture(&self.state, &[], true)
+            .map_err(|e| format!("watcher start: {e:?}"))?;
+        snapshot["fog"] = Value::Null;
+        let mut start = envelope.message(0, snapshot);
+        start.as_object_mut().unwrap().remove("fog");
+        Ok(start)
+    }
+    pub(crate) fn collect_watcher_frame(&mut self) -> Result<Value, String> {
+        self.running()?;
+        self.watchers
+            .capture(&self.state, &self.pending_events, false)
+            .map_err(|e| format!("watcher snapshot: {e:?}"))
+    }
     pub fn new(mut state: Match, now_ms: u64) -> Result<Self, String> {
         state.validate_tick_state()?;
         state
@@ -127,6 +151,7 @@ impl RoomRuntime {
             state,
             human_ai: ai::RoomAi::default(),
             delivery,
+            watchers: Default::default(),
             lists: RoomListCache::default(),
             meter,
             batch: 0,

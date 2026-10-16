@@ -61,6 +61,7 @@ fn messages(hub: &mut Hub, rx: &mut mpsc::Receiver<Output>) -> Vec<Value> {
                 out.push(serde_json::from_str(&write.json).unwrap());
                 hub.complete_snapshot(&write, true, 0);
             }
+            Output::Watcher(_) => panic!("unexpected spectator snapshot on a seated connection"),
             Output::Close(code, reason) => panic!("unexpected close {code}: {reason}"),
         }
     }
