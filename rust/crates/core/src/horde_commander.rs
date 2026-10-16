@@ -280,7 +280,15 @@ impl HordeCommander {
     /// The live wave guard runs even between observations and before planning.
     pub fn act(&mut self, live: Live) -> Result<Vec<Command>, String> {
         let Some(wave) = self.delivered.as_ref().map(|view| view.wave) else {
-            self.clear();
+            // A restored queue waits for the first fresh observation. Only live
+            // termination or a changed wave can invalidate it before that view.
+            if live.winner
+                || !live.wave.is_some_and(|wave| {
+                    wave.slot == self.owner && wave.active && Some(wave.number) == self.wave
+                })
+            {
+                self.clear();
+            }
             return Ok(Vec::new());
         };
         if !self.active(live, wave) || !self.due(live.tick) || self.last_think == Some(live.tick) {

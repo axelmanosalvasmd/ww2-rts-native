@@ -527,8 +527,20 @@ mod tests {
         let observation = Observation::new(input).unwrap();
         let units = &observation.input().units;
         let available = [&units[0], &units[1], &units[2]];
-        assert_eq!(plan(&observation, &available, 200.0, &ground, |_| true).unwrap().unwrap().unit, 1);
+        assert_eq!(
+            plan(&observation, &available, 200.0, &ground, |_| true)
+                .unwrap()
+                .unwrap()
+                .unit,
+            1
+        );
         let available = [&units[2], &units[1], &units[0]];
-        assert_eq!(plan(&observation, &available, 200.0, &ground, |_| true).unwrap().unwrap().unit, 3);
+        assert_eq!(
+            plan(&observation, &available, 200.0, &ground, |_| true)
+                .unwrap()
+                .unwrap()
+                .unit,
+            3
+        );
     }
 }

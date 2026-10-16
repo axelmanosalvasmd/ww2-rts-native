@@ -308,13 +308,13 @@ fn if25_construction_builder_ties_keep_available_order_and_repairs_keep_observat
     let ground = terrain(&input);
     let observation = Observation::new(input).unwrap();
     let units = &observation.input().units;
-    let available = [ &units[1], &units[0] ];
+    let available = [&units[1], &units[0]];
     let result = plan(&observation, &available, 2000.0, false, &ground, |_| true).unwrap();
     assert_eq!(
         result.commands[0],
         serde_json::json!({"t":"assist","ids":[2],"id":10})
     );
-    let available = [ &units[0], &units[1] ];
+    let available = [&units[0], &units[1]];
     let result = plan(&observation, &available, 2000.0, false, &ground, |_| true).unwrap();
     assert_eq!(
         result.commands[0],

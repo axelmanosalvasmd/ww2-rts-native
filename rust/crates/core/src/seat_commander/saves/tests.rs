@@ -16,7 +16,7 @@ fn step(
     memory: &mut HumanObservationMemory,
 ) -> Option<Value> {
     let tick = state.world.game.tick as u64;
-    let delivered = (tick % 2 == 0 && seat.wants_view(tick as i64, true))
+    let delivered = (tick.is_multiple_of(2) && seat.wants_view(tick as i64, true))
         .then(|| Delivered::Human(Box::new(state.human_commander_observation(memory).unwrap())));
     let Advance::Human(advance) = state
         .advance_seat_commander(seat, delivered, tick, &[])
@@ -62,7 +62,6 @@ fn if27_save_continuation_keeps_planner_memory_and_resets_commander_attention() 
         .find(|u| u.owner == 1 && original.rules.kinds[u.kind].name == "rifle")
         .unwrap()
         .id;
-    let old_enemy_position = original.world.game.units[&enemy].at();
     {
         let unit = original.world.game.units.get_mut(&enemy).unwrap();
         unit.x = 36.0;
@@ -83,12 +82,6 @@ fn if27_save_continuation_keeps_planner_memory_and_resets_commander_attention() 
             .is_empty(),
         "the checkpoint must carry actual remembered enemy contacts"
     );
-    {
-        let unit = original.world.game.units.get_mut(&enemy).unwrap();
-        unit.x = old_enemy_position.x;
-        unit.z = old_enemy_position.z;
-        original.grid.update(enemy, unit);
-    }
     let ai = original.save_ai_memories_json(&[(&seat, &memory)]).unwrap();
     assert_ne!(
         ai, fresh,
@@ -147,7 +140,6 @@ fn if27_save_continuation_keeps_planner_memory_and_resets_commander_attention() 
         attempts += usize::from(a.is_some());
         assert_eq!(a, b);
         assert_eq!(snapshot(&mut original), snapshot(&mut loaded));
-        assert_eq!(original.save_json().unwrap(), loaded.save_json().unwrap());
         assert_eq!(
             original.save_ai_memories_json(&[(&seat, &memory)]).unwrap(),
             loaded
@@ -155,6 +147,7 @@ fn if27_save_continuation_keeps_planner_memory_and_resets_commander_attention() 
                 .unwrap()
         );
     }
+    assert_eq!(original.save_json().unwrap(), loaded.save_json().unwrap());
     assert!(
         attempts > 0,
         "continuation must exercise actual delayed commands"
@@ -284,12 +277,16 @@ fn if27_horde_pending_memory_round_trips_order_budget_and_supersession() {
     })).unwrap();
     assert_eq!(state.submit(live, command).unwrap().len(), 4);
     assert_eq!(state.pending(), 3);
-    let map = crate::map::AuthoritativeMap::from_json(&serde_json::to_vec(&serde_json::json!({
-        "name":"Horde memory checkpoint", "w":80, "h":80,
-        "rows":vec![".".repeat(80);80], "defend":[0],
-        "spawns":[{"x":40,"y":5},{"x":10,"y":74},{"x":70,"y":74}],
-        "points":[{"x":40,"y":5,"vp":1}]
-    })).unwrap()).unwrap();
+    let map = crate::map::AuthoritativeMap::from_json(
+        &serde_json::to_vec(&serde_json::json!({
+            "name":"Horde memory checkpoint", "w":80, "h":80,
+            "rows":vec![".".repeat(80);80], "defend":[0],
+            "spawns":[{"x":40,"y":5},{"x":10,"y":74},{"x":70,"y":74}],
+            "points":[{"x":40,"y":5,"vp":1}]
+        }))
+        .unwrap(),
+    )
+    .unwrap();
     let mut options = ordinary().options;
     options.mode = crate::economy::Mode::Horde;
     options.army = crate::economy_state::ArmySize::Standard;
@@ -300,8 +297,12 @@ fn if27_horde_pending_memory_round_trips_order_budget_and_supersession() {
     let memory = HumanObservationMemory::new(1);
     let saved = game.save_ai_memories_json(&[(&seat, &memory)]).unwrap();
     let saved = serde_json::from_slice(&serde_json::to_vec(&saved).unwrap()).unwrap();
-    let mut restored = game.restore_ai_memories_json(&saved, &[(1, Level::Hard)]).unwrap();
-    let Brain::Horde(ref mut loaded) = restored[0].0.brain else { panic!() };
+    let mut restored = game
+        .restore_ai_memories_json(&saved, &[(1, Level::Hard)])
+        .unwrap();
+    let Brain::Horde(ref mut loaded) = restored[0].0.brain else {
+        panic!()
+    };
     let mut expected = state.clone();
     expected.reset_saved_delivery();
     assert_eq!(*loaded, expected);

@@ -2,3 +2,5 @@
 - Fold signed zero and NaN in numeric coordinate keys, avoid overflowing quarter-metre cache keys, and compare deferred Horde plans using JSON number equality.
 - Add a private core codec for external AI policy and observation memory. Restore ordinary commander attention fresh, retain native routing and planner state, and keep existing version 1 saves readable. Hosted AI room save/load remains separate.
 - Leave IF-25 unproven as a full row because its inventory includes closed World paths. The sort audit also lists ordinary feature planners that still lack native implementations.
+- Check the continuation state at tick 320 and commands, planner memory and snapshots on every tick, avoiding repeated full checkpoint encoding.
+- Keep restored Horde pending orders while waiting for the first fresh observation; match termination or a changed wave still invalidates them.
