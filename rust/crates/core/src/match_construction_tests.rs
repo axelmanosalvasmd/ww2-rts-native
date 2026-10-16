@@ -290,6 +290,79 @@ fn captured_worker_health_and_pose_changes_do_not_recompute_crew_membership() {
     assert_eq!(m.commands.units[&id].build_target, Some(site));
 }
 #[test]
+fn log09_building_repair_uses_average_engineer_recovery_rate() {
+    let cases: &[(&[(f64, bool)], f64)] = &[
+        (&[(120., false)], 1.),
+        (&[(30., false)], 1.),
+        (&[(29., false)], 0.5),
+        (&[(0., false)], 0.),
+        (&[(120., true)], 0.),
+        (
+            &[(120., false), (29., false), (120., true), (0., false)],
+            0.375,
+        ),
+    ];
+    let catalog = Catalog::compiled().unwrap();
+    let full = number(catalog.unit("flakpos").unwrap(), "hpPer").unwrap();
+    let classic = catalog.table("CFG").unwrap().get("classic").unwrap();
+    for &(states, rate) in cases {
+        let (mut m, id) = scene();
+        let site = build(&mut m, id);
+        // Keep the paid site's damaged sections; author it as a completed repair target.
+        m.world.game.units.get_mut(&site).unwrap().built = Some(1.);
+        let mut workers = vec![id];
+        for index in 1..states.len() {
+            workers.push(add_worker(
+                &mut m,
+                Point {
+                    x: 28.,
+                    z: 24. + index as f64 * 0.25,
+                },
+            ));
+        }
+        assert_eq!(
+            m.execute_assist(
+                0,
+                &workers.iter().map(|&id| i64::from(id)).collect::<Vec<_>>(),
+                i64::from(site),
+                false,
+            )
+            .unwrap(),
+            None
+        );
+        m.options.logistics = true;
+        m.initialize_logistics().unwrap();
+        for (&worker, &(provisions, exhausted)) in workers.iter().zip(states) {
+            let reserves = m.logistics.get_mut(worker).unwrap();
+            reserves.provisions = provisions;
+            reserves.exhausted = exhausted;
+        }
+        let crew = math::pow(workers.len() as f64, number(classic, "crew").unwrap());
+        let repair = number(classic, "repair").unwrap() * crew;
+        let unpenalized = full * repair * m.rules.movement.tick;
+        let expected = full * (repair * rate) * m.rules.movement.tick;
+        let before = m.world.game.units[&site].hp;
+        assert!(full - before > unpenalized);
+        let available = states
+            .iter()
+            .map(|&(provisions, _)| provisions * 5.)
+            .sum::<f64>();
+        assert!(available == 0. || available > unpenalized);
+        let mut frame = m.begin_construction_tick().unwrap();
+        for worker in workers {
+            m.step_construction_worker(worker, &mut frame).unwrap();
+        }
+        m.finish_construction_tick(frame).unwrap();
+        let repaired = m.world.game.units[&site].hp - before;
+        assert!(
+            (repaired - expected).abs() < 1e-10,
+            "states={states:?}: repaired {repaired}, expected {expected}"
+        );
+        assert_eq!(m.world.game.units[&site].built, Some(1.));
+    }
+}
+
+#[test]
 fn crew_capacity_and_layer_admission_precede_progress_story_and_section_health() {
     let (mut m, id) = scene();
     let site = build(&mut m, id);

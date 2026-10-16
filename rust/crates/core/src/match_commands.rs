@@ -194,6 +194,8 @@ pub struct UnitControl {
     pub supply_hold: bool,
     pub supply_escape: bool,
     pub enter: Option<usize>,
+    /// Physical entry used for supply handoff while inside a house.
+    pub garrison_entry: Option<Point>,
     pub fire_at: Option<usize>,
     pub nade: Option<Point>,
     /// Recruitment marks a rally walk so queued orders do not interrupt it.
@@ -261,6 +263,7 @@ impl UnitControl {
             supply_hold: false,
             supply_escape: false,
             enter: None,
+            garrison_entry: None,
             fire_at: None,
             nade: None,
             rally_drift: false,
@@ -2286,6 +2289,22 @@ impl crate::match_runtime::Match {
         }
         let owner = unit.owner;
         let kind = unit.kind;
+        let before = unit.at();
+        let dt = self.rules.movement.tick;
+        let fuel_speed = self.logistics.get(id).and_then(|r| {
+            r.fuel.map(|fuel| {
+                let available = fuel
+                    + if r.forced {
+                        r.emergency.unwrap_or(0.0)
+                    } else {
+                        0.0
+                    };
+                crate::math::min(1.0, available / dt)
+            })
+        });
+        if fuel_speed.is_some() {
+            self.validate_supply()?;
+        }
         self.refresh_recipient_routing(owner)?;
         let query = self.recipients[owner].query();
         let terrain = query
@@ -2305,7 +2324,8 @@ impl crate::match_runtime::Match {
             self.recipients[owner].wrecks(),
         )
         .map_err(|e| format!("movement recipient traffic: {e:?}"))?;
-        let moved = crate::movement::move_unit_with_knowledge(
+        // The final multiplier applies after retreat/sprint select their speed.
+        let moved = crate::movement::move_unit_with_march(
             &mut self.world.game,
             &self.rules,
             &mut self.grid,
@@ -2362,8 +2382,17 @@ impl crate::match_runtime::Match {
                 }
             },
             &traffic_knowledge,
+            fuel_speed.unwrap_or(1.0),
         )
         .map_err(|e| format!("movement recipient traffic: {e:?}"))?;
+        if fuel_speed.is_some()
+            && let Some(result) = &moved
+        {
+            let unit = &self.world.game.units[&id];
+            let distance = crate::math::hypot(unit.x - before.x, unit.z - before.z);
+            let driving = crate::math::min(dt, distance / crate::math::max(result.speed, 0.001));
+            self.consume_unit_driving_fuel(id, driving)?;
+        }
         if let Some(error) = error {
             return Err(error);
         }

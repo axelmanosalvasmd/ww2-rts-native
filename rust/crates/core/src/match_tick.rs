@@ -563,8 +563,10 @@ impl crate::match_runtime::Match {
                 match self.apply_unit_riding(id, dt)? {
                     crate::match_carriers::RidingOutcome::Riding => continue,
                     crate::match_carriers::RidingOutcome::OnFoot => {}
-                    crate::match_carriers::RidingOutcome::UnsupportedEjection => {
-                        return Err("thrown carrier ejection tick phase is not connected".into());
+                    crate::match_carriers::RidingOutcome::Ejected(hurt) => {
+                        events.push(TickEvent::Environment(crate::environment::Effect::Hurt(
+                            hurt,
+                        )));
                     }
                 }
             }

@@ -56,6 +56,10 @@ impl Match {
                     .get(&carrier)
                     .filter(|parent| parent.hp > 0.0)
                 else {
+                    if self.combat.get(carrier).is_none() {
+                        self.prepare_carrier_ejection(id)?;
+                        continue;
+                    }
                     if self
                         .combat
                         .get(carrier)
@@ -73,6 +77,9 @@ impl Match {
                 if !self.combat.get(parent.id).unwrap().cargo.contains(&id) {
                     return Err("inconsistent reciprocal riding tick relation".into());
                 }
+                // A command or an earlier combat phase may wreck a currently live
+                // carrier. Admit its passenger's eventual physical exit as well.
+                self.prepare_carrier_ejection(id)?;
                 let cd = self
                     .abilities
                     .get(id)
