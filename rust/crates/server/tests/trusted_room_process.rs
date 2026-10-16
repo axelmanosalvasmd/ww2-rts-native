@@ -503,7 +503,7 @@ fn hosted_horde_binary_trusted_start_and_restart_reach_horde_owner() {
     let mut guest = Client::join(server.address, "b");
     host.send(json!({"t":"mode","v":"horde"}));
     let lobby = host.until(|m| m["t"] == "lobby" && m["mode"] == "horde");
-    assert_eq!(lobby["map"], "bastogne");
+    assert_eq!(lobby["mapName"], "bastogne");
     let mut previous_id = None;
     for command in ["start", "restart"] {
         host.send(json!({"t":command}));
