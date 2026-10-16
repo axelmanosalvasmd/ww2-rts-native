@@ -48,8 +48,9 @@ The coordinator owns review, runtime acknowledgment, parity status, hosted check
 Merge `f538b606` has parents `abadc492579e70b85484602341acf0d518fd058b`
 and `4edfcd5e8b795aa47fde114de7d51d7eb6430078` (#373). Its tree is
 `3dfd69d6a7f41d0721830bd6d881d40aa37e0c48`, identical to
-`git merge-tree --write-tree` for those parents. There were no conflicts or
-hand-edited merge hunks. Main's guards, assertions and test registrations survive.
+`git merge-tree --write-tree` for those parents. The automatic merge preserves
+main's guards, assertions and test registrations, with no conflicts or
+hand-edited merge hunks.
 
 The refresh extends the existing MODE-09 accepted-input handover test, retaining
 every original assertion. It now runs eight ordinary ticks with the returned
@@ -77,14 +78,15 @@ Both full rows remain partial:
   client owner. Prototype sources: `server.js:521-532,640-648` and
   `shared/ai.js:220-239`.
 
-Overlap: #342 changes `core/src/match_commander.rs` to consume detached seat
-delivery and also owns `ai_seat_view`, scheduler tests and Classic planning.
-Its scheduler and view infrastructure overlap the handover's eventual caller;
-it does not supply `handover_to_normal_ai`. ROOM-AI owns `server/src/lobby.rs`,
+Overlap: #342 changes `core/src/match_commander.rs` only to initialize the
+Classic shopping input's `claimed_nodes`, separate from the handover hunks. It
+also owns `ai_seat_view`, scheduler tests and Classic planning, and does not
+supply `handover_to_normal_ai`. ROOM-AI owns `server/src/lobby.rs`,
 `room_runtime.rs`, `room_ai.rs`, native startup and socket tests. It activates AI
-and handles departure/reconnect through recipient snapshots. Those changes are
-not imported here. Its recorded flight-delivery dependency is separate from
-this bounded core handover.
+and handles departure/reconnect through recipient snapshots, using
+`create_seat_commander` and `advance_seat_commander` rather than
+`handover_to_normal_ai`. Those changes are not imported here. Its recorded
+flight-delivery dependency is separate from this bounded core handover.
 
 Validation for this refresh is reported with the pushed head in the final
 handoff: focused core nextest at `-j4`, fmt and strict workspace Clippy from
