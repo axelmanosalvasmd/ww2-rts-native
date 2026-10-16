@@ -170,6 +170,10 @@ impl StartPlan {
         #[cfg(test)] replay: Option<crate::aligned_replay::Replay>,
     ) -> Result<Self, String> {
         let world_mode = matches!(&profile, StartupProfile::World(_));
+        // Validation permits saving authored missions. Their executor is not admitted yet.
+        if map.source().get("scenario").is_some() {
+            return Err("native startup does not yet execute authored scenarios".into());
+        }
         let horde_mode = matches!(&profile, StartupProfile::Horde);
         let defender_team = match &profile {
             StartupProfile::Assault { defender_team } => Some(*defender_team),

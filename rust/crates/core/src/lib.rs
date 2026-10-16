@@ -71,6 +71,10 @@ pub mod scenario_validation;
 pub(crate) mod existing_observers;
 pub mod logistics;
 pub mod map;
+pub mod map_authoring;
+pub mod map_save;
+#[cfg(test)]
+mod map_world_validation_tests;
 pub mod match_abilities;
 pub mod match_actor;
 pub mod match_aircraft_commands;
