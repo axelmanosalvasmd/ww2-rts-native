@@ -2,7 +2,6 @@
 use crate::{
     catalog::{Catalog, Value as Rule},
     commander_ai::{Level, Observation, Point, UnitObservation},
-    commander_mind::Mind,
     commander_tactics::{Context, Skill},
     economy::Mode,
     game::{CELL, MOVE},
@@ -183,7 +182,13 @@ struct Economy {
     budget: f64,
     reserve: f64,
 }
-fn economy(observation: &Observation, context: &Context, facts: &Facts) -> Result<Economy, String> {
+fn economy(
+    observation: &Observation,
+    context: &Context,
+    facts: &Facts,
+    available: &[&UnitObservation],
+    budget: f64,
+) -> Result<Economy, String> {
     let input = observation.input();
     let team = input.players[input.slot].team;
     let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
@@ -258,7 +263,7 @@ fn economy(observation: &Observation, context: &Context, facts: &Facts) -> Resul
     let mut plan = Economy {
         commands: vec![],
         builders: BTreeSet::new(),
-        budget: input.manpower,
+        budget,
         reserve: if next == Some("depot") { 0.0 } else { cost },
     };
     let terrain = crate::commander_tactics::sight_game(observation, context);
@@ -268,11 +273,13 @@ fn economy(observation: &Observation, context: &Context, facts: &Facts) -> Resul
             .is_some_and(|c| facts.visible_cells.contains(&c))
     };
     let mut claimed = BTreeSet::new();
-    for worker in own
-        .iter()
-        .copied()
-        .filter(|u| u.kind == "engineer" && !u.retreating && !u.riding && !u.build)
-    {
+    for worker in own.iter().copied().filter(|u| {
+        u.kind == "engineer"
+            && !u.retreating
+            && !u.riding
+            && !u.build
+            && available.iter().any(|worker| worker.id == u.id)
+    }) {
         let fix = own
             .iter()
             .copied()
@@ -371,19 +378,62 @@ pub fn plan(
     if input.players[input.slot].out {
         return Ok(vec![]);
     }
-    let mut next = state.clone();
-    let result = plan_inner(observation, context, facts, &mut next, level)?;
-    *state = next;
+    let mut shared = crate::commander_tactics::State {
+        world: state.clone(),
+        ..crate::commander_tactics::State::default()
+    };
+    let result = crate::commander_tactics::plan(
+        observation,
+        &[],
+        &mut shared,
+        level,
+        &mut crate::random::MatchRandom::new(0),
+    )?;
+    *state = shared.world;
     Ok(result)
 }
-fn plan_inner(
+
+/// World construction replaces only the construction stage of the shared commander.
+pub(crate) fn construction(
     observation: &Observation,
-    context: &Context,
-    facts: &Facts,
+    available: &[&UnitObservation],
+    budget: f64,
+) -> Result<crate::commander_construction::Plan, String> {
+    let context = observation
+        .input()
+        .runtime
+        .as_ref()
+        .ok_or("missing World context")?;
+    let facts = context
+        .world
+        .as_ref()
+        .ok_or("missing delivered World facts")?;
+    facts.validate(observation)?;
+    let result = economy(observation, context, facts, available, budget)?;
+    Ok(crate::commander_construction::Plan {
+        commands: result.commands,
+        remaining_mp: result.budget,
+        reserve: result.reserve,
+        builders: result.builders.into_iter().collect(),
+    })
+}
+
+/// Run after shared adaptive, defensive and wounded-unit decisions have claimed their actors.
+pub(crate) fn movement(
+    observation: &Observation,
     state: &mut State,
     level: Level,
+    mine: &[&UnitObservation],
+    available: &BTreeSet<u32>,
+    mut hands: usize,
 ) -> Result<Vec<Value>, String> {
     let input = observation.input();
+    let context = input.runtime.as_ref().ok_or("missing World context")?;
+    let facts = context
+        .world
+        .as_ref()
+        .ok_or("missing delivered World facts")?;
+    facts.validate(observation)?;
     let team = input.players[input.slot].team;
     let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
     let definition = |u: &UnitObservation| {
@@ -391,90 +441,8 @@ fn plan_inner(
             .unit(&u.kind)
             .expect("observation validated unit definition")
     };
-    let own: Vec<_> = input
-        .units
-        .iter()
-        .filter(|u| u.owner == input.slot && u.hp > 0.0)
-        .collect();
-    let mine: Vec<_> = own
-        .iter()
-        .copied()
-        .filter(|u| {
-            u.kind != "engineer"
-                && !flag(definition(u), "structure")
-                && !flag(definition(u), "rail")
-                && !flag(definition(u), "logisticsTruck")
-                && !context.units.get(&u.id).is_some_and(|f| f.convoy)
-        })
-        .collect();
     let skill = Skill::for_level(level);
-    let mut economy = economy(observation, context, facts)?;
-    if !own.iter().any(|u| u.kind == "engineer") || !own.iter().any(|u| u.kind == "hq") {
-        economy.commands.push(json!({"t":"recover"}));
-    }
-    let terrain = crate::commander_tactics::sight_game(observation, context);
-    let available: Vec<_> = own
-        .iter()
-        .copied()
-        .filter(|u| !economy.builders.contains(&u.id))
-        .collect();
-    let sees = |at: Point| {
-        owned_ground(facts, team, at)
-            && terrain
-                .cell_of(at.x, at.z)
-                .is_some_and(|c| facts.visible_cells.contains(&c))
-    };
-    let forts = crate::commander_fortification::plan_after_builds(
-        observation,
-        &available,
-        economy.budget,
-        economy.reserve,
-        0.0,
-        &terrain,
-        sees,
-        &mut state.fort_steps,
-        &economy.commands,
-    )?;
-    economy.commands.extend(forts.commands);
-    economy.builders.extend(forts.builders);
-    economy.budget = forts.remaining_mp;
-    let mut field_input = input.clone();
-    field_input.manpower = economy.budget;
-    let field_observation = Observation::new(field_input).map_err(|e| e.to_string())?;
-    economy.budget = crate::commander_field_policy::field_work(
-        &field_observation,
-        &mut state.field,
-        &mut economy.builders,
-        |raw| {
-            let accepted = crate::commander_field_policy::can_submit(&terrain, &raw, |at| {
-                terrain
-                    .cell_of(at.x, at.z)
-                    .is_some_and(|cell| facts.visible_cells.contains(&cell))
-            });
-            economy.commands.push(raw);
-            accepted
-        },
-    )?;
-    let shopping = crate::commander_shopping::plan(
-        observation,
-        &mine,
-        &[],
-        0,
-        &Mind::default(),
-        None,
-        economy.budget,
-        own.iter().filter(|u| u.kind == "engineer").count(),
-        (economy.reserve, forts.reserve),
-        level,
-    )?;
-    economy.commands.extend(
-        shopping
-            .commands
-            .into_iter()
-            .filter(|c| c["t"] != "recover"),
-    );
-    let mut commands = economy.commands;
-    let mut hands = skill.hands;
+    let mut commands = Vec::new();
     let regions: Vec<_> = facts
         .regions
         .iter()
@@ -499,9 +467,9 @@ fn plan_inner(
     let mut railed = BTreeSet::new();
     let mut boarding: BTreeMap<u32, usize> = BTreeMap::new();
     let cargo = |u: &UnitObservation| facts.units.get(&u.id).map_or(0, |f| f.cargo);
-    for u in &mine {
+    for u in mine {
         let d = definition(u);
-        if !idle(u, d) || economy.builders.contains(&u.id) || railed.contains(&u.id) {
+        if !idle(u, d) || !available.contains(&u.id) || railed.contains(&u.id) {
             continue;
         }
         let target = regions
@@ -540,7 +508,7 @@ fn plan_inner(
                 .iter()
                 .filter(|v| {
                     idle(v, definition(v))
-                        && !economy.builders.contains(&v.id)
+                        && available.contains(&v.id)
                         && !railed.contains(&v.id)
                         && distance(v.at, at.at) <= 30.0
                 })
@@ -575,7 +543,7 @@ fn plan_inner(
                     v.id != u.id
                         && flag(definition(v), "infantry")
                         && idle(v, definition(v))
-                        && !economy.builders.contains(&v.id)
+                        && available.contains(&v.id)
                         && distance(v.at, u.at) < 30.0
                         && far(v)
                 }))
@@ -607,7 +575,7 @@ fn plan_inner(
                             && number(cd, "carries") as usize
                                 > cargo(c) + boarding.get(&c.id).copied().unwrap_or(0)
                             && !flag(cd, "naval")
-                            && !economy.builders.contains(&c.id)
+                            && available.contains(&c.id)
                             && !railed.contains(&c.id)
                             && distance(c.at, u.at) < 30.0
                             && c.path.is_empty()

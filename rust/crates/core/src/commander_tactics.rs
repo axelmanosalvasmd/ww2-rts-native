@@ -367,8 +367,9 @@ fn plan_inner(
         .runtime
         .as_ref()
         .ok_or("missing delivered runtime context")?;
-    if context.mode == Mode::World {
-        return crate::commander_world_policy::plan(observation, &mut state.world, level);
+    let world_policy = context.mode == Mode::World && context.world.is_some();
+    if let Some(world) = context.world.as_ref().filter(|_| world_policy) {
+        world.validate(observation)?;
     }
     let me = &input.players[input.slot];
     if me.out {
@@ -411,6 +412,11 @@ fn plan_inner(
     let sight_game = sight_game(observation, context);
     let sight_rules = crate::rules::Rules::from_catalog(catalog).map_err(|e| e.to_string())?;
     let sees = |at: Point| {
+        if let Some(world) = context.world.as_ref().filter(|_| world_policy) {
+            return sight_game
+                .cell_of(at.x, at.z)
+                .is_some_and(|cell| world.visible_cells.contains(&cell));
+        }
         input.units.iter().any(|u| {
             if !allied(Some(u.owner)) {
                 return false;
@@ -482,6 +488,18 @@ fn plan_inner(
     let alive: BTreeSet<_> = owned.iter().map(|u| u.id).collect();
     state.supply_waiting.retain(|id| alive.contains(id));
     let mut commands = Vec::new();
+    if world_policy
+        && (!input
+            .units
+            .iter()
+            .any(|u| u.owner == input.slot && u.hp > 0.0 && u.kind == "engineer")
+            || !input
+                .units
+                .iter()
+                .any(|u| u.owner == input.slot && u.hp > 0.0 && u.kind == "hq"))
+    {
+        commands.push(json!({"t":"recover"}));
+    }
     let mut mine = Vec::new();
     let mut available_engineers = 0;
     let mut available_units = Vec::new();
@@ -551,14 +569,18 @@ fn plan_inner(
                         && dist(u.at, e.at) < 35.0
                 })
         });
-    let construction = crate::commander_construction::plan(
-        observation,
-        &available_units,
-        budget,
-        (adaptive || skill.memory) && strategic_recent.iter().any(|s| armor(&s.kind)),
-        &sight_game,
-        sees,
-    )?;
+    let construction = if world_policy {
+        crate::commander_world_policy::construction(observation, &available_units, budget)?
+    } else {
+        crate::commander_construction::plan(
+            observation,
+            &available_units,
+            budget,
+            (adaptive || skill.memory) && strategic_recent.iter().any(|s| armor(&s.kind)),
+            &sight_game,
+            sees,
+        )?
+    };
     budget = construction.remaining_mp;
     let build_reserve = if rush { 0.0 } else { construction.reserve };
     mine.retain(|u| !construction.builders.contains(&u.id));
@@ -575,7 +597,11 @@ fn plan_inner(
             tier_savings,
             &sight_game,
             sees,
-            &mut state.fort_steps,
+            if world_policy {
+                &mut state.world.fort_steps
+            } else {
+                &mut state.fort_steps
+            },
             &commands,
         )?;
         budget = fortification.remaining_mp;
@@ -591,7 +617,11 @@ fn plan_inner(
     let field_observation = Observation::new(field_input).map_err(|e| e.to_string())?;
     budget = crate::commander_field_policy::field_work(
         &field_observation,
-        &mut state.field,
+        if world_policy {
+            &mut state.world.field
+        } else {
+            &mut state.field
+        },
         &mut newly_busy,
         |raw| {
             let accepted = crate::commander_field_policy::can_submit(&sight_game, &raw, sees);
@@ -835,7 +865,12 @@ fn plan_inner(
         level,
     )?;
     let buy = shopping.buy;
-    commands.extend(shopping.commands);
+    commands.extend(
+        shopping
+            .commands
+            .into_iter()
+            .filter(|raw| !(world_policy && raw["t"] == "recover")),
+    );
     budget = shopping.remaining_mp;
     let mut support = SupportBudget {
         mp: budget,
@@ -960,6 +995,7 @@ fn plan_inner(
             }
         }
     }
+    let mut world_free = BTreeSet::new();
     for u in &mine {
         let d = definition(u);
         if boolean(d, "air") || u.riding || u.retreating || busy.contains(&u.id) {
@@ -988,6 +1024,10 @@ fn plan_inner(
                 attacks.push((u.id, at));
                 armed.insert(u.id);
             }
+            continue;
+        }
+        if world_policy {
+            world_free.insert(u.id);
             continue;
         }
         if let Some(i) = point_of(u.at)
@@ -1071,6 +1111,16 @@ fn plan_inner(
             load[i] += 1;
             pending[i].push(u);
         }
+    }
+    if world_policy {
+        commands.extend(crate::commander_world_policy::movement(
+            observation,
+            &mut state.world,
+            level,
+            &mine,
+            &world_free,
+            skill.hands.saturating_sub(hands),
+        )?);
     }
     let mut pushed = false;
     for (i, group) in pending.into_iter().enumerate() {
@@ -1213,7 +1263,7 @@ fn plan_inner(
     }
     let operation_observation = Observation::new(operation_input).map_err(|e| e.to_string())?;
     let live_sightings: Vec<_> = remembered.iter().map(|s| (*s).clone()).collect();
-    let operation = if context.horde {
+    let operation = if context.horde || world_policy {
         crate::commander_assault::Plan::default()
     } else {
         crate::commander_assault::plan(
