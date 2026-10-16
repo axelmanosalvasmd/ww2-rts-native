@@ -2472,5 +2472,9 @@ mod world_ground_actor_tests;
 mod mov_audit;
 
 #[cfg(test)]
+#[path = "audit_combat_native.rs"]
+mod audit_native;
+
+#[cfg(test)]
 #[path = "map_intent_batch2_tests.rs"]
 mod map_intent_batch2;

@@ -31,10 +31,10 @@ fn sha256_prefix(bytes: &[u8]) -> String {
         padded.push(0);
     }
     padded.extend_from_slice(&(bytes.len() as u64 * 8).to_be_bytes());
-    for block in padded.chunks_exact(64) {
+    for block in padded.as_chunks::<64>().0 {
         let mut words = [0_u32; 64];
-        for (word, bytes) in words[..16].iter_mut().zip(block.chunks_exact(4)) {
-            *word = u32::from_be_bytes(bytes.try_into().unwrap());
+        for (word, bytes) in words[..16].iter_mut().zip(block.as_chunks::<4>().0) {
+            *word = u32::from_be_bytes(*bytes);
         }
         for i in 16..64 {
             let a = words[i - 15];
