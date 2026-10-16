@@ -69,7 +69,7 @@ fn view(id: u32, owner: usize, kind: &'static str) -> UnitView<'static> {
         built: 1.,
     }
 }
-fn context(units: &[UnitView<'static>]) -> Context<'_> {
+fn context<'a>(units: &'a [UnitView<'static>]) -> Context<'a> {
     Context {
         mode: ModeContext {
             kind: Mode::Classic,

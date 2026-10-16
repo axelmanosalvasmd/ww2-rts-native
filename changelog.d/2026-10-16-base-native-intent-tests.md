@@ -1,2 +1,3 @@
 - Add 27 native BASE behavior checks for the owned production, construction, building, tech and mode rows under Axel's approved intent standard. Keep partial checks in progress with a literal row-to-test mapping and remaining scope.
 - Preserve the original 33 test bodies, all earlier Source recipes and fixtures, and the recorded 1243b165 result of 2 PASS, 1 FAIL and 2 UNRUN. No historical result qualifies this new source head.
+- Give the new native test context helper an explicit borrow lifetime after its first compile returned E0106. No test assertion, input or runtime behavior changes. All 27 tests remain unrun.

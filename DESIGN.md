@@ -4870,3 +4870,12 @@ new module has separate names. Existing recipes, fixtures, artifacts and the
 No new Source recorder, captured behavior fixture or provenance bundle is made.
 No Cargo or native test has run for this candidate. Root owns the next literal
 focused nextest grant, using --no-fail-fast to isolate failing rows in one job.
+
+The first corrected batch launch at b3d152c1 reached compilation and failed with
+E0106 in the new context helper at line 72. No test was selected or executed.
+The mechanical child names that helper's existing input/return borrow lifetime
+explicitly, exactly as the compiler suggested. Assertions and inputs are unchanged.
+The separate earlier launch rejected duplicate thread arguments before compilation.
+Both launchers are terminal and their inherited slot locks are released. Their
+normal logs remain in the original Root-owned paths. No rerun is authorized by
+this source fix; Root must issue a new literal grant for the resulting head.
