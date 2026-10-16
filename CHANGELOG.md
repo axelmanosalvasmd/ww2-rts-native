@@ -2,6 +2,10 @@
 
 Unreleased entries that are not yet collected live in `changelog.d/`, one file per change.
 
+- Fix a nested condition in the AI sighting test that strict Clippy rejected. The assertions and behavior are unchanged.
+
+- Add nine native tests for AI sightings, camera attention and paced inputs. The focused batch passes 14 tests; seven row intents are accepted for a separate status update after the test PR merges.
+
 ## Unreleased
 
 - Mark CMB-39/40/41/64/65/69 ported for their complete selected checks. Producing 39b004f2 passes the five granted simtests, renewed fmt and strict locked core/simtest all-target ci-test Clippy. Carry CMB-64's single PASS at daaa4743 and unchanged complete three-platform main components at 7a7348cb with their original attribution. Preserve the prior zero-ammo CMB-65 failure, all Acceptance cells and seven held owned rows; no runtime, fixture or Source change.
