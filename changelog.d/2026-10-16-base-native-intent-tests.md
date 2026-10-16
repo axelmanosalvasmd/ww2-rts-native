@@ -1,0 +1,1 @@
+- Add eight native BASE feature tests for economy changes, region capacity loss, starting army wallets and recruitment boundaries, with mappings for all 16 assigned BASE rows. Keep incomplete rows open and preserve prior fixtures and failures. Native execution and prototype review are pending.

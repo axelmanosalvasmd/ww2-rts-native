@@ -1,5 +1,25 @@
 # Three Crossroads Native: design decisions
 
+## BASE native intent test window (2026-10-16)
+
+Apply Axel's approved rules 1 to 5 from issue #5 comment 6206861267. The
+BASE_AUDIT contribution covers the 16 assigned remaining BASE rows through a
+literal row/test/prototype table in `docs/parity/bases.md`. Eight native tests
+use the existing economy, current-depot and recruitment APIs. They cover
+Conquest startup army scaling, cut points and catch-up, Classic depot
+completion/destruction payments, World region-income and capacity loss,
+Conquest population-two admission, refusal precedence and instant maker
+selection. Inputs describe component facts; they are not claimed as constructor
+history or client behavior. Existing exact table and component checks remain
+unchanged and mapped beside the behavior tests.
+
+Classic startup/ticking, Tutorial recruitment, live node claiming and owner
+recruit-card consumers remain explicit gaps. This change adds no provider,
+shipping behavior, interface or approval condition. Tests are implemented but
+unrun pending Root's new literal slot grant; no row is promoted before an actual
+pass and prototype review. Historical failures and artifacts are untouched.
+
+
 ## BASE13 authentic five-control capture (2026-10-16)
 
 At producing `d81312fd521a69cb8f249352da578e9995ec4af2`, Rust tree `cbe8a656644037f95ee29e1ce71a9ef2f78397f8`, Root's new exact S2 SourceMirror grant ran the maintained optional `--controls` generation once and its conditional byte check once. Both exited 0 against clean pinned `e4e579a`, including untracked files, with x64 Node 24.21.0. Each exercised five independent authored production inputs, 18 original Buy calls, 13 paid jobs, five refusals, ten direct availability and ten buyCount queries (20 underlying availability calls), zero ticks and zero draws. These inputs do not claim constructor history.
