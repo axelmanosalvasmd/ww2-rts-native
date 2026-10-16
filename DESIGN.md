@@ -16,6 +16,17 @@ Tutorial startup selects authored spawn indices 0 and 1 directly. It must not ma
 
 Threads replace the prototype's child processes and loopback socket replay. Private readiness and directory channels replace process IPC without adding socket messages. Immutable maps stay front-owned; native save records and map editing remain unavailable, so no record or map-invalidation protocol is introduced. Every worker retains the existing trusted-room code policy. Public start, command admission, World admission and logistics guards keep their existing scope.
 
+## Queued house entry snapshot compatibility (2026-10-16)
+
+Queued native Enter orders use the pinned prototype's existing garrison kind 9
+and stored house coordinates in the owner-only waiting-order row. Serialization
+accepts only the normalized singleton actor with `queue: false`, then applies the
+existing finite-coordinate and rounding checks. Activation, house selection and
+player command behavior stay with the canonical garrison owner. No wire meaning
+is added. A full ordinary match test keeps Enter queued behind movement, enters
+the house, captures an objective and earns a VP victory while delivering every
+seat's snapshot on each tick and during the ending hold.
+
 ## Tutorial runtime over existing Match systems (2026-10-16)
 
 The explicit `Match::new_tutorial` constructor adds the unattended Enemy seat and uses the existing `tutorial_steps` definitions. Tutorial shares the ordinary ground, routing, combat, objective and support systems. Its private step state owns only the current index, spawned IDs and pending dialogue. Lines leave through the core tick report from tick 40; no server or client transport is introduced. The runner advances at most one step per tick after capture and income, and finishes at the bridgehead through the common Match finish state.
@@ -85,6 +96,18 @@ Map authoring uses an in-memory draft separate from `World` and `Match`. Selecti
 The map loader now calls the scenario validator added in #298. A validated scenario can be edited and prepared for saving, but every startup profile rejects explicit authored scenarios before creating match state because their executor is absent. The previous fixture assertion that scenarios were unsupported by the loader now checks their retained definition. No command, event, flag or other live match state was added.
 
 `map_save::prepare_map_save` applies the prototype's save-field projection and an 8 MiB limit to incoming bytes before parsing, including discarded properties. It prepares bytes in memory and validates the projected document again. HTTP editor authorization, persistence and server integration remain absent, so MAP-23 remains component-only. The existing 16 MiB authoritative-loader limit is unchanged. Generated World documents are outside the demonstrated save scope. MAP-57's rendered-ground sampler and MAP-90's station-yard construction integration remain unimplemented; World admission stays guarded. MAP-92 retains field-specific diagnostics and stronger bounded integer checks for region IDs and ordered bounds, reported as differs candidates rather than approved differences.
+
+
+## Movement actors and review repairs (2026-10-16)
+
+The movement runtime connects house entry and exit, carrier wreck ejection, World train passengers and aircraft purchases, orders and weapon actuation to the existing Match owners. Game keeps pose and movement state; combat keeps carrier links; rail and aviation metadata keep their actor-specific lifecycle. Public ingress admission remains bounded by its existing gates.
+
+Rooms using ordinary recipient snapshots bind that capability limit to the Match at attachment. Their aircraft purchases return the existing unsupported denial before payment or publication, including orders queued before attachment, because even parked aircraft require rows this adapter cannot carry. Standalone aircraft actuation remains available. Aircraft projectile contacts retain the source kind's air flag, so hits on surviving vehicles do not create ground-fire reaction memory.
+
+Aircraft shots keep their true off-map origin and collision segment. Only the terrain-cell traversal is clipped to the battlefield, so off-map launches neither abort the tick nor shift the shot to an unrelated edge cell. This follows the same geometry rule as the combat runtime repair in PR #299. Wounded house occupants leave through the existing ground-exit path before automatic retreat. World elimination admits validated train links and retires their metadata with the removed actors. Mixed Attack selections send orders to both aircraft and ground actors through their existing command paths.
+
+The movement witnesses discover a narrow crossing from terrain, measure arrival against the retained destination, and require a directly hit tank to die under dive bombing. These are prototype-intent repairs, with no FFI, header, wire, contract or privacy change. Owner acknowledgment and broader client adoption remain separate from these focused native checks.
+
 
 
 ## First-five engineering merged with MAP273 main (2026-10-16, source only)

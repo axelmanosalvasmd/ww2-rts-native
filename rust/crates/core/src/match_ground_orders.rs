@@ -557,6 +557,46 @@ mod tests {
     }
 
     #[test]
+    fn mixed_ground_air_attack_orders_both_groups_immediately() {
+        mixed_ground_air_attack(false);
+    }
+
+    #[test]
+    fn mixed_ground_air_attack_queues_both_groups() {
+        mixed_ground_air_attack(true);
+    }
+
+    fn mixed_ground_air_attack(queue: bool) {
+        let mut m = scene();
+        let plane = m.spawn_aircraft(0, "attacker").unwrap();
+        let command = Command::Attack {
+            ids: vec![1, i64::from(plane)],
+            target: 3,
+            queue,
+            at: None,
+        };
+        assert_eq!(m.execute_command(0, &command, false), Ok(None));
+        if queue {
+            for id in [1, plane] {
+                assert!(
+                    matches!(
+                        m.commands.units[&id].orders.front(),
+                        Some(Command::Attack {
+                            target: 3,
+                            queue: false,
+                            ..
+                        })
+                    ),
+                    "selected actor {id} must retain its attack order"
+                );
+            }
+        } else {
+            assert_eq!(m.commands.units[&1].attack_id, 3);
+            assert_eq!(m.aviation.planes[&plane].mission.unwrap().target, Some(3));
+        }
+    }
+
+    #[test]
     fn attack_batch_preflights_metadata_and_repeated_path_capacity_before_follow() {
         let mut m = scene();
         let mut second = m.world.game.units[&1].clone();

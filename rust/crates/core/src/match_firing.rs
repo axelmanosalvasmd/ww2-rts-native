@@ -2333,6 +2333,7 @@ impl Match {
             || self.combat.get(id).is_none()
             || self.firing.get(id).is_none()
             || self.logistics.get(id).is_some_and(|r| !r.ammo.is_finite())
+            || (u.air.is_some() != flag(self.definition(u)?, "air"))
             || (self.rules.kinds[u.kind].air && !vision::airborne(u))
             || u.riding
             || ![at.x, at.z].iter().all(|v| v.is_finite())

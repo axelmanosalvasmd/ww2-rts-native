@@ -135,3 +135,69 @@ fn cmb160_armor_flank_front_and_explicit_launch_end_are_deterministic() {
     assert!(launch.velocity.x > 0.);
     assert_eq!(launch.velocity.z, 0.);
 }
+
+#[test]
+fn aircraft_projectile_contact_preserves_vehicle_hit_memory_and_idle_route() {
+    use crate::match_firing::LaunchEvent;
+
+    let mut m = scene(&[("tank", 0, 60., 40.), ("rifle", 1, 90., 40.)]);
+    let plane = m.spawn_aircraft(1, "attacker").unwrap();
+    let aircraft = m.world.game.units.get_mut(&plane).unwrap();
+    aircraft.air = Some(PlaneState::Station);
+    aircraft.x = 40.;
+    aircraft.z = 40.;
+    m.grid.rebuild(&m.world.game.units);
+    let old_from = Some(p(90., 40.));
+    let tank = m.world.game.units.get_mut(&1).unwrap();
+    tank.hp = 150.;
+    // Face the incoming round so the rear-hit multiplier cannot kill the witness.
+    tank.rot = std::f64::consts::PI;
+    tank.hit_from = old_from;
+    let old_tick = -1e9;
+    let memory = m.combat.get_mut(1).unwrap();
+    memory.hit_by = Some(2);
+    memory.hit_at = old_tick;
+    let control = m.commands.units.get_mut(&1).unwrap();
+    control.hold_fire = true;
+    control.react = 0.;
+    assert!(m.world.game.units[&1].path.is_empty());
+
+    // Use the seeded weapon launches and actual swept contact, including misses.
+    let mut hit = false;
+    for _ in 0..8 {
+        m.fire_weapon(plane, 1, false).unwrap();
+        assert!(!m.firing.flights.is_empty());
+        for _ in 0..80 {
+            if m.firing.flights.is_empty() {
+                break;
+            }
+            m.capture_firing_prior().unwrap();
+            m.world.game.tick += 1;
+            m.step_firing_flights().unwrap();
+        }
+        assert!(m.firing.flights.is_empty());
+        hit = m.firing.take_events().iter().any(|event| {
+            matches!(event, LaunchEvent::Contact(contact)
+                if contact.shooter == plane && contact.target == Some(1) && contact.hit)
+        });
+        if hit {
+            break;
+        }
+    }
+    assert!(hit, "the aircraft projectile must contact the tank");
+    assert!(m.world.game.units[&1].hp > 0.);
+    assert!(m.world.game.units[&1].hp < 150.);
+    assert_eq!(m.combat.get(1).unwrap().hit_by, Some(2));
+    assert_eq!(m.combat.get(1).unwrap().hit_at, old_tick);
+    assert_eq!(m.world.game.units[&1].hit_from, old_from);
+
+    m.react_unit(1).unwrap();
+    let tank = &m.world.game.units[&1];
+    assert!(
+        tank.path.is_empty(),
+        "aircraft fire must not cause an idle pullback"
+    );
+    assert_eq!(tank.reverse, None);
+    assert!(!tank.retreating);
+    assert_eq!(m.commands.units[&1].react, 0.);
+}

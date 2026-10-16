@@ -244,6 +244,190 @@ fn protected(runtime: &RoomRuntime) -> Vec<String> {
 }
 
 #[test]
+fn r1_aircraft_purchase_is_denied_without_charge_and_every_seat_keeps_snapshots() {
+    let purchase_ready = || {
+        let mut m = crate::lobby::native_tests::native_match();
+        m.production = ww2_core::production::ProductionState::new(vec![
+            ww2_core::economy::TechState::new(3, 0, 0, 0).unwrap();
+            2
+        ])
+        .unwrap();
+        for unit in m.world.game.units.values() {
+            if m.rules.kinds[unit.kind].building {
+                m.production.initialize_building(unit.id).unwrap();
+            }
+        }
+        m.start.economy.players[0].mp = 50_000.;
+        m.start.economy.players[0].fuel = 50_000.;
+        let field = m.next_unit_id;
+        let kind = m.rules.kind("airfield").unwrap();
+        let definition = Catalog::compiled().unwrap().unit("airfield").unwrap();
+        let size = definition.get("size").unwrap().number().unwrap() as usize;
+        let hp = definition.get("hpPer").unwrap().number().unwrap();
+        let g = &m.world.game;
+        let cells = (1..g.chars.len())
+            .filter(|cell| cell % g.w + size < g.w && cell / g.w + size < g.h)
+            .map(|cell| {
+                (0..size)
+                    .flat_map(|y| (0..size).map(move |x| cell + y * g.w + x))
+                    .collect::<Vec<_>>()
+            })
+            .find(|cells| {
+                let at = Point {
+                    x: (cells[0] % g.w) as f64 * ww2_core::game::CELL
+                        + size as f64 * ww2_core::game::CELL / 2.,
+                    z: (cells[0] / g.w) as f64 * ww2_core::game::CELL
+                        + size as f64 * ww2_core::game::CELL / 2.,
+                };
+                cells.iter().all(|&cell| {
+                    g.chars[cell] == b'.'
+                        && g.height.as_ref().is_none_or(|h| h[cell] == h[cells[0]])
+                }) && g
+                    .units
+                    .values()
+                    .all(|u| ww2_core::math::hypot(u.x - at.x, u.z - at.z) > 10.)
+            })
+            .unwrap();
+        let at = Point {
+            x: (cells[0] % g.w) as f64 * ww2_core::game::CELL
+                + size as f64 * ww2_core::game::CELL / 2.,
+            z: (cells[0] / g.w) as f64 * ww2_core::game::CELL
+                + size as f64 * ww2_core::game::CELL / 2.,
+        };
+        for &cell in &cells {
+            m.world.set_cell(cell, b'K').unwrap();
+        }
+        let mut draft = StagedUnit::ordinary(
+            &m.world.game,
+            &m.rules,
+            0,
+            kind,
+            field,
+            m.world.game.units.len() as u32,
+            m.start.players[0].spawn,
+            Some(at),
+        )
+        .unwrap();
+        draft.unit.built = Some(1.);
+        draft.unit.hp = hp;
+        draft.unit.cells = Some(cells.iter().map(|&cell| cell as u32).collect());
+        prepare_publication(
+            PublicationParts {
+                units: &mut m.world.game.units,
+                grid: &mut m.grid,
+                controls: &mut m.commands.units,
+                recruitment: &mut m.recruit_metadata,
+                next_id: &mut m.next_unit_id,
+            },
+            &m.rules,
+            2,
+            vec![draft],
+        )
+        .unwrap()
+        .publish_with(|unit, _| {
+            m.combat.initialize(unit.id).hit_by = Some(0);
+            m.firing.initialize(unit.id);
+            m.abilities.initialize(unit.id);
+            m.recovery.initialize(unit.id);
+            m.production.initialize_building(unit.id).unwrap();
+            m.building_rallies.insert(unit.id, None);
+        });
+        for &cell in &cells {
+            m.building_cells.insert(
+                cell,
+                ww2_core::match_runtime::BuildingCell {
+                    unit: field,
+                    owner: 0,
+                    at,
+                },
+            );
+        }
+        m.world
+            .register_building_structure(field, &cells, hp, hp)
+            .unwrap();
+        (m, field)
+    };
+
+    // These purchases pass ordinary economy/maker admission without a host binding.
+    let (mut standalone, field) = purchase_ready();
+    for kind in ["fighter", "attacker", "bomber"] {
+        standalone.recorded_buy(0, kind, Some(field)).unwrap();
+    }
+
+    let (mut m, field) = purchase_ready();
+    let buy = |kind: &str| Command::Buy {
+        kind: kind.into(),
+        from: Some(field),
+    };
+    // A command recorded before attachment must obey the host's later binding too.
+    m.enqueue_command(
+        OrderKey {
+            tick: 1,
+            issuer: 0,
+            sequence: 1,
+        },
+        buy("fighter"),
+    )
+    .unwrap();
+    let mut runtime = RoomRuntime::new(m, 0).unwrap();
+    let initial_id = runtime.state().next_unit_id;
+    let initial_count = runtime.state().world.game.units.len();
+    let selected = (0..2)
+        .map(|slot| SelectedSeat {
+            slot,
+            full: true,
+            omit: false,
+        })
+        .collect::<Vec<_>>();
+    for tick in 1..=9 {
+        if tick == 4 || tick == 8 {
+            runtime
+                .state_mut()
+                .enqueue_command(
+                    OrderKey {
+                        tick,
+                        issuer: 0,
+                        sequence: tick,
+                    },
+                    buy(if tick == 4 { "attacker" } else { "bomber" }),
+                )
+                .unwrap();
+        }
+        let before = runtime.state().start.economy.players[0].clone();
+        let story = format!("{:?}", runtime.state().story);
+        assert!(matches!(
+            runtime.state_mut().recorded_buy(0, "fighter", Some(field)),
+            Err(ww2_core::match_runtime::RecruitError::Placement(
+                ww2_core::produced_units::Error::UnsupportedAir
+            ))
+        ));
+        assert_eq!(runtime.state().start.economy.players[0], before);
+        assert_eq!(format!("{:?}", runtime.state().story), story);
+        let report = runtime.advance_tick(&[false; 2]).unwrap();
+        assert_eq!(report.tick, tick as i64);
+        if [1, 4, 8].contains(&tick) {
+            assert_eq!(report.commands.len(), 1);
+            assert_eq!(
+                report.commands[0].denial,
+                Some(ww2_core::match_commands::Denial::Unsupported)
+            );
+        }
+        for kind in [FrameKind::Current, FrameKind::Scheduled] {
+            let frames = runtime.collect_frame(&selected, kind).unwrap();
+            assert_eq!(
+                frames.iter().map(|frame| frame.slot).collect::<Vec<_>>(),
+                vec![0, 1]
+            );
+        }
+        assert!(runtime.fault().is_none());
+        assert!(runtime.state().tick_state.fault().is_none());
+        assert!(runtime.state().aviation.planes.is_empty());
+        assert_eq!(runtime.state().next_unit_id, initial_id);
+        assert_eq!(runtime.state().world.game.units.len(), initial_count);
+    }
+}
+
+#[test]
 fn real_launch_prefix_survives_host_fault_and_retry_refusal() {
     let mut m = arena(&[
         ("rifle", 0, Point { x: 25., z: 25. }),

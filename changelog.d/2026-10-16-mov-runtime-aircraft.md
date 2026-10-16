@@ -1,0 +1,4 @@
+- Fighters now steer toward the nearest visible enemy aircraft near their mission, with unit ID deciding equal distances.
+- Aircraft can launch physical ground shots and bomber salvo sticks during sorties. Mission orders admit these weapons. New native checks exercise sortie travel, targeting, fire cadence and anti-air damage.
+- Aircraft waiting orders now wait for an idle, fueled, armed sortie instead of blocking the aircraft tick.
+- Updated simtest preflight checks to admit aircraft weapons and waiting orders, and removed obsolete mixed-command rejection cases. Malformed aircraft state and unsupported retreat still reject before writes.

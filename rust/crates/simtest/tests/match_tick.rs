@@ -649,7 +649,7 @@ fn trusted_tick_scene_stages_clock_paths_and_empty_queue_without_replay() {
 }
 
 #[test]
-fn unsupported_reaction_actors_reject_before_clock_commands_or_timers() {
+fn garrison_retreat_ticks_and_unsupported_reaction_actors_reject_before_writes() {
     use ww2_core::{match_commands::Command, orders::OrderKey};
     let fixture: Value = serde_json::from_str(include_str!("fixtures/match-tick.json")).unwrap();
     for actor in [
@@ -747,11 +747,13 @@ fn unsupported_reaction_actors_reject_before_clock_commands_or_timers() {
             .collect::<Vec<_>>();
         if actor == "garrison" {
             m.grid.rebuild(&m.world.game.units);
+            m.validate_tick_state().unwrap();
             assert!(m.automatic_retreat_candidate(id).unwrap());
             let home = m.reaction_home(id).unwrap();
             let path_gen = m.world.game.units[&id].path_gen;
             for tick in 1..=3 {
                 let report = m.advance_tick().unwrap();
+                assert_eq!(report.tick, tick);
                 assert_eq!(m.world.game.tick, tick);
                 assert_eq!(report.commands.len(), usize::from(tick <= 2));
                 assert!(report.commands.iter().all(|result| result.denial.is_none()));
@@ -763,8 +765,11 @@ fn unsupported_reaction_actors_reject_before_clock_commands_or_timers() {
                 assert!(!unit.path.is_empty());
                 assert!(unit.sprint < 0.25);
                 assert!(m.commands.units[&id].react < 0.75);
-                assert!(m.firing.get(id).unwrap().cooldown < 1.0);
-                assert!(m.abilities.get(id).unwrap().cooldown < 2.0);
+                assert!(m.firing.get(id).unwrap().cooldown < firing.get(id).unwrap().cooldown);
+                assert!(
+                    m.abilities.get(id).unwrap().cooldown < abilities.get(id).unwrap().cooldown
+                );
+                assert_eq!(m.commands.next_tick(), Some(tick as u64 + 1));
                 assert_eq!(m.commands.pending_commands(), usize::from(tick == 1));
                 assert!(m.tick_state.fault().is_none());
                 let recipient = ww2_core::recipient_snapshot::SnapshotCache::new(&m)
@@ -790,7 +795,7 @@ fn unsupported_reaction_actors_reject_before_clock_commands_or_timers() {
                 }
                 "noninfantry riding" => "unsupported riding tick actor",
                 "reverse riding" | "idle suppression" => "invalid canonical carrier unit",
-                _ => "rail tick actor",
+                _ => "unregistered World train",
             }),
             "{actor}: {error}"
         );

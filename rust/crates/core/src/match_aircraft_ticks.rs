@@ -100,11 +100,6 @@ impl Match {
                     "aircraft turn conflicts with another actor owner",
                 ));
             }
-            if !control.orders.is_empty() {
-                return Err(AviationError::Unsupported(
-                    "queued aircraft turns are unavailable",
-                ));
-            }
             self.validate_aircraft_step(id, dt)?;
         }
         Ok(())
@@ -140,15 +135,7 @@ impl Match {
                 "aircraft turn conflicts with another actor owner",
             ));
         }
-        if !c.orders.is_empty() {
-            return Err(AviationError::Unsupported(
-                "queued aircraft turns are unavailable",
-            ));
-        }
         self.step_aircraft(id, dt)?;
-        if self.tick_state.aircraft_weapons_allowed() {
-            self.step_aircraft_weapons(id)?;
-        }
         Ok(true)
     }
 }
@@ -216,11 +203,10 @@ impl Match {
             let picked = self
                 .pick_firing_target(id)
                 .map_err(AviationError::Actuation)?;
-            self.aviation.attack_picks.insert(id, picked);
+            self.aviation.planes.get_mut(&id).unwrap().attack_pick = picked;
             self.firing.get_mut(id).unwrap().retarget = 0.5;
         }
-        let target =
-            ordered.unwrap_or_else(|| self.aviation.attack_picks.get(&id).copied().unwrap_or(0));
+        let target = ordered.unwrap_or(self.aviation.planes[&id].attack_pick);
         if target != 0
             && self
                 .can_shoot_target(id, target)
@@ -235,6 +221,8 @@ impl Match {
                     .map_err(AviationError::Actuation)?;
                 self.aviation.planes.get_mut(&id).unwrap().ammo -= 1.0;
             }
+        } else {
+            self.firing.get_mut(id).unwrap().target_id = 0;
         }
         Ok(())
     }

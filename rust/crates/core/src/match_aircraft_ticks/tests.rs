@@ -143,6 +143,7 @@ fn add_plane(m: &mut Match, name: &str, mission: PlaneMission) -> UnitId {
             timer: 0.0,
             orbit: 0.0,
             mission: Some(mission),
+            attack_pick: 0,
             downed: false,
         },
     );
@@ -214,12 +215,14 @@ fn cmb67_aircraft_fire_after_moving_prioritize_orders_and_obey_hold_fire() {
     m.step_aircraft_turn(id, 0.05).unwrap();
     assert_eq!(m.aviation.planes[&id].ammo, 5.0);
     // A cached automatic target leaving range does not trigger a fresh pick until the half-second beat.
-    let cached = m.aviation.attack_picks[&id];
+    let cached = m.aviation.planes[&id].attack_pick;
     m.world.game.units.get_mut(&cached).unwrap().x = 130.0;
     sight(&mut m);
     m.firing.get_mut(id).unwrap().cooldown = 0.0;
     m.step_aircraft_turn(id, 0.05).unwrap();
     assert_eq!(m.aviation.planes[&id].ammo, 5.0);
+    assert_eq!(m.firing.get(id).unwrap().target_id, 0);
+    assert_eq!(m.aviation.planes[&id].attack_pick, cached);
     assert!(m.firing.get(id).unwrap().retarget > 0.0);
     for _ in 0..10 {
         m.step_aircraft_turn(id, 0.05).unwrap();
