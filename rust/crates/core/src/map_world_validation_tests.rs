@@ -296,6 +296,7 @@ fn map92_raw_authoring_validation_preserves_prototype_acceptance_and_error_order
     assert_eq!(validate(&value), Ok(()));
 
     // Missing homes precede disconnected routes.
+    value["world"]["regions"][63]["x"] = json!(15);
     value["world"]["regions"][0]
         .as_object_mut()
         .unwrap()
@@ -305,6 +306,5 @@ fn map92_raw_authoring_validation_preserves_prototype_acceptance_and_error_order
     }
     rejects(&value, "each player needs one home");
     value["world"]["regions"][0]["home"] = json!(0);
-    value["world"]["regions"][63]["x"] = json!(15);
     rejects_route(&value);
 }
