@@ -240,15 +240,18 @@ impl Observation {
             .ok_or(PolicyError::Catalog)?;
         if let Some(context) = &input.runtime {
             let finite_point = |p: Point| p.x.is_finite() && p.z.is_finite();
-            if ![
-                context.munitions,
-                context.fuel,
-                context.sight,
-                context.build_reserve,
-                context.fort_reserve,
-            ]
-            .iter()
-            .all(|v| v.is_finite())
+            if ![context.munitions, context.fuel, context.sight]
+                .iter()
+                .all(|v| v.is_finite())
+                || context
+                    .owned_nodes
+                    .iter()
+                    .any(|i| *i >= context.nodes.len())
+                || context
+                    .nodes
+                    .iter()
+                    .chain(&context.known_depots)
+                    .any(|p| !finite_point(*p))
                 || context.height.as_ref().is_some_and(|h| h.len() != cells)
                 || context
                     .smokes

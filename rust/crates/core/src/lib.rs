@@ -30,6 +30,8 @@ pub mod client_view;
 pub mod combat;
 pub mod command_destinations;
 pub mod commander_ai;
+mod commander_construction;
+mod commander_fortification;
 mod commander_forward_hq;
 pub mod commander_mind;
 mod commander_shopping;
@@ -49,12 +51,14 @@ pub mod fog;
 pub mod formation;
 pub mod game;
 pub mod grid;
+pub mod horde_commander;
 pub mod human_commander;
 pub mod human_commander_inputs;
 pub mod human_commander_policy;
 pub mod human_commander_state;
 pub mod human_commander_timing;
 pub mod match_horde;
+pub mod recipient_availability;
 
 #[cfg(test)]
 use crate as core_api;
@@ -67,6 +71,7 @@ pub mod match_companion_effects;
 mod match_companion_tick;
 pub mod match_companions;
 pub mod scenario_validation;
+pub mod seat_commander;
 
 pub(crate) mod existing_observers;
 pub mod logistics;
