@@ -109,6 +109,11 @@ impl RoomRuntime {
             .collect())
     }
     pub fn new(mut state: Match, now_ms: u64) -> Result<Self, String> {
+        if state.options.mode == ww2_core::economy::Mode::Horde {
+            return Err(
+                "Horde rooms need complete projectile delivery and scripted scheduling".into(),
+            );
+        }
         state.tick_state.restrict_aircraft_weapons_for_delivery();
         state.validate_tick_state()?;
         state
