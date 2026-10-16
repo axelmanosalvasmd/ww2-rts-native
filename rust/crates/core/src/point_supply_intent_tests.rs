@@ -332,12 +332,9 @@ fn intent_log46_cut_removes_point_mp_vp_and_classic_team_munitions() {
             assert_eq!(earned[0][0].vp - earned[1][0].vp, 3.);
             assert_eq!(earned[1][0].vp, 0.);
         } else {
-            for slot in 0..2 {
-                assert!(
-                    earned[0][slot].mun > earned[1][slot].mun,
-                    "allied Classic slot {slot}"
-                );
-                assert_eq!(earned[0][slot].mp, earned[1][slot].mp);
+            for (slot, (supplied, cut)) in earned[0].iter().zip(&earned[1]).enumerate() {
+                assert!(supplied.mun > cut.mun, "allied Classic slot {slot}");
+                assert_eq!(supplied.mp, cut.mp);
             }
         }
     }
