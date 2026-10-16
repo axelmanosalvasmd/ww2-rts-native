@@ -39,6 +39,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("LISTENING http://{}", listener.local_addr()?);
     let config = Config {
         public_url: env::var("PUBLIC_URL").unwrap_or_default(),
+        diagnostic_dir: (env::var("WW2_DIAG").as_deref() == Ok("1")).then(|| "logs".into()),
+        tick_log: env::var("WW2_TICKLOG").as_deref() == Ok("1"),
         ..Config::default()
     };
     let shutdown = async {

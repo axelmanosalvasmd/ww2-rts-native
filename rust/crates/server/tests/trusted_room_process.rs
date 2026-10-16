@@ -367,3 +367,44 @@ fn ordinary_binary_genuine_mine_contact_latches_fault_and_refuses_restart() {
 
 #[path = "trusted_room_process/net2.rs"]
 mod net2;
+
+#[test]
+fn net97_ordinary_binary_environment_writes_private_diagnostics_while_r1_snapshots_continue() {
+    let dir = std::env::temp_dir().join(format!("ww2-net97-process-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let server = BinaryServer::start_with_diagnostics(true, SEED, Some(&dir));
+    let mut host = Client::join(server.address, "a");
+    let mut guest = Client::join(server.address, "b");
+    begin(&mut host, &mut guest);
+    host.send(json!({"t":"ping","c":1,"d":[60,17,3],"rtt":30}));
+    let file = dir.join("logs/diag-ABC.jsonl");
+    let began = std::time::Instant::now();
+    let line = loop {
+        // Ordered frames prove the room keeps running while waiting for actual recorder output.
+        host.until(|m| m["t"] == "s");
+        guest.until(|m| m["t"] == "s");
+        if let Ok(data) = std::fs::read_to_string(&file)
+            && let Some(line) = data.lines().next()
+            && let Ok(value) = serde_json::from_str::<Value>(line)
+        {
+            break value;
+        }
+        assert!(
+            began.elapsed() < std::time::Duration::from_secs(20),
+            "diagnostic output deadline: {}",
+            server.log()
+        );
+    };
+    assert_eq!(line["players"][0]["client"]["fps"], 60.0);
+    assert_eq!(line["players"][1]["client"], Value::Null);
+    assert!(line["tick"].as_u64().unwrap() >= 100);
+    assert!(line["tickP95"].as_f64().unwrap() >= 0.0);
+    for client in [&mut host, &mut guest] {
+        let snapshot = client.until(|m| m["t"] == "s");
+        assert!(snapshot.get("client").is_none() && snapshot.get("loopP99").is_none());
+        assert!(client.view.unit_count() > 0);
+    }
+    assert!(!server.log().contains("NATIVE_FAULT"));
+    drop(server);
+    std::fs::remove_dir_all(dir).unwrap();
+}
