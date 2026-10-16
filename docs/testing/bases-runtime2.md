@@ -16,4 +16,6 @@ All five tests live under `match_construction::native_intent::runtime2`:
 
 BASE-17 and the construction-mode research checks use the existing canonical production component over explicit actor facts. They do not admit Classic or World matches. BASE-45 uses the actual construction and convoy components; the full logistics tick guard remains in place and is asserted. BASE-49 and BASE-50 already have `ported` entries; this batch adds direct intent checks without editing their status.
 
+The first focused run compiled and selected all five tests: three passed and two failed. Its 16-cell sea lay entirely inside the 10-cell shore margin, leaving no legal Destroyer cell; the revised arena has a 40-cell sea and explicitly requires deep water. The cache setup expected an automatic truck without creating supply demand; the revised test calls the canonical `add_truck` producer through a test-only helper, as the prototype audit does. The existing nearest-free fallback can still return a blocked cell when no suitable cell exists. This batch leaves that behavior unchanged.
+
 Dropped from this batch: BASE-01 needs contract work for owner currency snapshots; BASE-02 needs the remaining mode startup paths; BASE-03 needs raw army-key normalization and those all-mode starting-wallet paths. The remaining assigned rows continue in the next batch.

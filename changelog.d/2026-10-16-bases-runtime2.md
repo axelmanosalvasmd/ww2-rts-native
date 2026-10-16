@@ -1,2 +1,3 @@
 - Allow Shipyards to be constructed on naval coasts and Supply Caches when logistics is enabled, using the existing paid site and builder phases. Inland Shipyards return `coast`; non-naval maps and logistics-disabled caches return `blocked` without payment.
 - Add direct intent tests for purchase validation, Shipyard construction and boat purchases, unfinished-cache supply refusal and completion, HQ tiers and Armory research (BASE-17, BASE-39, BASE-45, BASE-49, BASE-50). Full logistics ticks, other mode startup and currency snapshot changes remain separate.
+- Leave the existing naval spawn fallback unchanged when a map has no suitable water cell. The Shipyard test includes deep water for Destroyers; its first all-shoal setup exposed this limitation.

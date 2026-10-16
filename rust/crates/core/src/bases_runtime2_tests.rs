@@ -131,7 +131,13 @@ fn base39_coastal_shipyard_builds_and_launches_its_boats() {
     );
     for naval in [false, true] {
         let mut m = coastal_match(naval, false);
-        assert!(m.world.game.flags.iter().any(|flags| flags & (crate::game::LAND | crate::game::SHOAL) == 0));
+        assert!(
+            m.world
+                .game
+                .flags
+                .iter()
+                .any(|flags| flags & (crate::game::LAND | crate::game::SHOAL) == 0)
+        );
         let worker = own(&m, 0, "rifle");
         let mp = m.start.economy.players[0].mp;
         let next = m.next_unit_id;
@@ -176,7 +182,8 @@ fn base39_coastal_shipyard_builds_and_launches_its_boats() {
                     [(boat.z / 2.).floor() as usize * 128 + (boat.x / 2.).floor() as usize]
                     & crate::game::LAND,
                 crate::game::LAND,
-                "{kind} launched at {:?}", boat.at()
+                "{kind} launched at {:?}",
+                boat.at()
             );
             assert_eq!(
                 m.start.economy.players[0].mp,
@@ -196,7 +203,6 @@ fn base39_coastal_shipyard_builds_and_launches_its_boats() {
     }
     assert_eq!(m.production.player(0).unwrap().tech().tier(), 2);
     assert_eq!(dispatch(&mut m, 0, command), None);
-
 }
 
 fn nearby_cache(m: &mut Match, worker: u32) -> u32 {
@@ -249,7 +255,12 @@ fn base45_paid_cache_requires_logistics_and_serves_only_when_finished() {
     assert_eq!(off.start.economy.players[0].mp, mp);
     off.recorded_buy(0, "rifle", None).unwrap();
     assert!(off.start.economy.players[0].mp < 60.);
-    denied(&mut off, 0, json!({"t":"build","kind":"supplycache","ids":[worker],"x":24,"z":24}), "mp");
+    denied(
+        &mut off,
+        0,
+        json!({"t":"build","kind":"supplycache","ids":[worker],"x":24,"z":24}),
+        "mp",
+    );
     let mut opts = options(Mode::Conquest, false);
     opts.logistics = true;
     let mut m = Match::new(&map(), opts).unwrap();
@@ -270,7 +281,10 @@ fn base45_paid_cache_requires_logistics_and_serves_only_when_finished() {
     assert_eq!(m.world.game.units[&truck].path, unit.path);
     assert_eq!(m.world.game.units[&truck].world_goal, unit.world_goal);
     assert_eq!(m.start.economy, wallets);
-    assert_eq!(m.advance_tick().unwrap_err().reason, "reserve and convoy tick phases are not connected");
+    assert_eq!(
+        m.advance_tick().unwrap_err().reason,
+        "reserve and convoy tick phases are not connected"
+    );
     for _ in 0..241 {
         m.world.game.tick += 1;
         let mut frame = m.begin_construction_tick().unwrap();
@@ -279,10 +293,16 @@ fn base45_paid_cache_requires_logistics_and_serves_only_when_finished() {
     }
     assert_eq!(m.world.game.units[&cache].built, Some(1.));
     assert_eq!(m.world.game.units[&cache].hp, 400.);
-    assert!(!m.convoys.as_ref().unwrap().stores.iter().any(|s|s.entity == Some(cache)));
+    assert!(
+        !m.convoys
+            .as_ref()
+            .unwrap()
+            .stores
+            .iter()
+            .any(|s| s.entity == Some(cache))
+    );
     assert!(m.supply_convoys(0, &[truck], cache).unwrap());
     assert_eq!(m.start.economy.players[0].mp, mp - 60.);
-
 }
 
 fn research_context<'a>(units: &'a [UnitView<'static>], mode: Mode) -> Context<'a> {
@@ -315,7 +335,10 @@ fn base49_tiers_charge_pause_resume_and_survive_hq_loss() {
             units[0].built = 0.5;
             let c = research_context(&units, mode);
             let unchanged = (p.clone(), w.clone());
-            assert_eq!(p.request_research(&c, &mut w, 0, Technology::Tier), Err(Error::Denied(Denial::Needs)));
+            assert_eq!(
+                p.request_research(&c, &mut w, 0, Technology::Tier),
+                Err(Error::Denied(Denial::Needs))
+            );
             assert_eq!((p.clone(), w.clone()), unchanged);
             units[0].built = 1.;
             let c = research_context(&units, mode);
@@ -359,7 +382,6 @@ fn base49_tiers_charge_pause_resume_and_survive_hq_loss() {
         m.advance_tick().unwrap();
     }
     assert!(m.production.player(0).unwrap().jobs()[0].progress > 0.);
-
 }
 
 #[test]
@@ -416,7 +438,10 @@ fn base50_armory_lines_tier_capacity_prices_and_retained_progress() {
         let c = research_context(&units, mode);
         let paid = w.clone();
         for line in [Technology::Infantry, Technology::Guns, Technology::Armor] {
-            assert_eq!(p.request_research(&c, &mut w, 0, line), Err(Error::Denied(Denial::Max)));
+            assert_eq!(
+                p.request_research(&c, &mut w, 0, line),
+                Err(Error::Denied(Denial::Max))
+            );
         }
         assert_eq!(w, paid);
         let units = [view(1, 0, "armory"), view(2, 1, "armory")];
@@ -438,8 +463,10 @@ fn base50_armory_lines_tier_capacity_prices_and_retained_progress() {
         );
         assert_eq!(w, paid);
         let mut p = ProductionState::new(vec![TechState::new(2, 2, 0, 0).unwrap(); 3]).unwrap();
-        assert_eq!(p.request_research(&c, &mut w, 0, Technology::Infantry), Err(Error::Denied(Denial::Tier)));
+        assert_eq!(
+            p.request_research(&c, &mut w, 0, Technology::Infantry),
+            Err(Error::Denied(Denial::Tier))
+        );
         assert_eq!(w, paid);
-
     }
 }
