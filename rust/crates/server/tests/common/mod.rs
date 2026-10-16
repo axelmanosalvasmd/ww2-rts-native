@@ -100,9 +100,20 @@ pub struct BinaryServer {
 }
 impl BinaryServer {
     pub fn start(trusted: bool, seed: u64) -> Self {
-        Self::start_with_public_url(trusted, seed, None)
+        Self::start_with_options(trusted, seed, None, None)
+    }
+    pub fn start_with_diagnostics(trusted: bool, seed: u64, dir: Option<&std::path::Path>) -> Self {
+        Self::start_with_options(trusted, seed, dir, None)
     }
     pub fn start_with_public_url(trusted: bool, seed: u64, public_url: Option<&str>) -> Self {
+        Self::start_with_options(trusted, seed, None, public_url)
+    }
+    fn start_with_options(
+        trusted: bool,
+        seed: u64,
+        dir: Option<&std::path::Path>,
+        public_url: Option<&str>,
+    ) -> Self {
         let log = std::env::temp_dir().join(format!(
             "ww2-r1-{}-{}.log",
             std::process::id(),
@@ -113,8 +124,16 @@ impl BinaryServer {
             .args(["--bind", "127.0.0.1:0"])
             .env_remove("PUBLIC_URL")
             .env_remove("WW2_BIND")
+            .env_remove("WW2_DIAG")
+            .env_remove("WW2_TICKLOG")
             .stdout(Stdio::piped())
             .stderr(File::create(&log).unwrap());
+        if let Some(dir) = dir {
+            command
+                .current_dir(dir)
+                .env("WW2_DIAG", "1")
+                .env("WW2_TICKLOG", "1");
+        }
         if trusted {
             command.args(["--trusted-room", "ABC", "--seed", &seed.to_string()]);
         }
