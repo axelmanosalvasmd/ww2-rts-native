@@ -325,7 +325,10 @@ fn intent_log46_cut_removes_point_mp_vp_and_classic_team_munitions() {
             let catchup_per = cfg.get("catchupPer").unwrap().number().unwrap();
             let expected = 5. - 3. / catchup_per;
             assert!((earned[0][0].mp - earned[1][0].mp - expected).abs() < 1e-12);
-            assert_eq!(earned[1][0].mp, cfg.get("mpBase").unwrap().number().unwrap());
+            assert_eq!(
+                earned[1][0].mp,
+                cfg.get("mpBase").unwrap().number().unwrap()
+            );
             assert_eq!(earned[0][0].vp - earned[1][0].vp, 3.);
             assert_eq!(earned[1][0].vp, 0.);
         } else {

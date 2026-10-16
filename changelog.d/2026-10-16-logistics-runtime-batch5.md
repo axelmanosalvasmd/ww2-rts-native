@@ -1,7 +1,3 @@
 - Connect manual convoy retreat to the nearest active allied source, checking the full selection before changing routes and preserving carried stock. Keep full logistics ticks and complete logistics snapshots guarded.
-- Cover manual truck orders, scheduler alerts, point supply cuts and their income, radio, reinforcement and territory effects with component and Match adapter checks. Classic/World cache construction and train boarding remain held.
+- Add 25 intent tests for manual truck orders, scheduler alerts, point supply cuts and their income, radio, reinforcement and territory effects. Cover capture-square edges and the 40-tick supply beat. Classic/World cache construction and train boarding remain held.
 - Replace the test for unconditional convoy retreat refusal with atomic refusal when no supply source exists, including trucks beyond the ordinary troop selection cap.
-- Check capture-square edges and the tick 40/41 supply boundary, keeping unsupported mode refusals explicit.
-- Correct the new convoy test import and set an explicit truck position for nearest-source retreat.
-- Create canonical trucks explicitly in the Match adapter tests instead of assuming the fleet scheduler has already spawned them.
-- Keep test points on open ground with valid MP values, and account for convoy standoff distance and the prototype catch-up income rule in fixture expectations.

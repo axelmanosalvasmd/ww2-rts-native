@@ -31,7 +31,10 @@ point MP/VP, Classic allied Munitions and territory source exclusion. The existi
 `mode_point_services::mode24_depot_reinforces_and_repairs_only_allies_within_home_radius`
 checks cover radio cooldowns and reinforcement-base exclusion. Non-Conquest
 adapters remain guarded. Their refusal tests do not claim playable Horde,
-Tutorial, Classic or World logistics matches.
+Tutorial, Classic or World logistics matches. The existing
+`bases_batch3_economy::base05_supply_runs_on_the_forty_tick_beat_only_in_enabled_point_modes`
+checks enabled modes, disabled supply and the Horde/Tutorial/World exclusions
+through the scheduling helper now used by the Match adapter.
 
 LOG-20 remains held for Classic/World construction. Core tables list the cache
 and engineer builder, but those mode adapters do not execute construction with
