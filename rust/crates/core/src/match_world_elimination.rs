@@ -9,7 +9,7 @@ use crate::{
     match_world_regions::WorldCapture,
     world::WorldTransaction,
 };
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Transient phase output. Canonical ownership, health, terrain and metadata stay in Match.
 #[derive(Clone, Debug, Default)]
@@ -47,21 +47,24 @@ impl Match {
         &self,
         live_order: &[u32],
         regions: &[RegionState],
+        transfers: &BTreeMap<u32, usize>,
     ) -> Result<Option<WorldEliminationDraft>, String> {
         self.validate_world_live_order(live_order)?;
+        if transfers.iter().any(|(id, owner)| {
+            !self.world.game.units.contains_key(id) || *owner >= self.start.players.len()
+        }) {
+            return Err("invalid World fort transfer identity".into());
+        }
         let mut planned = Vec::new();
         // Source repeats this for already-out players too. It does not transfer to a teammate.
         for (slot, player) in self.start.economy.players.iter().enumerate() {
             if !regions.iter().any(|r| r.team == player.team) {
-                planned.extend(
-                    live_order
-                        .iter()
-                        .copied()
-                        .filter(|id| self.world.game.units[id].owner == slot),
-                );
+                planned.extend(live_order.iter().copied().filter(|id| {
+                    self.world.game.units[id].owner == slot && !transfers.contains_key(id)
+                }));
             }
         }
-        if planned.is_empty() {
+        if planned.is_empty() && transfers.is_empty() {
             return Ok(None);
         }
         for id in &planned {
@@ -96,8 +99,14 @@ impl Match {
             return Err("unsupported World building elimination: current cargo and riders".into());
         }
         let mut transaction = self.world.begin_transaction().map_err(|e| e.to_string())?;
+        for (&id, &owner) in transfers {
+            transaction.world.game.units.get_mut(&id).unwrap().owner = owner;
+        }
         let mut environment = self.environment.clone();
         let mut grid = self.grid.clone_for_transaction();
+        for &id in transfers.keys() {
+            grid.update(id, &transaction.world.game.units[&id]);
+        }
         let mut combat = self.combat.clone();
         let mut seed = self.start.environment_seed;
         let mut next_id = self.next_unit_id;

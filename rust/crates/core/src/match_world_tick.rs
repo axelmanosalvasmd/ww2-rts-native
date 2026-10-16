@@ -138,34 +138,22 @@ impl Match {
                 validate_world_future_birth(&self.rules, &job.kind)?;
             }
         }
-        self.validate_world_tick_region_consequences()?;
-        let ids = self.world.game.units.keys().copied().collect::<Vec<_>>();
-        self.validate_dead_retirement(&ids, boundary)
-            .map_err(|error| format!("World retirement admission: {error:?}"))?;
-        self.prepare_recovery(&ids)?;
-        Ok(())
-    }
-
-    /// A region can advance by at most one capture increment in this tick.
-    /// Refuse an unrepresented fort transfer before commands, even if the fort dies later.
-    fn validate_world_tick_region_consequences(&self) -> Result<(), String> {
-        let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
-        let span = catalog
+        let capture_time = catalog
             .table("CFG")
             .map_err(|e| e.to_string())?
             .get("captureTime")
             .and_then(Value::number)
             .filter(|time| time.is_finite() && *time > 0.0)
             .ok_or("invalid World capture duration")?;
-        let rate = self.rules.movement.tick / span;
-        if !rate.is_finite() || !(0.0..1.0).contains(&rate) {
+        let capture_rate = self.rules.movement.tick / capture_time;
+        if !capture_rate.is_finite() || !(0.0..1.0).contains(&capture_rate) {
             return Err("World capture interval exceeds the bounded tick admission".into());
         }
         let runtime = self
             .world_runtime
             .as_ref()
             .ok_or("missing World tick runtime")?;
-        for (index, region) in runtime.regions.iter().enumerate() {
+        for region in &runtime.regions {
             if !region.progress.is_finite()
                 || !(0.0..=1.0).contains(&region.progress)
                 || !(-1..6).contains(&region.team)
@@ -175,25 +163,11 @@ impl Match {
             {
                 return Err("invalid World tick region progress".into());
             }
-            // Owned regions only neutralize this step. A new or changed capper resets
-            // progress to zero, so only this retained capper can complete at the limit.
-            let Some(owner) = region
-                .capper
-                .filter(|_| region.team < 0 && region.progress + rate >= 1.0)
-            else {
-                continue;
-            };
-            for unit in self.world.game.units.values() {
-                if unit.hp > 0.0
-                    && ["pillbox", "tower", "wall", "gate"]
-                        .contains(&self.rules.kinds[unit.kind].name.as_str())
-                    && !self.world.game.allied(unit.owner, owner)
-                    && self.world_region_index(unit.at())? == Some(index)
-                {
-                    return Err("World fort capture tick actuator is not connected".into());
-                }
-            }
         }
+        let ids = self.world.game.units.keys().copied().collect::<Vec<_>>();
+        self.validate_dead_retirement(&ids, boundary)
+            .map_err(|error| format!("World retirement admission: {error:?}"))?;
+        self.prepare_recovery(&ids)?;
         Ok(())
     }
 

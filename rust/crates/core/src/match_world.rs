@@ -814,3 +814,7 @@ fn world_find_site(
     }
     None
 }
+
+#[cfg(test)]
+#[path = "bases_batch4_fort_tests.rs"]
+mod bases_batch4_fort_tests;

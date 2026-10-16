@@ -4845,3 +4845,7 @@ prototype's `Object.hasOwn(unitTypes, v)` and `unitTypes[v]` coerce that array t
 the property name `"rifle"`. This stricter choice rejects malformed schema values
 instead of carrying JavaScript property-key coercion into the native validator.
 It does not admit or execute general authored scenarios.
+
+## Transactional World fort capture (2026-10-16)
+
+Stage a region's fort-owner changes before computing army elimination. An enemy fort captured on the same step that its former owner loses their last region belongs to the captor and survives the administrative removal. Prepare finish facts from those exact staged owners, then publish the unit, grid, matching footprint and currently visible remembered owner changes together. Preserve HP, physical sections, missing footprint entries and replacement buildings. Gate physics, World snapshots and hosted World admission remain guarded.

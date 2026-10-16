@@ -1,0 +1,3 @@
+- Transfer captured World forts at their current HP, retaining their footprint and grid ownership through army elimination. Keep replacement footprint records and refuse failed transactions without changing owners.
+- Update the existing World capture and finish oracle tests to compare fort-owner changes against their recorded prototype results.
+- Leave convoy retreat routing for an owner decision: an obstructed source can leave its route endpoint 4 m from the centre and refuse the return.
