@@ -30,4 +30,8 @@ Next rows: MAP-19, MAP-92, MAP-15, MAP-23, MAP-57 and MAP-90. MAP-22, MAP-59 and
 
 ## Validation
 
-On the initial main base `09e03d07`, all eight focused tests pass (Nextest run `55c494da-4a0e-4aab-a0e1-e2ffc259bbf0`). Formatting was applied in S2 on the Vostro, with four build jobs, a 6 GiB memory cap and no swap. Final merged-main checks are pending.
+At producer `119f53feb87d25e3eaed0d41f2f52f3f4620f15e`, after merging main `d505e6eb`, all eight focused checks pass (Nextest run `2398fc73-6a5e-4f08-84fa-ecf8ff0a73f6`). Formatting and strict workspace/all-target Clippy also pass. The tested Rust tree is `6156de4b77eacf6fc9adc3d05797fae9ad5a47cb`; the final documentation commit preserves it exactly.
+
+The preceding integration through main `2564cdaf` passed 45 focused and regression checks, including shared engineering, public catalogue delivery and real socket startup/reconnect (Nextest run `f987e45a-fb2b-4cfe-ba4e-ed38f161532d`, Rust tree `50a259e8e7f6f3d014424c34d74d85973f9c11fa`). Those results remain attributed to that tree. All Cargo jobs ran on the Vostro in locked S1/S2 slots, with four build jobs, a 6 GiB memory cap and no swap. Slots were released on exit.
+
+Independent source review accepts the five row mappings. The material projection's literal expectations also pass against pinned `mapForClient`. No behavior recorder or captured fixture was added.
