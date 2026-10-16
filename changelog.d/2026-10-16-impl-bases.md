@@ -1,0 +1,2 @@
+- Add 18 native BASE tests using existing production and Match APIs. Strengthen Classic/World queue selection, payment and refusal checks, and cover owned scuttling without refund or bounty. Keep 16 partial row witnesses and nine missing-runtime rows explicitly incomplete.
+- Record final Vostro validation: all 18 focused tests, formatting and strict workspace Clippy pass. Prototype-intent review accepts BASE-20 and BASE-32; other rows retain their documented gaps.
