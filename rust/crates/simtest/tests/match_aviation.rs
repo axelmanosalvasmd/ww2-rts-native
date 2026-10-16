@@ -371,7 +371,6 @@ fn unsupported_mixed_aircraft_selections_reject_before_supply_or_control_writes(
         json!({"t":"stop","ids":[1002,1000]}),
         json!({"t":"attack","ids":[1002,1000],"target":1002}),
         json!({"t":"move","queue":true,"orders":[[1002,20,21],[1000,22,23]]}),
-        json!({"t":"retreat","ids":[1000,1002]}),
         json!({"t":"stance","ids":[1002,1000],"key":"holdFire","on":false}),
     ];
     for (index, raw) in commands.iter().enumerate() {

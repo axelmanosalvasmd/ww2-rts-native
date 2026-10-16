@@ -1,0 +1,4 @@
+- Dispatch compound troop orders through the ordinary command owner, preserving the outer queue choice, issuer, eight-part limit and first refusal when every part fails.
+- Let one Retreat order return aircraft home and route ground units home together. Working builders stop without refunding or removing their unfinished site. Replace the obsolete mixed-retreat refusal case with a native positive check.
+- Add native coverage for World neutral guards' line of sight, building observers and loss of visibility beyond range, plus command delegation to the existing field-work and off-map support owners. Queued standalone Dig remains guarded.
+- Aircraft Hold Fire completion still waits on PR #299's shared air firing. Classic ability payment and building ghosts, Horde wave visibility and broader recipient delivery remain outside this batch.

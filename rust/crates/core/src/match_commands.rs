@@ -67,6 +67,10 @@ pub enum Stance {
 /// Internal recorded input. This is not a WebSocket or C interface.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Command {
+    Compound {
+        commands: Vec<serde_json::Value>,
+        queue: bool,
+    },
     Build {
         ids: Vec<i64>,
         kind: String,
@@ -409,6 +413,17 @@ impl Command {
                 rows.iter().map(|v| safe_id(v).unwrap_or(-1)).collect()
             });
         match object.get("t").and_then(|v| v.as_str()) {
+            Some("orders") => Ok(Self::Compound {
+                commands: object
+                    .get("commands")
+                    .and_then(|v| v.as_array())
+                    .ok_or(Denial::Blocked)?
+                    .iter()
+                    .take(8)
+                    .cloned()
+                    .collect(),
+                queue: object.get("queue").and_then(|v| v.as_bool()) == Some(true),
+            }),
             Some("build" | "assist") => {
                 let at = object
                     .get("x")
@@ -822,6 +837,9 @@ impl crate::match_runtime::Match {
         if matches!(command, Command::Unsupported) {
             return Ok(Some(Denial::Unsupported));
         }
+        if let Command::Compound { commands, queue } = command {
+            return self.execute_compound_orders(owner, commands, *queue, winner_decided);
+        }
         self.validate_building_activity_rows()?;
         if let Command::Build {
             ids,
@@ -852,16 +870,8 @@ impl crate::match_runtime::Match {
         {
             return self.ground_attack_command(owner, ids, *target, *queue);
         }
-        if let Command::Retreat { ids } = command
-            && !ids
-                .iter()
-                .take(50.max(self.world.game.units.len()))
-                .any(|raw| {
-                    self.eligible_command_unit(*raw, owner, command)
-                        .is_some_and(|id| self.is_aircraft_command_unit(id))
-                })
-        {
-            return self.ground_retreat_command(owner, ids);
+        if let Command::Retreat { ids } = command {
+            return self.retreat_command(owner, ids);
         }
         if let Command::Destroy { ids, id } = command {
             return self.execute_destroy(owner, ids, *id);
@@ -971,7 +981,8 @@ impl crate::match_runtime::Match {
             | Command::Attack { ids, .. }
             | Command::Escort { ids, .. }
             | Command::Retreat { ids } => ids.clone(),
-            Command::Build { .. }
+            Command::Compound { .. }
+            | Command::Build { .. }
             | Command::Assist { .. }
             | Command::Destroy { .. }
             | Command::Board { .. }
@@ -1327,7 +1338,8 @@ impl crate::match_runtime::Match {
                     self.commands.units.get_mut(&id).unwrap().auto_cast = *on;
                 }
             }
-            Command::Build { .. }
+            Command::Compound { .. }
+            | Command::Build { .. }
             | Command::Assist { .. }
             | Command::Destroy { .. }
             | Command::Board { .. }
@@ -2196,6 +2208,9 @@ impl crate::match_runtime::Match {
         result.map_err(|e| format!("command path request: {e:?}"))
     }
 }
+
+#[path = "match_compound_orders.rs"]
+mod compound;
 
 #[cfg(test)]
 mod tests;

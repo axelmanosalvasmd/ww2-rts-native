@@ -1290,3 +1290,12 @@ fn cmb101_formation_shapes_rear_ranks_drag_and_spread() {
 
 #[path = "combat_feature_tail_tests.rs"]
 mod tail;
+
+#[path = "combat_runtime3_tests.rs"]
+mod runtime3;
+
+#[path = "combat_field_work_command_tests.rs"]
+mod field_work_commands;
+
+#[path = "combat_support_command_tests.rs"]
+mod support_commands;

@@ -7,6 +7,45 @@ use serde_json::{Value, json};
 use ww2_core::match_tick::{TickEvent, TickPhase};
 
 #[test]
+fn cmb137_world_recorded_compound_moves_pass_the_existing_actuator_boundary() {
+    use ww2_core::{match_commands::Command, orders::OrderKey};
+    let fixture = common::fixture();
+    let case = &fixture["cases"][0];
+    for unsupported in [false, true] {
+        let mut m = common::construct(&fixture, case).unwrap();
+        let unit = m.world.game.units.values().find(|u| {
+            u.owner == 0 && !m.rules.kinds[u.kind].structure && u.air.is_none()
+        }).unwrap();
+        let id = unit.id;
+        let at = unit.at();
+        let mut parts = vec![
+            json!({"t":"move","orders":[[id,"invalid",at.z]]}),
+            json!({"t":"move","orders":[[id,at.x,at.z]],"queue":true}),
+            json!({"t":"amove","orders":[[id,at.x,at.z]],"queue":true}),
+        ];
+        if unsupported {
+            parts.push(json!({"t":"board","ids":[id],"target":999999}));
+        }
+        let tick = m.world.game.tick;
+        let key = OrderKey { tick: tick as u64 + 1, issuer: 0, sequence: 0 };
+        m.enqueue_command(key, Command::from_json(&json!({"t":"orders","queue":false,"commands":parts})).unwrap()).unwrap();
+        let before = format!("{:?}", (&m.world.game.units, &m.commands.units));
+        if unsupported {
+            let error = m.advance_tick().unwrap_err();
+            assert!(format!("{error:?}").contains("World command requires an unrepresented tick actuator"));
+            assert_eq!(m.world.game.tick, tick);
+            assert_eq!(format!("{:?}", (&m.world.game.units, &m.commands.units)), before);
+        } else {
+            let report = m.advance_tick().unwrap();
+            assert_eq!(report.tick, tick + 1);
+            assert_eq!(report.commands.len(), 1);
+            assert_eq!(report.commands[0].key, key);
+            assert_eq!(report.commands[0].denial, None);
+        }
+    }
+}
+
+#[test]
 fn lossless_oracle_numbers_survive_parent_replacement_and_deletion() {
     let mut image = unpack(
         &json!({"raw":{"tick":0,"values":[null,0,null,null],"old":1},"numberBits":{
