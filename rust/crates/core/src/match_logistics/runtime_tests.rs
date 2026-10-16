@@ -18,12 +18,13 @@ pub(super) fn arena_with_barrier(enabled: bool, barrier: bool) -> Match {
     if barrier {
         row.replace_range(40..42, "WW");
     }
+    let point_x = if barrier { 36 } else { 40 };
     let map = AuthoritativeMap::from_json(
         &serde_json::to_vec(&json!({
             "name": "logistics runtime arena", "w": 80, "h": 80,
             "rows": vec![row; 80],
             "spawns": [{"x":12,"y":40},{"x":68,"y":40}],
-            "points": [{"x":40,"y":8,"vp":0,"mp":0}], "defend":[0]
+            "points": [{"x":point_x,"y":8,"vp":0,"mp":0}], "defend":[0]
         }))
         .unwrap(),
     )

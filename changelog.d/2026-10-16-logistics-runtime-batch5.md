@@ -4,3 +4,4 @@
 - Check capture-square edges and the tick 40/41 supply boundary, keeping unsupported mode refusals explicit.
 - Correct the new convoy test import and set an explicit truck position for nearest-source retreat.
 - Create canonical trucks explicitly in the Match adapter tests instead of assuming the fleet scheduler has already spawned them.
+- Keep test points on open ground with valid MP values, and account for convoy standoff distance and the prototype catch-up income rule in fixture expectations.

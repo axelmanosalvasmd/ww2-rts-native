@@ -1,5 +1,6 @@
 //! Point connectivity and cut consumers on explicit component and ordinary match inputs.
 use crate::{
+    catalog::Catalog,
     economy::{Faction, Mode},
     economy_state::{self as economy, ArmySize},
     game::{CELL, MOVE, Point, VBLOCK},
@@ -25,7 +26,7 @@ fn objective() -> Objective {
         id: json!(0),
         at: at(65, 20),
         vp: 3.,
-        mp: 7.,
+        mp: 5.,
         kind: Some("depot".into()),
         needs: None,
         owner: Some(0),
@@ -187,7 +188,7 @@ fn arena(supply: bool) -> Match {
         &serde_json::to_vec(&json!({
             "name":"point supply arena", "w":80,"h":80,"rows":vec![".".repeat(80);80],
             "spawns":[{"x":12,"y":40},{"x":68,"y":40}],
-            "points":[{"x":65,"y":8,"vp":3,"mp":7}],"defend":[0]
+            "points":[{"x":65,"y":8,"vp":3,"mp":5}],"defend":[0]
         }))
         .unwrap(),
     )
@@ -296,7 +297,7 @@ fn intent_log46_cut_removes_point_mp_vp_and_classic_team_munitions() {
             let points = [economy::Point {
                 owner: Some(0),
                 cut,
-                mp: 7.,
+                mp: 5.,
                 vp: 3.,
             }];
             state
@@ -320,7 +321,11 @@ fn intent_log46_cut_removes_point_mp_vp_and_classic_team_munitions() {
             earned.push(state.players);
         }
         if mode == Mode::Default {
-            assert_eq!(earned[0][0].mp - earned[1][0].mp, 7.);
+            let cfg = Catalog::compiled().unwrap().table("CFG").unwrap();
+            let catchup_per = cfg.get("catchupPer").unwrap().number().unwrap();
+            let expected = 5. - 3. / catchup_per;
+            assert!((earned[0][0].mp - earned[1][0].mp - expected).abs() < 1e-12);
+            assert_eq!(earned[1][0].mp, cfg.get("mpBase").unwrap().number().unwrap());
             assert_eq!(earned[0][0].vp - earned[1][0].vp, 3.);
             assert_eq!(earned[1][0].vp, 0.);
         } else {

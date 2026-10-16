@@ -62,7 +62,7 @@ fn intent_log39_match_supply_hold_resume_queued_moves_and_nearest_source_retreat
     let mut m = arena(true);
     let target = troop(&m);
     let truck = m.test_supply_truck(0);
-    place(&mut m, truck, Point { x: 65., z: 81. });
+    place(&mut m, truck, Point { x: 45., z: 81. });
     let stock = cargo(&mut m, truck);
     let destination = Point { x: 67., z: 77. };
     place(&mut m, target, destination);
