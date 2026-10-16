@@ -478,3 +478,41 @@ fn fire_at_preserves_aircraft_area_dispatch_and_mixed_selection_refusal() {
     assert_eq!(m.commands.units[&tank].fire_at, Some(20 * 80 + 21));
     assert_eq!(m.aviation.planes[&bomber].mission, Some(mission));
 }
+
+#[test]
+fn fire_at_mixed_aircraft_and_ground_sheller_keeps_main_refusal_atomic() {
+    for queue in [false, true] {
+        let (mut m, id) = scene("howitzer");
+        let bomber = m.spawn_aircraft(0, "bomber").unwrap();
+        let before = format!("{:?}", (&m.world, &m.commands.units, &m.aviation));
+        let random = m.start.random.snapshot();
+        assert_eq!(
+            dispatch(
+                &mut m,
+                json!({"t":"fireat","ids":[bomber,id],"x":41,"z":41,"queue":queue})
+            ),
+            Some(Denial::Unsupported)
+        );
+        assert_eq!(
+            format!("{:?}", (&m.world, &m.commands.units, &m.aviation)),
+            before
+        );
+        assert_eq!(m.start.random.snapshot(), random);
+    }
+}
+
+#[test]
+fn fire_at_dead_aircraft_keeps_main_needs_refusal_without_ground_validation() {
+    let (mut m, _) = scene("howitzer");
+    let bomber = m.spawn_aircraft(0, "bomber").unwrap();
+    m.world.game.units.get_mut(&bomber).unwrap().hp = 0.0;
+    let before = format!("{:?}", (&m.world, &m.commands.units, &m.aviation));
+    assert_eq!(
+        dispatch(&mut m, json!({"t":"fireat","ids":[bomber],"x":41,"z":41})),
+        Some(Denial::Needs)
+    );
+    assert_eq!(
+        format!("{:?}", (&m.world, &m.commands.units, &m.aviation)),
+        before
+    );
+}
