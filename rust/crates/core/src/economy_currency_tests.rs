@@ -291,11 +291,10 @@ fn base14_classic_aimed_payment_waits_for_throw_and_rechecks_wallet() {
         unit.path.clear();
         m.grid.rebuild(&m.world.game.units);
         m.start.economy.players[0].mun = if pay { 15. } else { 14. };
-        m.step_aimed_ability(id).unwrap();
+        m.advance_tick().unwrap();
         assert_eq!(m.start.economy.players[0].mun, if pay { 0. } else { 14. });
         assert_eq!(m.commands.units[&id].nade, None);
         assert_eq!(m.abilities.get(id).unwrap().cooldown > 0., pay);
-        m.firing.take_events();
         // Income can add Munitions on later second boundaries; these four ticks cannot reach one.
         snapshots_after_ticks(&mut m);
         assert_eq!(m.start.economy.players[0].mun, if pay { 0. } else { 14. });

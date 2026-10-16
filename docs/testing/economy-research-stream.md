@@ -2,7 +2,9 @@
 
 This branch covers BASE-01, BASE-14, BASE-49, BASE-50 and BASE-53. BASE-56 remains with PR #379. It changes no parity status table, reference pin, FFI, C header, World admission or public room startup.
 
-The runtime changes connect existing Classic currency values to the internal recipient projection and pass Horde's attacker slot to research access checks. New research and wallet state continue to use the existing canonical owners and checkpoint shape. No state field is added. The ordinary cache accepts matching Assault, Annihilation, Classic and Tutorial state while retaining its actor capability checks. [Projection fields](../contracts/economy-projection.md) match the prototype.
+The runtime also permits a pending aimed ability to pass the ordinary firing phase while its squad walks into range, matching `shared/sim.js:5416-5431,5557-5584`. The normal tick performs the eventual payment and throw.
+
+The other runtime changes connect existing Classic currency values to the internal recipient projection and pass Horde's attacker slot to research access checks. New research and wallet state continue to use the existing canonical owners and checkpoint shape. No state field is added. The ordinary cache accepts matching Assault, Annihilation, Classic and Tutorial state while retaining its actor capability checks. [Projection fields](../contracts/economy-projection.md) match the prototype.
 
 ## Each row and its literal tests
 
