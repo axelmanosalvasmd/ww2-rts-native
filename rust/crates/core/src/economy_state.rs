@@ -27,7 +27,17 @@ pub enum ArmySize {
     Endless,
 }
 impl ArmySize {
-    fn key(self) -> &'static str {
+    /// Normalize the core's army choice, including the prototype's unknown-key fallback.
+    pub fn from_key(key: &str) -> Self {
+        match key {
+            "large" => Self::Large,
+            "massive" => Self::Massive,
+            "endless" => Self::Endless,
+            _ => Self::Standard,
+        }
+    }
+
+    pub fn key(self) -> &'static str {
         match self {
             Self::Standard => "standard",
             Self::Large => "large",

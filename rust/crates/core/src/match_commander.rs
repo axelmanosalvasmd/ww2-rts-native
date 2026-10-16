@@ -222,6 +222,55 @@ mod tests {
         }
     }
     #[test]
+    fn ai62_core_lobby_choices_and_new_seat_default_survive_ticks_and_snapshots() {
+        for (key, expected) in [
+            (Some("easy"), Level::Easy),
+            (Some("normal"), Level::Normal),
+            (Some("hard"), Level::Hard),
+            (None, Level::Normal),
+        ] {
+            let seat = OpeningCommander::from_lobby_level(0, key).unwrap();
+            assert_eq!(seat, OpeningCommander::new(0, expected));
+        }
+        for key in ["", "Normal", "HARD", "normal ", "unknown"] {
+            assert!(
+                OpeningCommander::from_lobby_level(0, Some(key)).is_err(),
+                "{key}"
+            );
+        }
+        let mut m = instance(803);
+        let mut seat = OpeningCommander::from_lobby_level(0, None).unwrap();
+        let toughness = (1.0 + 3.0 / 33_554_432.0) as f32;
+        assert_eq!(toughness.to_bits(), 0x3f80_0001);
+        m.world.game.tough = Some(vec![toughness; m.world.game.chars.len()]);
+        let mut delivery = crate::recipient_snapshot::DeliveryState::new(&m).unwrap();
+        m.tick_opening_commander(&mut seat).unwrap();
+        for tick in 1..=6 {
+            let report = m.advance_tick().unwrap();
+            assert_eq!(report.tick, tick);
+            assert!(m.tick_state.fault().is_none());
+            let effects = report.environment().cloned().collect::<Vec<_>>();
+            let frame = delivery
+                .capture_with_lists(&mut m, &[true; 2], &[false; 2], &effects)
+                .unwrap();
+            for slot in 0..2 {
+                let snapshot = frame.recipient(slot).unwrap().into_json();
+                assert_eq!(snapshot["t"], "s");
+            }
+        }
+        assert_eq!(seat.level, Level::Normal);
+        assert!(
+            m.world
+                .game
+                .tough
+                .as_ref()
+                .unwrap()
+                .iter()
+                .all(|v| v.to_bits() == toughness.to_bits())
+        );
+    }
+
+    #[test]
     fn opening_orders_use_real_admission_and_the_delivered_view() {
         let mut a = instance(803);
         let mut b = instance(803);
@@ -757,6 +806,16 @@ pub struct OpeningCommander {
     sequence: u64,
 }
 impl OpeningCommander {
+    /// Construct a core seat from a validated lobby choice; new seats play Normal.
+    /// The server retains authority over who can change a seat or hand one over.
+    pub fn from_lobby_level(owner: usize, choice: Option<&str>) -> Result<Self, String> {
+        let level = match choice {
+            Some(key) => Level::from_key(key).ok_or("invalid AI difficulty")?,
+            None => Level::default(),
+        };
+        Ok(Self::new(owner, level))
+    }
+
     pub fn new(owner: usize, level: Level) -> Self {
         Self {
             owner,

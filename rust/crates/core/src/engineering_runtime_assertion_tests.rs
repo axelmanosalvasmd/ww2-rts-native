@@ -505,6 +505,265 @@ fn intent_eng42_direct_building_hits_apply_weapon_slit_and_alliance_rules() {
     }
 }
 
+// Prototype damageCells (sim.js:4734-4794) debits one nearest-cell-strength
+// budget per building, carrying unused damage through cells in that order.
+#[test]
+fn eng42_blast_debits_building_once_at_nearest_cell_strength() {
+    let mut m = empty_scene();
+    let cells = building(&mut m, 901, "hq");
+    environment(&mut m, |runtime, world, ctx| {
+        runtime
+            .damage_cells(
+                world,
+                Blast {
+                    at: Point { x: 35., z: 33. },
+                    radius: 8.,
+                    damage: 200.,
+                    scar: 0.,
+                },
+                ctx,
+                &mut DamageContext::plain(&BTreeSet::new()),
+            )
+            .unwrap();
+    });
+    // The nearest cell is 2 m away: 200 * (1 - 2 / (8 + 2) * 0.5) = 180.
+    close(m.world.game.units[&901].hp, 2820.);
+    for (index, &cell) in cells.iter().enumerate() {
+        close(
+            m.world.game.sections[&(cell as u32)].hp,
+            if index == 3 { 570. } else { 750. },
+        );
+        assert!(!m.world.fires.contains_key(&cell), "K cells never ignite");
+    }
+}
+
+#[test]
+fn eng42_blast_overflow_visits_nearest_cells_then_stable_distance_ties() {
+    let mut m = empty_scene();
+    let cells = building(&mut m, 901, "hq");
+    environment(&mut m, |runtime, world, ctx| {
+        runtime
+            .damage_cells(
+                world,
+                Blast {
+                    at: center(cells[3]),
+                    radius: 8.,
+                    damage: 1800.,
+                    scar: 0.,
+                },
+                ctx,
+                &mut DamageContext::plain(&BTreeSet::new()),
+            )
+            .unwrap();
+    });
+    // Last cell is nearest. The equally distant top-right and bottom-left
+    // cells follow in prototype row scan order, then the far top-left cell.
+    for (&cell, hp) in cells.iter().zip([750., 0., 450., 0.]) {
+        close(m.world.game.sections[&(cell as u32)].hp, hp);
+        assert_eq!(m.world.game.sections[&(cell as u32)].failed, hp == 0.);
+    }
+    close(m.world.game.units[&901].hp, 1200.);
+}
+
+fn rubble_scene(ground: u8, material: &str) -> Match {
+    let mut m = empty_scene();
+    let mut chars = vec![b'.'; WIDTH * WIDTH];
+    chars[16 * WIDTH + 15] = ground;
+    chars[15 * WIDTH + 15] = b'B';
+    let rows: Vec<_> = chars
+        .chunks(WIDTH)
+        .map(|row| String::from_utf8(row.to_vec()).unwrap())
+        .collect();
+    let map = AuthoritativeMap::from_value(json!({
+        "name": "Rubble settlement", "w": WIDTH, "h": WIDTH, "rows": rows,
+        "spawns": [{"x": 3, "y": 3}, {"x": 36, "y": 36}],
+        "points": [{"id": "center", "x": 20, "y": 20}]
+    }))
+    .unwrap();
+    let players = m.world.game.players.clone();
+    m.world = World::from_map(&map).unwrap();
+    m.world.game.players = players;
+    let source = 15 * WIDTH + 15;
+    m.world.sections.get_mut(&source).unwrap().material = material.into();
+    m.world.game.sections.get_mut(&(source as u32)).unwrap().hp = 1.;
+    m.world.game.cell_hp[source] = 1.;
+    m
+}
+
+fn settle_house(m: &mut Match, source: usize) {
+    environment(m, |runtime, world, ctx| {
+        let skip = BTreeSet::new();
+        let mut hit = DamageContext::plain(&skip);
+        hit.direction = Some(Point { x: 0., z: 1. });
+        runtime
+            .damage_section(world, source, 1., ctx, &hit)
+            .unwrap();
+        assert_eq!(world.game.physical(source), b'.');
+        assert!(world.sections[&source].rubble.is_empty());
+        runtime.step_sections(world, 2.5, ctx).unwrap();
+    });
+    assert!(m.environment.falling_sections().is_empty());
+    assert!(m.world.sections[&source].failure.settled_at.is_some());
+}
+
+#[test]
+fn eng44_settled_house_rubble_keeps_material_covers_two_cells_and_only_fill_clears_it() {
+    let source = 15 * WIDTH + 15;
+    for ground in *b".D+MR" {
+        for material in ["wood", "stone"] {
+            let mut m = rubble_scene(ground, material);
+            settle_house(&mut m, source);
+            let rubble = m.world.sections[&source].rubble.clone();
+            // With a minimum impulse the body lands in its original cell;
+            // the prototype's 1.4 m projection reaches the next row.
+            assert_eq!(
+                rubble,
+                vec![source, source + WIDTH],
+                "ground {}",
+                ground as char
+            );
+            for &cell in &rubble {
+                assert_eq!(m.world.game.physical(cell), b'R');
+                assert_eq!(m.world.material_name(cell, false), Some(material));
+                assert_eq!(
+                    m.world.game.flags[cell] & (VBLOCK | COVER | MOVE),
+                    VBLOCK | COVER
+                );
+                assert_eq!(m.world.game.cell_hp[cell], 0.);
+                assert_eq!(m.world.max_hp(cell), 0.);
+            }
+            environment(&mut m, |runtime, world, ctx| {
+                runtime
+                    .damage_cells(
+                        world,
+                        Blast {
+                            at: center(source),
+                            radius: 4.,
+                            damage: 5000.,
+                            scar: 0.,
+                        },
+                        ctx,
+                        &mut DamageContext::plain(&BTreeSet::new()),
+                    )
+                    .unwrap();
+                for &cell in &rubble {
+                    world.fires.insert(cell, 0.1);
+                }
+                runtime.burn(world, 2.5, ctx).unwrap();
+                assert!(rubble.iter().all(|cell| !world.fires.contains_key(cell)));
+                runtime.step_sections(world, 2.5, ctx).unwrap();
+            });
+            for &cell in &rubble {
+                assert_eq!(m.world.game.physical(cell), b'R');
+                assert!(m.world.fillable(cell));
+                m.world.fill_cell(cell).unwrap();
+                assert_ne!(m.world.game.physical(cell), b'R');
+                assert_eq!(m.world.game.flags[cell] & VBLOCK, 0);
+            }
+        }
+    }
+}
+
+#[test]
+fn eng44_house_rubble_skips_live_vehicles_and_ineligible_ground() {
+    let source = 15 * WIDTH + 15;
+    for ground in *b"WFT#XY" {
+        let mut m = rubble_scene(ground, "stone");
+        settle_house(&mut m, source);
+        assert!(!m.world.sections[&source].rubble.contains(&(source + WIDTH)));
+        assert_eq!(m.world.game.physical(source + WIDTH), ground);
+    }
+    for alive in [true, false] {
+        let mut m = rubble_scene(b'.', "wood");
+        add_unit(&mut m, 901, "tank", 0, center(source + WIDTH));
+        if !alive {
+            m.world.game.units.get_mut(&901).unwrap().hp = 0.;
+        }
+        settle_house(&mut m, source);
+        assert_eq!(m.world.game.physical(source + WIDTH) == b'R', !alive);
+    }
+}
+
+#[test]
+fn eng44_failed_bridge_settles_without_rubble() {
+    let mut m = empty_scene();
+    environment(&mut m, |runtime, world, ctx| {
+        runtime
+            .damage_section(
+                world,
+                BRIDGE,
+                5000.,
+                ctx,
+                &DamageContext::plain(&BTreeSet::new()),
+            )
+            .unwrap();
+        runtime.step_sections(world, 2.5, ctx).unwrap();
+    });
+    assert!(m.environment.falling_sections().is_empty());
+    assert!(m.world.sections[&BRIDGE].failure.settled_at.is_some());
+    assert!(m.world.sections[&BRIDGE].rubble.is_empty());
+    assert!(!m.world.game.chars.contains(&b'R'));
+}
+
+#[test]
+fn eng44_dead_building_footprint_becomes_durable_rubble_until_fill() {
+    for occupied in [false, true] {
+        let mut m = empty_scene();
+        let cells = building(&mut m, 901, "hq");
+        if occupied {
+            add_unit(&mut m, 902, "tank", 0, center(cells[3]));
+        }
+        // Initialize the ordinary death phase's required unit sidecars.
+        let unit = &m.world.game.units[&901];
+        m.commands.units.insert(
+            901,
+            crate::match_commands::UnitControl::new(unit, &m.rules).unwrap(),
+        );
+        m.abilities.initialize(901);
+        m.recovery.initialize(901);
+        m.world.game.units.get_mut(&901).unwrap().hp = 0.;
+        let result = m.retire_dead(&[901]).unwrap();
+        assert_eq!(result.retired.len(), 1);
+        assert!(!m.world.game.units.contains_key(&901));
+        if occupied {
+            assert!(
+                m.world.game.units[&902].hp > 0.,
+                "building footprint rubble is unconditional"
+            );
+        }
+        for &cell in &cells {
+            assert_eq!(m.world.game.physical(cell), b'R');
+            assert_eq!(m.world.game.cell_hp[cell], 0.);
+            assert_eq!(
+                m.world.game.flags[cell] & (VBLOCK | COVER | MOVE),
+                VBLOCK | COVER
+            );
+        }
+        environment(&mut m, |runtime, world, ctx| {
+            runtime.step_sections(world, 2.5, ctx).unwrap();
+            runtime
+                .damage_cells(
+                    world,
+                    Blast {
+                        at: Point { x: 32., z: 32. },
+                        radius: 8.,
+                        damage: 5000.,
+                        scar: 0.,
+                    },
+                    ctx,
+                    &mut DamageContext::plain(&BTreeSet::new()),
+                )
+                .unwrap();
+        });
+        for &cell in &cells {
+            assert_eq!(m.world.game.physical(cell), b'R');
+            m.world.fill_cell(cell).unwrap();
+            assert_eq!(m.world.game.physical(cell), b'.');
+            assert_eq!(m.world.game.flags[cell] & VBLOCK, 0);
+        }
+    }
+}
+
 fn spawn_wreck(m: &mut Match, id: u32, at: Point) {
     let kind = m.rules.kind("tank").unwrap();
     let mut corpse = initial_unit(&m.rules, Catalog::compiled().unwrap(), kind, id, 0, at).unwrap();

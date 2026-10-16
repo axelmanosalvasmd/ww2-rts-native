@@ -10,13 +10,24 @@ use crate::{
     random::{MatchRandom, StreamId},
 };
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Level {
     Easy,
+    #[default]
     Normal,
     Hard,
 }
 impl Level {
+    /// Lobby choices are exact names. A missing choice is handled by the seat default.
+    pub fn from_key(key: &str) -> Option<Self> {
+        match key {
+            "easy" => Some(Self::Easy),
+            "normal" => Some(Self::Normal),
+            "hard" => Some(Self::Hard),
+            _ => None,
+        }
+    }
+
     pub fn every(self) -> i64 {
         match self {
             Self::Easy => 120,
