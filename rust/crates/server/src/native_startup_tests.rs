@@ -507,6 +507,28 @@ async fn actual_socket_start_decode_mutations_resync_reconnect_and_new_match() {
                     .is_some_and(|ids| ids.iter().any(|id| id.as_u64() == Some(u64::from(victim))))
         });
         assert!(a.view.unit(victim).is_none());
+        // Resync repairs unit/list delivery, not a lost fog XOR or terrain delta.
+        // Freeze simulation and drain the first paused heartbeat on both sockets
+        // so the dropped birth packet contains only state resync can restore.
+        let paused_tick = host.block_on(async {
+            let now = control.server.now();
+            native(&control, |runtime| {
+                runtime
+                    .pause(0, "a", crate::room_runtime::PauseReason::Host, now)
+                    .unwrap()
+                    .unwrap();
+                runtime.state().world.game.tick
+            })
+            .await
+        });
+        for receiver in [&mut a, &mut b] {
+            receiver.until(|message| {
+                message["t"] == "pause" && message["paused"] == true && message["reason"] == "host"
+            });
+            let heartbeat = receiver.until(|message| message["t"] == "s");
+            assert_eq!(heartbeat["tick"].as_i64(), Some(paused_tick));
+        }
+        let after_pause = a.messages.len();
         let mut lagged = a.view.clone();
         let published = host.block_on(native(&control, |runtime| {
             let state = runtime.state_mut();
@@ -514,7 +536,12 @@ async fn actual_socket_start_decode_mutations_resync_reconnect_and_new_match() {
             state.recorded_buy(0, "rifle", None).unwrap().unit
         }));
         let mut lost = false;
-        for _ in 0..64 {
+        let drift_deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        while !(lost && lagged.needs_resync()) {
+            assert!(
+                std::time::Instant::now() < drift_deadline,
+                "held mismatch did not arrive"
+            );
             let message = a.receive();
             if !lost
                 && message["t"] == "s"
@@ -524,40 +551,57 @@ async fn actual_socket_start_decode_mutations_resync_reconnect_and_new_match() {
                     .iter()
                     .any(|row| row[0].as_u64() == Some(u64::from(published)))
             {
+                assert_eq!(message["tick"].as_i64(), Some(paused_tick));
+                assert!(
+                    message.get("fog").is_none(),
+                    "dropped packet must not lose fog"
+                );
+                assert!(
+                    message["cells"].as_array().unwrap().is_empty(),
+                    "dropped packet must not lose terrain"
+                );
                 // Only this secondary consumer loses one actual application.
                 // The primary above applied every received packet successfully.
                 lost = true;
             } else {
                 lagged.apply(&message.to_string()).unwrap();
             }
-            if lost && lagged.needs_resync() {
-                break;
-            }
         }
         assert!(lost && lagged.needs_resync());
+        assert!(lagged.unit(published).is_none());
         assert!(a.view.unit(published).is_some());
         a.send(json!({"t":"resync"}));
-        for _ in 0..32 {
+        let resync_deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        let resync = loop {
+            assert!(
+                std::time::Instant::now() < resync_deadline,
+                "full resync did not arrive"
+            );
             let message = a.receive();
             lagged.apply(&message.to_string()).unwrap();
             if message["t"] == "s" && message["all"] == true {
-                break;
+                break message;
             }
-        }
-        assert_eq!(a.messages.last().unwrap()["all"], true);
+        };
+        assert_eq!(resync["all"], true);
         assert!(!lagged.needs_resync());
         assert_eq!(lagged, a.view);
-        let resync_tick = a.messages.last().unwrap()["tick"].as_u64().unwrap();
-        let peer = b.until(|message| {
-            message["t"] == "s"
-                && message["tick"]
-                    .as_u64()
-                    .is_some_and(|tick| tick >= resync_tick)
-        });
-        assert!(
-            peer.get("all").is_none(),
-            "one seat's resync cannot reset another socket ledger"
-        );
+        let resync_tick = resync["tick"].as_i64().unwrap();
+        assert_eq!(resync_tick, paused_tick);
+        // Paused snapshots share a tick. Match their stream positions from the
+        // shared heartbeat, including the batch that supplied the full resync.
+        let snapshots = a.messages[after_pause..]
+            .iter()
+            .filter(|message| message["t"] == "s")
+            .count();
+        for _ in 0..snapshots {
+            let peer = b.until(|message| message["t"] == "s");
+            assert_eq!(peer["tick"].as_i64(), Some(resync_tick));
+            assert!(
+                peer.get("all").is_none(),
+                "one seat's resync cannot reset another socket ledger"
+            );
+        }
         assert_eq!(
             a.messages
                 .iter()
@@ -568,8 +612,14 @@ async fn actual_socket_start_decode_mutations_resync_reconnect_and_new_match() {
         );
         // Real drop pauses the current stable seat. Replacing another seat must
         // deliver its start and paused state without resuming the dropped seat.
+        host.block_on(async {
+            let now = control.server.now();
+            native(&control, |runtime| runtime.resume(now)).await;
+        });
         drop(a);
-        b.until(|message| message["t"] == "pause" && message["paused"] == true);
+        b.until(|message| {
+            message["t"] == "pause" && message["paused"] == true && message["reason"] == "drop"
+        });
         let mut replacement_b = Receiver::open(address, "b");
         let b_start = replacement_b.receive();
         expected.check(&b_start, 1, identity);

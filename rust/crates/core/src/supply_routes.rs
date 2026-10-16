@@ -8,6 +8,9 @@ use crate::{
     supply_convoys::{Route, RouteFailure},
 };
 use std::collections::BTreeMap;
+
+#[cfg(test)]
+mod intent_tests;
 #[derive(Clone, Copy, Debug)]
 pub struct RouteRequest {
     pub owner: usize,

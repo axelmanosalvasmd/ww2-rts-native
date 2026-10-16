@@ -945,10 +945,10 @@ impl Match {
         let mut points = self.start.points.clone();
         let mut wallets = self.start.economy.clone();
         let mut placer = SpawnPlacer::new();
-        let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
-        let cfg = catalog.table("CFG").map_err(|e| e.to_string())?;
-        let supply_beat = number(field(cfg, "supply")?, "every")? as i64;
-        if supply && self.options.supply && game.tick % supply_beat == 1 {
+        if supply
+            && objectives::point_supply_due(self.options.mode, self.options.supply, game.tick)
+                .map_err(|e| format!("point supply scheduling: {e:?}"))?
+        {
             objectives::supply_lines(
                 terrain_view(game),
                 &mut points,
@@ -1239,7 +1239,12 @@ pub(crate) fn foot_center(game: &Game, cell: usize, size: usize) -> Point {
         z: (cell / game.w) as f64 * CELL + size as f64 * CELL / 2.0,
     }
 }
-fn find_site(game: &Game, at: Point, size: usize, avoid: &[(Point, f64)]) -> Option<usize> {
+pub(crate) fn find_site(
+    game: &Game,
+    at: Point,
+    size: usize,
+    avoid: &[(Point, f64)],
+) -> Option<usize> {
     let x = at.x.max(0.0).min(game.w as f64 * CELL - 1.0);
     let z = at.z.max(0.0).min(game.h as f64 * CELL - 1.0);
     let start = (z / CELL).floor() as usize * game.w + (x / CELL).floor() as usize;

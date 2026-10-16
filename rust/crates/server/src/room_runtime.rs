@@ -190,6 +190,12 @@ impl RoomRuntime {
                 .meter
                 .should_snapshot(tick as u64, self.state.finish.is_some())
     }
+    pub(crate) fn timing_stats(&self) -> crate::tick_timing::TimingStats {
+        self.meter.stats()
+    }
+    pub(crate) fn snapshot_cadence(&self) -> u8 {
+        self.meter.snap_every()
+    }
     pub fn record_timing(&mut self, sample: TickSample, now_ms: u64) -> Result<u8, String> {
         self.meter.record(sample, now_ms).map_err(|e| e.to_string())
     }
