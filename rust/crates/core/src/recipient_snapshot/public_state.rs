@@ -72,17 +72,12 @@ pub(super) fn capture_perspective(
     let mut result = Vec::with_capacity(g.players.len());
     for slot in 0..g.players.len() {
         let mut fields = Map::new();
+        let mode = super::mode_row(state)?;
+        if !mode.is_null() {
+            fields.insert("mode".into(), mode);
+        }
         if state.options.mode == Mode::Classic {
             let classic = state.elimination.as_ref().ok_or(SnapshotError::Rules)?;
-            let time = classic.time_left.ok_or(SnapshotError::Rules)?;
-            finite(&[time])?;
-            fields.insert(
-                "mode".into(),
-                json!({
-                    "kind":"classic", "timeLeft": math::max(0., time.ceil()),
-                    "suddenDeath": classic.sudden_death
-                }),
-            );
             let nodes = classic
                 .nodes
                 .iter()
@@ -98,9 +93,7 @@ pub(super) fn capture_perspective(
                 .collect::<Result<Vec<_>, SnapshotError>>()?;
             fields.insert("nodes".into(), json!(nodes));
             fields.insert("ghosts".into(), json!([]));
-        }
-        if state.options.mode == Mode::Horde {
-            fields.insert("mode".into(), horde_mode_row(state)?);
+
         }
         // Reuse Source's six-field ghost rows. Never consult a hidden live building here.
         if matches!(state.options.mode, Mode::Classic | Mode::World)
