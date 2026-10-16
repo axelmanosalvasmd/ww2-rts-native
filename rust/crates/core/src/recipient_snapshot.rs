@@ -1,5 +1,5 @@
-//! Internal ordinary and Classic projections over the canonical recipient owners.
-//! Unsupported canonical actors remain explicit. No transport contract is added.
+//! Recipient projections for admitted ordinary matches.
+//! Projectile and aviation fields follow the pinned prototype recipient rules.
 use crate::{
     catalog::Catalog,
     combat,
@@ -22,6 +22,8 @@ mod engineering;
 mod falling;
 #[path = "recipient_snapshot/modes.rs"]
 mod modes;
+#[path = "recipient_snapshot/flights.rs"]
+mod flights;
 #[path = "recipient_snapshot/owners.rs"]
 mod owners;
 #[path = "recipient_snapshot/projectiles.rs"]
@@ -247,6 +249,7 @@ impl<'a> SnapshotCache<'a> {
         fields.extend(self.owners[slot].clone());
         fields.extend(self.public[slot].clone());
         fields.insert("falling".into(), falling::project(self.state, slot)?);
+        fields.insert("flights".into(), flights::project(self.state, slot)?);
         Ok(RecipientProjection {
             fields,
             missing: vec![
@@ -261,7 +264,7 @@ impl<'a> SnapshotCache<'a> {
     }
 }
 
-fn seen_by(state: &Match, slot: usize, id: u32) -> bool {
+pub(crate) fn seen_by(state: &Match, slot: usize, id: u32) -> bool {
     let g = &state.world.game;
     let u = g.units.get(&id);
     g.reveal && u.is_some()
@@ -1104,9 +1107,11 @@ pub(crate) mod tests {
             let cache = SnapshotCache::new(&m).unwrap();
             for (slot, expected) in case["outputs"].as_array().unwrap().iter().enumerate() {
                 let projection = cache.recipient(slot).unwrap();
+                let mut expected = expected.clone();
+                expected["flights"] = case["fullOutputs"][slot]["flights"].clone();
                 equal(
                     &Value::Object(projection.fields),
-                    expected,
+                    &expected,
                     &format!("{} recipient{slot}", case["name"]),
                 );
                 assert!(!projection.missing.is_empty());

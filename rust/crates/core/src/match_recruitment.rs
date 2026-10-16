@@ -278,13 +278,6 @@ impl Match {
         name: &str,
         from: Option<u32>,
     ) -> Result<CompletedRecruitUnit, RecruitError> {
-        // Aircraft AA events need the complete aviation delivery adapter before
-        // purchases may introduce planes into a bound recipient room.
-        if self.ordinary_snapshot_only {
-            return Err(RecruitError::Placement(
-                crate::produced_units::Error::UnsupportedAir,
-            ));
-        }
         let facts = admission_facts(
             &self.world.game,
             &self.start,

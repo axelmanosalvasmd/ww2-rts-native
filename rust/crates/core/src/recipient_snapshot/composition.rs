@@ -189,8 +189,25 @@ pub(super) fn admit_actors(state: &Match, outside_events: &[Effect]) -> Result<(
         return Err(refused(SnapshotCapability::ShotsAndFlights));
     }
     projectiles::validate(state)?;
-    // Aircraft state has an owner adapter. Aviation shot encodings still need
-    // a contract, so undrained event payloads retain their admission guard.
+    if !state.firing.flights.is_empty() || !state.firing.salvos.is_empty() {
+        state
+            .validate_firing_tick_state()
+            .map_err(|_| refused(SnapshotCapability::ShotsAndFlights))?;
+        if state.firing.salvos.iter().any(|s| {
+            s.owner >= state.world.game.players.len()
+                || ![s.at.x, s.at.z, s.next, s.every, s.spread]
+                    .iter()
+                    .all(|v| v.is_finite())
+                || s.left == 0
+                || s.left > 4096
+                || s.every <= 0.
+                || s.spread < 0.
+        }) {
+            return Err(refused(SnapshotCapability::ShotsAndFlights));
+        }
+    }
+    // The caller must drain aviation events into the chronological tick batch
+    // before delivery, just as it drains firing and support events above.
     if !state.aviation.events.is_empty() {
         return Err(refused(SnapshotCapability::Air));
     }

@@ -202,7 +202,18 @@ fn supported_support_lifecycles_deliver_every_r1_seat_through_match_finish() {
         state.start.players[0]
             .support
             .insert(kind.name().into(), 0.);
-        let at = Point { x: 100., z: 100. };
+        let at = if kind.name() == "para" {
+            state
+                .world
+                .game
+                .units
+                .values()
+                .find(|unit| unit.owner == 0 && unit.hp > 0.)
+                .unwrap()
+                .at()
+        } else {
+            Point { x: 100., z: 100. }
+        };
         state
             .enqueue_command(
                 OrderKey {
@@ -228,7 +239,11 @@ fn supported_support_lifecycles_deliver_every_r1_seat_through_match_finish() {
         let mut observed = false;
         let mut retired = false;
         for _ in 0..2400 {
-            runtime.advance_tick(&[false; 2]).unwrap();
+            let report = runtime.advance_tick(&[false; 2]).unwrap();
+            if report.tick == 1 {
+                assert_eq!(report.commands.len(), 1);
+                assert_eq!(report.commands[0].denial, None, "{} admission", kind.name());
+            }
             let frames = runtime
                 .collect_frame(&selected, FrameKind::Scheduled)
                 .unwrap();
@@ -272,16 +287,66 @@ fn supported_support_lifecycles_deliver_every_r1_seat_through_match_finish() {
 }
 
 #[test]
-fn plane_support_state_cannot_attach_to_an_r1_room_before_its_event_contract() {
+fn preattached_plane_support_delivers_arrival_to_every_seat_and_retires_without_fault() {
     for name in ["recon", "strafe", "bombing", "dive", "para"] {
         let mut state = crate::lobby::native_tests::native_match();
+        for control in state.commands.units.values_mut() {
+            control.hold_fire = true;
+            control.auto_cast = false;
+            control.auto_retreat = false;
+        }
         state.start.economy.players[0].mp = 10000.;
         state.start.players[0].support.insert(name.into(), 0.);
-        let at = state.start.players[0].spawn;
+        let at = state
+            .world
+            .game
+            .units
+            .values()
+            .find(|unit| unit.owner == 0 && unit.hp > 0.)
+            .unwrap()
+            .at();
         assert_eq!(state.admit_support(0, name, at, Some(0.)).unwrap(), None);
-        assert!(
-            matches!(RoomRuntime::new(state, 0), Err(error) if error == "snapshot admission: Unsupported { unit: 0, capability: TeamEffects }")
-        );
+        let mut runtime = RoomRuntime::new(state, 0).unwrap();
+        let seats = (0..2)
+            .map(|slot| SelectedSeat {
+                slot,
+                full: false,
+                omit: false,
+            })
+            .collect::<Vec<_>>();
+        let initial = runtime.collect_frame(&seats, FrameKind::Current).unwrap();
+        assert_eq!(initial.len(), seats.len());
+        assert_eq!(initial[0].message["strikes"], initial[1].message["strikes"]);
+        assert_eq!(initial[0].message["strikes"][0][0], name);
+        let mut arrivals = [false; 2];
+        let mut canonical_arrival = false;
+        let mut retired = false;
+        for _ in 0..2400 {
+            runtime.advance_tick(&[false; 2]).unwrap();
+            canonical_arrival |= runtime.pending_events.iter().any(|event| {
+                matches!(event, TickEvent::Support(ww2_core::match_support::SupportEvent::Plane { kind, .. }) if kind.name() == name)
+            });
+            let frames = runtime.collect_frame(&seats, FrameKind::Scheduled).unwrap();
+            assert_eq!(frames.len(), seats.len());
+            for frame in &frames {
+                assert_eq!(frame.message["t"], "s");
+                arrivals[frame.slot] |= frame.message["shots"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|shot| shot["k"] == name && shot["fo"] == 0);
+            }
+            assert!(runtime.fault().is_none());
+            assert!(runtime.tick_failure().is_none());
+            assert!(runtime.state().tick_state.fault().is_none());
+            if runtime.state().world.game.strikes.is_empty() {
+                retired = true;
+                break;
+            }
+        }
+        assert!(canonical_arrival, "{name} must actually arrive");
+        assert!(arrivals.into_iter().all(|delivered| delivered));
+        assert!(retired, "{name} must retire");
     }
 }
 
@@ -311,7 +376,7 @@ fn protected(runtime: &RoomRuntime) -> Vec<String> {
 }
 
 #[test]
-fn r1_aircraft_purchase_is_denied_without_charge_and_every_seat_keeps_snapshots() {
+fn r1_aircraft_purchase_publishes_paid_aircraft_and_every_seat_keeps_snapshots() {
     let purchase_ready = || {
         let mut m = crate::lobby::native_tests::native_match();
         m.production = ww2_core::production::ProductionState::new(vec![
@@ -426,7 +491,7 @@ fn r1_aircraft_purchase_is_denied_without_charge_and_every_seat_keeps_snapshots(
         kind: kind.into(),
         from: Some(field),
     };
-    // A command recorded before attachment must obey the host's later binding too.
+    // A purchase queued before attachment uses the same paid publication as later orders.
     m.enqueue_command(
         OrderKey {
             tick: 1,
@@ -461,23 +526,14 @@ fn r1_aircraft_purchase_is_denied_without_charge_and_every_seat_keeps_snapshots(
                 .unwrap();
         }
         let before = runtime.state().start.economy.players[0].clone();
-        let story = format!("{:?}", runtime.state().story);
-        assert!(matches!(
-            runtime.state_mut().recorded_buy(0, "fighter", Some(field)),
-            Err(ww2_core::match_runtime::RecruitError::Placement(
-                ww2_core::produced_units::Error::UnsupportedAir
-            ))
-        ));
-        assert_eq!(runtime.state().start.economy.players[0], before);
-        assert_eq!(format!("{:?}", runtime.state().story), story);
         let report = runtime.advance_tick(&[false; 2]).unwrap();
         assert_eq!(report.tick, tick as i64);
         if [1, 4, 8].contains(&tick) {
             assert_eq!(report.commands.len(), 1);
-            assert_eq!(
-                report.commands[0].denial,
-                Some(ww2_core::match_commands::Denial::Unsupported)
-            );
+            assert_eq!(report.commands[0].denial, None);
+            assert!(runtime.state().start.economy.players[0].mp < before.mp);
+            // Ordinary skirmish prices charge MP only (price_of at the pin).
+            assert_eq!(runtime.state().start.economy.players[0].fuel, before.fuel);
         }
         for kind in [FrameKind::Current, FrameKind::Scheduled] {
             let frames = runtime.collect_frame(&selected, kind).unwrap();
@@ -488,9 +544,16 @@ fn r1_aircraft_purchase_is_denied_without_charge_and_every_seat_keeps_snapshots(
         }
         assert!(runtime.fault().is_none());
         assert!(runtime.state().tick_state.fault().is_none());
-        assert!(runtime.state().aviation.planes.is_empty());
-        assert_eq!(runtime.state().next_unit_id, initial_id);
-        assert_eq!(runtime.state().world.game.units.len(), initial_count);
+        let purchased = [1, 4, 8].into_iter().filter(|&at| at <= tick).count();
+        assert_eq!(runtime.state().aviation.planes.len(), purchased);
+        assert_eq!(runtime.state().next_unit_id, initial_id + purchased as u32);
+        assert_eq!(
+            runtime.state().world.game.units.len(),
+            initial_count + purchased
+        );
+        for &id in runtime.state().aviation.planes.keys() {
+            assert_eq!(runtime.state().recruit_metadata[&id].building, field);
+        }
     }
 }
 
@@ -670,16 +733,15 @@ fn real_section_hurt_waits_for_scheduled_frame_and_empty_schedule_discards_it() 
 }
 
 #[test]
-fn aircraft_weapons_wait_for_contract_while_every_seat_receives_ticks_through_victory() {
+fn aircraft_and_artillery_fire_while_every_seat_receives_every_tick_through_victory_and_ending() {
     use ww2_core::{
-        game::PlaneState,
         match_aviation::{MissionKind, PlaneMission},
         match_end::EndReason,
     };
     for name in ["attacker", "bomber"] {
         let map = AuthoritativeMap::from_json(
             &serde_json::to_vec(&json!({
-                "name":"Aircraft delivery boundary", "w":80, "h":80,
+                "name":"Aircraft and artillery lifecycle", "w":80, "h":80,
                 "rows":vec![".".repeat(80);80],
                 "spawns":[{"x":8,"y":8},{"x":70,"y":70}],
                 "points":[{"x":12,"y":12,"vp":5,"mp":0}]
@@ -733,6 +795,51 @@ fn aircraft_weapons_wait_for_contract_while_every_seat_receives_ticks_through_vi
         state.world.game.units.get_mut(&target).unwrap().x = 40.;
         state.world.game.units.get_mut(&target).unwrap().z = 40.;
         state.grid.rebuild(&state.world.game.units);
+        // Keep the artillery engagement apart from the aircraft's attack run and
+        // the objective. Its spotter supplies ordinary shared vision to the gun.
+        let artillery = state.next_unit_id;
+        for (kind, owner, at) in [
+            ("howitzer", 0, Point { x: 100., z: 60. }),
+            ("rifle", 0, Point { x: 105., z: 95. }),
+            ("rifle", 1, Point { x: 110., z: 110. }),
+        ] {
+            let id = state.next_unit_id;
+            let mut draft = StagedUnit::ordinary(
+                &state.world.game,
+                &state.rules,
+                owner,
+                state.rules.kind(kind).unwrap(),
+                id,
+                state.world.game.units.len() as u32,
+                state.start.players[owner].spawn,
+                Some(at),
+            )
+            .unwrap();
+            draft.unit.hold_pos = true;
+            draft.unit.still = Some(20.);
+            draft.control.hold_fire = true;
+            draft.control.auto_cast = false;
+            draft.control.auto_retreat = false;
+            prepare_publication(
+                PublicationParts {
+                    units: &mut state.world.game.units,
+                    grid: &mut state.grid,
+                    controls: &mut state.commands.units,
+                    recruitment: &mut state.recruit_metadata,
+                    next_id: &mut state.next_unit_id,
+                },
+                &state.rules,
+                2,
+                vec![draft],
+            )
+            .unwrap()
+            .publish_with(|u, _| {
+                state.combat.initialize(u.id).hit_by = Some(0);
+                state.firing.initialize(u.id);
+                state.abilities.initialize(u.id);
+                state.recovery.initialize(u.id);
+            });
+        }
         let plane = state.spawn_aircraft(0, name).unwrap();
         state.commands.units.get_mut(&plane).unwrap().hold_fire = false;
         ww2_core::vision::update_vision(&mut state.world.game, &state.rules, &state.grid);
@@ -772,6 +879,22 @@ fn aircraft_weapons_wait_for_contract_while_every_seat_receives_ticks_through_vi
                 Command::from_json(&json!({"t":"move", "orders":[[capturer,24.,24.]]})).unwrap(),
             )
             .unwrap();
+        // Start the gun after the plane's first attack opportunity so artillery
+        // cannot remove the plane's target before its flight reaches the front.
+        state
+            .enqueue_command(
+                OrderKey {
+                    tick: 400,
+                    issuer: 0,
+                    sequence: 2,
+                },
+                Command::Stance {
+                    ids: vec![i64::from(artillery)],
+                    stance: ww2_core::match_commands::Stance::HoldFire,
+                    on: false,
+                },
+            )
+            .unwrap();
         let mut room = RoomRuntime::new(state, 0).unwrap();
         let seats = (0..2)
             .map(|slot| SelectedSeat {
@@ -781,44 +904,84 @@ fn aircraft_weapons_wait_for_contract_while_every_seat_receives_ticks_through_vi
             })
             .collect::<Vec<_>>();
         let mut snapshots = 0;
-        let mut ready_to_fire = false;
+        let mut plane_launched = false;
+        let mut artillery_launched = false;
+        let mut plane_shot_delivered = false;
+        let mut artillery_shot_delivered = false;
+        let mut plane_flight_delivered = false;
+        let mut artillery_flight_delivered = false;
+        let mut ammo_spent = false;
+        let mut salvo_started = false;
         assert!(room.state().finish.is_none());
         assert_eq!(room.state().start.economy.players[0].vp, 0.);
         for _ in 0..10000 {
             let report = room.advance_tick(&[false; 2]).unwrap();
-            let m = room.state();
-            assert!(m.firing.flights.is_empty());
-            assert!(m.firing.salvos.is_empty());
-            assert_eq!(m.aviation.planes[&plane].ammo, initial_ammo);
-            ready_to_fire |= if name == "bomber" {
-                m.world.game.units[&plane].air == Some(PlaneState::Station)
-            } else {
-                m.can_shoot_target(plane, target).unwrap()
-            };
+            for event in &room.pending_events {
+                if let TickEvent::Firing(LaunchEvent::Flight { shooter, .. }) = event {
+                    plane_launched |= *shooter == plane;
+                    artillery_launched |= *shooter == artillery;
+                }
+                if let TickEvent::Firing(LaunchEvent::Salvo { shooter, .. }) = event {
+                    salvo_started |= *shooter == plane;
+                }
+            }
+            ammo_spent |= room.state().aviation.planes[&plane].ammo < initial_ammo;
             let frames = room.collect_frame(&seats, FrameKind::Scheduled).unwrap();
             assert_eq!(frames.len(), seats.len());
             snapshots += frames.len();
+            assert_eq!(snapshots, report.tick as usize * seats.len());
             assert!(frames.iter().all(|frame| frame.message["t"] == "s"));
+            for shot in frames[0].message["shots"].as_array().unwrap() {
+                if shot["k"] == "flight" {
+                    plane_shot_delivered |= shot["f"] == plane;
+                    artillery_shot_delivered |= shot["f"] == artillery;
+                }
+            }
+            for flight in frames[0].message["flights"].as_array().unwrap() {
+                plane_flight_delivered |= flight["f"] == plane;
+                artillery_flight_delivered |= flight["f"] == artillery;
+            }
+            assert!(room.fault().is_none());
+            assert!(room.tick_failure().is_none());
+            assert!(room.state().tick_state.fault().is_none());
             if room.state().finish.is_some() {
                 assert!(frames.iter().all(|frame| frame.message["winner"] == 0));
-                assert_eq!(snapshots, report.tick as usize * seats.len());
                 break;
             }
         }
-        assert!(
-            ready_to_fire,
-            "{name} must reach a genuine firing opportunity"
-        );
-        let end = room
+        assert!(plane_launched && ammo_spent, "{name} must actually fire");
+        assert!(artillery_launched, "the howitzer must actually fire");
+        assert!(plane_shot_delivered && plane_flight_delivered);
+        assert!(artillery_shot_delivered && artillery_flight_delivered);
+        assert_eq!(salvo_started, name == "bomber");
+        let end = *room
             .state()
             .finish
             .as_ref()
-            .expect("ordinary income must finish the match");
+            .expect("ordinary capture and income must finish the match");
         assert_eq!(end.reason, EndReason::VictoryPoints);
         assert_eq!(end.winner, 0);
-        assert!(room.fault().is_none());
-        assert!(room.tick_failure().is_none());
-        assert!(room.state().tick_state.fault().is_none());
+        assert!(room.state().capture_ticks[0].is_some());
+        assert_eq!(room.state().start.points[0].owner, Some(0));
+        for callback in 1..=120 {
+            let ending = room.hold_callback().unwrap().unwrap();
+            assert_eq!(ending.advance, callback % 2 == 0);
+            assert_eq!(ending.complete, callback == 120);
+            if ending.advance {
+                let report = room.advance_tick(&[false; 2]).unwrap();
+                let frames = room.collect_frame(&seats, FrameKind::Scheduled).unwrap();
+                assert_eq!(frames.len(), seats.len());
+                snapshots += frames.len();
+                assert_eq!(snapshots, report.tick as usize * seats.len());
+                assert!(frames.iter().all(|frame| frame.message["winner"] == 0));
+                assert_eq!(room.state().finish, Some(end));
+                assert!(room.fault().is_none());
+                assert!(room.tick_failure().is_none());
+                assert!(room.state().tick_state.fault().is_none());
+            }
+        }
+        assert_eq!(room.held(), 120);
+        assert_eq!(room.state().world.game.tick, end.end_tick + 60);
     }
 }
 

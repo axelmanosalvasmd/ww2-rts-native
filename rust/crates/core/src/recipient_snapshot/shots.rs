@@ -1,12 +1,13 @@
-//! Recipient projection of one caller-owned chronological ground shot batch.
+//! Recipient projection of one caller-owned chronological shot batch.
 use super::*;
 use crate::{
     environment::Effect,
     game::Point,
     grid::SpatialGrid,
     legacy_scenario::{SayAction, validate_public_say},
+    match_aviation::AviationEvent,
     match_firing::LaunchEvent,
-    match_support::SupportEvent,
+    match_support::{SupportEvent, SupportKind},
     match_tick::TickEvent,
     projectiles::{self, BodyPosition, Box3, Flight, Point3},
 };
@@ -16,6 +17,7 @@ use crate::{
 #[derive(Clone, Copy, Debug)]
 pub enum ShotRef<'a> {
     Firing(&'a LaunchEvent),
+    Aviation(&'a AviationEvent),
     Support(&'a SupportEvent),
     Environment(&'a Effect),
     Scenario(&'a SayAction),
@@ -32,10 +34,7 @@ impl<'a> TryFrom<&'a TickEvent> for ShotRef<'a> {
             TickEvent::Environment(value) => Ok(Self::Environment(value)),
             TickEvent::Scenario(value) => Ok(Self::Scenario(value)),
             TickEvent::Horde(value) => Ok(Self::Horde(value)),
-            TickEvent::Aviation(_) => Err(SnapshotError::Unsupported {
-                unit: 0,
-                capability: SnapshotCapability::Air,
-            }),
+            TickEvent::Aviation(value) => Ok(Self::Aviation(value)),
         }
     }
 }
@@ -67,8 +66,7 @@ impl DeliveryState {
 
     /// Project the complete supplied batch before any selected memory owner
     /// publishes. The host retains the scheduled global batch-reset policy.
-    /// Retained flights pass their canonical validation before delivery.
-    /// Unsupported AIR/debris actors and undrained producer buffers still refuse.
+    /// Undrained producer buffers still refuse through complete-frame admission.
     pub fn capture_selected_with_shots<'a>(
         &mut self,
         state: &'a mut Match,
@@ -142,14 +140,18 @@ fn identity(value: u64) -> Result<(), SnapshotError> {
 }
 
 fn kind(state: &Match, value: usize) -> Result<(), SnapshotError> {
-    let kind = state.rules.kinds.get(value).ok_or(SnapshotError::Rules)?;
-    if kind.air {
-        Err(SnapshotError::Unsupported {
-            unit: 0,
-            capability: SnapshotCapability::Air,
-        })
-    } else {
-        Ok(())
+    state.rules.kinds.get(value).ok_or(SnapshotError::Rules)?;
+    Ok(())
+}
+
+fn plane_kind(kind: SupportKind) -> Result<(), SnapshotError> {
+    match kind {
+        SupportKind::Recon
+        | SupportKind::Strafe
+        | SupportKind::Bombing
+        | SupportKind::Dive
+        | SupportKind::Para => Ok(()),
+        _ => Err(SnapshotError::Rules),
     }
 }
 
@@ -225,25 +227,89 @@ fn raw_event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
         }
         ShotRef::Environment(value) => effect(state, value),
         ShotRef::Support(SupportEvent::Environment(value)) => effect(state, value),
-        ShotRef::Support(
-            SupportEvent::Bomb(_)
-            | SupportEvent::Chutes(_)
-            | SupportEvent::Plane { .. }
-            | SupportEvent::Flak { .. }
-            | SupportEvent::ShotDown { .. },
-        ) => Err(SnapshotError::Unsupported {
-            unit: 0,
-            capability: SnapshotCapability::Air,
-        }),
-        ShotRef::Support(SupportEvent::Shell(at) | SupportEvent::SmokeShells(at)) => {
-            numbers(&[at.x, at.z])?;
-            let name = if matches!(shot, ShotRef::Support(SupportEvent::Shell(_))) {
-                "shell"
-            } else {
-                "smokeshells"
+        ShotRef::Support(value) => {
+            let row = match value {
+                SupportEvent::Shell(at)
+                | SupportEvent::SmokeShells(at)
+                | SupportEvent::Bomb(at)
+                | SupportEvent::Chutes(at) => {
+                    numbers(&[at.x, at.z])?;
+                    let name = match value {
+                        SupportEvent::Shell(_) => "shell",
+                        SupportEvent::SmokeShells(_) => "smokeshells",
+                        SupportEvent::Bomb(_) => "bomb",
+                        SupportEvent::Chutes(_) => "chutes",
+                        _ => unreachable!(),
+                    };
+                    json!({"k":name,"x":at.x,"z":at.z,"pub":true})
+                }
+                SupportEvent::Plane {
+                    kind,
+                    at,
+                    direction,
+                    owner: seat,
+                } => {
+                    plane_kind(*kind)?;
+                    owner(state, *seat)?;
+                    numbers(&[at.x, at.z, *direction])?;
+                    json!({"k":kind.name(),"x":at.x,"z":at.z,"dir":direction,"fo":seat,"pub":true})
+                }
+                SupportEvent::Flak {
+                    unit,
+                    owner: seat,
+                    at,
+                } => {
+                    identity(u64::from(*unit))?;
+                    owner(state, *seat)?;
+                    numbers(&[at.x, at.z])?;
+                    json!({"k":"flak","f":unit,"fo":seat,"x":at.x,"z":at.z,"pub":true})
+                }
+                SupportEvent::ShotDown {
+                    kind,
+                    at,
+                    direction,
+                    fighters,
+                } => {
+                    plane_kind(*kind)?;
+                    numbers(&[at.x, at.z, *direction])?;
+                    let by = if *fighters { "fighters" } else { "flak" };
+                    json!({"k":"shotdown","x":at.x,"z":at.z,"dir":direction,"kind":kind.name(),"by":by,"pub":true})
+                }
+                SupportEvent::Environment(_) => unreachable!(),
             };
-            Ok(json!({"k":name,"x":at.x,"z":at.z,"pub":true}))
+            Ok(row)
         }
+        ShotRef::Aviation(value) => match value {
+            AviationEvent::AntiAir {
+                shooter,
+                target,
+                owner: seat,
+                target_owner,
+                at,
+            } => {
+                identity(u64::from(*shooter))?;
+                identity(u64::from(*target))?;
+                owner(state, *seat)?;
+                owner(state, *target_owner)?;
+                numbers(&[at.x, at.z])?;
+                Ok(
+                    json!({"k":"aa","f":shooter,"fo":seat,"t":target,"to":target_owner,"x":at.x,"z":at.z}),
+                )
+            }
+            AviationEvent::PlaneDown {
+                target,
+                owner: seat,
+                at,
+                direction,
+            } => {
+                identity(u64::from(*target))?;
+                owner(state, *seat)?;
+                numbers(&[at.x, at.z, *direction])?;
+                Ok(
+                    json!({"k":"planedown","t":target,"to":seat,"x":at.x,"z":at.z,"dir":direction,"kill":true}),
+                )
+            }
+        },
         ShotRef::Firing(value) => {
             match value {
                 LaunchEvent::Environment(value) => return effect(state, value),
@@ -381,6 +447,16 @@ pub(super) fn until(state: &Match, visible: &[u8], shot: &Value) -> Result<f64, 
         gravity: value("gravity")?,
         stamp: time,
     };
+    trajectory_until(state, visible, p, time, expires)
+}
+
+pub(super) fn trajectory_until(
+    state: &Match,
+    visible: &[u8],
+    p: Flight,
+    time: f64,
+    expires: f64,
+) -> Result<f64, SnapshotError> {
     let end = math::min(expires, time + 0.15);
     numbers(&[end])?;
     let a = projectiles::flight_at(p, time).map_err(|_| SnapshotError::Rules)?;
@@ -671,7 +747,12 @@ mod tests {
                 target: 1,
                 owner: 0,
                 at: Point { x: 13.0, z: 13.0 },
-                direction: 0.0,
+                direction: f64::NAN,
+            }),
+            TickEvent::Firing(LaunchEvent::Throw {
+                shooter: 0,
+                owner: 0,
+                at: Point { x: 13.0, z: 13.0 },
             }),
             TickEvent::Environment(metadata.clone()),
         ] {
@@ -712,3 +793,7 @@ mod tests {
         assert_eq!(delivery, acknowledgments);
     }
 }
+
+#[cfg(test)]
+#[path = "shots_event_tests.rs"]
+mod event_tests;
