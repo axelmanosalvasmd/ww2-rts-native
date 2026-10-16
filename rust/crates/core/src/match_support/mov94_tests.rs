@@ -406,7 +406,7 @@ fn mov94_cover_exempts_recon_then_intercepts_only_one_same_tick_plane() {
                 assert_eq!(
                     down,
                     vec![
-                        &json!({"k":"shotdown","x":at.x,"z":at.z,"dir":0.,"kind":"dive","by":"fighters","pub":true})
+                        &json!({"k":"shotdown","x":at.x,"z":at.z,"dir":0,"kind":"dive","by":"fighters","pub":true})
                     ]
                 );
             }
