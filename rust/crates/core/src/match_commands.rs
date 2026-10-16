@@ -67,6 +67,11 @@ pub enum Stance {
 /// Internal recorded input. This is not a WebSocket or C interface.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Command {
+    Spawn {
+        kind: String,
+        at: Point,
+        enemy: bool,
+    },
     Build {
         ids: Vec<i64>,
         kind: String,
@@ -446,6 +451,34 @@ impl Command {
                 rows.iter().map(|v| safe_id(v).unwrap_or(-1)).collect()
             });
         match object.get("t").and_then(|v| v.as_str()) {
+            Some("spawn") => {
+                let kind = object
+                    .get("unit")
+                    .and_then(|v| v.as_str())
+                    .ok_or(Denial::Blocked)?;
+                let x = object
+                    .get("x")
+                    .and_then(|v| v.as_f64())
+                    .filter(|v| v.is_finite())
+                    .ok_or(Denial::Blocked)?;
+                let z = object
+                    .get("z")
+                    .and_then(|v| v.as_f64())
+                    .filter(|v| v.is_finite())
+                    .ok_or(Denial::Blocked)?;
+                let enemy = object.get("enemy").is_some_and(|v| match v {
+                    serde_json::Value::Null => false,
+                    serde_json::Value::Bool(v) => *v,
+                    serde_json::Value::Number(v) => v.as_f64().is_some_and(|v| v != 0.0),
+                    serde_json::Value::String(v) => !v.is_empty(),
+                    serde_json::Value::Array(_) | serde_json::Value::Object(_) => true,
+                });
+                Ok(Self::Spawn {
+                    kind: kind.into(),
+                    at: Point { x, z },
+                    enemy,
+                })
+            }
             Some("build" | "assist") => {
                 let at = object
                     .get("x")
@@ -744,9 +777,10 @@ impl Command {
     }
     fn valid(&self) -> bool {
         match self {
-            Self::Rail { at, .. } | Self::Enter { at, .. } | Self::FireAt { at, .. } => {
-                at.x.is_finite() && at.z.is_finite()
-            }
+            Self::Spawn { at, .. }
+            | Self::Rail { at, .. }
+            | Self::Enter { at, .. }
+            | Self::FireAt { at, .. } => at.x.is_finite() && at.z.is_finite(),
             Self::Attack { at, .. } => at.is_none_or(|p| p.x.is_finite() && p.z.is_finite()),
             Self::Dig {
                 ids, at, direction, ..
@@ -897,6 +931,9 @@ impl crate::match_runtime::Match {
         }
         if matches!(command, Command::Unsupported) {
             return Ok(Some(Denial::Unsupported));
+        }
+        if let Command::Spawn { kind, at, enemy } = command {
+            return self.sandbox_spawn(owner, kind, *at, *enemy);
         }
         self.validate_building_activity_rows()?;
         if let Command::Rally { ids, id, at } = command {
@@ -1087,7 +1124,8 @@ impl crate::match_runtime::Match {
             | Command::Attack { ids, .. }
             | Command::Escort { ids, .. }
             | Command::Retreat { ids } => ids.clone(),
-            Command::Build { .. }
+            Command::Spawn { .. }
+            | Command::Build { .. }
             | Command::Assist { .. }
             | Command::Cancel { .. }
             | Command::CancelProduction { .. }
@@ -1556,6 +1594,7 @@ impl crate::match_runtime::Match {
                 }
             }
             Command::Attack { .. }
+            | Command::Spawn { .. }
             | Command::Build { .. }
             | Command::Assist { .. }
             | Command::Cancel { .. }

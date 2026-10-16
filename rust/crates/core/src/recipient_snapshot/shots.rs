@@ -270,13 +270,31 @@ fn raw_event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
                     owner(state, *seat)?;
                     numbers(&[at.x, at.z, *spread])?;
                 }
+                LaunchEvent::Breath {
+                    shooter,
+                    target,
+                    owner: seat,
+                    target_owner,
+                    at,
+                } => {
+                    if !state.options.sandbox {
+                        return Err(refused());
+                    }
+                    identity(u64::from(*shooter))?;
+                    identity(u64::from(*target))?;
+                    owner(state, *seat)?;
+                    owner(state, *target_owner)?;
+                    numbers(&[at.x, at.z])?;
+                }
+                LaunchEvent::BreathShell { at } => {
+                    if !state.options.sandbox {
+                        return Err(refused());
+                    }
+                    numbers(&[at.x, at.z])?;
+                }
                 // SmallArms is an operative payload. Throw is shared by ordinary
                 // abilities and operatives, with no retained source provenance.
-                // Horde breath effects also remain outside ordinary recipient admission.
-                LaunchEvent::Throw { .. }
-                | LaunchEvent::SmallArms(_)
-                | LaunchEvent::Breath { .. }
-                | LaunchEvent::BreathShell { .. } => return Err(refused()),
+                LaunchEvent::Throw { .. } | LaunchEvent::SmallArms(_) => return Err(refused()),
                 LaunchEvent::Contact(value) => {
                     kind(state, value.kind)?;
                     identity(value.flight)?;
@@ -465,6 +483,61 @@ fn project_shots(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sandbox_breath_is_public_but_hidden_actor_ids_are_removed() {
+        let fixture: Value =
+            serde_json::from_str(include_str!("../../tests/fixtures/recipient-delivery.json"))
+                .unwrap();
+        let mut state = super::super::tests::initialize(&fixture["initial"]);
+        state.options.sandbox = true;
+        let breath = LaunchEvent::Breath {
+            shooter: 900001,
+            target: 900002,
+            owner: 0,
+            target_owner: 1,
+            at: Point {
+                x: -100.0,
+                z: -100.0,
+            },
+        };
+        let shell = LaunchEvent::BreathShell {
+            at: Point {
+                x: -100.0,
+                z: -100.0,
+            },
+        };
+        let selected = [
+            SelectedSeat {
+                slot: 0,
+                full: false,
+                omit: false,
+            },
+            SelectedSeat {
+                slot: 1,
+                full: false,
+                omit: false,
+            },
+        ];
+        let shots = [ShotRef::Firing(&breath), ShotRef::Firing(&shell)];
+        for (_, rows) in project_shots(&state, &selected, &shots).unwrap() {
+            assert_eq!(
+                rows,
+                json!([
+                    {"fo":0,"to":1,"x":-100.0,"z":-100.0,"hit":true,"k":"kaiju","pub":true},
+                    {"k":"shell","x":-100.0,"z":-100.0,"pub":true}
+                ])
+            );
+        }
+        state.options.sandbox = false;
+        assert!(matches!(
+            project_shots(&state, &selected, &shots),
+            Err(SnapshotError::Unsupported {
+                capability: SnapshotCapability::ShotsAndFlights,
+                ..
+            })
+        ));
+    }
 
     #[test]
     fn actual_legacy_say_keeps_public_order_and_rejects_a_later_bad_row() {
