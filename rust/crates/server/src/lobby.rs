@@ -697,7 +697,16 @@ fn clean(s: &str, length: usize, fallback: &str, controls: bool) -> String {
         .filter(|c| !"<>&\"'".contains(*c) && !(controls && (*c as u32) < 32))
         .collect();
     // JavaScript slices UTF-16 code units, including a possible lone surrogate at the boundary.
-    let units: Vec<_> = filtered.trim().encode_utf16().take(length).collect();
+    // Its trim removes BOM but preserves U+0085, unlike Rust's Unicode trim.
+    let units: Vec<_> = filtered
+        .trim_matches(|c| {
+            matches!(c, '\u{0009}'..='\u{000d}' | ' ' | '\u{00a0}' | '\u{1680}'
+                | '\u{2000}'..='\u{200a}' | '\u{2028}' | '\u{2029}' | '\u{202f}'
+                | '\u{205f}' | '\u{3000}' | '\u{feff}')
+        })
+        .encode_utf16()
+        .take(length)
+        .collect();
     let name = String::from_utf16_lossy(&units);
     if name.is_empty() {
         fallback.into()
@@ -2045,3 +2054,7 @@ mod combat_deny_tests;
 #[cfg(test)]
 #[path = "net_batch50_lobby_tests.rs"]
 mod net_batch50;
+
+#[cfg(test)]
+#[path = "net_runtime2_tests.rs"]
+mod net_runtime2;
