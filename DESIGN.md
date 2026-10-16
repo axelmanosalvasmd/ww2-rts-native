@@ -14,6 +14,12 @@ Instant Tutorial recruitment reuses the existing admission, debit and unit-publi
 
 ## Concrete work and waiting Dig orders (2026-10-16)
 
+## Interface collection order and recipient queries (2026-10-16)
+
+Field hospitals use insertion order plus keyed membership, matching the prototype's Map semantics. Replacing an owner preserves placement order; removing and rebuilding a hospital appends it. World transactions clone both parts, and recovery and logistics consume the ordered iterator. Existing fire, soak, contact, navigation and live ascending-unit traversal keep their native implementations, with focused consumer tests for each collection. The hospital test advances an ordinary one-VP match through victory and three subsequent ticks, capturing complete snapshots for every seat without a fault. The World training test exercises the existing live unit loop without changing World admission or claiming World snapshot delivery.
+
+Availability and denial queries borrow only the reconstructed recipient ClientView. Map presentation helpers consume only the supplied received map; authoritative map validation still uses its stricter layer validation. The pure queries compare against pinned JavaScript fixtures, while collection tests assert the prototype's traversal intent. ABI exports and Unreal adoption remain separate. No header, wire, contract, privacy or public ingress change is included.
+
 Concrete cells use the existing finished-building publisher so their unit, control, combat, firing, ability, recovery, production and terrain records share the normal Match owners. The paid job retains its bounded occupancy retry count. A separate step-back goal keeps a deferred crew escape valid when the deterministic path budget is exhausted. This preserves the intended four-metre escape on a later tick without changing wall cost, build time or retry limits.
 
 Waiting Dig orders use the existing unit queue and ordinary paid Dig activation. The recipient adapter emits the existing engineering order kind for those waiting orders. Default/Conquest admission remains bounded; Classic and World field-work rooms stay guarded. No FFI, header, wire schema, contract or privacy policy changes.
