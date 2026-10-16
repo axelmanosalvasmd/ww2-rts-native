@@ -11,8 +11,8 @@ use std::io::Read;
 use ww2_core::{
     economy::Mode,
     environment::{Collapse, Effect, Hurt},
-    game::{Point, Strike, StrikeKind},
-    match_aviation::AviationEvent,
+    game::{PlaneState, Point, Strike, StrikeKind},
+    match_aviation::{AircraftRuntime, AviationEvent},
     match_commands::UnitControl,
     match_firing::{ContactEvent, LaunchEvent, LiveFlight, SmallArmsEvent},
     match_runtime::Match,
@@ -152,6 +152,7 @@ fn reload(state: &mut Match, source: &Value) {
     state.firing.events.clear();
     state.firing.salvos.clear();
     state.firing.grenades.clear();
+    state.aviation.planes.clear();
     for id in state.combat.iter().map(|(id, _)| id).collect::<Vec<_>>() {
         state.combat.remove(id);
     }
@@ -172,6 +173,24 @@ fn reload(state: &mut Match, source: &Value) {
             state.world.game.w * state.world.game.h,
         )
         .unwrap();
+        if let Some(air) = unit.air {
+            // This fixture's sole aircraft boundary is a parked, missionless
+            // fighter. Import its recorded inputs for the aircraft adapter.
+            assert_eq!(air, PlaneState::Base);
+            let recorded = &row["air"];
+            assert!(recorded["mission"].is_null());
+            state.aviation.planes.insert(
+                unit.id,
+                AircraftRuntime {
+                    fuel: n(&recorded["fuel"]),
+                    ammo: n(&recorded["ammo"]),
+                    timer: n(&recorded["timer"]),
+                    orbit: n(&recorded["ang"]),
+                    mission: None,
+                    downed: truthy(&recorded["down"]),
+                },
+            );
+        }
         let mut control = UnitControl::new(&unit, &state.rules).unwrap();
         control.aim = n(&row["aim"]);
         control.auto_cast = truthy(&row["auto"]);
@@ -443,30 +462,9 @@ fn seats(frame: &Value) -> Vec<SelectedSeat> {
         })
         .collect()
 }
-fn receipt(state: &mut Match, air: bool) -> DeliveryState {
-    if !air {
-        return DeliveryState::new(state).unwrap();
-    }
-    // The actual recorded AIR actor prevents complete admission. Temporarily
-    // withhold that one input row to admit this same Match's receipt owner, then
-    // restore it before the refusal call. No baseline frame is published.
-    let ids: Vec<_> = state
-        .world
-        .game
-        .units
-        .values()
-        .filter(|u| state.rules.kinds[u.kind].air)
-        .map(|u| u.id)
-        .collect();
-    assert_eq!(ids.len(), 1);
-    let actor = state.world.game.units.remove(&ids[0]).unwrap();
-    let result = DeliveryState::new(state);
-    state.world.game.units.insert(actor.id, actor);
-    result.unwrap()
-}
 fn guard(state: &Match, delivery: &DeliveryState) -> String {
     // Public owned state only. Private routing/fog atomicity also has core tests;
-    // this observer performs no recipient query that could obscure AIR refusal.
+    // this observer performs no recipient query that could obscure a refusal.
     format!(
         "{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}",
         state.world,
@@ -495,7 +493,7 @@ fn original_ordinary_batches_match_selected_shot_rows_and_numeric_bits() {
         mut shots,
         mut supplied,
         mut empty,
-        mut air,
+        mut air_frames,
         mut flights,
         mut falling,
     ) = (0, 0, 0, 0, 0, 0, 0, 0, 0);
@@ -556,14 +554,24 @@ fn original_ordinary_batches_match_selected_shot_rows_and_numeric_bits() {
                         .unwrap()
                         .iter()
                         .any(|v| v == "air");
+                    if air_input {
+                        assert_eq!(
+                            state
+                                .world
+                                .game
+                                .units
+                                .values()
+                                .filter(|u| state.rules.kinds[u.kind].air)
+                                .count(),
+                            1
+                        );
+                    }
                     // Source snapshotFor warms teamFog at each selected query,
                     // including the launch frame that native complete admission
                     // refuses. The public base-field query supplies this input
                     // history from canonical facts, before the refusal baseline.
                     // Its disposable receipt is not complete-frame delivery.
-                    // The terminal AIR witness cannot admit even base fields;
-                    // no later supported boundary depends on its query history.
-                    if !selected.is_empty() && !air_input {
+                    if !selected.is_empty() {
                         let mut query = DeliveryState::new(&state).unwrap();
                         assert!(
                             query
@@ -574,7 +582,7 @@ fn original_ordinary_batches_match_selected_shot_rows_and_numeric_bits() {
                     }
                     // Each boundary has a fresh receipt owner on this same
                     // Match. Delivery-history parity is outside this test.
-                    let mut delivery = receipt(&mut state, air_input);
+                    let mut delivery = DeliveryState::new(&state).unwrap();
                     let state_before = guard(&state, &delivery);
                     let result =
                         delivery.capture_selected_with_tick_events(&mut state, &selected, &batch);
@@ -582,18 +590,16 @@ fn original_ordinary_batches_match_selected_shot_rows_and_numeric_bits() {
                         .as_array()
                         .unwrap()
                         .iter()
-                        .any(|v| v == "air" || v == "live-flights")
+                        .any(|v| v == "live-flights")
                     {
-                        let capability = if frame["refusals"][0] == "air" {
-                            air += 1;
-                            SnapshotCapability::Air
-                        } else {
-                            flights += 1;
-                            SnapshotCapability::ShotsAndFlights
-                        };
-                        assert!(
-                            matches!(result, Err(SnapshotError::Unsupported { capability: c, .. }) if c == capability)
-                        );
+                        flights += 1;
+                        assert!(matches!(
+                            result,
+                            Err(SnapshotError::Unsupported {
+                                capability: SnapshotCapability::ShotsAndFlights,
+                                ..
+                            })
+                        ));
                         assert_eq!(guard(&state, &delivery), state_before);
                     } else if selected.is_empty() {
                         assert!(result.unwrap().is_none());
@@ -621,6 +627,7 @@ fn original_ordinary_batches_match_selected_shot_rows_and_numeric_bits() {
                             shots += row["fields"]["shots"].as_array().unwrap().len();
                         }
                         frames += 1;
+                        air_frames += usize::from(air_input);
                         supplied += batch.len();
                     }
                     assert_eq!(state.start.random.snapshot(), random);
@@ -641,9 +648,9 @@ fn original_ordinary_batches_match_selected_shot_rows_and_numeric_bits() {
     }
     assert_eq!(
         (
-            traces, frames, recipients, shots, supplied, empty, air, flights, falling
+            traces, frames, recipients, shots, supplied, empty, air_frames, flights, falling
         ),
-        (7, 157, 785, 90, 24, 1, 1, 1, 4)
+        (7, 158, 790, 90, 24, 1, 1, 1, 4)
     );
 }
 

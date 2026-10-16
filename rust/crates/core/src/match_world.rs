@@ -755,7 +755,9 @@ impl Match {
         Ok(())
     }
 }
-fn world_can_stamp(game: &Game, rules: &crate::rules::Rules, cells: &[usize]) -> bool {
+/// Test a bounded, nonempty footprint against physical terrain and live occupancy.
+/// World ownership, visibility and rail exclusions are separate placement queries.
+pub fn world_can_stamp(game: &Game, rules: &crate::rules::Rules, cells: &[usize]) -> bool {
     if cells.is_empty()
         || cells.iter().any(|&c| {
             c >= game.flags.len()

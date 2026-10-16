@@ -10,6 +10,8 @@ use crate::{
     weather::{WeatherRow, WeatherRules},
 };
 use serde_json::{Map, Value, json};
+#[path = "recipient_snapshot/aircraft.rs"]
+mod aircraft;
 #[path = "recipient_snapshot/composition.rs"]
 mod composition;
 #[path = "recipient_snapshot/delivery.rs"]
@@ -149,6 +151,7 @@ impl<'a> SnapshotCache<'a> {
             finite(&[u.x, u.z])?;
         }
         engineering::validate(state)?;
+        aircraft::validate(state)?;
         let rows = state
             .world
             .game
@@ -247,9 +250,6 @@ fn unit_row(state: &Match, u: &Unit) -> Result<Value, SnapshotError> {
         unit: u.id,
         capability,
     };
-    if u.air.is_some() || k.air {
-        return Err(unsupported(SnapshotCapability::Air));
-    }
     let def = Catalog::compiled()
         .map_err(|_| SnapshotError::Rules)?
         .unit(&k.name)
@@ -309,6 +309,9 @@ fn unit_row(state: &Match, u: &Unit) -> Result<Value, SnapshotError> {
         u.built.unwrap_or(1.0),
     ])?;
     let mut flags = 0u64;
+    if u.air.is_some() && !vision::airborne(u) {
+        flags |= 512;
+    }
     if u.riding {
         flags |= 262144;
     }

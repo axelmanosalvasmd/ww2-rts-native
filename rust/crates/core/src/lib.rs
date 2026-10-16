@@ -31,6 +31,10 @@ pub mod combat;
 pub mod command_destinations;
 pub mod command_feedback;
 pub mod commander_ai;
+pub mod commander_assault;
+pub mod commander_classic_rules;
+mod commander_construction;
+mod commander_fortification;
 mod commander_forward_hq;
 pub mod commander_mind;
 mod commander_shopping;
@@ -57,6 +61,7 @@ pub mod human_commander_policy;
 pub mod human_commander_state;
 pub mod human_commander_timing;
 pub mod match_horde;
+pub mod recipient_availability;
 
 #[cfg(test)]
 use crate as core_api;
@@ -165,7 +170,9 @@ pub mod match_world_tick;
 
 pub mod match_world_memory;
 pub mod world_memory;
+pub mod world_placement;
 pub mod world_recipient_metadata;
+pub mod world_supply;
 pub mod world_territories;
 
 pub mod staged_observer;
