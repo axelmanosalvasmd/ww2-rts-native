@@ -23,3 +23,7 @@ Parents: the sandbox merge `f2481f96` and #386 `9aa5438826ce032462c94f9c312189b1
 - `server/src/lobby.rs`, one hunk: retain #386's custom authoring-map load path, #404's map-dependent logistics option and #393's sandbox flag. Resolve the map once before constructing options, then construct the same canonical Match from that map.
 
 All other paths merged automatically, including scenario tests, registrations, save compatibility and command/runtime guards.
+
+## Shared flight zero literals
+
+The first integrated run at `dbce513d` passed 295 of 296 selected tests, including all six new placement witnesses. The sandbox exact-flight test expected floating-point JSON zero storage, while #404's common flight projector normalizes zeros to integer JSON storage. Update only the expected zero literals in `sandbox_live_flights_use_current_pose_exact_shape_and_recipient_visibility`: the two zero velocity components, gravity and launch time. Retain every field, value, visibility assertion and complete-frame assertion. No production code changes for this correction. Clippy was not reached after that test failure.
