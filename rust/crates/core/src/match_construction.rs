@@ -1062,3 +1062,7 @@ impl Match {
 #[cfg(test)]
 #[path = "match_construction_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "base_native_intent_tests.rs"]
+mod native_intent;

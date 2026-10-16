@@ -2039,5 +2039,13 @@ mod trusted_room_tests;
 mod lobby_socket_tests;
 
 #[cfg(test)]
+#[path = "combat_deny_tests.rs"]
+mod combat_deny_tests;
+
+#[cfg(test)]
+#[path = "net_batch50_lobby_tests.rs"]
+mod net_batch50;
+
+#[cfg(test)]
 #[path = "mode_runtime_a_tests.rs"]
 mod mode_runtime_a_tests;
