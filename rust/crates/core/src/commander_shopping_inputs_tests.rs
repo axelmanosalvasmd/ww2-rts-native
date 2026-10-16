@@ -312,7 +312,7 @@ fn intent_ai33_classic_reserves_only_non_depot_builds_and_rush_releases_them() {
 }
 
 #[test]
-fn intent_ai33_deferred_fort_jobs_do_not_consume_the_shopping_wallet() {
+fn intent_ai33_fort_jobs_charge_gate_and_leave_deferred_wall_segments_for_ticks() {
     let mut input = fixture(vec![
         unit(1, "rifle", 30.0),
         unit(2, "mg", 32.0),
@@ -320,6 +320,7 @@ fn intent_ai33_deferred_fort_jobs_do_not_consume_the_shopping_wallet() {
         unit(4, "hq", 20.0),
     ]);
     input.tick = 3000;
+    input.players[1].spawn = Point { x: 140.0, z: 20.0 };
     let observation = Observation::new(input).unwrap();
     let context = observation.input().runtime.as_ref().unwrap();
     let ground = sight_game(&observation, context);
@@ -336,9 +337,9 @@ fn intent_ai33_deferred_fort_jobs_do_not_consume_the_shopping_wallet() {
             &mut BTreeMap::from([(4, step)]),
         )
         .unwrap();
-        assert_eq!(r.remaining_mp, 300.0);
+        assert_eq!(r.remaining_mp, if step == 3 { 150.0 } else { 300.0 });
         assert_eq!(r.reserve, 0.0);
-        assert!(r.commands.is_empty());
+        assert!(!r.commands.is_empty());
     }
 }
 

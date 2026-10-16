@@ -12,4 +12,4 @@ Save files still contain commander seats only. Existing connected people not ass
 
 Ordinary watcher flight rows use the prototype's full-map overlay and identity predicate (`server.js:204,217-220`; `shared/sim.js:5945-5997`). Their existing `flight`, `kind`, optional `effect`, `seq`, position, velocity, gravity and time fields include unseen or retired shooters. Prediction ends at expiry, 0.15 seconds or canonical visible contact. Seat recipients retain their ground-fog and shooter-visibility rules. Horde retains its ground-projectile validation and aircraft-weapon restriction.
 
-The literal test mapping and merge record are in `docs/testing/room-ai3-20261016.md`. Hermes' exact-head runtime acknowledgment and hosted merge gates remain with the orchestrator.
+The literal test mapping and merge record are in `docs/testing/room-ai3-20261016.md`. Runtime review and hosted merge gates remain with the orchestrator under the current issue #5 process.

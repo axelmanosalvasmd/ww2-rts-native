@@ -239,3 +239,6 @@ mod save_state;
 
 #[cfg(test)]
 mod match_horde_operative_tests;
+
+pub mod commander_field_policy;
+pub mod commander_world_policy;
