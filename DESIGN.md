@@ -4204,3 +4204,39 @@ The complete pinned spread part of `test.js:1316-1326` requires all six rifles t
 The full five-row audit remains separate from this one-row change. Actual native2 and fmt pass once at `1785b9db55ef246e35f6ac9de9c770cd1033f390`, followed by strict core Clippy at that same head. Preserve the original native receipt-reader125 and Root reconciliation separately. Source generation/check for both command scenes remain at `f8ff612c0fe534e60188ef6b02bc0a58ec4b9dc7`. Ready replacement at 733 uses the target owner's Destroy while the first target is alive at 85 HP; it launches immediately and damages the replacement by 737. The old selected-retarget scene instead kills by physical fire at 14 and replaces at 15 with positive cooldown and no shot on that tick. Neither is relabeled as the other. The purchased medic proves actual 120 MP production and naturally unseen Unseen at 3 versus visible unarmed QueueFull at 700. The older all-visible route witness remains QueueFull. These commands and their complete consumed-input receipts do not alone complete the other four literal row checks.
 
 This documentation child executes no Source, Node, Cargo, rustc, native, formatter, lint, discovery or CI job and takes no slot. It changes no Rust, harness, input, fixture, registry, shipping provider, FFI, wire, contract or reference pin. Historical successes and failures retain their producing heads; no old green result becomes a pass at this child. Full typed-union and table-inverse records are private at `/tmp/cmb-five-literal-audit-6fa7-20261016/`. Root owns fresh independent exact-head review, integration onto its selected main, hosted qualification and publication. ALIGNED 83/91 and held combat work remain outside this change. Receipt is not owner consent, default approval, provider adoption or Unreal acceptance.
+
+
+## Native combat intent batches (2026-10-16, unrun)
+
+Apply Axel's literal approval of rules 1 to 5 in issue #5 comment
+6206861267. Hermes comment 6206844573 adds no requirements. Behavior rows
+use native intent tests plus prototype review; pure functions, tables and
+single components retain their exact checks. No behavior Source recorder,
+captured fixture or provenance bundle is added. Historical command captures,
+failures and producing-head passes remain unchanged.
+
+The first assigned 50-row window now has 43 new tests in the registered
+`combat_feature_tests` lib module, plus the unchanged CMB-88 spread check.
+The tests create authored physical terrain and canonical unit/control owners,
+then call shipping command, targeting, reaction, ability, healing, vision
+and snapshot providers. CMB-87 uses the prototype test's explicit dead-target
+transition, requires a replacement launch on that same acquisition tick,
+and checks subsequent physical-flight damage. This does not reinterpret the
+older Destroy and physical-kill command receipts.
+
+[The row map](docs/testing/combat-native-feature-batches.md) lists all 66
+assigned IDs, exact native tests, prototype references and remaining gaps.
+No new row is ported before actual native results and prototype intent
+review. Incomplete rows stay pending while the other rows continue. FireAt,
+Garrison, ghost/guard/Horde visibility and client-only work have concrete
+provider gaps. Component tests do not fill those gaps. The second 16-row
+window remains separate from the first candidate window.
+
+This source change runs no native, Source, formatter, Clippy or CI job.
+Root must grant one focused nextest batch with no-fail-fast, the assigned
+exclusive target, current inherited slot guard and resource caps. Do not
+retry semantic failures. Root combines combat contributions under the
+50-row file limit and owns publication. No shipping provider, interface,
+ABI, wire, terrain policy, reference pin or intentional gameplay difference
+changes in this test-only work. Runtime changes still need exact-head
+Hermes acknowledgment and deliberate observable differences need Axel.
