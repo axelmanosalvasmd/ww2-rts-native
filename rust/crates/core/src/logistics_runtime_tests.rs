@@ -137,8 +137,11 @@ fn logistics_runtime_ordinary_logistics_off_ticks_and_complete_snapshots_still_w
             TickPhase::SupplyNetwork,
             TickPhase::Convoys,
         ] {
-            assert!(report.unavailable.contains(&phase));
+            assert!(!report.unavailable.contains(&phase));
+            assert!(!report.phases.contains(&phase));
         }
+        assert!(m.convoys.is_none());
+        assert!(m.logistics.iter().next().is_none());
         let frame = delivery
             .capture_with_lists(&mut m, &[true, true], &[false, false], &[])
             .unwrap();

@@ -49,7 +49,7 @@ Locations below refer to the resulting source, not conflict-marker positions.
   retain PR 375's logistics save admission elsewhere in the document.
 - Second merge, `core/src/match_tick.rs:862` and `:893`: keep PR 375's convoy-state
   predicates and nonzero network beat, with main's complete victory dispatch.
-- Second merge, `core/src/match_logistics.rs:966`: keep PR 375's `non_truck`
+- Second merge, `core/src/match_logistics.rs:967`: keep PR 375's `non_truck`
   signature, unsupported-command refusal and both matching call sites. Remove
   unused `unit_will_force_withdrawal`; main's canonical exit preflight replaces it.
 - Second merge, `core/src/match_withdrawal.rs:76` and `:138`: keep PR 375's work
@@ -71,7 +71,7 @@ logistics can tick and deliver while both option/convoy mismatches still reject
 before clock, reserve or control mutation. The convoy witness retains truck
 birth and repeated service checks with supported complete delivery.
 
-The player-control test at `:231` retains stop, escape, blocked attack-move,
+The player-control test at `:239` retains stop, escape, blocked attack-move,
 retreat and recovery checks. Its former allowed-stance assertion now requires
 `Needs` and exact unchanged controls/hold position, matching main and the
 prototype's real command path. No inherited main assertion is weakened.
@@ -102,3 +102,10 @@ blanket guard to PR 375's initialized-state refusal.
 The older `fix-322-logistics-admission.md` is a historical guard-closed receipt.
 This stacked repair supersedes its admission narrative and LOG-13 full-row claim.
 Fresh Hermes acknowledgment is required. Merges after PR 373 and PR 375.
+
+The first focused run on `28d2d88e` passed 142 of 143 tests. Its sole failure
+was the old logistics-off `unavailable` report expectation. PR 375 now implements
+those phases, so `core/src/logistics_runtime_tests.rs:128` retains 45 ticks and
+every-seat complete delivery while requiring that all three logistics phases
+are neither unavailable nor executed, and that convoys and reserves remain
+absent. Runtime code is unchanged by this test repair.
