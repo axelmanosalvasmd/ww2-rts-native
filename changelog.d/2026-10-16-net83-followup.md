@@ -1,0 +1,1 @@
+- Add a NET-83 test that disconnects the first seat through match completion, checks that names, teams and story move with the surviving player, and checks empty report rows when an AI seat is added.
