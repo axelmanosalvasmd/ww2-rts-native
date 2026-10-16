@@ -216,8 +216,9 @@ it (`server.js:246`; `server/room-tick.js:25-34`).
 
 A live `flights` entry has `flight` (projectile ID), `kind` (unit type), optional
 `effect`, `seq` (contact sequence), `x`, `y`, `z` (current position), `v` (current
-`[vx, vy, vz]`), `gravity`, `time`, `launched`, `expires` and `until`. It appears
-only after launch and while its current ground cell is visible to the recipient's
+`[vx, vy, vz]`), `gravity`, `time`, `launched`, `expires` and `until`. `time` is the current simulation
+time; the other three are absolute simulation times. Velocity is in metres per
+second and gravity is in metres per second squared. A row appears only after launch and while its current ground cell is visible to the recipient's
 team, or during reveal. `f` and `fo` appear together only when the recipient sees
 the shooter. No target fields appear. `until` is bounded by expiry, the next
 0.15 seconds, the first hidden ground cell and the first visible static contact.
