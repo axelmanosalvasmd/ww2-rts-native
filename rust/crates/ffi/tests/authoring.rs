@@ -10,7 +10,7 @@ fn call(query: Query, input: &Value) -> Value {
     let mut output = vec![0_i8; 128 * 1024];
     let mut written = 0;
     // SAFETY: both buffers and the output length are valid for the provided lengths.
-    let status = unsafe {
+    let mut status = unsafe {
         query(
             input.as_ptr().cast(),
             input.len(),
@@ -19,6 +19,19 @@ fn call(query: Query, input: &Value) -> Value {
             &mut written,
         )
     };
+    if status == WW2_ERR_CAPACITY {
+        output.resize(written, 0);
+        // SAFETY: the resized buffer owns the reported capacity and remains disjoint.
+        status = unsafe {
+            query(
+                input.as_ptr().cast(),
+                input.len(),
+                output.as_mut_ptr(),
+                output.len(),
+                &mut written,
+            )
+        };
+    }
     let mut error = [0 as c_char; 512];
     let mut error_len = 0;
     // SAFETY: disjoint writable error buffer and count storage.
@@ -433,8 +446,10 @@ fn sixty_seeded_c_matches_reproduce_the_editor_unfair_verdict_by_authored_spawn(
     let mut timeouts = 0;
     let mut winning_seats = std::collections::BTreeSet::new();
     for seed in 7..67 {
-        let result = call(ww2_authoring_play_match,
-            &json!({"map":source,"seed":seed,"max_ticks":2400,"options":{"players":2}}));
+        let result = call(
+            ww2_authoring_play_match,
+            &json!({"map":source,"seed":seed,"max_ticks":2400,"options":{"players":2}}),
+        );
         if result["timedOut"] == true {
             timeouts += 1;
             continue;
@@ -442,18 +457,60 @@ fn sixty_seeded_c_matches_reproduce_the_editor_unfair_verdict_by_authored_spawn(
         let winner = result["winner"].as_u64().unwrap() as usize;
         winning_seats.insert(winner);
         let spawn = &result["players"][winner]["spawn"];
-        let index = if spawn == &json!({"x":9.0,"z":9.0}) { 0 }
-            else if spawn == &json!({"x":183.0,"z":183.0}) { 1 }
-            else { panic!("winner has no authored spawn: {result}") };
+        let index = if spawn == &json!({"x":9.0,"z":9.0}) {
+            0
+        } else if spawn == &json!({"x":183.0,"z":183.0}) {
+            1
+        } else {
+            panic!("winner has no authored spawn: {result}")
+        };
         wins[index] += 1;
     }
     // client/fairness.js credits the shuffled start; editor.js:392-399 uses this precedence.
     let played = 60 - timeouts;
-    let percentages = wins.map(|n| if played == 0 { 0 } else { (f64::from(n) / f64::from(played) * 100.0).round() as u32 });
-    let verdict = if timeouts > 12 { "too-long" }
-        else if played < 60 { "too-few" }
-        else if percentages.iter().any(|p| *p < 30 || *p > 70) { "unfair" }
-        else { "fair" };
-    assert_eq!((wins,timeouts,percentages,verdict),([60,0],0,[100,0],"unfair"));
-    assert_eq!(winning_seats.len(),2,"spawn attribution must survive seat shuffling");
+    let percentages = wins.map(|n| {
+        if played == 0 {
+            0
+        } else {
+            (f64::from(n) / f64::from(played) * 100.0).round() as u32
+        }
+    });
+    let verdict = if timeouts > 12 {
+        "too-long"
+    } else if played < 60 {
+        "too-few"
+    } else if percentages.iter().any(|p| *p < 30 || *p > 70) {
+        "unfair"
+    } else {
+        "fair"
+    };
+    assert_eq!(
+        (wins, timeouts, percentages, verdict),
+        ([60, 0], 0, [100, 0], "unfair")
+    );
+    assert_eq!(
+        winning_seats.len(),
+        2,
+        "spawn attribution must survive seat shuffling"
+    );
+}
+
+#[test]
+fn every_committed_map_builds_a_detached_conquest_preview_through_c() {
+    for &(name, source) in authored_maps::MAPS {
+        let source: Value = serde_json::from_str(source).unwrap();
+        let preview = call(
+            ww2_authoring_create_preview,
+            &json!({"map":source,"options":{"mode":"conquest","players":2}}),
+        );
+        assert_eq!(preview["w"], source["w"], "{name}");
+        assert_eq!(preview["h"], source["h"], "{name}");
+        assert_eq!(preview["players"].as_array().unwrap().len(), 2, "{name}");
+        assert_eq!(
+            preview["map"]["layers"]["ground"].as_array().unwrap().len() as u64,
+            source["h"].as_u64().unwrap(),
+            "{name}"
+        );
+        assert!(!preview["units"].as_array().unwrap().is_empty(), "{name}");
+    }
 }

@@ -234,6 +234,6 @@ mod save_codec;
 mod save_state;
 
 pub mod authoring_queries;
-pub mod recipient_placement;
 pub mod commander_field_policy;
 pub mod commander_world_policy;
+pub mod recipient_placement;
