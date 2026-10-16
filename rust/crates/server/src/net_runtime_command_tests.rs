@@ -25,6 +25,7 @@ fn drain(rx: &mut mpsc::Receiver<Output>) -> Vec<Value> {
         match output {
             Output::Json(value) => messages.push(value),
             Output::Snapshot(write) => messages.push(serde_json::from_str(&write.json).unwrap()),
+            Output::Watcher(_) => panic!("unexpected spectator output for commander"),
             Output::Close(..) => panic!("unexpected close"),
         }
     }

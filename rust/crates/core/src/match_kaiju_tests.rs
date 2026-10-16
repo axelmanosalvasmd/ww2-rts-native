@@ -288,3 +288,96 @@ fn ordinary_ticks_and_recipient_snapshot_keep_horde_breath_unreachable() {
     assert_eq!(m.firing.events, before);
     assert!(m.horde.is_none());
 }
+
+#[test]
+fn cmb59_breath_full_range_and_radius_boundaries_hit_once_without_falloff() {
+    let mut m = combat_scene(1);
+    let boss = add(&mut m, "kaiju", 1, 61.0, 61.0);
+    let target = add(&mut m, "rifle", 0, 71.0, 61.0);
+    let mut cases = Vec::new();
+    // sim.js: along > 0 && along <= 34 && across <= 2.5 + radius (1.5).
+    for (x, z, hit) in [
+        (95.0, 61.0, true),
+        (95.000001, 61.0, false),
+        (61.0, 65.0, false),
+        (61.000001, 65.0, true),
+        (81.0, 65.0, true),
+        (81.0, 65.000001, false),
+        (81.0, 57.0, true),
+        (81.0, 56.999999, false),
+    ] {
+        let id = add(&mut m, "rifle", 0, x, z);
+        cases.push((id, hit, m.world.game.units[&id].hp));
+    }
+    m.fire_breath(boss, target).unwrap();
+    for (id, hit, hp) in cases {
+        assert_eq!(
+            hp - m.world.game.units[&id].hp,
+            if hit { 40.0 } else { 0.0 }
+        );
+        assert_eq!(
+            m.firing
+                .events
+                .iter()
+                .filter(|e| matches!(e,
+            LaunchEvent::Environment(crate::environment::Effect::Hurt(h)) if h.unit == id))
+                .count(),
+            usize::from(hit)
+        );
+    }
+}
+
+#[test]
+fn cmb59_breath_terrain_samples_scar_once_and_obey_seeded_ignition_predicates() {
+    for (wet, burnt, wear, existing_fire, can_ignite) in [
+        (0.0, 0, 0.0, false, true),
+        (0.35, 0, 0.0, false, false),
+        (0.349999, 0, 0.0, false, true),
+        (0.0, 1, 0.0, false, false),
+        (0.0, 0, 0.5, false, false),
+        (0.0, 0, 0.0, true, true),
+    ] {
+        let mut m = combat_scene(1);
+        let boss = add(&mut m, "kaiju", 1, 61.0, 61.0);
+        let target = add(&mut m, "rifle", 0, 71.0, 61.0);
+        m.start.environment_seed = 1;
+        m.world.game.wet = Some(wet);
+        m.world.burnt.fill(burnt);
+        m.world.game.wear.as_mut().unwrap().fill(wear);
+        if existing_fire {
+            m.world.fires.insert(1772, 2.5);
+        }
+        m.fire_breath(boss, target).unwrap();
+        // Pinned damageCells: 4..=34 by 2m, radius 2.5, cell reach 3.5,
+        // terrain 250, scar 0.25, scar.hit 600. Overlap retains the first sample.
+        assert_eq!(m.world.scar.iter().filter(|v| **v != 0.0).count(), 54);
+        for (cell, expected) in [
+            (1772, f32::from_bits(0x3da5_ed09)),
+            (1831, f32::from_bits(0x3da5_ed09)),
+            (1832, f32::from_bits(0x3dd5_5555)),
+            (1833, f32::from_bits(0x3da5_ed09)),
+            (1892, f32::from_bits(0x3da5_ed09)),
+            (1830, 0.0),
+            (1849, 0.0),
+        ] {
+            assert_eq!(
+                m.world.scar[cell].to_bits(),
+                expected.to_bits(),
+                "cell {cell}"
+            );
+        }
+        // Seed 1 consumes one draw per unique grass cell. Exactly cell 1772
+        // draws below CFG.fire.ignite['.'] (0.03), before flammability checks.
+        assert_eq!(m.start.environment_seed, 120306095);
+        assert_eq!(
+            m.world.fires.iter().map(|(c, _)| *c).collect::<Vec<_>>(),
+            if can_ignite { vec![1772] } else { vec![] }
+        );
+        if can_ignite {
+            assert_eq!(
+                *m.world.fires.get(&1772).unwrap(),
+                if existing_fire { 2.5 } else { 5.0 }
+            );
+        }
+    }
+}

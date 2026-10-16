@@ -868,7 +868,9 @@ fn eng12_unrepresented_modes_and_logistics_cannot_publish_paid_or_waiting_gates(
     for (mode, game_mode, logistics) in [
         (Mode::Tutorial, Some(crate::game::ModeKind::Tutorial), false),
         (Mode::World, Some(crate::game::ModeKind::World), false),
-        (Mode::Classic, Some(crate::game::ModeKind::Classic), false),
+        (Mode::Horde, Some(crate::game::ModeKind::Horde), false),
+        (Mode::Classic, None, false),
+        (Mode::Default, Some(crate::game::ModeKind::Classic), false),
         (Mode::Default, None, true),
     ] {
         let (mut m, id) = scene();
