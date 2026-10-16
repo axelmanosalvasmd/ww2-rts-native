@@ -589,6 +589,24 @@ pub fn end_spots(
     let view = terrain(context);
     validate(context, view)?;
     validate_requests(context, go, face)?;
+    // An unseen World click must not select spots using hidden physical terrain.
+    // One unseen destination bypasses settling for the whole command, as in Source.
+    if context.game.mode == Some(ModeKind::World) {
+        for request in go {
+            let owner = unit(context, request.id)?.owner;
+            let team = crate::match_actor::checked_game_team(context.game, owner)
+                .map_err(|_| Error::InvalidUnit(request.id))?;
+            if !crate::vision::team_sees(
+                context.game,
+                context.rules,
+                context.grid,
+                team,
+                request.at,
+            ) {
+                return Ok(go.to_vec());
+            }
+        }
+    }
     let b = Behavior::compiled()?;
     let mut out = go.to_vec();
     let skip: BTreeSet<_> = go.iter().map(|o| o.id).collect();

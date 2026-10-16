@@ -10,6 +10,12 @@ Read current main before integration: it lacks ai_receipt_input and ai_delivered
 
 # Three Crossroads Native: design decisions
 
+## Typed scenario conditions and core refunds (2026-10-16)
+
+Scenario condition evaluation borrows typed authored state while reading current units, point owners and World region teams from Match. A caller supplies the context and shares an explicit work budget across evaluations. This keeps condition reads separate from scenario admission, trigger scheduling, actions and recipient projection. The evaluator follows the pinned condition semantics, including historical captures, pending arrivals, context fallback and short-circuit work charges. A 64-level guard protects callers that construct trees directly; validated authored trees remain below it.
+
+Waiting-job refunds prepare small production and wallet drafts before publishing the negative MP-spent tally. Site cancellation uses the existing World transaction before the wallet, story and metadata cleanup commit. These core operations add no network admission. Full MODE-91 remains held beyond the selected refund and recovery checks. MODE-83 proves the condition component, not an admitted authored-scenario match.
+
 
 ## First-five engineering merged with MAP273 main (2026-10-16, source only)
 
@@ -4828,6 +4834,10 @@ and Unreal acceptance are not completed by these selected component rows.
 ## AI sighting test lint correction (2026-10-16)
 
 PR #274 strict Clippy rejected a nested conditional in the stillness-reset assertion. Combine the existing option match and movement threshold with a let chain. The condition, assertions and authored inputs stay the same.
+
+## Native server diagnostics (2026-10-16)
+
+NET-97 uses the existing host tick meter and an opt-in bounded writer. `WW2_DIAG=1` appends room JSONL records under the process working directory's `logs/`; `WW2_TICKLOG=1` prints phase percentiles every thirty seconds. Library hosts choose a diagnostic directory through `Config`. A 64-record channel keeps file writes outside the room lock; full queues and file errors discard diagnostic records without affecting the match. Native scheduler delay measures excess over the ten-millisecond maintenance poll, providing the equivalent of the prototype's event-loop delay. Timestamps are Unix milliseconds. A separate optional socket gauge measures queued UTF-8 payload bytes for all output classes and preserves the existing UTF-16 snapshot admission threshold. Browser metrics stay host-private. None of these measurements enters the deterministic rules state or recipient snapshots.
 
 ## Horde wave phase and scenario type validation (2026-10-16)
 

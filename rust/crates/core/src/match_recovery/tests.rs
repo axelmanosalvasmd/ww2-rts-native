@@ -1173,3 +1173,54 @@ fn invalid_world_recovery_actor_rejects_before_health_wallet_or_metadata() {
     );
     assert_eq!(m.recovery, metadata);
 }
+
+#[test]
+fn mode91_recovery_spending_tracks_actual_charges_and_freezes_after_finish() {
+    let fixture: Value =
+        serde_json::from_str(include_str!("../../tests/fixtures/match-recovery.json")).unwrap();
+    for name in [
+        "infantry-timer-modelheal-wallet-and-reset",
+        "vehicle-rate-wallet-provisions-and-insufficient-wallet",
+    ] {
+        let case = fixture["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|case| case["name"] == name)
+            .unwrap();
+        let (mut m, order) = make(case);
+        m.options.logistics = false;
+        m.convoys = None;
+        m.start.economy.players[0].mp = 500.0;
+        m.recovery.get_mut(2).unwrap().reinforcement = 10.0;
+        let wallet = m.start.economy.players[0].mp;
+        let hp = m.world.game.units[&2].hp;
+        let frame = m.prepare_recovery(&order).unwrap();
+        m.reinforce(&frame, 0.05).unwrap();
+        let spent = wallet - m.start.economy.players[0].mp;
+        assert!(spent > 0.0 && m.world.game.units[&2].hp > hp, "{name}");
+        assert!((m.story[0].mp_spent - spent).abs() < 1e-10, "{name}");
+        assert_eq!(m.story[1], PlayerStory::default());
+        assert_eq!(m.story[2], PlayerStory::default());
+        m.world.game.units.get_mut(&2).unwrap().hp = hp;
+        m.start.economy.players[0].mp = 0.0;
+        m.recovery.get_mut(2).unwrap().reinforcement = 10.0;
+        m.reinforce(&frame, 0.05).unwrap();
+        assert_eq!(m.world.game.units[&2].hp, hp);
+        assert_eq!(m.start.economy.players[0].mp, 0.0);
+        let story = m.story.clone();
+        m.finish = Some(crate::match_end::MatchFinish {
+            winner: 0,
+            reason: crate::match_end::EndReason::Headquarters,
+            end_at: Point { x: 15.0, z: 15.0 },
+            end_tick: m.world.game.tick,
+        });
+        m.start.economy.players[0].mp = 500.0;
+        m.reinforce(&frame, 0.05).unwrap();
+        assert!(m.start.economy.players[0].mp < 500.0, "{name}");
+        assert_eq!(
+            m.story, story,
+            "decided recovery leaves report counters frozen"
+        );
+    }
+}
