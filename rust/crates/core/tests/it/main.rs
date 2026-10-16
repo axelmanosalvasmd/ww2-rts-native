@@ -7,6 +7,8 @@
 
 #[path = "../authoritative_maps.rs"]
 mod authoritative_maps;
+#[path = "../base_audit_features.rs"]
+mod base_audit_features;
 #[path = "../client_view.rs"]
 mod client_view;
 #[path = "../combat.rs"]
@@ -35,6 +37,8 @@ mod field_projects;
 mod field_works;
 #[path = "../formation.rs"]
 mod formation;
+#[path = "../fps_intent.rs"]
+mod fps_intent;
 #[path = "../grid.rs"]
 mod grid;
 #[path = "../human_commander_inputs.rs"]
@@ -43,16 +47,24 @@ mod human_commander_inputs;
 mod human_commander_state;
 #[path = "../human_commander_timing.rs"]
 mod human_commander_timing;
+#[path = "../interface_intent.rs"]
+mod interface_intent;
 #[path = "../legacy_scenario.rs"]
 mod legacy_scenario;
 #[path = "../logistics.rs"]
 mod logistics;
+#[path = "../logistics_features.rs"]
+mod logistics_features;
 #[path = "../match_combat.rs"]
 mod match_combat;
 #[path = "../match_routing.rs"]
 mod match_routing;
 #[path = "../math.rs"]
 mod math;
+#[path = "../mode_intent_batch1.rs"]
+mod mode_intent_batch1;
+#[path = "../mode_point_services.rs"]
+mod mode_point_services;
 #[path = "../objectives.rs"]
 mod objectives;
 #[path = "../observed_memory.rs"]

@@ -450,3 +450,6 @@ async fn net30_websocket_host_recomputes_across_humans_offline_fallback_and_watc
     })
     .await;
 }
+
+#[path = "net_batch50_socket_tests.rs"]
+mod net_batch50_socket;
