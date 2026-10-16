@@ -341,6 +341,9 @@ impl Match {
                 crate::economy::Mode::Default | crate::economy::Mode::Conquest,
                 None
             ) | (
+                crate::economy::Mode::Tutorial,
+                Some(crate::game::ModeKind::Tutorial)
+            ) | (
                 crate::economy::Mode::World,
                 Some(crate::game::ModeKind::World)
             )
@@ -411,7 +414,7 @@ impl Match {
         }
         Ok(())
     }
-    fn firing_damage_view<'a>(
+    pub(crate) fn firing_damage_view<'a>(
         &'a mut self,
         unit_order: &'a [UnitId],
     ) -> (crate::match_combat::DamageWorld<'a>, &'a mut FiringState) {
@@ -1819,7 +1822,7 @@ impl Match {
         let targets = self.grid.in_order(
             &g.units,
             (u.x, u.z),
-            n(w, "range", 0.0) + if g.naval { 55.0 } else { 0.0 },
+            self.weapon_range(u, w)? + if g.naval { 55.0 } else { 0.0 },
             |_, t| t.hp > 0.0 && t.air.is_none() && !g.allied(t.owner, u.owner) && actor.sees(t.id),
         );
         let mut best = 0;
@@ -1953,6 +1956,26 @@ impl Match {
     fn weapon(&self, u: &Unit) -> Result<Option<&'static Value>, String> {
         Ok(self.definition(u)?.get("w"))
     }
+    fn weapon_range(&self, unit: &Unit, weapon: &Value) -> Result<f64, String> {
+        let range = n(weapon, "range", 0.0);
+        let name = &self.rules.kinds[unit.kind].name;
+        let in_pit = matches!(name.as_str(), "mg" | "at" | "mortar" | "flak" | "howitzer")
+            && self.world.game.cell_of(unit.x, unit.z).is_some_and(|cell| {
+                self.field_works.pits().contains(&cell) && self.world.game.chars[cell] == b'T'
+            });
+        if !in_pit {
+            return Ok(range);
+        }
+        let bonus = Catalog::compiled()
+            .map_err(|e| e.to_string())?
+            .table("FORTS")
+            .map_err(|e| e.to_string())?
+            .get("nest")
+            .and_then(|v| v.get("range"))
+            .and_then(Value::number)
+            .ok_or("missing Gun Pit range rule")?;
+        Ok(range * bonus)
+    }
     fn hull_point(&self, from: Point, target: &Unit) -> Point {
         let h = self.rules.kinds[target.kind].hull;
         if h == 0.0 {
@@ -2026,7 +2049,7 @@ impl Match {
         let Some(w) = self.weapon(u)? else {
             return Ok(false);
         };
-        let range = n(w, "range", 0.0);
+        let range = self.weapon_range(u, w)?;
         if range == 0.0
             || !self.logistics.can_fire(u.id, 1.0)
             || t.hp <= 0.0
@@ -2474,6 +2497,10 @@ mod mov_audit;
 #[cfg(test)]
 #[path = "audit_combat_native.rs"]
 mod audit_native;
+
+#[cfg(test)]
+#[path = "engineering_runtime2_pit_tests.rs"]
+mod engineering_runtime2_pit_tests;
 
 #[cfg(test)]
 #[path = "map_feature_tests.rs"]

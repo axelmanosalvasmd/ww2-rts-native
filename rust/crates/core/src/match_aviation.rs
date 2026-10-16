@@ -143,7 +143,7 @@ impl Match {
     }
     fn validate_aviation_context(&self, horde_spawn: bool) -> Result<(), AviationError> {
         let g = &self.world.game;
-        if !(matches!(self.options.mode, Mode::Default | Mode::Conquest) && g.mode.is_none()
+        if !(crate::match_actor::ordinary_ground_mode(g, self.options.mode)
             || horde_spawn
                 && self.options.mode == Mode::Horde
                 && g.mode == Some(crate::game::ModeKind::Horde)
@@ -230,8 +230,7 @@ impl Match {
     }
     /// Nearest finished own airfield, otherwise the source off-map base past HQ.
     pub fn aircraft_base(&self, owner: usize, at: Point) -> Result<Point, AviationError> {
-        if !(matches!(self.options.mode, Mode::Default | Mode::Conquest)
-            && self.world.game.mode.is_none()
+        if !(crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode)
             || self.options.mode == Mode::Horde
                 && self.world.game.mode == Some(crate::game::ModeKind::Horde)
                 && self.start.shared_defenders.is_some())

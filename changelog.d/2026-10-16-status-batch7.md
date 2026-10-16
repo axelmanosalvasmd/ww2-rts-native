@@ -1,0 +1,1 @@
+- Mark 20 parity rows ported from merged native intent tests: ENG-05, 07, 16, 27, 42, 44, 63, 64 (#314, #324); MOV-23 and BASE-03 (#326); MAP-15, 19 (#328); IF-07, 14, 20 (#321); AI-02, 03, 06, 07, 09 (#329).
