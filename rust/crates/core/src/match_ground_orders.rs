@@ -257,6 +257,63 @@ impl Match {
         }
         Ok(None)
     }
+    pub(crate) fn retreat_command(
+        &mut self,
+        owner: usize,
+        ids: &[i64],
+    ) -> Result<Option<crate::match_commands::Denial>, String> {
+        use crate::{match_aircraft_commands::AircraftOrder, match_commands::Denial};
+        let command = Command::Retreat { ids: ids.to_vec() };
+        let mut aircraft = Vec::new();
+        let mut forced_air = Vec::new();
+        let mut ground = Vec::new();
+        let limit = 50.max(self.world.game.units.len());
+        for (index, &raw) in ids.iter().enumerate() {
+            let air = u32::try_from(raw)
+                .ok()
+                .filter(|id| self.world.game.units.contains_key(id))
+                .filter(|id| self.is_aircraft_command_unit(*id));
+            if let Some(id) = air {
+                if self.world.game.units[&id].owner == owner
+                    && self.logistics.get(id).is_some_and(|r| r.forced)
+                {
+                    if !self.commands.units.contains_key(&id) {
+                        return Err("missing forced retreat control".into());
+                    }
+                    forced_air.push(id);
+                }
+                if index < limit
+                    && let Some(id) = self.eligible_command_unit(raw, owner, &command)
+                {
+                    match self.prepare_aircraft_order(owner, id, AircraftOrder::Retreat) {
+                        Ok(order) => aircraft.push(order),
+                        Err(crate::match_aviation::AviationError::Unsupported(_)) => {
+                            return Ok(Some(Denial::Unsupported));
+                        }
+                        Err(error) => return Err(error.to_string()),
+                    }
+                }
+                // Retain original positions and the full tail for ground admission checks.
+                ground.push(-1);
+            } else {
+                ground.push(raw);
+            }
+        }
+        // All aircraft have passed admission before the ground owner commits its routes.
+        let denial = self.ground_retreat_command(owner, &ground)?;
+        if denial.is_some() && denial != Some(Denial::Needs) {
+            return Ok(denial);
+        }
+        for id in forced_air {
+            self.commands.units.get_mut(&id).unwrap().supply_hold = false;
+        }
+        let has_aircraft = !aircraft.is_empty();
+        for order in aircraft {
+            self.apply_aircraft_order(order);
+        }
+        Ok(if has_aircraft { None } else { denial })
+    }
+
     pub(crate) fn ground_retreat_command(
         &mut self,
         owner: usize,
@@ -303,9 +360,10 @@ impl Match {
         }
         for &id in &selected {
             self.ground_order_identity(id)?;
-            if self.world.game.units[&id].build {
-                return Ok(Some(Denial::Unsupported));
-            }
+            crate::match_construction::validate_build_activity(
+                &self.world.game.units[&id],
+                &self.commands.units[&id],
+            )?;
         }
         self.ground_order_capacity(&selected)?;
         let mut forced = Vec::new();
