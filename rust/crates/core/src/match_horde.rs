@@ -417,12 +417,6 @@ impl Match {
         {
             return Err("Horde needs an attacker spawn".into());
         }
-        if map.source().get("scenario").is_some() {
-            return Err("Horde startup does not yet apply authored scenarios".into());
-        }
-        if options.army == ArmySize::Endless {
-            return Err("Horde does not support Endless armies".into());
-        }
         let defenders = options.players.len();
         let faction = [Faction::Germany, Faction::Ussr, Faction::Usa]
             .into_iter()
@@ -500,7 +494,7 @@ impl Match {
             ArmySize::Standard => "standard",
             ArmySize::Large => "large",
             ArmySize::Massive => "massive",
-            ArmySize::Endless => return Err("Horde Endless army".into()),
+            ArmySize::Endless => "endless",
         };
         let cfg = Catalog::compiled()
             .map_err(|e| e.to_string())?

@@ -13,8 +13,8 @@ name = "ww2_core"
 
 [dependencies]
 serde = { version = "1.0.229", features = ["derive", "rc"] }
-# Match the harness parser and preserve every finite IEEE 754 number.
-serde_json = { version = "1.0.154", features = ["float_roundtrip"] }
+# Preserve finite IEEE 754 numbers and authored object order for localized text.
+serde_json = { version = "1.0.154", features = ["float_roundtrip", "preserve_order"] }
 
 [[test]]
 name = "it"

@@ -475,3 +475,43 @@ fn aircraft_purchase_and_training_pay_once_and_survive_bound_room_delivery() {
         );
     }
 }
+
+#[test]
+fn base21_logistics_training_stages_full_vehicle_reserves_before_fifo_publication() {
+    let mut state = scene(Mode::Classic, Faction::Usa);
+    // Use the same reserve initializer as constructor logistics.
+    state.options.logistics = true;
+    state.initialize_logistics().unwrap();
+    let maker = facility(&mut state, 0, "motorpool", 20, 20);
+    for _ in 0..2 {
+        state
+            .recorded_world_buy(0, "halftrack", Some(maker))
+            .unwrap();
+    }
+    let jobs = state.production.building(maker).unwrap().jobs().to_vec();
+    assert!(state.step_training(maker, 21.95).unwrap().is_none());
+    let id = state.next_unit_id;
+    let birth = state.step_training(maker, 0.05).unwrap().unwrap();
+    assert_eq!(birth.unit, id);
+    let u = &state.world.game.units[&id];
+    assert_eq!(state.rules.kinds[u.kind].name, "halftrack");
+    let reserves = state.logistics.get(id).unwrap();
+    // Prototype logistics.js:4,46-52 and sim.js:251-253.
+    assert_eq!(reserves.ammo, reserves.ammo_max);
+    assert_eq!(reserves.ammo_max, 225.);
+    assert_eq!(reserves.provisions, 120.);
+    assert_eq!(reserves.fuel, Some(180.));
+    assert_eq!(reserves.emergency, Some(60.));
+    assert!(!reserves.forced && !reserves.stranded && !reserves.exhausted);
+    let maker_state = state.production.building(maker).unwrap();
+    assert_eq!(maker_state.jobs(), &jobs[1..]);
+    assert_eq!(maker_state.progress(), 0.);
+    let second = state.step_training(maker, 22.).unwrap().unwrap().unit;
+    assert!(state.logistics.get(second).is_some());
+    assert!(state.production.building(maker).unwrap().jobs().is_empty());
+    for c in state.commands.units.values_mut() {
+        c.hold_fire = true;
+        c.auto_cast = false;
+    }
+    ordinary_ticks(&mut state, 4);
+}

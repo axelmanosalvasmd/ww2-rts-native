@@ -99,15 +99,24 @@ fn execution_valid(execution: &str) -> bool {
         .and_then(|s| s.parse::<u64>().ok())
         .is_some_and(|n| (1..=MAX_INTEGER).contains(&n) && execution == format!("scenario:{n}"))
 }
-fn supported_localization(text: &Value) -> bool {
-    text.as_object()
-        .is_none_or(|m| m.len() == 1 || m.contains_key("en"))
-}
 fn localized_text(text: &Value) -> Option<String> {
     text.as_str().map(str::to_owned).or_else(|| {
         text.get("en")
             .and_then(Value::as_str)
-            .or_else(|| text.as_object()?.values().next()?.as_str())
+            .or_else(|| {
+                let object = text.as_object()?;
+                // JavaScript enumerates canonical array-index keys before other keys.
+                object
+                    .iter()
+                    .filter_map(|(key, value)| {
+                        let index = key.parse::<u32>().ok()?;
+                        (index < u32::MAX && key == &index.to_string()).then_some((index, value))
+                    })
+                    .min_by_key(|(index, _)| *index)
+                    .map(|(_, value)| value)
+                    .or_else(|| object.values().next())?
+                    .as_str()
+            })
             .or_else(|| text.as_array()?.first()?.as_str())
             .map(str::to_owned)
     })
@@ -147,7 +156,12 @@ pub(crate) fn validate_definition(data: &Value, count: usize, mode: Mode) -> Res
         || data["version"].as_f64() != Some(1.0)
         || !matches!(
             mode,
-            Mode::Default | Mode::Conquest | Mode::Assault | Mode::Annihilation | Mode::Classic
+            Mode::Default
+                | Mode::Conquest
+                | Mode::Assault
+                | Mode::Annihilation
+                | Mode::Classic
+                | Mode::Horde
         )
         || list(data, "objectives")
             .iter()
@@ -161,14 +175,9 @@ pub(crate) fn validate_definition(data: &Value, count: usize, mode: Mode) -> Res
                 || !condition_sides_exist(&t["condition"], count)
                 || list(t, "actions").iter().any(|a| !side_exists(a, count))
         })
-        || list(data, "triggers")
-            .iter()
-            .flat_map(|t| list(t, "actions"))
-            .any(|a| a["kind"] == "say" && !supported_localization(&a["text"]))
     {
         return Err(
-            "authored scenarios require ordinary rooms, present sides, ordinary targets and supported localized text"
-                .into(),
+            "authored scenarios require non-World rooms, present sides and ordinary targets".into(),
         );
     }
     Ok(())

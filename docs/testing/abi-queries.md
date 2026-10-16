@@ -38,7 +38,7 @@ IF-12, bounded authoring exports:
 - `fairness_crosses_both_commander_beats_with_complete_recipient_delivery`
 - `rejected_modes_and_insufficient_buffers_never_publish_an_answer`
 
-These tests call every new authoring C function. Follow-up ABI-QUERIES-2 replaces the bounded opening policy with the native human commander and adds completed C-entry fairness and preview checks. Its mapping, dependencies, remaining IF-12 limits and integration record are in [abi-queries2.md](abi-queries2.md). Full IF-12 remains held for unsupported non-World startup and active match contexts. This PR does not promote a partial authoring witness to a completed row.
+These tests call every new authoring C function. Follow-up ABI-QUERIES-2 replaces the bounded opening policy with the native human commander and adds completed C-entry fairness and preview checks. Its mapping, runtime dependencies, World deferral and integration record are in [abi-queries2.md](abi-queries2.md). The follow-up connects mode-aware recipient packets, logistics and authored scenarios; its PR records the complete final-head qualification.
 
 ABI boundary checks:
 

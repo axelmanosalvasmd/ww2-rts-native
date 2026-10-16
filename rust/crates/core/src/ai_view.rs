@@ -23,6 +23,7 @@ pub struct SeatView {
     pub initial_height: Option<Vec<i8>>,
     pub works: Vec<Value>,
     pub chars: Vec<u8>,
+    pub ground: Vec<u8>,
     pub flags: Vec<u16>,
     pub height: Option<Vec<i8>>,
     pub naval: bool,
@@ -57,6 +58,7 @@ pub struct SeatMemory {
     initial_chars: Vec<u8>,
     initial_height: Option<Vec<i8>>,
     chars: Vec<u8>,
+    ground: Vec<u8>,
     flags: Vec<u16>,
     height: Option<Vec<i8>>,
     naval: bool,
@@ -161,6 +163,7 @@ impl SeatMemory {
             initial_chars: vec![b'?'; cells],
             initial_height: None,
             chars: vec![b'?'; cells],
+            ground: vec![b'?'; cells],
             flags: vec![0; cells],
             height: None,
             naval: false,
@@ -187,6 +190,19 @@ impl SeatMemory {
             .iter()
             .map(|ch| terrain_flag(terrain, *ch))
             .collect::<Result<_>>()?;
+        // Match the flat public map layer normalization until a delivered cell supplies layers.
+        self.ground = chars
+            .iter()
+            .map(|ch| {
+                if b".D+MWF".contains(ch) {
+                    *ch
+                } else if *ch == b'=' {
+                    b'W'
+                } else {
+                    b'.'
+                }
+            })
+            .collect();
         self.initial_chars = chars.clone();
         self.initial_height = height.clone();
         self.chars = chars;
@@ -328,6 +344,17 @@ impl SeatMemory {
             if surface.len() != 1 || !surface.is_ascii() {
                 return Err("invalid AI terrain surface".into());
             }
+            if let Some(ground) = data.get("ground").filter(|value| !value.is_null()) {
+                let ground = ground
+                    .as_str()
+                    .filter(|value| value.len() == 1 && value.is_ascii())
+                    .ok_or("invalid AI terrain ground")?
+                    .as_bytes()[0];
+                if !b".D+MWF".contains(&ground) {
+                    return Err("invalid AI terrain ground".into());
+                }
+                self.ground[c] = ground;
+            }
             let terrain = catalog.table("TERRAIN").map_err(|e| e.to_string())?;
             self.chars[c] = ch;
             self.flags[c] = terrain_flag(
@@ -465,7 +492,7 @@ impl SeatMemory {
             }
         }
         self.tick = Some(tick);
-        Ok(SeatView { initial_chars:self.initial_chars.clone(), initial_height:self.initial_height.clone(), works:optional_rows(&snap["works"])?.to_vec(), chars:self.chars.clone(), flags:self.flags.clone(), height:self.height.clone(), naval:self.naval,
+        Ok(SeatView { initial_chars:self.initial_chars.clone(), initial_height:self.initial_height.clone(), works:optional_rows(&snap["works"])?.to_vec(), chars:self.chars.clone(), ground:self.ground.clone(), flags:self.flags.clone(), height:self.height.clone(), naval:self.naval,
             local_defenders: world.then(||json!({"slot":-1,"name":"Local defenders","team":-1,"faction":0,"spawn":null,"out":false})), tick, units, players, points, nodes, mines, found_mines,
             weather:json!({"now":snap["weather"][0].as_str().unwrap_or("clear"),"next":snap["weather"][1],"left":snap["weather"][2]}),
             mode:snap["mode"].clone(),army:snap["army"].clone(),smokes,strikes,covers,known_buildings:known,claimed_nodes,logistics })
@@ -648,6 +675,8 @@ impl crate::match_runtime::Match {
             initial.height.clone(),
             self.world.game.naval,
         )?;
+        // Starting ground is public map metadata, including surfaces beneath objects.
+        memory.ground = initial.ground.clone();
         memory.binding = Some((
             self.options.seed,
             self.world.initial().chars.as_ptr() as usize,

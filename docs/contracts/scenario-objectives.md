@@ -6,9 +6,9 @@ The recipient fields below are identical to the prototype. This document adds no
 
 ## Admitted execution
 
-Default, Conquest, Assault, Classic and Annihilation matches admit authored groups, all ordinary condition kinds, match/player/team contexts, once/risingEdge/whileTrue repeats, announcements, objective actions, reinforcement rosters and per-cell damage/destroy actions. Region targets require World and remain refused. World, Horde and Tutorial admission stays closed for authored scenarios. Legacy timed triggers keep their existing executor. The implementation follows `shared/scenarios.js:88-170` and the canonical tools at `shared/sim.js:4882-4923`.
+Default, Conquest, Assault, Classic, Annihilation and canonical Horde matches admit authored groups, all ordinary condition kinds, match/player/team contexts, once/risingEdge/whileTrue repeats, announcements, objective actions, reinforcement rosters and per-cell damage/destroy actions. Region targets require World and remain refused. World and Tutorial admission stays closed for authored scenarios. Horde initial groups and reinforcements are limited to defender seats, matching `shared/sim.js:818-823,4884-4897`; the internal Horde director cannot receive authored arrivals. Legacy timed triggers keep their existing executor. The implementation follows `shared/scenarios.js:88-170` and the canonical tools at `shared/sim.js:4882-4923`.
 
-Announcement text may be a string, an array, an object with `en`, or a single-translation object. Multiple translations without `en` remain refused because their fallback requires the prototype's object insertion order. No authored mission ships in this batch and public map rows continue to omit private scenario definitions.
+Announcement text may be a string, an array or a translation object. English takes precedence; without English, canonical numeric-index keys precede other keys, then authored insertion order selects the first translation, matching `shared/scenarios.js:160`. The existing serde_json dependency now retains object insertion order. No authored mission ships in this batch and public map rows continue to omit private scenario definitions.
 
 ## Recipient snapshot
 

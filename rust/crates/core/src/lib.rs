@@ -221,6 +221,7 @@ mod mov_intent_batch;
 #[cfg(test)]
 mod bases_runtime_construction_tests;
 
+#[cfg(test)]
 mod logistics_support_tests;
 
 #[cfg(test)]

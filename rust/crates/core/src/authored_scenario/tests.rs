@@ -9,10 +9,11 @@ fn authored_scenarios_validate_ordinary_sides_and_localization_before_startup() 
         Mode::Assault,
         Mode::Annihilation,
         Mode::Classic,
+        Mode::Horde,
     ] {
         assert!(validate_definition(&data, 2, mode).is_ok());
     }
-    for mode in [Mode::World, Mode::Horde, Mode::Tutorial] {
+    for mode in [Mode::World, Mode::Tutorial] {
         assert!(validate_definition(&data, 2, mode).is_err());
     }
     data["groups"] = json!([{"id":"g","units":[]}]);
@@ -22,7 +23,7 @@ fn authored_scenarios_validate_ordinary_sides_and_localization_before_startup() 
     data["triggers"][0]["actions"] = json!([{"kind":"say","text":"OK","side":2}]);
     assert!(validate_definition(&data, 2, Mode::Conquest).is_err());
     data["triggers"][0]["actions"] = json!([{"kind":"say","text":{"es":"First","fr":"Second"}}]);
-    assert!(validate_definition(&data, 2, Mode::Conquest).is_err());
+    assert!(validate_definition(&data, 2, Mode::Conquest).is_ok());
     data["triggers"][0]["actions"][0]["text"] = json!({"en":"Default","es":"Translation"});
     assert!(validate_definition(&data, 2, Mode::Conquest).is_ok());
     data["triggers"][0]["condition"] = json!({"kind":"ownership","target":"region:1","side":0});
@@ -155,4 +156,20 @@ fn authored_checkpoint_preserves_canonical_trigger_and_objective_history() {
     let before = state.authored_scenario.clone();
     state = Match::from_save_json(state.save_json().unwrap()).unwrap();
     assert_eq!(state.authored_scenario, before);
+}
+
+#[test]
+fn localized_announcement_fallback_retains_authored_key_order_without_english() {
+    let text: Value = serde_json::from_str(r#"{"es":"Primero","fr":"Deuxieme"}"#).unwrap();
+    assert_eq!(localized_text(&text).as_deref(), Some("Primero"));
+    let reversed: Value = serde_json::from_str(r#"{"fr":"Deuxieme","es":"Primero"}"#).unwrap();
+    assert_eq!(localized_text(&reversed).as_deref(), Some("Deuxieme"));
+    let numeric: Value =
+        serde_json::from_str(r#"{"2":"Second","1":"First","es":"Spanish"}"#).unwrap();
+    assert_eq!(localized_text(&numeric).as_deref(), Some("First"));
+    let non_index: Value = serde_json::from_str(
+        r#"{"es":"Spanish","01":"Not an index","4294967295":"Also not an index"}"#,
+    )
+    .unwrap();
+    assert_eq!(localized_text(&non_index).as_deref(), Some("Spanish"));
 }

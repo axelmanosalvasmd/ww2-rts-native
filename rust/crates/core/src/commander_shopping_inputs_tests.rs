@@ -297,7 +297,7 @@ fn intent_ai33_classic_reserves_only_non_depot_builds_and_rush_releases_them() {
 }
 
 #[test]
-fn intent_ai33_fort_jobs_charge_gate_and_leave_deferred_wall_segments_for_ticks() {
+fn intent_ai33_wall_plans_defer_payment_and_gate_reserves_its_price() {
     let mut input = fixture(vec![
         unit(1, "rifle", 30.0),
         unit(2, "mg", 32.0),
