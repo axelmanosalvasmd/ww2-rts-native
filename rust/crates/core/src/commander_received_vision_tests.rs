@@ -4,6 +4,22 @@ use crate::{
     mov_audit_test_support as scene,
 };
 
+fn assert_same_geometry(a: &Game, b: &Game) {
+    assert_eq!((a.w, a.h, a.weather), (b.w, b.h, b.weather));
+    assert_eq!(a.flags, b.flags);
+    assert_eq!(a.chars, b.chars);
+    assert_eq!(a.height, b.height);
+    assert_eq!(a.smokes, b.smokes);
+    // Initial Unit fields include an unused NaN pace sentinel. Compare the actual sight inputs.
+    let rows = |g: &Game| {
+        g.units
+            .iter()
+            .map(|(id, u)| (*id, u.kind, u.owner, u.x, u.z, u.hp, u.supp, u.built, u.air))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(rows(a), rows(b));
+}
+
 #[test]
 fn identical_received_coordinates_keep_point_vision_stable_at_the_live_boundary() {
     let mut m = scene::scene();
@@ -25,7 +41,7 @@ fn identical_received_coordinates_keep_point_vision_stable_at_the_live_boundary(
     assert_eq!(a.input(), b.input());
     let grid = SpatialGrid::new(&m.world.game.units, 16.0);
     assert!(vision::team_sees(&m.world.game, &m.rules, &grid, 0, point));
-    assert_eq!(received_a, received_b);
+    assert_same_geometry(&received_a, &received_b);
     let grid = SpatialGrid::new(&received_a.units, 16.0);
     assert!(vision::team_sees(&received_a, &m.rules, &grid, 0, point));
 }
@@ -47,7 +63,7 @@ fn unpublished_physical_flags_and_heights_cannot_change_received_los() {
         (80.0, 50.0)
     ));
     let after = received_game(&m, &observation).unwrap();
-    assert_eq!(before, after);
+    assert_same_geometry(&before, &after);
     assert!(vision::los(&after, &m.rules, (40.0, 50.0), (80.0, 50.0)));
     assert_eq!(after.height.as_ref().unwrap()[cell], 0);
 }
@@ -68,7 +84,7 @@ fn hidden_actors_and_private_state_never_enter_received_sight_geometry() {
     m.abilities.get_mut(enemy).unwrap().cooldown = 123.0;
     m.world.game.units.get_mut(&own).unwrap().path = vec![Point { x: 80.0, z: 80.0 }];
     m.commands.units.get_mut(&own).unwrap().attack_id = enemy;
-    assert_eq!(before, received_game(&m, &observation).unwrap());
+    assert_same_geometry(&before, &received_game(&m, &observation).unwrap());
     assert!(before.units[&own].path.is_empty());
     assert_eq!(before.units[&own].x, 40.0);
     assert_eq!(before.w as f64 * CELL, 128.0);
@@ -107,4 +123,19 @@ fn smoke_projection_uses_public_visibility_and_received_coordinates() {
             remaining: None
         }
     );
+}
+
+#[test]
+fn delivered_allied_aircraft_use_the_public_airborne_state() {
+    let mut m = scene::scene();
+    let id = m.spawn_aircraft(0, "fighter").unwrap();
+    let u = m.world.game.units.get_mut(&id).unwrap();
+    u.x = 40.0;
+    u.z = 50.0;
+    u.air = Some(PlaneState::Out);
+    m.grid.update(id, &m.world.game.units[&id]);
+    let observation = m.opening_commander_observation(0).unwrap();
+    let received = received_game(&m, &observation).unwrap();
+    assert_eq!(received.units[&id].air, Some(PlaneState::Out));
+    assert_eq!((received.units[&id].x, received.units[&id].z), (40.0, 50.0));
 }

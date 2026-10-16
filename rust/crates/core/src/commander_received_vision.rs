@@ -63,8 +63,12 @@ pub(crate) fn received_game(m: &Match, observation: &Observation) -> Result<Game
         if canonical.owner != row.owner || canonical.kind != kind {
             return Err("received sight actor binding mismatch".into());
         }
-        let mut unit = unit_spawn::initial_unit(&m.rules, catalog, kind, row.id, row.owner, row.at)
-            .map_err(|e| format!("received sight actor: {e:?}"))?;
+        let mut unit = if m.rules.kinds[kind].air {
+            unit_spawn::initial_aircraft(&m.rules, catalog, kind, row.id, row.owner, row.at)
+        } else {
+            unit_spawn::initial_unit(&m.rules, catalog, kind, row.id, row.owner, row.at)
+        }
+        .map_err(|e| format!("received sight actor: {e:?}"))?;
         unit.hp = row.hp;
         unit.supp = row.supp;
         unit.built = canonical.built;
