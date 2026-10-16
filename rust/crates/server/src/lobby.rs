@@ -543,6 +543,14 @@ impl Room {
             }
             return false;
         }
+        if t == "nextwave"
+            && let Some(native) = &mut self.native
+        {
+            if let Err(error) = native.runtime.next_wave(host) {
+                native.runtime.fault_stop(error);
+            }
+            return false;
+        }
         // Other gameplay and public setup admission remain unavailable.
         if UNAVAILABLE.contains(&t) {
             let reason = match t {
