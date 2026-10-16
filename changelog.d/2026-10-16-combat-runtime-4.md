@@ -4,3 +4,4 @@
 - Dispatch core construction cancellation and waiting production refunds through their existing owners, and verify the existing rally, research and purchase paths. Add native checks for later ticks and recipient snapshots; public command admission stays unchanged.
 - Replace the old Classic ability rejection assertion with a check for mismatched mode tags. Complete combat scheduling, house entry and transport dispatch remain for later work.
 - Extend the ability, base dispatch, research and bunker checks through an ordinary VP finish and ending hold, collecting every seat's snapshot on every tick. Add ordinary building-memory privacy checks through hidden changes, unseen destruction and a later revisit.
+- Update the batch test map and room boundaries for ordinary building memory and full-match validation.
