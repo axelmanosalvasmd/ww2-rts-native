@@ -1,0 +1,1 @@
+- Check delayed ability payment against an uncommanded Classic match with the same income, so earned Munitions remain distinct from the one-time ability charge.

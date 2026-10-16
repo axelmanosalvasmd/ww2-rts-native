@@ -260,6 +260,9 @@ fn base14_all_support_prices_charge_the_mode_currency_once() {
 fn base14_classic_aimed_payment_waits_for_throw_and_rechecks_wallet() {
     for pay in [true, false] {
         let mut m = scene(Mode::Classic);
+        let mut uncharged = scene(Mode::Classic);
+        uncharged.start.economy.players[0].mp = 123.;
+        uncharged.start.economy.players[0].mun = 15.;
         let id = m
             .world
             .game
@@ -282,7 +285,11 @@ fn base14_classic_aimed_payment_waits_for_throw_and_rechecks_wallet() {
                 .unwrap();
         assert_eq!(m.execute_command(0, &command, false).unwrap(), None);
         snapshots_after_ticks(&mut m);
-        assert_eq!(m.start.economy.players[0].mun, 15.);
+        snapshots_after_ticks(&mut uncharged);
+        assert_eq!(
+            m.start.economy.players[0].mun,
+            uncharged.start.economy.players[0].mun
+        );
         assert_eq!(m.commands.units[&id].nade, Some(target));
         // A squad arriving in range pays at the throw. A competing purchase can exhaust it first.
         let unit = m.world.game.units.get_mut(&id).unwrap();
@@ -291,13 +298,24 @@ fn base14_classic_aimed_payment_waits_for_throw_and_rechecks_wallet() {
         unit.path.clear();
         m.grid.rebuild(&m.world.game.units);
         m.start.economy.players[0].mun = if pay { 15. } else { 14. };
+        uncharged.start.economy.players[0].mun = m.start.economy.players[0].mun;
+        uncharged.advance_tick().unwrap();
         m.advance_tick().unwrap();
-        assert_eq!(m.start.economy.players[0].mun, if pay { 0. } else { 14. });
+        let paid = if pay { 15. } else { 0. };
+        assert!(
+            (uncharged.start.economy.players[0].mun - m.start.economy.players[0].mun - paid).abs()
+                < 1e-10
+        );
         assert_eq!(m.commands.units[&id].nade, None);
         assert_eq!(m.abilities.get(id).unwrap().cooldown > 0., pay);
-        // Income can add Munitions on later second boundaries; these four ticks cannot reach one.
+        // The uncommanded run receives the same HQ income. The difference stays
+        // exactly one charge after later ticks and every-seat delivery.
         snapshots_after_ticks(&mut m);
-        assert_eq!(m.start.economy.players[0].mun, if pay { 0. } else { 14. });
+        snapshots_after_ticks(&mut uncharged);
+        assert!(
+            (uncharged.start.economy.players[0].mun - m.start.economy.players[0].mun - paid).abs()
+                < 1e-10
+        );
     }
     let mut free = scene(Mode::Conquest);
     let rifle = free
