@@ -62,6 +62,20 @@ fn facts<'a>(u: &Unit, rules: &'a Rules) -> UnitFacts<'a> {
     }
 }
 impl Match {
+    #[cfg(test)]
+    pub(crate) fn test_supply_truck(&mut self, owner: usize) -> u32 {
+        self.with_supply_world(|_, state, _, world| {
+            let source = state
+                .stores
+                .iter()
+                .find(|store| store.source && store.owner == owner)
+                .unwrap()
+                .clone();
+            Ok(state.add_truck(owner, &source, world))
+        })
+        .unwrap()
+    }
+
     /// Initialize after troop/base/scenario setup and metadata registration. The constructor invokes this after base and recipient setup.
     pub fn initialize_logistics(&mut self) -> Result<(), String> {
         if !self.options.logistics {
