@@ -1,0 +1,1 @@
+- Rewrite `lobby::net_runtime2::net41_r1_restart_repeats_settings_resets_pause_and_reconnects_absent_seat` for fresh restart seeds: verify regenerated spawns and environment while preserving its settings, pause-reset, reconnect and fault-refusal checks. Its old identical-spawn and identical-receipt assertions caused PR #384 to fail on all three hosted Rust platforms.

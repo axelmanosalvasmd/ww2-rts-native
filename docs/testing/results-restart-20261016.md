@@ -12,6 +12,17 @@ The existing generic `fallen.structure` component check remains in `match_story:
 
 The existing binary regression `trusted_room_process::ordinary_binary_two_seats_move_stop_takeover_and_restart_with_private_seed` also covers MODE-94 through the real server. Its restart expectations now require a fresh recorded seed, including wrapping from `u64::MAX` to zero, unchanged remaining settings, a fresh environment seed and matching startup data for both recipients. The old identical-seed assertion failed at `trusted_room_process.rs:181` before this correction.
 
+The existing NET-41 regression
+`lobby::net_runtime2::net41_r1_restart_repeats_settings_resets_pause_and_reconnects_absent_seat`
+now checks the regenerated spawn list against the next deterministic seed's
+match and requires the fresh seed and environment in the private receipt. It
+still checks the same map, roster, factions, explicit rain weather and other
+settings, host-only restart, pause reset, absent-seat pause/reconnect and
+faulted-restart refusal. This replaces the old identical-spawn and
+identical-receipt assertions deliberately invalidated by MODE-94. Hosted run
+`38940398529` failed only this test on all three platforms; the unmodified
+`afdb004b` reproduced the same spawn assertion locally.
+
 ## Dropped from this batch
 
 - MODE-90: `lobby::result_message` accepts only Conquest and refuses territory timelines. Existing Conquest and host-end checks do not prove complete ordinary-mode result publication.
@@ -23,6 +34,6 @@ Hosted Horde-only branches are excluded as requested. Tutorial, World room admis
 
 ## Validation
 
-Run from `rust/` with Rust 1.99.0, an S1-S3 flock, that slot's target directory, MemoryMax=6G and MemorySwapMax=0. Use `--cargo-profile ci-test -j4` for focused tests. The focused expression is `test(results_restart_tests) | test(trusted_room_tests) | binary(trusted_room_process)`. Final validation and producing commit are recorded in the PR body.
+Run from `rust/` with Rust 1.99.0, an S1-S3 flock, that slot's target directory, MemoryMax=6G and MemorySwapMax=0. Use `--cargo-profile ci-test -j4` for focused tests. The focused expression is `test(results_restart_tests) | test(trusted_room_tests) | test(net_runtime2) | binary(trusted_room_process)`. Final validation and producing commit are recorded in the PR body.
 
 Coordination readback: the #5 requests about main's elimination serde failure and exact-head validation are acknowledged by retaining #373's fix and validating this branch after merging current main. This stream posts no issue replies. Runtime owner acknowledgment and hosted checks remain the orchestrator's gates.
