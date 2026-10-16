@@ -232,6 +232,92 @@ fn nearby_cache(m: &mut Match, worker: u32) -> u32 {
     panic!("no legal nearby cache site for {at:?}");
 }
 
+fn assert_construction_snapshot(m: &Match, worker: u32, site: u32) {
+    let cache = crate::recipient_snapshot::SnapshotCache::new(m).unwrap();
+    let actor = &m.world.game.units[&worker];
+    let at = m.world.game.units[&site].at();
+    for slot in 0..m.world.game.players.len() {
+        let snapshot = cache.recipient(slot).unwrap();
+        let units = snapshot.fields["units"].as_array().unwrap();
+        let row = units.iter().find(|row| row[0] == worker);
+        if slot == actor.owner {
+            assert_eq!(row.unwrap()[12].as_u64().unwrap() & 128, 128);
+            let plan = snapshot.fields["plans"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|row| row[0] == worker)
+                .unwrap();
+            assert_eq!(
+                &plan.as_array().unwrap()[..4],
+                &[json!(worker), json!(8), json!(at.x), json!(at.z)]
+            );
+            let site_row = units.iter().find(|row| row[0] == site).unwrap();
+            assert_eq!(
+                site_row[14],
+                json!(m.world.game.units[&site].built.unwrap())
+            );
+        } else {
+            assert!(
+                snapshot.fields["plans"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .all(|row| row[0] != worker)
+            );
+            if !m.world.game.players[slot].sees(worker) {
+                assert!(row.is_none());
+            }
+        }
+    }
+}
+
+#[test]
+fn shipyard_construction_survives_ticks_and_all_seat_snapshot_delivery() {
+    use crate::recipient_snapshot::{DeliveryState, SelectedSeat};
+    let mut m = coastal_match(true, false);
+    let worker = own(&m, 0, "rifle");
+    let site = m.next_unit_id;
+    let mut delivery = DeliveryState::new(&m).unwrap();
+    assert_eq!(
+        dispatch(
+            &mut m,
+            0,
+            json!({"t":"build","kind":"shipyard","ids":[worker],"x":44,"z":28})
+        ),
+        None
+    );
+    assert_construction_snapshot(&m, worker, site);
+    let selected = (0..m.world.game.players.len())
+        .map(|slot| SelectedSeat {
+            slot,
+            full: false,
+            omit: false,
+        })
+        .collect::<Vec<_>>();
+    for _ in 0..902 {
+        let report = m.advance_tick().unwrap();
+        let building = m.world.game.units[&worker].build;
+        if building {
+            assert_construction_snapshot(&m, worker, site);
+        }
+        let frame = delivery
+            .capture_selected_with_tick_events(&mut m, &selected, &report.events)
+            .unwrap()
+            .unwrap();
+        for seat in &selected {
+            assert_eq!(frame.recipient(seat.slot).unwrap().into_json()["t"], "s");
+        }
+        if !building {
+            break;
+        }
+    }
+    assert_eq!(m.world.game.units[&site].built, Some(1.));
+    assert!(!m.world.game.units[&worker].build);
+    assert_eq!(m.commands.units[&worker].build_target, None);
+    assert!(m.tick_state.fault().is_none());
+}
+
 #[test]
 fn base45_paid_cache_requires_logistics_and_serves_only_when_finished() {
     for (field, value) in [
@@ -268,6 +354,7 @@ fn base45_paid_cache_requires_logistics_and_serves_only_when_finished() {
     let mp = m.start.economy.players[0].mp;
     let truck = m.test_supply_truck(0);
     let cache = nearby_cache(&mut m, worker);
+    assert_construction_snapshot(&m, worker, cache);
     assert_eq!(m.start.economy.players[0].mp, mp - 60.);
     assert_eq!(m.world.game.units[&cache].hp, 100.);
     assert_eq!(m.world.game.units[&cache].cells.as_ref().unwrap().len(), 4);
@@ -290,6 +377,9 @@ fn base45_paid_cache_requires_logistics_and_serves_only_when_finished() {
         let mut frame = m.begin_construction_tick().unwrap();
         m.step_construction_worker(worker, &mut frame).unwrap();
         m.finish_construction_tick(frame).unwrap();
+        if m.world.game.units[&worker].build {
+            assert_construction_snapshot(&m, worker, cache);
+        }
     }
     assert_eq!(m.world.game.units[&cache].built, Some(1.));
     assert_eq!(m.world.game.units[&cache].hp, 400.);
