@@ -497,7 +497,7 @@ impl HumanRuntimeSnapshot {
                     .expect("validated visible ID")
             })
             .collect();
-        dots.sort_by(|a, b| near(a).total_cmp(&near(b)));
+        crate::sort::sort_by(&mut dots, |a, b| near(a) - near(b));
         let target = if let Some(dot) = dots.first() {
             Some(dot.motion.at)
         } else {
@@ -683,8 +683,8 @@ impl HumanRuntimeSnapshot {
             .filter_map(|id| screen.units.iter().find(|u| u.motion.id == *id).copied())
             .filter(|e| e.hp > 0.0 && !e.air && distance(e.motion.at, u.motion.at) <= 60.0)
             .collect();
-        foes.sort_by(|a, b| {
-            distance(a.motion.at, u.motion.at).total_cmp(&distance(b.motion.at, u.motion.at))
+        crate::sort::sort_by(&mut foes, |a, b| {
+            distance(a.motion.at, u.motion.at) - distance(b.motion.at, u.motion.at)
         });
         let Some(foe) = foes.first() else {
             return Ok(None);
@@ -895,3 +895,7 @@ impl HumanRuntimeSnapshot {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "if25_human_tests.rs"]
+mod if25_tests;

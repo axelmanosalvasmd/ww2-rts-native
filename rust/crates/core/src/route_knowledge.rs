@@ -8,7 +8,10 @@ use crate::navigation::{TerrainChange, TerrainView, Versions};
 use crate::pathfinding::PathTerrain;
 use crate::rules::Rules;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+mod cover_preview;
+pub use cover_preview::{CoverBody, CoverClass, CoverPreview};
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Material {
     Soil,
     Road,
@@ -18,7 +21,7 @@ pub enum Material {
     Steel,
     Water,
 }
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct RememberedSection {
     pub hp: f64,
     pub max_hp: Option<f64>,
@@ -27,7 +30,7 @@ pub struct RememberedSection {
 }
 /// Producer-supplied public or remembered inputs that the reference inherits
 /// from its world object. Absence in World mode means unknown, not toughness 1.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct CoverBasis {
     pub house_kind: Option<u8>,
     pub toughness: f64,
@@ -64,10 +67,10 @@ pub struct InitialTerrain<'a> {
     pub shoals: Option<&'a [bool]>,
     pub house_kinds: Option<&'a [u8]>,
     /// None explicitly means this public authored map has no toughness override.
-    pub toughness: Option<&'a [f64]>,
+    pub toughness: Option<&'a [f32]>,
     pub trench_front: Option<&'a [f32]>,
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum KnowledgeMode {
     Observed,
     World,
@@ -81,19 +84,20 @@ pub enum KnowledgeError {
     UnknownCell,
     MissingCoverBasis,
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 struct Change {
     from: u64,
     to: u64,
     cells: Vec<usize>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct RouteKnowledge {
     width: usize,
     height: usize,
     mode: KnowledgeMode,
     identity: u64,
+    #[serde(skip, default = "crate::save_state::compiled_rules")]
     rules: Rules,
     known: Vec<bool>,
     revisions: Vec<Option<u64>>,
@@ -149,6 +153,10 @@ pub struct KnownCell {
     pub ground_material: Material,
 }
 impl RouteKnowledge {
+    pub(crate) fn storage_pointers(&self) -> [usize; 2] {
+        [self.flags.as_ptr() as usize, self.heights.as_ptr() as usize]
+    }
+
     pub fn world(
         width: usize,
         height: usize,
@@ -246,7 +254,7 @@ impl RouteKnowledge {
             if !valid_char(ground) || !valid_char(object) {
                 return Err(KnowledgeError::InvalidValue);
             }
-            let toughness = initial.toughness.map_or(1.0, |v| v[c]);
+            let toughness = initial.toughness.map_or(1.0, |v| f64::from(v[c]));
             if !toughness.is_finite() || toughness < 0.0 {
                 return Err(KnowledgeError::InvalidValue);
             }

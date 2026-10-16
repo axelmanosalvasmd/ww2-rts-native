@@ -1,7 +1,6 @@
 //! Paid sites and the source-positioned builder/crew phases. No second job or queue authority.
 use crate::{
     catalog::{Catalog, Value},
-    economy::Mode,
     game::Unit,
     grid::UnitId,
     match_commands::UnitControl,
@@ -48,6 +47,116 @@ fn number(value: &Value, key: &str) -> Result<f64, String> {
 }
 
 impl Match {
+    /// Tear down an owned unfinished site for the original 75 percent MP refund.
+    /// This administrative removal creates no death, bounty, rubble or built counter.
+    pub fn cancel_construction(
+        &mut self,
+        owner: usize,
+        id: UnitId,
+    ) -> Result<Option<crate::match_commands::Denial>, String> {
+        use crate::match_commands::Denial;
+        use crate::match_story::{StoryChange, StoryKey, prepare_story_updates};
+        if self.finish.is_some()
+            || self
+                .start
+                .economy
+                .players
+                .get(owner)
+                .is_none_or(|p| p.away || p.out)
+        {
+            return Ok(Some(Denial::Blocked));
+        }
+        self.validate_match_finish_state()?;
+        let Some(unit) = self.world.game.units.get(&id) else {
+            return Ok(Some(Denial::Unseen));
+        };
+        let kind = self
+            .rules
+            .kinds
+            .get(unit.kind)
+            .ok_or("invalid cancelled site kind")?;
+        if unit.owner != owner || !kind.building || unit.built.is_none_or(|built| built >= 1.0) {
+            return Ok(Some(Denial::Unseen));
+        }
+        if unit.id != id || unit.built.is_none_or(|b| !b.is_finite() || b < 0.0) {
+            return Err("invalid cancelled site identity or progress".into());
+        }
+        let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
+        let refund = number(catalog.unit(&kind.name).map_err(|e| e.to_string())?, "cost")? * 0.75;
+        let wallet = self.start.economy.players[owner].mp + refund;
+        if !wallet.is_finite() {
+            return Err("construction refund overflow".into());
+        }
+        let structure = self
+            .world
+            .structures
+            .iter()
+            .find(|s| s.entity_id == Some(id))
+            .ok_or("missing cancelled site structure")?;
+        let structure_id = structure.id.clone();
+        let cells = structure.cells.clone();
+        let sections: BTreeSet<_> = structure.section_ids.iter().cloned().collect();
+        let mut physical = self.world.begin_transaction().map_err(|e| e.to_string())?;
+        physical.world.game.units.remove(&id);
+        for &cell in &cells {
+            if physical
+                .world
+                .sections
+                .get(&cell)
+                .is_some_and(|s| s.structure_id == structure_id)
+            {
+                physical.world.sections.remove(&cell);
+                physical.world.game.sections.remove(&(cell as u32));
+            }
+        }
+        physical.world.structures.retain(|s| s.id != structure_id);
+        physical
+            .world
+            .detached_sections
+            .retain(|key, _| !sections.contains(key));
+        for &cell in &cells {
+            physical
+                .world
+                .set_cell(cell, b'.')
+                .map_err(|e| e.to_string())?;
+        }
+        let physical = physical
+            .prepare_publication(&mut self.world)
+            .map_err(|e| e.to_string())?;
+        let story = prepare_story_updates(
+            &mut self.story,
+            false,
+            &[StoryChange {
+                slot: Some(owner),
+                key: StoryKey::MpSpent,
+                amount: -refund,
+            }],
+        )?;
+        physical.commit();
+        self.environment.cancel_structure_sections(&sections);
+        self.grid.remove_unit(id);
+        self.field_works.cancel(id);
+        self.commands.units.remove(&id);
+        self.commands.requests.retire_unit(id);
+        self.combat.remove(id);
+        self.firing.remove(id);
+        self.abilities.remove(id);
+        self.recovery.remove(id);
+        self.logistics.remove(id);
+        self.production.remove_building(id);
+        self.building_rallies.remove(&id);
+        self.recruit_metadata.remove(&id);
+        if let Some(world) = self.world_runtime.as_mut() {
+            for node in &mut world.nodes {
+                if node.depot == Some(id) {
+                    node.depot = None;
+                }
+            }
+        }
+        self.start.economy.players[owner].mp = wallet;
+        story.commit();
+        Ok(None)
+    }
     fn validate_construction_actor(&self, id: UnitId) -> Result<(), String> {
         let unit = self
             .world
@@ -156,8 +265,8 @@ impl Match {
 
     /// Read-only admission. The sole runner calls this before inputs and again before its clock.
     pub fn validate_construction_tick(&self) -> Result<(), String> {
-        if !matches!(self.options.mode, Mode::Default | Mode::Conquest)
-            || self.world.game.mode.is_some()
+        if self.validate_actor_mode().is_err()
+            || !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode)
             || self.world.game.tick < 0
         {
             return Err("construction phases require ordinary Conquest".into());
@@ -214,8 +323,8 @@ impl Match {
         id: UnitId,
         frame: &mut ConstructionFrame,
     ) -> Result<(), String> {
-        if !matches!(self.options.mode, Mode::Default | Mode::Conquest)
-            || self.world.game.mode.is_some()
+        if self.validate_actor_mode().is_err()
+            || !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode)
         {
             return Err("construction worker requires ordinary Conquest".into());
         }
@@ -303,7 +412,7 @@ impl Match {
         if frame.tick != self.world.game.tick {
             return Err("stale construction crew frame".into());
         }
-        self.validate_conquest_finish_state()?;
+        self.validate_ordinary_finish_state()?;
         let dt = self.rules.movement.tick;
         if !dt.is_finite() || dt <= 0.0 {
             return Err("invalid construction interval".into());
@@ -346,13 +455,24 @@ impl Match {
                         available = f64::INFINITY;
                     }
                 }
+                let cap = if self.elimination_sudden_death() {
+                    number(classic, "decay")? * 0.6
+                } else {
+                    f64::INFINITY
+                };
                 let amount = math::min(
                     available,
-                    full * (number(classic, "repair")? * crew * (recovery / workers.len() as f64))
-                        * dt,
+                    full * math::min(
+                        number(classic, "repair")? * crew * (recovery / workers.len() as f64),
+                        cap,
+                    ) * dt,
                 );
+
                 (built, amount)
             } else {
+                if self.elimination_sudden_death() {
+                    continue;
+                }
                 let time = definition
                     .get("buildTime")
                     .and_then(Value::number)
@@ -439,7 +559,7 @@ impl Match {
         command: &crate::match_commands::Command,
     ) -> Result<Vec<UnitId>, String> {
         self.validate_construction_tick()?;
-        self.validate_conquest_finish_state()?;
+        self.validate_ordinary_finish_state()?;
         if owner >= self.world.game.players.len()
             || !self.start.economy.players[owner].mp.is_finite()
         {
@@ -557,11 +677,12 @@ impl Match {
                         None,
                     )
                     .map_err(|e| format!("construction garrison exit: {e:?}"))?;
-                unit.x = (cell % game.w) as f64 * crate::game::CELL + crate::game::CELL / 2.0;
-                unit.z = (cell / game.w) as f64 * crate::game::CELL + crate::game::CELL / 2.0;
-                unit.garrison = None;
+                crate::unit_placement::place_unit(&mut preview.grid, &mut unit, |unit| {
+                    unit.x = (cell % game.w) as f64 * crate::game::CELL + crate::game::CELL / 2.0;
+                    unit.z = (cell / game.w) as f64 * crate::game::CELL + crate::game::CELL / 2.0;
+                    unit.garrison = None;
+                });
                 preview.physical.world.game.units.insert(id, unit.clone());
-                preview.grid.update(id, &unit);
             }
             preview.routed = true;
             let receipt = crate::match_routing::refresh_recipient_parts(
@@ -784,13 +905,16 @@ impl Match {
             queue,
         };
         let selected = self.construction_selection(owner, ids, &command)?;
+        if self.elimination_sudden_death() {
+            return Ok(Some(Denial::SuddenDeath));
+        }
         if !crate::economy::build_kinds(self.options.mode)
             .map_err(|e| e.to_string())?
             .contains(&name)
         {
             return Ok(Some(Denial::Blocked));
         }
-        if matches!(name, "depot" | "shipyard" | "supplycache") {
+        if name == "depot" {
             return Ok(Some(Denial::Unsupported));
         }
         let types = crate::economy::builder_types(self.options.mode).map_err(|e| e.to_string())?;
@@ -871,6 +995,9 @@ impl Match {
         {
             return self.construction_denial(&selected, Denial::Tier);
         }
+        if name == "supplycache" && !self.options.logistics {
+            return self.construction_denial(&selected, Denial::Blocked);
+        }
         let size = number(definition, "size")? as usize;
         let x = math::round(at.x / CELL - size as f64 / 2.0);
         let z = math::round(at.z / CELL - size as f64 / 2.0);
@@ -890,6 +1017,28 @@ impl Match {
             .preflight_cell_rows(&cells)
             .map_err(|e| e.to_string())?;
         let g = &self.world.game;
+        if definition.get("coast").and_then(Value::boolean) == Some(true) {
+            if !g.naval {
+                return self.construction_denial(&selected, Denial::Blocked);
+            }
+            let coastal = cells.iter().any(|&cell| {
+                let x = (cell % g.w) as isize;
+                let z = (cell / g.w) as isize;
+                (-2..=2).any(|dz| {
+                    (-2..=2).any(|dx| {
+                        let (x, z) = (x + dx, z + dz);
+                        x >= 0
+                            && z >= 0
+                            && x < g.w as isize
+                            && z < g.h as isize
+                            && g.flags[z as usize * g.w + x as usize] & crate::game::LAND == 0
+                    })
+                })
+            });
+            if !coastal {
+                return self.construction_denial(&selected, Denial::Coast);
+            }
+        }
         let min = cells
             .iter()
             .map(|&c| g.height.as_ref().map_or(0, |h| h[c]))

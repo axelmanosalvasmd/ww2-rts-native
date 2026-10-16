@@ -5,16 +5,33 @@
 //! Windows. A new test file needs a `#[path]` module below;
 //! `every_test_file_is_compiled` fails until it has one.
 
+#[path = "../world_components.rs"]
+mod world_components;
+#[path = "../world_home_components.rs"]
+mod world_home_components;
+
+#[path = "../ai_if_if25.rs"]
+mod ai_if_if25;
 #[path = "../authoritative_maps.rs"]
 mod authoritative_maps;
 #[path = "../base_audit_features.rs"]
 mod base_audit_features;
+#[path = "../bases_batch3_economy.rs"]
+mod bases_batch3_economy;
+#[path = "../bases_batch3_rally.rs"]
+mod bases_batch3_rally;
+#[path = "../bases_batch3_runtime.rs"]
+mod bases_batch3_runtime;
+#[path = "../bases_batch3_training.rs"]
+mod bases_batch3_training;
 #[path = "../client_cell_state.rs"]
 mod client_cell_state;
 #[path = "../client_view.rs"]
 mod client_view;
 #[path = "../combat.rs"]
 mod combat;
+#[path = "../combat_enemy_faction.rs"]
+mod combat_enemy_faction;
 #[path = "../commander_ai.rs"]
 mod commander_ai;
 #[path = "../convoys.rs"]
@@ -51,10 +68,16 @@ mod human_commander_state;
 mod human_commander_timing;
 #[path = "../interface_intent.rs"]
 mod interface_intent;
+#[path = "../interface_map_helpers.rs"]
+mod interface_map_helpers;
 #[path = "../interface_math_intent.rs"]
 mod interface_math_intent;
 #[path = "../interface_motion_intent.rs"]
 mod interface_motion_intent;
+#[path = "../interface_runtime_batch3.rs"]
+mod interface_runtime_batch3;
+#[path = "../interface_stream_consumers.rs"]
+mod interface_stream_consumers;
 #[path = "../legacy_scenario.rs"]
 mod legacy_scenario;
 #[path = "../logistics.rs"]
@@ -75,6 +98,11 @@ mod math;
 mod mode_intent_batch1;
 #[path = "../mode_point_services.rs"]
 mod mode_point_services;
+
+#[path = "../mode_runtime_batch4.rs"]
+mod mode_runtime_batch4;
+#[path = "../mode_runtime_world.rs"]
+mod mode_runtime_world;
 #[path = "../mov_aircraft_controls.rs"]
 mod mov_aircraft_controls;
 #[path = "../mov_aircraft_immunity.rs"]
@@ -83,6 +111,9 @@ mod mov_aircraft_immunity;
 mod mov_hull_clearance;
 #[path = "../mov_wreck_journey.rs"]
 mod mov_wreck_journey;
+
+#[path = "../mov_settling.rs"]
+mod mov_settling;
 #[path = "../objectives.rs"]
 mod objectives;
 #[path = "../observed_memory.rs"]
@@ -93,6 +124,8 @@ mod produced_units;
 mod production;
 #[path = "../projectiles.rs"]
 mod projectiles;
+#[path = "../recipient_availability.rs"]
+mod recipient_availability;
 #[path = "../recruitment.rs"]
 mod recruitment;
 #[path = "../route_knowledge.rs"]

@@ -105,9 +105,10 @@ pub(super) fn complete(
     projection.fields.insert("t".into(), json!("s"));
     // Admission inspected each actual canonical actor/list owner. Their
     // absent output is a represented source result for this bounded frame.
-    for name in ["air", "flights", "shots"] {
+    for name in ["flights", "shots"] {
         projection.fields.insert(name.into(), json!([]));
     }
+    projection.fields.entry("air").or_insert_with(|| json!([]));
     projection.fields.insert(
         "wrecks".into(),
         lists.map_or_else(
@@ -169,6 +170,7 @@ fn admit(state: &Match, outside_events: &[Effect]) -> Result<(), SnapshotError> 
     Ok(())
 }
 pub(super) fn admit_actors(state: &Match, outside_events: &[Effect]) -> Result<(), SnapshotError> {
+    support::admit_lifecycle(state)?;
     // Recipient projections belong to delivery preflight. This common actor
     // guard must not read a skipped seat's private wallet or lazy producers.
     let refused = |capability| SnapshotError::Unsupported {
@@ -184,7 +186,9 @@ pub(super) fn admit_actors(state: &Match, outside_events: &[Effect]) -> Result<(
     {
         return Err(refused(SnapshotCapability::ShotsAndFlights));
     }
-    if !state.aviation.events.is_empty() || !state.aviation.planes.is_empty() {
+    // Aircraft state has an owner adapter. Aviation shot encodings still need
+    // a contract, so undrained event payloads retain their admission guard.
+    if !state.aviation.events.is_empty() {
         return Err(refused(SnapshotCapability::Air));
     }
     state

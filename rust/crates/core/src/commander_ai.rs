@@ -10,13 +10,24 @@ use crate::{
     random::{MatchRandom, StreamId},
 };
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Level {
     Easy,
+    #[default]
     Normal,
     Hard,
 }
 impl Level {
+    /// Lobby choices are exact names. A missing choice is handled by the seat default.
+    pub fn from_key(key: &str) -> Option<Self> {
+        match key {
+            "easy" => Some(Self::Easy),
+            "normal" => Some(Self::Normal),
+            "hard" => Some(Self::Hard),
+            _ => None,
+        }
+    }
+
     pub fn every(self) -> i64 {
         match self {
             Self::Easy => 120,
@@ -116,10 +127,13 @@ pub struct Input {
     pub chars: Vec<u8>,
     pub manpower: f64,
     pub research: Option<ResearchObservation>,
+    /// Delivered runtime facts. None retains the original quiet component envelope.
+    pub runtime: Option<crate::commander_tactics::Context>,
 }
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct Kind {
     combat: bool,
+    structure: bool,
     infantry: bool,
     garrisons: bool,
     health: f64,
@@ -154,6 +168,7 @@ pub enum PolicyError {
     UnsupportedHolder,
     UnsupportedResearch,
     UnsupportedShopping,
+    RuntimeContext,
     InvalidFraction,
     ExhaustedFractions,
 }
@@ -223,6 +238,65 @@ impl Observation {
             .and_then(Value::number)
             .filter(|v| v.is_finite() && *v >= 2.0)
             .ok_or(PolicyError::Catalog)?;
+        if let Some(context) = &input.runtime {
+            let finite_point = |p: Point| p.x.is_finite() && p.z.is_finite();
+            if ![
+                context.munitions,
+                context.fuel,
+                context.sight,
+                context.caution,
+                context.build_reserve,
+                context.fort_reserve,
+            ]
+            .iter()
+            .all(|v| v.is_finite())
+                || context
+                    .hidden_spawns
+                    .iter()
+                    .any(|i| *i >= input.players.len())
+                || context.site_nodes.iter().any(|p| !within(*p))
+                || context.caution <= 0.0
+                || context.known_buildings.iter().any(|b| {
+                    b.id == 0
+                        || b.owner >= input.players.len()
+                        || !within(b.at)
+                        || !catalog
+                            .unit(&b.kind)
+                            .is_ok_and(|d| d.get("building").and_then(Value::boolean) == Some(true))
+                })
+                || context
+                    .known_buildings
+                    .windows(2)
+                    .any(|w| w[0].id >= w[1].id)
+                || context
+                    .owned_nodes
+                    .iter()
+                    .any(|i| *i >= context.nodes.len())
+                || context
+                    .nodes
+                    .iter()
+                    .chain(&context.known_depots)
+                    .any(|p| !finite_point(*p))
+                || context.height.as_ref().is_some_and(|h| h.len() != cells)
+                || context
+                    .smokes
+                    .iter()
+                    .any(|s| !s.x.is_finite() || !s.z.is_finite() || !s.r.is_finite() || s.r < 0.0)
+                || context.support.values().any(|v| !v.is_finite())
+                || context.units.iter().any(|(id, f)| {
+                    *id == 0
+                        || !f.built.is_finite()
+                        || f.amove.is_some_and(|p| !finite_point(p))
+                        || f.stock.as_ref().is_some_and(|r| {
+                            !r.provisions.is_finite()
+                                || r.ammo.is_some_and(|v| !v.is_finite())
+                                || r.fuel.is_some_and(|v| !v.is_finite())
+                        })
+                })
+            {
+                return Err(PolicyError::RuntimeContext);
+            }
+        }
         let mut kinds = Vec::with_capacity(input.units.len());
         for u in &input.units {
             if u.owner >= input.players.len() {
@@ -260,6 +334,7 @@ impl Observation {
                 && u.kind != "engineer";
             kinds.push(Kind {
                 combat,
+                structure: is("structure"),
                 infantry: is("infantry"),
                 garrisons: is("garrisons"),
                 health,
@@ -271,6 +346,12 @@ impl Observation {
             kinds,
             radius,
         })
+    }
+    pub(crate) fn unit_is_structure(&self, index: usize) -> bool {
+        self.kinds[index].structure
+    }
+    pub(crate) fn point_radius(&self) -> f64 {
+        self.radius
     }
     pub fn input(&self) -> &Input {
         &self.input
@@ -587,7 +668,7 @@ fn plan_inner(
     }
     Ok(Plan { commands, draws })
 }
-fn spot_near(observation: &Observation, at: Point, fraction: f64) -> Point {
+pub(crate) fn spot_near(observation: &Observation, at: Point, fraction: f64) -> Point {
     let input = &observation.input;
     let radius = ((observation.radius - 2.0) / CELL).floor() as isize;
     let cx = (at.x / CELL).floor() as isize;

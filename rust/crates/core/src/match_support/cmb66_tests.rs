@@ -1,0 +1,191 @@
+use super::*;
+use crate::{match_aircraft_ticks::tests::scene, random::StreamId};
+
+fn strike(kind: SupportKind) -> (Strike, SupportTiming) {
+    (
+        Strike {
+            live: false,
+            kind: if kind == SupportKind::Recon {
+                StrikeKind::Recon
+            } else {
+                StrikeKind::Other
+            },
+            owner: 1,
+            x: 40.0,
+            z: 40.0,
+            dir: 0.7,
+            runtime: None,
+        },
+        SupportTiming {
+            kind,
+            delay: 0.0,
+            left: 20.0,
+            next: 0.0,
+        },
+    )
+}
+fn reserves(m: &mut Match, id: u32, name: &str) {
+    m.logistics
+        .initialize_unit(
+            crate::logistics::Context {
+                enabled_override: Some(true),
+                scenario: false,
+                mode: crate::logistics::Mode::Conquest,
+            },
+            crate::logistics::UnitFacts {
+                id,
+                kind: name,
+                owner: Some(m.world.game.units[&id].owner),
+                owner_exists: true,
+                guard_home: false,
+                riding: false,
+            },
+            Some(&crate::logistics::Definition::from_catalog(name).unwrap()),
+        )
+        .unwrap();
+}
+fn cover() -> FighterCover {
+    FighterCover {
+        team: 0,
+        owner: 0,
+        at: Point { x: 40.0, z: 40.0 },
+        radius: 20.0,
+        remaining: 10.0,
+    }
+}
+
+#[test]
+fn cmb66_fighter_cover_is_consumed_before_flak_and_recon_bypasses_it() {
+    let mut m = scene(&[("flak", 0, 40.0, 40.0)]);
+    reserves(&mut m, 1, "flak");
+    let ammo = m.logistics.get(1).unwrap().ammo;
+    m.support.covers.push(cover());
+    let (s, mut timing) = strike(SupportKind::Bombing);
+    let shells = number(definition(SupportKind::Bombing).unwrap(), "shells").unwrap();
+    let mut expected = m.start.random.clone();
+    let kept = (expected.next_fraction(StreamId::OffMap) * shells).floor();
+    assert!(m.intercept_support(&s, &mut timing, &[1]).unwrap());
+    assert_eq!(timing.left, kept);
+    assert!(timing.left >= 0.0 && timing.left < shells);
+    assert_eq!(m.support.covers[0].remaining, 0.0);
+    assert_eq!(m.logistics.get(1).unwrap().ammo, ammo);
+    assert!(matches!(
+        m.support.events.last(),
+        Some(SupportEvent::ShotDown { fighters: true, .. })
+    ));
+    assert_eq!(m.story[0].planes_downed, 1.0);
+
+    let mut recon = scene(&[]);
+    recon.support.covers.push(cover());
+    let (s, mut timing) = strike(SupportKind::Recon);
+    assert!(!recon.intercept_support(&s, &mut timing, &[]).unwrap());
+    assert_eq!(recon.support.covers[0].remaining, 10.0);
+    assert_eq!(timing.left, 20.0);
+}
+
+#[test]
+fn cmb66_flak_checks_ammo_setup_completion_hold_fire_alliance_range_and_rolls() {
+    for (name, ammo, still, built, hold, owner, x, attempts) in [
+        ("flak", 0.0, 10.0, 1.0, false, 0, 40.0, 0),
+        ("flak", 1.0, 0.0, 1.0, false, 0, 40.0, 0),
+        ("flakpos", 1.0, 10.0, 0.5, false, 0, 40.0, 0),
+        ("flakpos", 1.0, 10.0, 1.0, false, 0, 40.0, 1),
+        ("flak", 1.0, 10.0, 1.0, true, 0, 40.0, 0),
+        ("flak", 1.0, 10.0, 1.0, false, 1, 40.0, 0),
+        ("flak", 1.0, 10.0, 1.0, false, 0, 100.0, 0),
+        ("flak", 1.0, 10.0, 1.0, false, 0, 40.0, 1),
+    ] {
+        let mut m = scene(&[(name, owner, x, 40.0)]);
+        if name == "flak" {
+            reserves(&mut m, 1, name);
+            m.logistics.get_mut(1).unwrap().ammo = ammo;
+        }
+        let u = m.world.game.units.get_mut(&1).unwrap();
+        u.still = Some(still);
+        if name == "flakpos" {
+            u.built = Some(built);
+        }
+        m.commands.units.get_mut(&1).unwrap().hold_fire = hold;
+        let (s, mut timing) = strike(SupportKind::Recon);
+        let mut expected = m.start.random.clone();
+        let chance = Catalog::compiled()
+            .unwrap()
+            .unit(name)
+            .unwrap()
+            .get("aa")
+            .unwrap()
+            .get("chance")
+            .unwrap()
+            .number()
+            .unwrap();
+        let success = attempts == 1 && expected.next_fraction(StreamId::OffMap) < chance;
+        let kept = if success {
+            expected.next_fraction(StreamId::OffMap) * timing.left
+        } else {
+            timing.left
+        };
+        assert_eq!(m.intercept_support(&s, &mut timing, &[1]).unwrap(), success);
+        assert_eq!(timing.left, kept);
+        if name == "flakpos" {
+            assert!(
+                m.logistics.get(1).is_none(),
+                "emplacements have unlimited ammunition"
+            );
+        } else {
+            assert_eq!(m.logistics.get(1).unwrap().ammo, ammo - attempts as f64);
+        }
+        assert_eq!(
+            m.support
+                .events
+                .iter()
+                .filter(|e| matches!(e, SupportEvent::Flak { unit: 1, .. }))
+                .count(),
+            attempts as usize
+        );
+    }
+    for blocked in ["dead", "forced"] {
+        let mut m = scene(&[("flak", 0, 40.0, 40.0)]);
+        reserves(&mut m, 1, "flak");
+        m.logistics.get_mut(1).unwrap().ammo = 1.0;
+        if blocked == "dead" {
+            m.world.game.units.get_mut(&1).unwrap().hp = 0.0;
+        } else {
+            m.logistics.get_mut(1).unwrap().forced = true;
+        }
+        let (s, mut timing) = strike(SupportKind::Recon);
+        assert!(!m.intercept_support(&s, &mut timing, &[1]).unwrap());
+        assert_eq!(m.logistics.get(1).unwrap().ammo, 1.0);
+        assert!(m.support.events.is_empty());
+    }
+    // Exercise both outcomes from the seeded native stream, and stop after the first successful gun.
+    let mut outcomes = [false; 2];
+    for seed in 1..=32 {
+        let mut m = scene(&[("flak", 0, 40.0, 40.0), ("flak", 0, 40.0, 40.0)]);
+        m.start.random = crate::random::MatchRandom::new(seed);
+        reserves(&mut m, 1, "flak");
+        reserves(&mut m, 2, "flak");
+        m.logistics.get_mut(1).unwrap().ammo = 1.0;
+        m.logistics.get_mut(2).unwrap().ammo = 1.0;
+        let (s, mut timing) = strike(SupportKind::Recon);
+        let mut expected = m.start.random.clone();
+        let chance = Catalog::compiled()
+            .unwrap()
+            .unit("flak")
+            .unwrap()
+            .get("aa")
+            .unwrap()
+            .get("chance")
+            .unwrap()
+            .number()
+            .unwrap();
+        let first_down = expected.next_fraction(StreamId::OffMap) < chance;
+        outcomes[usize::from(first_down)] = true;
+        m.intercept_support(&s, &mut timing, &[1, 2]).unwrap();
+        assert_eq!(m.logistics.get(1).unwrap().ammo, 0.0);
+        assert_eq!(
+            m.logistics.get(2).unwrap().ammo,
+            if first_down { 1.0 } else { 0.0 }
+        );
+    }
+    assert_eq!(outcomes, [true, true]);
+}

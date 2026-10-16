@@ -16,7 +16,7 @@
 //! NaN, which Rust's methods do not.
 //!
 //! JavaScript has a single NaN, so a NaN result here may carry any payload; compare it as NaN.
-//! `tests/math.rs` checks the floating-point functions against `harness/math-fixture.mjs`'s fixture.
+//! `tests/math.rs` checks the original functions against `harness/math-fixture.mjs`.
 //! `tests/interface_math_intent.rs` checks JavaScript's wrapping 32-bit conversions and `imul`.
 
 // The following is adapted from fdlibm (http://www.netlib.org/fdlibm).
@@ -38,6 +38,11 @@
 // like as decimal literals. Each literal still parses to the bits in the hex comment beside it, and
 // keeping the text as V8 has it makes the port easy to check line by line.
 #![allow(clippy::excessive_precision, clippy::approx_constant)]
+
+/// Ceiling for recipient cooldown labels, alongside the core's other rounding helpers.
+pub fn ceil(x: f64) -> f64 {
+    x.ceil()
+}
 
 // ---------- word access (the C macros EXTRACT_WORDS, GET_HIGH_WORD, SET_LOW_WORD, ...) ----------
 

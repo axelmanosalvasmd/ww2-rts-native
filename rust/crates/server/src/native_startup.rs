@@ -9,6 +9,9 @@ use ww2_core::{
 };
 
 pub(crate) const MAX_MATCH_ID: u64 = 9_007_199_254_740_991;
+#[cfg(test)]
+#[path = "native_map_batch3_tests.rs"]
+mod map_runtime_batch3;
 pub(crate) struct StartupSettings<'a> {
     pub map: &'a str,
     pub mode: &'a str,
@@ -18,6 +21,7 @@ pub(crate) struct StartupSettings<'a> {
 }
 pub(crate) struct NativeStartup {
     map: Value,
+    raw_map: Value,
     count: usize,
 }
 pub(crate) struct StartEnvelope {
@@ -32,6 +36,29 @@ pub(crate) struct StartEnvelope {
 }
 impl NativeStartup {
     pub(crate) fn prepare(state: &Match, settings: StartupSettings<'_>) -> Result<Self, String> {
+        let authored = crate::authoritative_maps::load(settings.map).map_err(|e| e.to_string())?;
+        Self::prepare_authored(state, settings, authored)
+    }
+
+    pub(crate) fn raw_map(&self) -> &Value {
+        &self.raw_map
+    }
+    pub(crate) fn prepare_loaded(
+        state: &Match,
+        settings: StartupSettings<'_>,
+        raw: &Value,
+    ) -> Result<Self, String> {
+        let authored = ww2_core::map::AuthoritativeMap::from_json(
+            &serde_json::to_vec(raw).map_err(|e| e.to_string())?,
+        )
+        .map_err(|e| e.to_string())?;
+        Self::prepare_authored(state, settings, &authored)
+    }
+    fn prepare_authored(
+        state: &Match,
+        settings: StartupSettings<'_>,
+        authored: &ww2_core::map::AuthoritativeMap,
+    ) -> Result<Self, String> {
         if settings.mode != "conquest"
             || !matches!(state.options.mode, Mode::Default | Mode::Conquest)
             || state.world.game.mode.is_some()
@@ -50,8 +77,7 @@ impl NativeStartup {
         if army != settings.army {
             return Err("native startup army disagrees with the lobby".into());
         }
-        let authored = crate::authoritative_maps::load(settings.map).map_err(|e| e.to_string())?;
-        let public = crate::maps::public_map(settings.map).ok_or("public startup map absent")?;
+        let public = ww2_core::map::map_for_client(authored.source()).map_err(|e| e.to_string())?;
         let initial = World::from_map(authored).map_err(|e| e.to_string())?;
         let expected = initial.initial();
         let actual = state.world.initial();
@@ -62,7 +88,13 @@ impl NativeStartup {
             || actual.objects != expected.objects
             || actual.mines != expected.mines
             || actual.height != expected.height
-            || actual.trench_front != expected.trench_front
+            || match (&actual.trench_front, &expected.trench_front) {
+                (Some(a), Some(b)) => {
+                    a.len() != b.len() || a.iter().zip(b).any(|(a, b)| a.to_bits() != b.to_bits())
+                }
+                (None, None) => false,
+                _ => true,
+            }
         {
             return Err("native startup authoring map binding changed".into());
         }
@@ -82,6 +114,7 @@ impl NativeStartup {
         }
         Ok(Self {
             map: public,
+            raw_map: authored.source().clone(),
             count: plan.players.len(),
         })
     }
