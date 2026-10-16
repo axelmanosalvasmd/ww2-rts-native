@@ -1064,7 +1064,7 @@ fn intent_ai66_private_streams_drive_ordinary_ai_ticks_and_every_seat_snapshot()
             }
         }
         if mode == Mode::Conquest {
-            game.start.win_vp = 1.0;
+            game.start.win_vp = 20.0;
         } else {
             // Start after two existing depots, so the ordinary non-depot branch
             // is reached without depending on the separate node-economy planner.

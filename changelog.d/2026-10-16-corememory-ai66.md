@@ -1,1 +1,2 @@
 - Add Classic non-depot AI site planning and its per-engineer random draw, including fixed-angle buildings and failed placement or budget checks. Preserve engineer escape orders during a Classic rush. Keep planner randomness independent from commander timing and add ordinary match, recipient snapshot and draw-count tests. World room admission and Classic depot economy remain outside this change.
+- Give both commander seats time to emit sampled inputs before the quiet Conquest witness reaches its normal VP finish.
