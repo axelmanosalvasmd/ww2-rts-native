@@ -165,7 +165,7 @@ fn ai62_net40_hosted_horde_levels_start_all_roles_and_share_recipient_economy_ru
         assert_eq!(hub.native_status("ABC").unwrap().fault, None);
         assert_eq!(runtime(&hub).state().world.game.tick, 0);
         assert!(!runtime(&hub).paused());
-        assert_eq!(runtime(&hub).snap_every(), 2);
+        assert_eq!(runtime(&hub).snapshot_cadence(), 2);
         assert_eq!(runtime(&hub).held(), 0);
         let horde = runtime(&hub).state().horde.as_ref().unwrap().slot;
         assert_eq!(horde, 2);
@@ -290,7 +290,7 @@ fn net40_loaded_all_roles_receive_lobby_pause_start_before_resumed_snapshots() {
         runtime(&hub).ai_level(1),
         Some(ww2_core::commander_ai::Level::Hard)
     );
-    assert_eq!(runtime(&hub).snap_every(), 2);
+    assert_eq!(runtime(&hub).snapshot_cadence(), 2);
     assert_eq!(hub.rooms["ABC"].spectators.len(), 1);
     assert_eq!(hub.rooms["ABC"].operatives.len(), 1);
     for (role, peer) in peers.iter_mut().enumerate() {
