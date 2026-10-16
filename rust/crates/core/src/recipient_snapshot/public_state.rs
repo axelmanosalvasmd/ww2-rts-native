@@ -92,6 +92,9 @@ pub(super) fn capture(state: &Match) -> Result<Vec<Map<String, Value>>, Snapshot
             fields.insert("nodes".into(), json!(nodes));
             fields.insert("ghosts".into(), json!([]));
         }
+        if state.options.mode == Mode::Horde {
+            fields.insert("mode".into(), horde_mode_row(state)?);
+        }
         // Reuse Source's six-field ghost rows. Never consult a hidden live building here.
         if matches!(state.options.mode, Mode::Classic | Mode::World)
             && let Some((_, rows)) = state

@@ -59,9 +59,13 @@ impl NativeStartup {
         settings: StartupSettings<'_>,
         authored: &ww2_core::map::AuthoritativeMap,
     ) -> Result<Self, String> {
-        if settings.mode != "conquest"
-            || !matches!(state.options.mode, Mode::Default | Mode::Conquest)
-            || state.world.game.mode.is_some()
+        let horde = settings.mode == "horde"
+            && state.options.mode == Mode::Horde
+            && state.world.game.mode == Some(ww2_core::game::ModeKind::Horde);
+        let conquest = settings.mode == "conquest"
+            && matches!(state.options.mode, Mode::Default | Mode::Conquest)
+            && state.world.game.mode.is_none();
+        if !(horde || conquest)
             || state.options.map_key.as_deref() != Some(settings.map)
             || state.options.weather != WeatherChoice::from_reference(Some(settings.weather))
             || state.options.sandbox != settings.sandbox
@@ -98,7 +102,11 @@ impl NativeStartup {
         {
             return Err("native startup authoring map binding changed".into());
         }
-        let plan = StartPlan::prepare(authored, &state.options, &state.rules)?;
+        let plan = if horde {
+            StartPlan::prepare_horde(authored, &state.options, &state.rules)?
+        } else {
+            StartPlan::prepare(authored, &state.options, &state.rules)?
+        };
         if plan.players.len() != state.start.players.len()
             || plan
                 .players

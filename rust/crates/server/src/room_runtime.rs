@@ -1,5 +1,5 @@
 //! One trusted host runtime over the canonical Match and recipient producers.
-//! Public network start and complete gameplay admission are separate work.
+//! Hosted admission and public input capabilities stay with the lobby.
 use crate::{
     snapshot_lists::{ListScope, ListVersions, RoomListCache},
     tick_timing::{TickMeter, TickSample},
@@ -46,7 +46,7 @@ pub struct EndingAction {
     pub complete: bool,
 }
 
-/// Host control over an existing Horde clock. This does not admit Horde rooms.
+/// Host control over an existing Horde break clock.
 pub(crate) fn end_horde_break(state: &mut Match, host: bool, paused: bool) -> Result<bool, String> {
     if !host || paused {
         return Ok(false);
@@ -64,12 +64,14 @@ pub struct RoomRuntime {
     batch: u64,
     last_versions: Option<(u64, ListVersions)>,
     pending_events: Vec<TickEvent>,
+    event_generation: u64,
     tick_failure: Option<TickFailure>,
     fault: Option<String>,
     pause: Option<Pause>,
     pause_sent_at: u64,
     auto_paused: BTreeSet<usize>,
     held: u16,
+    pub(crate) ai: Option<crate::room_ai::RoomAi>,
     #[cfg(test)]
     snapshot_production_calls: u64,
 }
@@ -125,15 +127,41 @@ impl RoomRuntime {
             batch: 0,
             last_versions: None,
             pending_events: Vec::new(),
+            event_generation: 0,
             tick_failure: None,
             fault: None,
             pause: None,
             pause_sent_at: now_ms,
             auto_paused: BTreeSet::new(),
             held: 0,
+            ai: None,
             #[cfg(test)]
             snapshot_production_calls: 0,
         })
+    }
+    pub(crate) fn configure_ai(
+        &mut self,
+        seats: &[(usize, ww2_core::commander_ai::Level)],
+    ) -> Result<(), String> {
+        self.ai = Some(crate::room_ai::RoomAi::new(
+            &mut self.state,
+            &mut self.delivery,
+            seats,
+        )?);
+        Ok(())
+    }
+    pub(crate) fn think(&mut self, sent: bool) -> Result<(), String> {
+        self.running()?;
+        if let Some(ai) = &mut self.ai {
+            ai.tick(
+                &mut self.state,
+                &mut self.delivery,
+                sent,
+                self.event_generation,
+                &self.pending_events,
+            )?;
+        }
+        Ok(())
     }
     pub(crate) fn save_json(&self) -> Result<Value, String> {
         self.running()?;
@@ -255,9 +283,14 @@ impl RoomRuntime {
         kind: FrameKind,
     ) -> Result<Vec<CapturedSeat>, String> {
         self.running()?;
+        let next_event_generation = self
+            .event_generation
+            .checked_add(u64::from(kind == FrameKind::Scheduled))
+            .ok_or("AI frame generation exhausted")?;
         if selected.is_empty() {
             if kind == FrameKind::Scheduled {
                 self.pending_events.clear();
+                self.event_generation = next_event_generation;
             }
             return Ok(Vec::new());
         }
@@ -302,6 +335,7 @@ impl RoomRuntime {
         self.last_versions = Some((batch, versions));
         if kind == FrameKind::Scheduled {
             self.pending_events.clear();
+            self.event_generation = next_event_generation;
         }
         Ok(captured)
     }
