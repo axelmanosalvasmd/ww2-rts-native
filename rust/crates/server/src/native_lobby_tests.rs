@@ -547,3 +547,5 @@ fn manual_end_restart_old_completion_cannot_consume_current_snapshot_ticket() {
             .all(|account| account.pressure.inflight() == 0)
     );
 }
+#[path = "mode_server_lifecycle_tests.rs"]
+mod mode_server_lifecycle;
