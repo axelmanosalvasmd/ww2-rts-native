@@ -97,6 +97,7 @@ fn packet(frame: &Value, owner: usize) -> Observation {
             .collect(),
         manpower: frame["me"]["mp"].as_f64().unwrap(),
         research: None,
+        runtime: None,
     })
     .unwrap()
 }
@@ -454,4 +455,333 @@ fn original_cut_reconnection_check_and_human_inputs_match() {
         );
         assert_eq!((a, first), before);
     }
+}
+
+fn runtime_match() -> crate::match_runtime::Match {
+    use crate::{
+        economy::{Faction, Mode},
+        economy_state::ArmySize,
+        map::AuthoritativeMap,
+        match_runtime::{Match, MatchOptions, PlayerConfig},
+        weather::WeatherChoice,
+    };
+    let map=AuthoritativeMap::from_json(&serde_json::to_vec(&json!({"name":"AI runtime intent","w":64,"h":64,
+        "rows":vec![".".repeat(64);64],"spawns":[{"x":4,"y":4},{"x":59,"y":59}],"points":[{"x":32,"y":32}]})).unwrap()).unwrap();
+    Match::new(
+        &map,
+        MatchOptions {
+            seed: 771,
+            mode: Mode::Conquest,
+            players: [0, 1]
+                .into_iter()
+                .map(|team| PlayerConfig {
+                    name: format!("Seat {team}"),
+                    team,
+                    faction: Faction::Germany,
+                })
+                .collect(),
+            shuffle: false,
+            army: ArmySize::Standard,
+            weather: WeatherChoice::Map,
+            weather_seed: None,
+            living_weather: false,
+            map_key: None,
+            tech: false,
+            supply: false,
+            logistics: false,
+            sandbox: false,
+        },
+    )
+    .unwrap()
+}
+fn screen(view: &HumanView<Observation>) -> ScreenView<'_, Observation> {
+    ScreenView {
+        tick: view.tick,
+        spawn: view.spawn,
+        units: view.units.iter().collect(),
+        visible: view.visible.clone(),
+        sightings: view.sightings.iter().collect(),
+        packet: &view.packet,
+    }
+}
+
+#[test]
+fn intent_ai01_detached_delivered_view_drives_decisions_under_hidden_perturbations() {
+    let mut a = runtime_match();
+    let mut b = runtime_match();
+    for u in b.world.game.units.values_mut().filter(|u| u.owner == 1) {
+        u.x -= 0.2;
+        u.hp *= 0.5;
+        u.supp = 95.0;
+    }
+    b.start.economy.players[1].mp = 1e6;
+    b.start.economy.players[1].mun = 1e6;
+    b.world.set_cell(60 * 64 + 40, b'O').unwrap();
+    a.start.economy.players[0].mp = 100.2;
+    b.start.economy.players[0].mp = 100.8;
+    let va = a
+        .human_commander_observation(
+            &mut crate::match_human_observation::HumanObservationMemory::new(0),
+        )
+        .unwrap();
+    let vb = b
+        .human_commander_observation(
+            &mut crate::match_human_observation::HumanObservationMemory::new(0),
+        )
+        .unwrap();
+    assert_eq!(va, vb);
+    let mut pa = HumanPolicy::new(0, 771);
+    let mut pb = pa.clone();
+    let before = va.clone();
+    let commands = pa.plan(screen(&va), Level::Normal).unwrap();
+    assert!(!commands.is_empty());
+    assert_eq!(commands, pb.plan(screen(&vb), Level::Normal).unwrap());
+    assert_eq!(pa, pb);
+    assert_eq!(va, before);
+    // A visible health change changes the decision while hidden state cannot.
+    let id = *a
+        .world
+        .game
+        .units
+        .iter()
+        .find(|(_, u)| u.owner == 0 && a.rules.kinds[u.kind].name == "rifle")
+        .unwrap()
+        .0;
+    let u = a.world.game.units.get_mut(&id).unwrap();
+    u.x = 40.0;
+    u.z = 40.0;
+    u.hp = 20.0;
+    let hurt = a
+        .human_commander_observation(
+            &mut crate::match_human_observation::HumanObservationMemory::new(0),
+        )
+        .unwrap();
+    let changed = HumanPolicy::new(0, 771)
+        .plan(screen(&hurt), Level::Normal)
+        .unwrap();
+    assert!(
+        changed
+            .iter()
+            .any(|c| c["t"] == "retreat" && c["ids"].as_array().unwrap().contains(&json!(id)))
+    );
+    assert_ne!(commands, changed);
+}
+
+#[test]
+fn intent_ai36_runtime_policy_retreat_reaches_the_canonical_command_queue() {
+    use crate::{match_commands::Command, orders::OrderKey};
+    let mut m = runtime_match();
+    m.start.economy.players[0].mp = 0.0;
+    let id = *m
+        .world
+        .game
+        .units
+        .iter()
+        .find(|(_, u)| u.owner == 0 && m.rules.kinds[u.kind].name == "rifle")
+        .unwrap()
+        .0;
+    let u = m.world.game.units.get_mut(&id).unwrap();
+    u.x = 40.0;
+    u.z = 40.0;
+    u.hp = 20.0;
+    m.grid.rebuild(&m.world.game.units);
+    let view = m
+        .human_commander_observation(
+            &mut crate::match_human_observation::HumanObservationMemory::new(0),
+        )
+        .unwrap();
+    let commands = HumanPolicy::new(0, 771)
+        .plan(screen(&view), Level::Normal)
+        .unwrap();
+    let raw = commands.iter().find(|c| c["t"] == "retreat").unwrap();
+    m.enqueue_command(
+        OrderKey {
+            tick: 1,
+            issuer: 0,
+            sequence: 0,
+        },
+        Command::from_json(raw).unwrap(),
+    )
+    .unwrap();
+    let results = m.apply_commands(1, false).unwrap();
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].denial, None);
+    assert!(m.world.game.units[&id].retreating);
+    assert!(m.world.game.units[&id].world_goal.is_some());
+}
+
+#[test]
+fn intent_ai28_delivered_stock_uses_public_two_decimal_precision() {
+    let mut m = runtime_match();
+    m.options.logistics = true;
+    m.initialize_logistics().unwrap();
+    let id = *m
+        .world
+        .game
+        .units
+        .iter()
+        .find(|(_, u)| u.owner == 0 && m.rules.kinds[u.kind].name == "rifle")
+        .unwrap()
+        .0;
+    let stock = m.logistics.get_mut(id).unwrap();
+    stock.provisions = 59.6;
+    stock.fuel = Some(36.4);
+    stock.ammo = stock.ammo_max * 0.499;
+    let view = m
+        .human_commander_observation(
+            &mut crate::match_human_observation::HumanObservationMemory::new(0),
+        )
+        .unwrap();
+    let delivered = view.packet.input().runtime.as_ref().unwrap().units[&id]
+        .stock
+        .as_ref()
+        .unwrap();
+    assert_eq!(delivered.provisions, 59.6);
+    assert_eq!(delivered.fuel, Some(36.4));
+    assert_eq!(delivered.ammo, Some(0.5));
+    let commands = HumanPolicy::new(0, 771)
+        .plan(screen(&view), Level::Normal)
+        .unwrap();
+    assert!(!commands.iter().any(|c| c["t"] == "retreat"));
+}
+
+#[test]
+fn intent_ai11_ai_attempts_and_human_replay_share_costs_and_denials() {
+    use crate::{match_commands::Command, orders::OrderKey};
+    let mut ai = runtime_match();
+    let mut human = runtime_match();
+    ai.start.economy.players[0].mp = 100.0;
+    human.start.economy.players[0].mp = 100.0;
+    let delivered = ai
+        .human_commander_observation(
+            &mut crate::match_human_observation::HumanObservationMemory::new(0),
+        )
+        .unwrap();
+    let commands = HumanPolicy::new(0, 771)
+        .plan(screen(&delivered), Level::Normal)
+        .unwrap();
+    let buy = commands.iter().find(|c| c["t"] == "buy").unwrap();
+    for state in [&mut ai, &mut human] {
+        state
+            .enqueue_command(
+                OrderKey {
+                    tick: 1,
+                    issuer: 0,
+                    sequence: 0,
+                },
+                Command::from_json(buy).unwrap(),
+            )
+            .unwrap();
+    }
+    let a = ai.apply_commands(1, false).unwrap();
+    let h = human.apply_commands(1, false).unwrap();
+    assert_eq!(a, h);
+    assert_eq!(a[0].denial, None);
+    assert_eq!(ai.start.economy.players[0].mp, 0.0);
+    assert_eq!(human.start.economy.players[0].mp, 0.0);
+    // Refusal happens against the current wallet, after planning from an earlier delivery.
+    let mut denied = runtime_match();
+    denied.start.economy.players[0].mp = 0.0;
+    denied
+        .enqueue_command(
+            OrderKey {
+                tick: 1,
+                issuer: 0,
+                sequence: 0,
+            },
+            Command::from_json(buy).unwrap(),
+        )
+        .unwrap();
+    let results = denied.apply_commands(1, false).unwrap();
+    assert_eq!(
+        results[0].denial,
+        Some(crate::match_commands::Denial::Manpower)
+    );
+    assert_eq!(denied.start.economy.players[0].mp, 0.0);
+}
+
+#[test]
+fn intent_ai53_forward_hq_uses_real_build_admission_and_next_observation_keeps_worker_busy() {
+    use crate::{match_commands::Command, orders::OrderKey};
+    let mut m = runtime_match();
+    m.start.economy.players[0].mp = 200.0;
+    for u in m
+        .world
+        .game
+        .units
+        .values_mut()
+        .filter(|u| u.owner == 0 && !m.rules.kinds[u.kind].structure)
+    {
+        u.x = 100.0;
+        u.z = 40.0;
+    }
+    m.grid.rebuild(&m.world.game.units);
+    let mut memory = crate::match_human_observation::HumanObservationMemory::new(0);
+    let view = m.human_commander_observation(&mut memory).unwrap();
+    let commands = HumanPolicy::new(0, 771)
+        .plan(screen(&view), Level::Normal)
+        .unwrap();
+    let build = commands.iter().find(|c| c["t"] == "build").unwrap();
+    let builder = build["ids"][0].as_u64().unwrap() as u32;
+    m.enqueue_command(
+        OrderKey {
+            tick: 1,
+            issuer: 0,
+            sequence: 0,
+        },
+        Command::from_json(build).unwrap(),
+    )
+    .unwrap();
+    let results = m.apply_commands(1, false).unwrap();
+    assert_eq!(results[0].denial, None);
+    assert_eq!(m.start.economy.players[0].mp, 0.0);
+    assert!(m.world.game.units[&builder].build);
+    assert!(m.commands.units[&builder].build_target.is_some());
+    let next = m.human_commander_observation(&mut memory).unwrap();
+    let worker = next.units.iter().find(|u| u.motion.id == builder).unwrap();
+    assert!(worker.build);
+    assert!(worker.motion.amove.is_none());
+    assert!(worker.motion.world_goal.is_none());
+    let planned = HumanPolicy::new(0, 771)
+        .plan(screen(&next), Level::Normal)
+        .unwrap();
+    assert!(!planned.iter().any(|c| c["t"] == "build"));
+    assert!(!planned.iter().any(|c| {
+        c["orders"]
+            .as_array()
+            .is_some_and(|rows| rows.iter().any(|r| r[0] == builder))
+    }));
+}
+
+#[test]
+fn runtime_observation_attack_move_goal_obeys_owner_order_precedence() {
+    let mut m = runtime_match();
+    let id = *m
+        .world
+        .game
+        .units
+        .iter()
+        .find(|(_, u)| u.owner == 0 && m.rules.kinds[u.kind].name == "rifle")
+        .unwrap()
+        .0;
+    m.world.game.units.get_mut(&id).unwrap().amove = Some(crate::game::Point { x: 50.0, z: 30.0 });
+    m.commands.units.get_mut(&id).unwrap().fire_at = Some(20 * 64 + 20);
+    let view = m
+        .human_commander_observation(
+            &mut crate::match_human_observation::HumanObservationMemory::new(0),
+        )
+        .unwrap();
+    assert!(
+        view.packet
+            .input()
+            .units
+            .iter()
+            .find(|u| u.id == id)
+            .unwrap()
+            .fire_at
+    );
+    assert_eq!(
+        view.packet.input().runtime.as_ref().unwrap().units[&id].amove,
+        None
+    );
 }

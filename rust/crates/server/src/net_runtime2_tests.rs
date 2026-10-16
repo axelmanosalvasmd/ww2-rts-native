@@ -3,7 +3,7 @@ use super::*;
 fn peer(id: u64) -> (Connection, mpsc::Receiver<Output>) {
     let (tx, rx) = mpsc::channel(64);
     let (cancel, _) = watch::channel(false);
-    (Connection { id, tx, cancel }, rx)
+    (Connection::new(id, tx, cancel), rx)
 }
 
 fn messages(rx: &mut mpsc::Receiver<Output>) -> Vec<Value> {

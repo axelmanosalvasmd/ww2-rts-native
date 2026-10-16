@@ -3,7 +3,8 @@
 //! This is not a client-map importer or a match constructor. Client projections erase mines,
 //! triggers and scenarios irreversibly. Callers must supply the original authoritative document;
 //! the format has no provenance marker that could distinguish a stripped projection.
-//! Authored scenarios remain unsupported. Unknown authoring properties stay in `source()` for later systems.
+//! Authored scenarios are validated here; their execution remains guarded at match admission.
+//! Unknown authoring properties stay in `source()` for later systems.
 use std::{collections::BTreeMap, fmt};
 
 use serde_json::Value;
@@ -220,11 +221,6 @@ impl AuthoritativeMap {
             .transpose()?;
         let layers = normalize_layers(&source, w, h, &chars)?;
         let structures = crate::structures::parse(source.get("structures"), w, h, &layers)?;
-        if source.get("scenario").is_some() {
-            return Err(MapError::Unsupported {
-                feature: "scenario",
-            });
-        }
         let is_world = source.get("world").is_some();
         let minimum_spawns = if is_world { 1 } else { 2 };
         let pos = |v: &Value, field: &str| -> Result<(usize, usize)> {
@@ -371,6 +367,8 @@ impl AuthoritativeMap {
             }
         }
         let catalog = Catalog::compiled().map_err(|e| MapError::Catalog(e.to_string()))?;
+        crate::scenario_validation::validate_scenario(&source, catalog)
+            .map_err(|e| invalid("scenario", &e.0))?;
         let houses = catalog
             .table("CFG")
             .map_err(|e| MapError::Catalog(e.to_string()))?
@@ -566,6 +564,69 @@ impl AuthoritativeMap {
     }
 }
 
+/// The prototype's public authored-map projection. Private scripts and mine materials
+/// are removed from a copy; the authoritative document is never changed.
+pub fn map_for_client(source: &Value) -> Result<Value> {
+    let mut result = source.clone();
+    let object = result
+        .as_object_mut()
+        .ok_or_else(|| invalid("document", "expected a map object"))?;
+    object.remove("triggers");
+    object.remove("scenario");
+    let map = AuthoritativeMap::from_value(result.clone())?;
+    let w = map.w;
+    let strings = |cells: &[u8]| -> Value {
+        serde_json::json!(
+            cells
+                .chunks(w)
+                .map(|row| String::from_utf8(row.to_vec()).expect("validated ASCII terrain"))
+                .collect::<Vec<_>>()
+        )
+    };
+    if source.get("layers").is_none() {
+        result["worldVersion"] = serde_json::json!(2);
+        result["layers"] = serde_json::json!({"ground":strings(&map.layers.ground),"objects":strings(&map.layers.objects)});
+    }
+    let hidden_rows = source
+        .get("layers")
+        .map_or(&source["rows"], |layers| &layers["objects"]);
+    let hidden: Vec<_> = hidden_rows
+        .as_array()
+        .expect("validated rows")
+        .iter()
+        .flat_map(|row| row.as_str().expect("validated row").bytes())
+        .map(|ch| ch == b'N')
+        .collect();
+    let public: Vec<_> = map
+        .chars
+        .iter()
+        .enumerate()
+        .map(|(cell, &ch)| {
+            if ch != b'N' {
+                ch
+            } else if map.layers.objects[cell] != b'.' {
+                map.layers.objects[cell]
+            } else {
+                map.layers.ground[cell]
+            }
+        })
+        .collect();
+    result["rows"] = strings(&public);
+    result["layers"]["objects"] = strings(&map.layers.objects);
+    result["layers"]["mines"] = serde_json::json!(vec![".".repeat(w); map.h]);
+    for key in ["materials", "objectMaterials"] {
+        if let Some(list) = result["layers"].get_mut(key).and_then(Value::as_array_mut) {
+            list.retain(|entry| {
+                !hidden[entry["c"].as_f64().expect("validated material cell") as usize]
+            });
+        }
+    }
+    if result["layers"].get("mineMaterials").is_some() {
+        result["layers"]["mineMaterials"] = serde_json::json!([]);
+    }
+    Ok(result)
+}
+
 fn material_list(source: &Value, key: &str, n: usize) -> Result<BTreeMap<usize, String>> {
     let mut result = BTreeMap::new();
     if let Some(v) = source.get(key) {
@@ -759,7 +820,7 @@ pub struct TerrainState {
     pub height: Option<Vec<i8>>,
     pub house: Vec<u8>,
     pub cell_hp: Vec<f32>,
-    pub tough: Option<Vec<f64>>,
+    pub tough: Option<Vec<f32>>,
     pub wear: Vec<f32>,
     pub surface_wear: Vec<f32>,
     pub trench_front: Option<Vec<f32>>,
@@ -905,7 +966,7 @@ impl AuthoritativeMap {
             let values = tough.get_or_insert_with(|| vec![1.0; n]);
             let mut seen = vec![false; n];
             for c in component(&self.chars, self.w, b.y * self.w + b.x, &mut seen) {
-                values[c] = cfg_num("stoneBridge")?;
+                values[c] = cfg_num("stoneBridge")? as f32;
             }
         }
         let mut terrain = TerrainState {
@@ -948,7 +1009,7 @@ impl AuthoritativeMap {
                 rules.movement.house_hp[usize::from(terrain.house[c])]
             } else {
                 rules.movement.terrain_hp(*ch).unwrap_or(0.0)
-                    * terrain.tough.as_ref().map_or(1.0, |t| t[c])
+                    * terrain.tough.as_ref().map_or(1.0, |t| f64::from(t[c]))
             }) as f32;
         }
         if self.trench_facing {

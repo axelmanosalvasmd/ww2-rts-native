@@ -187,6 +187,10 @@ impl StartPlan {
     ) -> Result<Self, String> {
         let world_mode = matches!(&profile, StartupProfile::World(_));
         let tutorial = matches!(&profile, StartupProfile::Tutorial);
+        // Validation permits saving authored missions. Their executor is not admitted yet.
+        if map.source().get("scenario").is_some() {
+            return Err("native startup does not yet execute authored scenarios".into());
+        }
         let horde_mode = matches!(&profile, StartupProfile::Horde);
         let defender_team = match &profile {
             StartupProfile::Assault { defender_team } => Some(*defender_team),
@@ -369,12 +373,7 @@ impl StartPlan {
                 })
             })
             .collect::<Result<Vec<_>, String>>()?;
-        let army_key = match options.army {
-            ArmySize::Standard => "standard",
-            ArmySize::Large => "large",
-            ArmySize::Massive => "massive",
-            ArmySize::Endless => "endless",
-        };
+        let army_key = options.army.key();
         let income_scale = number(field(field(cfg, "armies")?, army_key)?, "income")?;
         let initial_mp = number(
             if world_mode {
@@ -972,10 +971,10 @@ impl Match {
         let mut points = self.start.points.clone();
         let mut wallets = self.start.economy.clone();
         let mut placer = SpawnPlacer::new();
-        let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
-        let cfg = catalog.table("CFG").map_err(|e| e.to_string())?;
-        let supply_beat = number(field(cfg, "supply")?, "every")? as i64;
-        if supply && self.options.supply && game.tick % supply_beat == 1 {
+        if supply
+            && objectives::point_supply_due(self.options.mode, self.options.supply, game.tick)
+                .map_err(|e| format!("point supply scheduling: {e:?}"))?
+        {
             objectives::supply_lines(
                 terrain_view(game),
                 &mut points,
@@ -1277,7 +1276,12 @@ pub(crate) fn foot_center(game: &Game, cell: usize, size: usize) -> Point {
         z: (cell / game.w) as f64 * CELL + size as f64 * CELL / 2.0,
     }
 }
-fn find_site(game: &Game, at: Point, size: usize, avoid: &[(Point, f64)]) -> Option<usize> {
+pub(crate) fn find_site(
+    game: &Game,
+    at: Point,
+    size: usize,
+    avoid: &[(Point, f64)],
+) -> Option<usize> {
     let x = at.x.max(0.0).min(game.w as f64 * CELL - 1.0);
     let z = at.z.max(0.0).min(game.h as f64 * CELL - 1.0);
     let start = (z / CELL).floor() as usize * game.w + (x / CELL).floor() as usize;
