@@ -326,14 +326,19 @@ fn cmb127_bunkers_show_through_fog_and_survive_ordinary_ticks_and_recipient_snap
 }
 
 fn snapshots(m: &Match) -> Vec<serde_json::Value> {
+    assert!(m.classic_known_buildings.is_empty());
     let cache = SnapshotCache::new(m).unwrap();
     (0..m.world.game.players.len())
-        .map(|slot| serde_json::Value::Object(cache.recipient(slot).unwrap().fields))
+        .map(|slot| {
+            let fields = cache.recipient(slot).unwrap().fields;
+            assert!(!fields.contains_key("ghosts"));
+            serde_json::Value::Object(fields)
+        })
         .collect()
 }
 
 #[test]
-fn cmb130_ordinary_building_memories_are_private_last_observed_facts_through_match_finish() {
+fn ordinary_default_and_conquest_never_remember_or_deliver_building_ghosts_through_finish() {
     for mode in [Mode::Default, Mode::Conquest] {
         for teams in [[0, 1, 2], [0, 1, 0]] {
             let mut m = scene_mode(&teams, mode);
@@ -341,7 +346,7 @@ fn cmb130_ordinary_building_memories_are_private_last_observed_facts_through_mat
             add(&mut m, "rifle", 2, at(10., 170.));
             let building = m.next_unit_id;
             let cell = m.world.game.cell_of(80., 70.).unwrap();
-            let building_at = m.place_starting_building(1, "barracks", cell).unwrap();
+            m.place_starting_building(1, "barracks", cell).unwrap();
             let secret = m.next_unit_id;
             let cell = m.world.game.cell_of(170., 170.).unwrap();
             m.place_starting_building(1, "barracks", cell).unwrap();
@@ -358,7 +363,6 @@ fn cmb130_ordinary_building_memories_are_private_last_observed_facts_through_mat
                     .iter()
                     .any(|r| r[0] == building)
             );
-            assert_eq!(observed[0]["ghosts"], json!([]));
             assert!(
                 !observed[0]["units"]
                     .as_array()
@@ -366,7 +370,6 @@ fn cmb130_ordinary_building_memories_are_private_last_observed_facts_through_mat
                     .iter()
                     .any(|r| r[0] == secret)
             );
-            let expected = json!([[building, "barracks", 1, building_at.x, building_at.z, 0.3]]);
             m.world.game.units.get_mut(&scout).unwrap().x = 5.;
             m.world.game.units.get_mut(&scout).unwrap().z = 5.;
             m.world.game.units.get_mut(&building).unwrap().built = Some(0.9);
@@ -377,11 +380,11 @@ fn cmb130_ordinary_building_memories_are_private_last_observed_facts_through_mat
                 assert_eq!(m.tick_state.fault(), None);
             }
             let check = |m: &Match, cache: &SnapshotCache<'_>| {
+                assert!(m.classic_known_buildings.is_empty());
                 for (slot, team) in teams.iter().enumerate() {
                     let snap = cache.recipient(slot).unwrap();
-                    let ghosts = &snap.fields["ghosts"];
+                    assert!(!snap.fields.contains_key("ghosts"));
                     if *team == 0 {
-                        assert_eq!(ghosts, &expected);
                         let units = snap.fields["units"].as_array().unwrap();
                         assert!(!units.iter().any(|r| r[0] == building));
                         assert_eq!(
@@ -389,18 +392,16 @@ fn cmb130_ordinary_building_memories_are_private_last_observed_facts_through_mat
                             m.finish.is_some(),
                             "the unobserved building appears only after canonical match reveal"
                         );
-                    } else {
-                        assert_eq!(ghosts, &json!([]));
                     }
                 }
                 assert_eq!(m.tick_state.fault(), None);
             };
             check(&m, &SnapshotCache::new(&m).unwrap());
-            // Retirement happens under fog. No recipient learns the destruction until a revisit.
+            // Retirement under fog never creates a remembered building in either ordinary mode.
             m.world.game.units.get_mut(&building).unwrap().hp = 0.;
             crate::cmb5_match_tests::through_finish(&mut m, check);
             assert!(!m.world.game.units.contains_key(&building));
-            assert_eq!(snapshots(&m)[0]["ghosts"], expected);
+            snapshots(&m);
             m.world.game.units.get_mut(&scout).unwrap().x = 70.;
             m.world.game.units.get_mut(&scout).unwrap().z = 70.;
             rebuild(&mut m);
@@ -409,9 +410,29 @@ fn cmb130_ordinary_building_memories_are_private_last_observed_facts_through_mat
                 snapshots(&m);
                 assert_eq!(m.tick_state.fault(), None);
             }
-            for snap in snapshots(&m) {
-                assert_eq!(snap["ghosts"], json!([]));
-            }
+            snapshots(&m);
+        }
+    }
+}
+
+#[test]
+fn ordinary_recipient_omits_ghosts_even_with_stale_component_memory() {
+    for mode in [Mode::Default, Mode::Conquest] {
+        let mut m = scene_mode(&[0, 1], mode);
+        m.initialize_recipient_routing().unwrap();
+        m.classic_known_buildings.push((
+            0,
+            vec![KnownBuilding {
+                id: 1000,
+                kind: m.rules.kind("barracks").unwrap(),
+                owner: 1,
+                at: at(80., 70.),
+                built: Some(0.25),
+            }],
+        ));
+        let cache = SnapshotCache::new(&m).unwrap();
+        for slot in 0..m.world.game.players.len() {
+            assert!(!cache.recipient(slot).unwrap().fields.contains_key("ghosts"));
         }
     }
 }
