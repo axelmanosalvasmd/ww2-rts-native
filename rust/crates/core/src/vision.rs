@@ -3,6 +3,7 @@
 //! `aimPoint`, `inStrip`, the camouflage and trench rules). Its answers match the JavaScript exactly
 //! (`harness/vision-check.mjs`).
 //!
+//! Horde wave markers are composed by `Match::update_horde_vision`; this pass has no wave state.
 //! Construction-mode building memory is refreshed separately after this pass. Horde and World have
 //! explicit Match adapters for their mode-specific observers and visibility exceptions.
 

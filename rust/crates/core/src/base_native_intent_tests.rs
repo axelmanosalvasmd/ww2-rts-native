@@ -720,27 +720,6 @@ fn base48_tier_gating_refuses_mortar_before_wallet_debit() {
 }
 
 #[test]
-fn base52_conquest_starts_with_its_own_forces() {
-    let m = ordinary(true);
-    for owner in 0..2 {
-        let names = m
-            .world
-            .game
-            .units
-            .values()
-            .filter(|u| u.owner == owner)
-            .map(|u| m.rules.kinds[u.kind].name.as_str())
-            .collect::<Vec<_>>();
-        assert_eq!(names.iter().filter(|&&k| k == "hq").count(), 1);
-        let hq = &m.world.game.units[&own(&m, owner, "hq")];
-        assert_eq!(hq.built, Some(1.));
-        assert_eq!(hq.cells.as_ref().unwrap().len(), 9);
-        assert_eq!(names.iter().filter(|&&k| k == "rifle").count(), 2);
-        assert!(names.contains(&"mg") && names.contains(&"barracks"));
-    }
-}
-
-#[test]
 fn base53_assault_defender_gets_trenches_bunker_and_four_flak() {
     let m = Match::new_assault(&map(), options(Mode::Assault, true), 1).unwrap();
     for (owner, count) in [(0, 0), (1, 4)] {
@@ -878,50 +857,5 @@ fn base03_army_keys_scale_population_income_and_starting_wallets() {
     }
 }
 
-#[test]
-fn base02_available_startup_profiles_scale_wallets_by_army_income() {
-    let source = map();
-    let mut json = source.source().clone();
-    json["defend"] = json!([0]);
-    let map = AuthoritativeMap::from_json(&serde_json::to_vec(&json).unwrap()).unwrap();
-    let rules = crate::rules::Rules::compiled().unwrap();
-    for (army, income) in [
-        (ArmySize::Standard, 1.0),
-        (ArmySize::Large, 3.0),
-        (ArmySize::Massive, 6.0),
-        (ArmySize::Endless, 20.0),
-    ] {
-        let mut opts = options(Mode::Conquest, false);
-        opts.army = army;
-        let plan = crate::match_runtime::StartPlan::prepare(&map, &opts, &rules).unwrap();
-        assert_eq!(
-            plan.economy
-                .players
-                .iter()
-                .map(|p| p.mp)
-                .collect::<Vec<_>>(),
-            vec![150.0 * income; 2]
-        );
-        opts.mode = Mode::Assault;
-        let plan =
-            crate::match_runtime::StartPlan::prepare_assault(&map, &opts, &rules, 1).unwrap();
-        assert_eq!(
-            plan.economy
-                .players
-                .iter()
-                .map(|p| p.mp)
-                .collect::<Vec<_>>(),
-            vec![320.0 * income, 250.0 * income]
-        );
-        opts.mode = Mode::Horde;
-        let plan = crate::match_runtime::StartPlan::prepare_horde(&map, &opts, &rules).unwrap();
-        assert_eq!(
-            plan.economy
-                .players
-                .iter()
-                .map(|p| p.mp)
-                .collect::<Vec<_>>(),
-            vec![250.0 * income, 0.0]
-        );
-    }
-}
+#[path = "mode_startup_tests.rs"]
+mod mode_startup;

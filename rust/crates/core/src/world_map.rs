@@ -1,9 +1,12 @@
 //! Immutable World geography validation and the native generator's typed map handoff.
 //! These records are authoring data, not live ownership, capture progress or a Match.
 use crate::{
-    game::{MOVE, VBLOCK},
+    game::MOVE,
     map::{AuthoritativeMap, Building, Layers, MapError, Spawn, flags},
 };
+mod validation;
+pub use validation::validate_geography;
+
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -104,6 +107,8 @@ pub(crate) fn parse(
     heights: Option<&[i8]>,
     spawns: usize,
 ) -> Result<WorldDefinition, MapError> {
+    validate_geography(v, w, h, chars, heights, spawns)
+        .map_err(|reason| invalid("world.validation", reason))?;
     let object = v
         .as_object()
         .ok_or_else(|| invalid("world", "expected an object"))?;
@@ -203,40 +208,6 @@ pub(crate) fn parse(
                 .collect::<Result<_, _>>()?,
         ),
     };
-    let mut seen = vec![false; w * h];
-    let first = regions[0].y * w + regions[0].x;
-    let mut queue = vec![first];
-    seen[first] = true;
-    let mut i = 0;
-    while i < queue.len() {
-        let c = queue[i];
-        i += 1;
-        let x = c % w;
-        let y = c / w;
-        for next in [
-            (x + 1 < w).then_some(c + 1),
-            c.checked_sub(1).filter(|_| x > 0),
-            (y + 1 < h).then_some(c + w),
-            c.checked_sub(w),
-        ]
-        .into_iter()
-        .flatten()
-        {
-            if !seen[next]
-                && flags(chars[next]) & (MOVE | VBLOCK) == 0
-                && heights.is_none_or(|v| (i16::from(v[next]) - i16::from(v[c])).abs() <= 1)
-            {
-                seen[next] = true;
-                queue.push(next);
-            }
-        }
-    }
-    if regions.iter().any(|r| !seen[r.y * w + r.x]) {
-        return Err(invalid(
-            "world.regions",
-            "objectives need connected ground routes",
-        ));
-    }
     Ok(WorldDefinition {
         size,
         region_cells: 64,

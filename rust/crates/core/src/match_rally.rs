@@ -146,6 +146,7 @@ impl Match {
         let context = RallyContext {
             mode: ModeContext {
                 kind: self.options.mode,
+                income_excluded_slot: self.horde.as_ref().map(|horde| horde.slot),
                 ..Default::default()
             },
             terrain: crate::match_runtime::terrain_view(&self.world.game),
@@ -176,6 +177,10 @@ impl Match {
         Ok(None)
     }
 }
+
+#[cfg(test)]
+#[path = "match_base24_tests.rs"]
+mod base24_tests;
 
 #[cfg(test)]
 mod tests {

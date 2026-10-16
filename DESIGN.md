@@ -2766,7 +2766,7 @@ The core carries its own math (`rust/crates/core/src/math.rs`) instead of Rust's
 - **Smoke keeps its identity.** A kept source remembers the smoke clouds near it by object identity in the JavaScript, so a cloud that drifts does not make it look again. Each `Smoke` carries an id that stands for that identity. The harness codec does not keep identity, so a source loaded from a state file remembers clouds that match none of the game's, as in the reference after decoding.
 - **Units are in ascending id order.** The reference iterates its units Map in insertion order; ids only grow and no unit is put back, so `Game::units` is a `BTreeMap` by id. The loader refuses a state where the Map is in another order.
 - **Ported as the reference has it, for now:** the fog's sight walk ignores the woods depth rule that `los` applies (`docs/parity/combat.md`, limitations), and the vision pass still runs one team after another.
-- **Not ported yet** (Conquest does not use them): Horde stragglers and the Kaiju shown through the fog, the remembered enemy buildings of Classic and World Conquest, World Conquest's guards and its visible-cell list.
+- **Mode-specific vision:** Horde wave markers are composed by `Match::update_horde_vision`. Full Horde ticking and recipient admission remain guarded. Building memories, World guards and visible-cell lists remain outside the standalone vision pass.
 
 ## Vision row source checks (2026-10-15, unrun candidate)
 
@@ -5099,3 +5099,15 @@ PR #336 retains main's World fort-capture refusal before region, income, elimina
 ## Borrowed building placement (2026-10-16)
 
 Ordinary Build admission uses one read-only building-placement query. It borrows terrain, actors, visibility and optional node, territory and rail-yard facts, so previews can use the same rule without adding match state. Equal-distance nodes retain their input index, matching the prototype's stable sort. The query returns the selected footprint and snapped centre even when a later rule refuses it. Visibility precedes territory, rail, node overlap, coast and physical occupancy. World facts are exercised as components; they do not admit World construction, hosted rooms or recipient delivery. Fortifications retain their separate existing query.
+
+## Horde core reveal, shared facilities and scripted policy (2026-10-16)
+
+`Match::update_horde_vision` refreshes ordinary sight and then adds the existing Horde wave markers in sorted unit-ID order. Only the canonical defender team receives the markers during an active wave. A zero remaining budget and `left <= 3` mark ground attackers; Kaiju markers ignore those two thresholds. Aircraft never gain a wave marker. The component reads existing wave state and changes no fog, recipient or hosting policy.
+
+Shared Horde production reuses the existing buyer debit, unit publisher, building rally and construction transactions. Horde startup initializes the existing seat-owned routing memories after stamping its shared base. Routing, recorded purchases and construction phases validate the canonical Horde team layout before using those components. The builder's team may supply the shared prerequisite and assist a living allied site, while only the site's owner may cancel it and receive the refund. No new Match or Unit fields are needed.
+
+The scripted policy receives detached seat facts and feeds movements through #343's bounded queue. It uses Normal scheduling, immediate visible contacts, automatic retreat arming, the nearest visible bunker measured from the Horde spawn, support priorities, ready aircraft and ground abilities. It does not buy, research, issue health retreats, choose human situations or call paradrops. Its private stationary history is derived from successive delivered positions; deterministic ties use unit IDs. This is the AI-57 decision component. Generic engineering and house-shelling chores belong to their separate AI rows and are not claimed here.
+
+Kaiju breath reuses #325's firing component. Added checks cover full-range and radius boundaries, one terrain debit per overlapping cell, scar values and seeded ignition predicates. The pinned prototype's unchanged trench check and direct breath component were run from an external temporary copy at `e4e579a`; the read-only submodule remains unchanged.
+
+Full Horde ticks, complete Horde snapshots and hosted rooms stay guarded. Support, aircraft and ability command attempts from the policy do not open their Horde actuation paths. Ordinary-match witnesses retain the new private policy state through actual capture, income and victory, collect every seat's recipient snapshot on every tick, and continue after finish. FFI, headers, wire schemas, contracts, privacy, public ingress, World admission and logistics tick/snapshot guards are unchanged.

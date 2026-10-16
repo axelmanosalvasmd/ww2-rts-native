@@ -86,10 +86,18 @@ impl Match {
         map: &crate::map::AuthoritativeMap,
         mut options: MatchOptions,
     ) -> Result<Self, String> {
-        if options.mode != Mode::Tutorial
-            || !(1..=5).contains(&options.players.len())
-            || map.spawns().len() < 2
-            || map.points().iter().filter(|p| p.mp > 0.0).count() < 2
+        if options.mode != Mode::Tutorial || !(1..=6).contains(&options.players.len()) {
+            return Err("Tutorial startup needs Tutorial mode and one through six players".into());
+        }
+        // Ordinary map validation requires two spawns. World maps remain guarded by new.
+        if options.players.len() == 6 || map.spawns().len() < 2 {
+            options.mode = Mode::Conquest;
+            // createGame's feature whitelists still use the requested Tutorial mode.
+            options.logistics = false;
+            options.tech = false;
+            return Self::new(map, options);
+        }
+        if map.points().iter().filter(|p| p.mp > 0.0).count() < 2
             || map.geography().is_some()
             || !map.triggers().is_empty()
         {

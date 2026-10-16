@@ -15,7 +15,7 @@ use crate::{
     math,
 };
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct EliminationState {
     pub teams: usize,
     pub bunkers: Vec<usize>,
@@ -227,7 +227,8 @@ impl Match {
         let point_radius = number(cfg, "pointRadius")?;
         avoid.extend(self.start.points.iter().map(|p| (p.at, point_radius + 3.0)));
         let mut wanted = Vec::new();
-        let mut pairs = BTreeSet::new();
+        let mut pairs = Vec::new();
+        let mut paired = BTreeSet::new();
         for (slot, player) in self.start.players.iter().enumerate() {
             let a = math::atan2(center.z - player.spawn.z, center.x - player.spawn.x);
             for side in [-1.0, 1.0] {
@@ -257,7 +258,10 @@ impl Match {
                     .then(a.cmp(b))
             });
             for (other, _) in enemies.into_iter().take(2) {
-                pairs.insert((slot.min(other), slot.max(other)));
+                let pair = (slot.min(other), slot.max(other));
+                if paired.insert(pair) {
+                    pairs.push(pair);
+                }
             }
         }
         for &(a, b) in &pairs {
@@ -282,12 +286,25 @@ impl Match {
                 ));
             }
         }
+        // Node footprints reject live ground troops. Only the search copy treats
+        // those cells as blocked; walking distances retain the original terrain.
+        let mut sites = self.world.game.clone();
+        for unit in self.world.game.units.values() {
+            if unit.hp > 0.0
+                && !self.rules.kinds[unit.kind].air
+                && !unit.riding
+                && !self.rules.kinds[unit.kind].structure
+                && let Some(cell) = self.world.game.cell_of(unit.x, unit.z)
+            {
+                sites.flags[cell] |= crate::game::MOVE;
+            }
+        }
         let mut nodes = Vec::<ResourceNode>::new();
         let mut walking = ClassicWalking::new(&self.world.game, &self.rules)?;
         for (at, rate, fuel, from) in wanted {
             let mut away = avoid.clone();
             away.extend(nodes.iter().map(|node| (node.at, 10.0)));
-            let mut selected = find_site(&self.world.game, at, 2, &away);
+            let mut selected = find_site(&sites, at, 2, &away);
             if let Some((a, b)) = from
                 && selected.is_some()
             {
@@ -299,7 +316,7 @@ impl Match {
                             x: at.x + math::cos(angle) * radius,
                             z: at.z + math::sin(angle) * radius,
                         };
-                        if let Some(cell) = find_site(&self.world.game, wanted, 2, &away) {
+                        if let Some(cell) = find_site(&sites, wanted, 2, &away) {
                             let center = foot_center(&self.world.game, cell, 2);
                             let da = walking.distance(&self.world.game, &self.rules, a, center)?;
                             let db = walking.distance(&self.world.game, &self.rules, b, center)?;
@@ -885,3 +902,7 @@ impl EliminationDraft {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+#[path = "elimination_modes/classic_nodes_tests.rs"]
+mod classic_nodes_tests;
