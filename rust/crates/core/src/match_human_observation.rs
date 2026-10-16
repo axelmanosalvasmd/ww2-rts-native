@@ -523,6 +523,8 @@ impl Match {
             None,
         )?;
         apply_view_rows(&mut input, preview.remembered(), terrain)?;
+        let initial = self.world.initial();
+        complete_ordinary_facts(&mut input, &initial.chars, initial.height.as_deref());
         let packet =
             Observation::new(input).map_err(|e| format!("human strategic observation: {e:?}"))?;
         let view = HumanView {
@@ -566,13 +568,91 @@ fn apply_view_rows(
         // ai-view retains the received N character while decoding its delivered surface mask.
         input.chars[row.cell] = row.ch;
         input.flags[row.cell] = flag as u16;
-        if let Some(runtime) = &mut input.runtime
-            && let Some(height) = &mut runtime.height
-        {
-            height[row.cell] = row.height;
+        if let Some(runtime) = &mut input.runtime {
+            if let Some(height) = &mut runtime.height {
+                height[row.cell] = row.height;
+            }
+            if row.ch == b'N' {
+                let at = Point {
+                    x: (row.cell % input.width) as f64 * crate::game::CELL
+                        + crate::game::CELL / 2.0,
+                    z: (row.cell / input.width) as f64 * crate::game::CELL
+                        + crate::game::CELL / 2.0,
+                };
+                if observed.mine_owned == Some(true) {
+                    runtime.mines.push(at);
+                } else {
+                    runtime.found_mines.push(at);
+                }
+            }
         }
     }
     Ok(())
+}
+
+/// Complete planner facts from the same public map and remembered rows as ai-view.
+/// Authoritative hidden terrain and hidden depot positions never enter this adapter.
+fn complete_ordinary_facts(input: &mut Input, initial_chars: &[u8], initial_height: Option<&[i8]>) {
+    let Some(context) = &mut input.runtime else {
+        return;
+    };
+    context.known_depots = context
+        .known_buildings
+        .iter()
+        .filter(|row| row.kind == "depot")
+        .map(|row| row.at)
+        .collect();
+    let team = input.players[input.slot].team;
+    context.claimed_nodes = context
+        .nodes
+        .iter()
+        .enumerate()
+        .filter_map(|(index, at)| {
+            let claimed = input.units.iter().any(|u| {
+                u.kind == "depot"
+                    && input.players[u.owner].team == team
+                    && math::hypot(u.at.x - at.x, u.at.z - at.z) < 8.0
+            }) || context
+                .known_depots
+                .iter()
+                .any(|b| math::hypot(b.x - at.x, b.z - at.z) < 8.0);
+            claimed.then_some(index)
+        })
+        .collect();
+    let level = |cell: usize| context.height.as_ref().map_or(0, |h| h[cell]);
+    let original = |cell: usize| initial_height.map_or(0, |h| h[cell]);
+    context.spoiled_cells = input
+        .chars
+        .iter()
+        .enumerate()
+        .filter_map(|(cell, &ch)| {
+            let fillable = matches!(ch, b'+' | b'R')
+                || ch == b'F' && initial_chars[cell] != b'F'
+                || ch == b'.' && level(cell) < original(cell);
+            let raised = || {
+                let x = cell % input.width;
+                let low = [
+                    cell.checked_sub(input.width),
+                    cell.checked_add(input.width)
+                        .filter(|&c| c < input.chars.len()),
+                    cell.checked_sub(1).filter(|_| x > 0),
+                    (x + 1 < input.width).then_some(cell + 1),
+                ]
+                .into_iter()
+                .flatten()
+                .map(level)
+                .min();
+                low.map_or(original(cell), |low| {
+                    original(cell).min(low.saturating_add(1))
+                }) > level(cell)
+            };
+            ((ch == b'R' && initial_chars[cell] == b'D')
+                || fillable
+                    && (ch == b'F' || level(cell) < original(cell))
+                    && (ch != b'.' || raised()))
+            .then_some(cell)
+        })
+        .collect();
 }
 
 #[cfg(test)]

@@ -1,0 +1,5 @@
+## Recipient-fed AI engineering proposals
+
+The ordinary AI planner remembers bridges delivered to its seat and proposes bridge, fill and mine-clearing work over received terrain and contacts. Newly delivered bridge cells are sorted numerically before new cells append to existing memory. Fill and mine-clear scans reuse their sorted crew arrays, preserving the earlier ordering when a later target ties.
+
+Engineering uses the existing delayed human-command input path. A proposed Dig retains a pending crew job until a later delivered observation shows digging, completion, loss or the prototype's 90-second expiry. This avoids duplicating a command while motor inputs wait. The detached planner checks delivered span visibility and proposes the prototype's approach move when the span is unseen. It receives no synchronous canonical denial receipt, so a visible Dig refused by canonical admission cannot trigger an immediate approach fallback and may wait for pending expiry. No wire field or command is added.

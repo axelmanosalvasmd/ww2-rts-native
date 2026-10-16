@@ -9,6 +9,7 @@ use crate::{
     random::{MatchRandom, StreamId},
 };
 use serde_json::{Value, json};
+use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Plan {
@@ -170,6 +171,7 @@ pub(crate) fn site(
     Ok(Some(at))
 }
 
+#[cfg(test)]
 pub(crate) fn plan(
     observation: &Observation,
     available: &[&UnitObservation],
@@ -178,6 +180,29 @@ pub(crate) fn plan(
     terrain: &Game,
     sees: impl Fn(Point) -> bool,
     random: &mut MatchRandom,
+) -> Result<Plan, String> {
+    plan_with_nodes(
+        observation,
+        available,
+        budget,
+        need_armor,
+        terrain,
+        sees,
+        random,
+        &mut BTreeMap::new(),
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn plan_with_nodes(
+    observation: &Observation,
+    available: &[&UnitObservation],
+    budget: f64,
+    need_armor: bool,
+    terrain: &Game,
+    sees: impl Fn(Point) -> bool,
+    random: &mut MatchRandom,
+    node_assignments: &mut BTreeMap<u32, usize>,
 ) -> Result<Plan, String> {
     if !budget.is_finite() {
         return Err("non-finite construction budget".into());
@@ -299,6 +324,13 @@ pub(crate) fn plan(
         if context.mode != Mode::Classic {
             return Ok(plan);
         }
+        let engineer_ids: BTreeSet<_> = available
+            .iter()
+            .filter(|u| u.owner == input.slot && u.kind == "engineer")
+            .map(|u| u.id)
+            .collect();
+        node_assignments.retain(|id, _| engineer_ids.contains(id));
+        let mut taken: BTreeSet<_> = node_assignments.values().copied().collect();
         for worker in available.iter().copied().filter(|u| {
             u.owner == input.slot
                 && u.kind == "engineer"
@@ -322,7 +354,35 @@ pub(crate) fn plan(
                 plan.builders.push(worker.id);
                 continue;
             }
-            let Some(kind) = next.filter(|kind| *kind != "depot") else {
+            if next == Some("depot") {
+                let pick = crate::sort::first_by(
+                    context.nodes.iter().enumerate().filter(|(i, at)| {
+                        free.contains(at)
+                            && (!taken.contains(i) || node_assignments.get(&worker.id) == Some(i))
+                    }),
+                    |(a, at), (b, bt)| {
+                        let worth = |i: usize| context.node_worth.get(i).copied().unwrap_or(0.0);
+                        distance(worker.at, *at)
+                            - worth(a) * 20.0
+                            - (distance(worker.at, *bt) - worth(b) * 20.0)
+                    },
+                );
+                let Some((index, &at)) = pick else { continue };
+                node_assignments.insert(worker.id, index);
+                taken.insert(index);
+                if budget >= cost && sees(at) {
+                    plan.commands.push(
+                        json!({"t":"build","ids":[worker.id],"kind":"depot","x":at.x,"z":at.z}),
+                    );
+                    plan.builders.push(worker.id);
+                } else if worker.path.is_empty() {
+                    plan.commands
+                        .push(json!({"t":"move","orders":[[worker.id,at.x,at.z]]}));
+                    plan.builders.push(worker.id);
+                }
+                continue;
+            }
+            let Some(kind) = next else {
                 continue;
             };
             // The prototype evaluates its flak angle even when indexing another
@@ -456,3 +516,7 @@ pub(crate) fn plan(
 #[cfg(test)]
 #[path = "commander_skirmish_base_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "commander_depot_tests.rs"]
+mod depot_tests;

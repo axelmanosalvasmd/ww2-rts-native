@@ -52,6 +52,28 @@ fn produces(kind: usize, rules: &crate::rules::Rules) -> Result<bool, String> {
         .unwrap_or(false))
 }
 
+fn classic_node_pairs(players: &[crate::match_runtime::PlayerStart]) -> Vec<(usize, usize)> {
+    let mut pairs = Vec::new();
+    for (slot, player) in players.iter().enumerate() {
+        let mut enemies = players
+            .iter()
+            .enumerate()
+            .filter(|(_, p)| p.config.team != player.config.team)
+            .collect::<Vec<_>>();
+        crate::sort::sort_by(&mut enemies, |(_, p), (_, q)| {
+            math::hypot(p.spawn.x - player.spawn.x, p.spawn.z - player.spawn.z)
+                - math::hypot(q.spawn.x - player.spawn.x, q.spawn.z - player.spawn.z)
+        });
+        for (other, _) in enemies.into_iter().take(2) {
+            let pair = (slot.min(other), slot.max(other));
+            if !pairs.contains(&pair) {
+                pairs.push(pair);
+            }
+        }
+    }
+    pairs
+}
+
 impl Match {
     pub fn new_annihilation(
         map: &crate::map::AuthoritativeMap,
@@ -227,8 +249,8 @@ impl Match {
         let point_radius = number(cfg, "pointRadius")?;
         avoid.extend(self.start.points.iter().map(|p| (p.at, point_radius + 3.0)));
         let mut wanted = Vec::new();
-        let mut pairs = BTreeSet::new();
-        for (slot, player) in self.start.players.iter().enumerate() {
+        let pairs = classic_node_pairs(&self.start.players);
+        for player in &self.start.players {
             let a = math::atan2(center.z - player.spawn.z, center.x - player.spawn.x);
             for side in [-1.0, 1.0] {
                 wanted.push((
@@ -240,20 +262,6 @@ impl Match {
                     false,
                     None,
                 ));
-            }
-            let mut enemies = self
-                .start
-                .players
-                .iter()
-                .enumerate()
-                .filter(|(_, p)| p.config.team != player.config.team)
-                .collect::<Vec<_>>();
-            crate::sort::sort_by(&mut enemies, |(_, p), (_, q)| {
-                math::hypot(p.spawn.x - player.spawn.x, p.spawn.z - player.spawn.z)
-                    - math::hypot(q.spawn.x - player.spawn.x, q.spawn.z - player.spawn.z)
-            });
-            for (other, _) in enemies.into_iter().take(2) {
-                pairs.insert((slot.min(other), slot.max(other)));
             }
         }
         for &(a, b) in &pairs {

@@ -27,6 +27,7 @@ pub struct UnitFacts {
     pub stock: Option<Stock>,
     pub amove: Option<Point>,
     pub airborne: bool,
+    pub air_ready: bool,
     pub wall_work: bool,
 }
 #[derive(Clone, Debug, PartialEq)]
@@ -57,7 +58,13 @@ pub struct Context {
     pub support: BTreeMap<String, f64>,
     /// Resource positions and enemy depot memories already delivered to this seat.
     pub nodes: Vec<Point>,
+    pub node_worth: Vec<f64>,
     pub known_depots: Vec<Point>,
+    pub mines: Vec<Point>,
+    pub bridge_cells: Vec<usize>,
+    pub spoiled_cells: Vec<usize>,
+    pub found_mines: Vec<Point>,
+    pub claimed_nodes: BTreeSet<usize>,
     /// Indices of delivered nodes on owned World ground. Other modes use every node.
     pub owned_nodes: BTreeSet<usize>,
     pub build_reserve: f64,
@@ -84,7 +91,13 @@ impl Default for Context {
             sight: 1.0,
             support: BTreeMap::new(),
             nodes: Vec::new(),
+            node_worth: Vec::new(),
             known_depots: Vec::new(),
+            mines: Vec::new(),
+            bridge_cells: Vec::new(),
+            spoiled_cells: Vec::new(),
+            found_mines: Vec::new(),
+            claimed_nodes: BTreeSet::new(),
             owned_nodes: BTreeSet::new(),
             build_reserve: 0.0,
             fort_reserve: 0.0,
@@ -197,6 +210,10 @@ pub struct State {
     pub called: Option<f64>,
     pub cleared_sightings: BTreeMap<u32, f64>,
     pub(crate) fort_steps: BTreeMap<u32, u8>,
+    #[serde(default)]
+    pub(crate) engineering: crate::commander_engineering::State,
+    #[serde(default)]
+    pub(crate) node_assignments: BTreeMap<u32, usize>,
 }
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Decision {
@@ -543,7 +560,7 @@ fn plan_inner(
                         && dist(u.at, e.at) < 35.0
                 })
         });
-    let construction = crate::commander_construction::plan(
+    let construction = crate::commander_construction::plan_with_nodes(
         observation,
         &available_units,
         budget,
@@ -551,6 +568,7 @@ fn plan_inner(
         &sight_game,
         sees,
         random,
+        &mut state.node_assignments,
     )?;
     budget = construction.remaining_mp;
     let build_reserve = if rush { 0.0 } else { construction.reserve };
@@ -583,6 +601,16 @@ fn plan_inner(
         newly_busy.extend(fortification.builders);
         commands.extend(fortification.commands);
     }
+    let engineering = crate::commander_engineering::plan(
+        observation,
+        &mine,
+        &enemies,
+        &newly_busy,
+        &mut state.engineering,
+        sees,
+    )?;
+    newly_busy.extend(engineering.builders);
+    commands.extend(engineering.commands);
     let count = |kind: &str| mine.iter().filter(|u| u.kind == kind).count();
     let watched = |id| context.horde || state.mind.watched(id, now, skill.notice);
     let mut sit = Situation {
@@ -885,13 +913,9 @@ fn plan_inner(
         )
         .collect();
     for at in guarded {
-        let foe_value: f64 = enemies
-            .iter()
-            .filter(|e| {
-                dist(e.at, at) <= 24.0
-                    && !boolean(definition(e), "structure")
-                    && !boolean(definition(e), "air")
-            })
+        let foe_value: f64 = enemies_near(&enemies, at, 24.0)
+            .into_iter()
+            .filter(|e| !boolean(definition(e), "structure") && !boolean(definition(e), "air"))
             .map(|e| worth(e, definition(e)))
             .sum();
         if foe_value <= 0.0 {
@@ -937,6 +961,7 @@ fn plan_inner(
             }
         }
     }
+    commands.extend(aircraft(observation, context, &mine, &enemies)?);
     for u in &mine {
         let d = definition(u);
         if boolean(d, "air") || u.riding || u.retreating || busy.contains(&u.id) {
@@ -979,16 +1004,18 @@ fn plan_inner(
                 .min()
                 == Some(u.id);
             if allied(input.points[i].owner)
-                && !u.garrison
-                && !u.dig
-                && !u.entrench
-                && !matches!(u.cover, 1 | 2)
                 && first
-                && !enemies
-                    .iter()
-                    .any(|e| dist(e.at, input.points[i].at) < 40.0)
+                && let Some(command) = point_holder::plan(
+                    observation,
+                    context,
+                    u,
+                    &input.points[i],
+                    &enemies,
+                    !armor_seen.is_empty(),
+                    budget,
+                )?
             {
-                commands.push(json!({"t":"cover","ids":[u.id]}));
+                commands.push(command);
             }
             if !allied(input.points[i].owner) || first {
                 continue;
@@ -1316,3 +1343,79 @@ mod regression_tests;
 #[cfg(test)]
 #[path = "if25_tactics_tests.rs"]
 mod if25_tests;
+
+#[path = "commander_point_holder.rs"]
+mod point_holder;
+
+fn aircraft(
+    observation: &Observation,
+    context: &Context,
+    mine: &[&UnitObservation],
+    enemies: &[&UnitObservation],
+) -> Result<Vec<Value>, String> {
+    let input = observation.input();
+    let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
+    let definition = |u: &UnitObservation| catalog.unit(&u.kind).map_err(|e| e.to_string());
+    let army: Vec<_> = mine
+        .iter()
+        .copied()
+        .filter(|u| definition(u).is_ok_and(|d| !boolean(d, "air")))
+        .collect();
+    let front = if army.is_empty() {
+        input.players[input.slot].spawn
+    } else {
+        Point {
+            x: army.iter().map(|u| u.at.x).sum::<f64>() / army.len() as f64,
+            z: army.iter().map(|u| u.at.z).sum::<f64>() / army.len() as f64,
+        }
+    };
+    let mut commands = Vec::new();
+    for u in mine.iter().copied().filter(|u| {
+        definition(u).is_ok_and(|d| boolean(d, "air"))
+            && context.units.get(&u.id).is_some_and(|f| f.air_ready)
+    }) {
+        if u.kind == "attacker" {
+            let target = crate::sort::first_by(
+                enemies.iter().copied().filter(|e| {
+                    definition(e).is_ok_and(|d| {
+                        !boolean(d, "air")
+                            && !boolean(d, "building")
+                            && (!boolean(d, "infantry")
+                                || matches!(e.kind.as_str(), "at" | "flak" | "mortar" | "howitzer"))
+                    })
+                }),
+                |a, b| dist(a.at, front) - dist(b.at, front),
+            );
+            if let Some(target) = target.filter(|target| dist(target.at, front) < 120.0) {
+                commands.push(json!({"t":"attack","ids":[u.id],"target":target.id}));
+            }
+        } else {
+            let at = crate::sort::first_by(
+                enemies
+                    .iter()
+                    .copied()
+                    .filter(|e| definition(e).is_ok_and(|d| boolean(d, "air"))),
+                |a, b| dist(a.at, front) - dist(b.at, front),
+            )
+            .map_or(front, |e| e.at);
+            commands.push(json!({"t":"move","orders":[[u.id,at.x,at.z]]}));
+        }
+    }
+    Ok(commands)
+}
+
+fn enemies_near<'a>(
+    enemies: &[&'a UnitObservation],
+    at: Point,
+    radius: f64,
+) -> Vec<&'a UnitObservation> {
+    enemies
+        .iter()
+        .copied()
+        .filter(|e| dist(e.at, at) <= radius)
+        .collect()
+}
+
+#[cfg(test)]
+#[path = "if25_ai_lifecycle_tests.rs"]
+mod if25_lifecycle_tests;

@@ -679,3 +679,35 @@ fn unexercised_multiple_purchase_budget_retains_private_state() {
     assert_eq!(state, before);
     assert_eq!(rng, before_rng);
 }
+
+#[test]
+fn if25_quiet_research_equal_armory_levels_select_first_authored_line() {
+    use ww2_core::economy::Technology;
+    let fixture: Value =
+        serde_json::from_str(include_str!("fixtures/commander-research.json")).unwrap();
+    let case = array(&fixture["cases"])
+        .iter()
+        .find(|c| c["name"] == "infantry-line-without-armory")
+        .unwrap();
+    let frame = &case["frames"][0];
+    let observation = Observation::new(research_input(case, frame)).unwrap();
+    let planned = commander_ai::plan_with_fractions(
+        &observation,
+        &mut SourceState::default(),
+        Level::Normal,
+        &array(&frame["random"])
+            .iter()
+            .map(number)
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    let technology = planned
+        .commands
+        .iter()
+        .filter_map(|c| match c {
+            Command::Technology { kind } => Some(*kind),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(technology, [Technology::Infantry]);
+}

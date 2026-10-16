@@ -439,3 +439,22 @@ fn mov46_r1_recorded_moves_keep_ticking_and_delivering_both_seat_snapshots() {
         );
     }
 }
+
+#[test]
+fn if25_end_spots_equal_lateral_projection_keeps_request_order() {
+    for ids in [[1, 2], [2, 1]] {
+        let mut scene = Scene::new("rifle", 2);
+        for (&id, x) in [1, 2].iter().zip([28.0, 32.0]) {
+            let unit = scene.game.units.get_mut(&id).unwrap();
+            unit.x = x;
+            unit.z = 60.0;
+        }
+        scene.rebuild();
+        let click = p(100.0, 60.0);
+        let orders = ids.map(|id| Request { id, at: click });
+        let ends = scene.ends(&orders);
+        assert_eq!(ends.iter().map(|r| r.id).collect::<Vec<_>>(), ids);
+        assert_eq!(ends[0].at, p(100.0, 57.5));
+        assert_eq!(ends[1].at, p(100.0, 62.5));
+    }
+}

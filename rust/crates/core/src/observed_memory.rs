@@ -499,6 +499,34 @@ mod tests {
             .unwrap()
     }
     #[test]
+    fn if25_observed_pending_replays_log_indices_after_reverse_retouch() {
+        let mut w = world();
+        let mut memory = ObservedMemory::new(&w, 0, 7).unwrap();
+        let frame = ObservationFrame {
+            team: 0,
+            skip_fog: false,
+        };
+        for cell in [90, 30, 60] {
+            w.game.wear.as_mut().unwrap()[cell] = 0.25;
+            w.log_cell(cell, false).unwrap();
+        }
+        assert_eq!(memory.refresh(&mut w, frame, &mut Seen).unwrap(), 3);
+        memory.take_changes();
+        for cell in [60, 30, 90] {
+            w.game.wear.as_mut().unwrap()[cell] = 0.5;
+            w.log_cell(cell, false).unwrap();
+        }
+        assert_eq!(memory.refresh(&mut w, frame, &mut Seen).unwrap(), 3);
+        let changes = memory.take_changes();
+        assert_eq!(
+            changes.iter().map(|r| r.row.cell).collect::<Vec<_>>(),
+            vec![90, 30, 60]
+        );
+        assert!(changes.windows(2).all(|r| r[0].revision < r[1].revision));
+        assert!(w.pending(Recipient::Player(0)).unwrap().is_empty());
+    }
+
+    #[test]
     fn if26_terrain_json_comparison_ignores_zero_sign_and_preserves_nearby_fields() {
         let mut w = world();
         let mut memory = ObservedMemory::new(&w, 0, 7).unwrap();
