@@ -121,7 +121,7 @@ fn recipient_projection_matches_original_helpers() {
             .as_array()
             .unwrap()
             .iter()
-            .map(number)
+            .map(|v| number(v) as f32)
             .collect();
         let fronts: Vec<_> = i["trenchFront"]
             .as_array()

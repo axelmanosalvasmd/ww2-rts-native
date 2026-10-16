@@ -9,6 +9,14 @@
 mod authoritative_maps;
 #[path = "../base_audit_features.rs"]
 mod base_audit_features;
+#[path = "../bases_batch3_economy.rs"]
+mod bases_batch3_economy;
+#[path = "../bases_batch3_rally.rs"]
+mod bases_batch3_rally;
+#[path = "../bases_batch3_runtime.rs"]
+mod bases_batch3_runtime;
+#[path = "../bases_batch3_training.rs"]
+mod bases_batch3_training;
 #[path = "../client_view.rs"]
 mod client_view;
 #[path = "../combat.rs"]
@@ -53,6 +61,10 @@ mod interface_intent;
 mod interface_map_helpers;
 #[path = "../interface_sort_intent.rs"]
 mod interface_sort_intent;
+#[path = "../interface_runtime_batch3.rs"]
+mod interface_runtime_batch3;
+#[path = "../interface_stream_consumers.rs"]
+mod interface_stream_consumers;
 #[path = "../legacy_scenario.rs"]
 mod legacy_scenario;
 #[path = "../logistics.rs"]

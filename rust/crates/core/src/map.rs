@@ -3,7 +3,8 @@
 //! `AuthoritativeMap` is not a client-map importer or a match constructor. Client projections erase
 //! mines, triggers and scenarios irreversibly. Its callers must supply the authoritative document;
 //! the format has no provenance marker that could distinguish a stripped projection.
-//! Authored scenarios remain unsupported. Unknown authoring properties stay in `source()` for later systems.
+//! Authored scenarios are validated here; their execution remains guarded at match admission.
+//! Unknown authoring properties stay in `source()` for later systems.
 use std::{collections::BTreeMap, fmt};
 
 use serde_json::Value;
@@ -216,11 +217,6 @@ impl AuthoritativeMap {
             .transpose()?;
         let layers = normalize_layers(&source, w, h, &chars, true)?;
         let structures = crate::structures::parse(source.get("structures"), w, h, &layers)?;
-        if source.get("scenario").is_some() {
-            return Err(MapError::Unsupported {
-                feature: "scenario",
-            });
-        }
         let is_world = source.get("world").is_some();
         let minimum_spawns = if is_world { 1 } else { 2 };
         let pos = |v: &Value, field: &str| -> Result<(usize, usize)> {
@@ -367,6 +363,8 @@ impl AuthoritativeMap {
             }
         }
         let catalog = Catalog::compiled().map_err(|e| MapError::Catalog(e.to_string()))?;
+        crate::scenario_validation::validate_scenario(&source, catalog)
+            .map_err(|e| invalid("scenario", &e.0))?;
         let houses = catalog
             .table("CFG")
             .map_err(|e| MapError::Catalog(e.to_string()))?
@@ -824,7 +822,7 @@ pub struct TerrainState {
     pub height: Option<Vec<i8>>,
     pub house: Vec<u8>,
     pub cell_hp: Vec<f32>,
-    pub tough: Option<Vec<f64>>,
+    pub tough: Option<Vec<f32>>,
     pub wear: Vec<f32>,
     pub surface_wear: Vec<f32>,
     pub trench_front: Option<Vec<f32>>,
@@ -944,7 +942,7 @@ impl AuthoritativeMap {
             let values = tough.get_or_insert_with(|| vec![1.0; n]);
             let mut seen = vec![false; n];
             for c in component(&self.chars, self.w, b.y * self.w + b.x, &mut seen) {
-                values[c] = cfg_num("stoneBridge")?;
+                values[c] = cfg_num("stoneBridge")? as f32;
             }
         }
         let mut terrain = TerrainState {
@@ -987,7 +985,7 @@ impl AuthoritativeMap {
                 rules.movement.house_hp[usize::from(terrain.house[c])]
             } else {
                 rules.movement.terrain_hp(*ch).unwrap_or(0.0)
-                    * terrain.tough.as_ref().map_or(1.0, |t| t[c])
+                    * terrain.tough.as_ref().map_or(1.0, |t| f64::from(t[c]))
             }) as f32;
         }
         if self.trench_facing {
