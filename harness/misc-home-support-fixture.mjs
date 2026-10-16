@@ -42,15 +42,37 @@ for (let stage = 0; stage < 3; stage++) {
   // Preserve the actual inputs independently from the next stage's mutations.
   stages[stage] = structuredClone(stages[stage]);
 }
+const hordePlayers = [0, 0, 1, 1].map((team, slot) => ({ slot, team, spawn }));
+const hordeUnits = [
+  [10, 'hq', 0, 10, 100, 1], [11, 'hq', 1, 35, 100, 1],
+  [12, 'hq', 1, 39, 100, 0.5], [13, 'hq', 1, 39.5, 0, 1],
+  [14, 'hq', 2, 40, 100, 1], [15, 'hq', 3, 39.75, 100, 1],
+  [16, 'barracks', 1, 40, 100, 1], [17, 'hq', 1, 45, 100, 1],
+].map(([id, type, owner, x, hp, built]) => ({ id, type, owner, x, z: 40, hp, built }));
+const hordeHomes = [
+  ['nearest-shared-allied-hq', 0, []],
+  ['nearer-owned-hq', 0, [[10, { x: 38 }]]],
+  ['equal-distance-insertion-order', 0, [[10, { x: 45 }]]],
+  ['dead-unfinished-enemy-and-non-hq-refused', 0, [[11, { hp: 0 }], [17, { built: 0.9 }]]],
+  ['horde-actor-cannot-share', 2, [[14, { x: 10 }]]],
+  ['horde-owned-hq-cannot-be-shared', 3, []],
+].map(([name, owner, changes]) => {
+  const units = new Map(hordeUnits.map(u => [u.id, structuredClone(u)]));
+  for (const [id, change] of changes) Object.assign(units.get(id), change);
+  const actor = { id: 1, type: 'rifle', owner, x: 40, z: 40 };
+  const game = { players: hordePlayers, units, mode: { kind: 'horde', slot: 2 } };
+  const result = sim.__home(game, actor);
+  return { name, actor, players: hordePlayers, hordeSlot: 2, units: [...units.values()], home: { x: result.x, z: result.z } };
+});
 const support = Object.entries(sim.SUPPORT).map(([name, def]) => ({ name, mp: def.cost, mun: def.mun, cd: def.cd, delay: def.delay }));
 const aircraft = ['base', 'rearm', 'out', 'station', 'home'].map(prior => {
   const unit = { air: { state: prior } };
   sim.__retreat({ tick: 0 }, unit);
   return { prior, after: unit.air.state };
 });
-const output = JSON.stringify({ pin, actor, spawn, stages, support, aircraft }) + '\n';
+const output = JSON.stringify({ pin, actor, spawn, stages, hordeHomes, support, aircraft }) + '\n';
 const destination = `${root}/rust/crates/core/tests/fixtures/misc-home-support.json`;
 if (process.argv.includes('--check')) assert.equal(readFileSync(destination, 'utf8'), output);
 else writeFileSync(destination, output);
 assert.equal(git(['status', '--porcelain', '--untracked-files=no']), '');
-console.log('Home/support fixture: 24 home selections, 8 support rows, 5 aircraft states; pin clean.');
+console.log('Home/support fixture: 30 home selections, 8 support rows, 5 aircraft states; pin clean.');

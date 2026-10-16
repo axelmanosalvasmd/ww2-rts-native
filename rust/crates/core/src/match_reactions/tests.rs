@@ -426,10 +426,91 @@ fn mov48_home_component_uses_mode_finished_ownership_and_nearest_distance() {
         for row in stage["homes"].as_array().unwrap() {
             let mode = Mode::from_kind(row["mode"].as_str());
             assert_eq!(
-                super::ground_home(mode, &unit, &buildings, &rules, spawn).unwrap(),
+                super::ground_home(
+                    mode,
+                    &unit,
+                    &buildings,
+                    &rules,
+                    spawn,
+                    &[
+                        crate::game::Player {
+                            slot: 0,
+                            team: 0,
+                            visible: vec![]
+                        },
+                        crate::game::Player {
+                            slot: 1,
+                            team: 1,
+                            visible: vec![]
+                        }
+                    ],
+                    (mode == Mode::Horde).then_some(1),
+                )
+                .unwrap(),
                 point(&row["home"]),
                 "{mode:?}"
             );
         }
+    }
+}
+
+#[test]
+fn mov48_horde_home_component_shares_only_finished_allied_non_horde_hqs() {
+    let fixture: Value =
+        serde_json::from_str(include_str!("../../tests/fixtures/misc-home-support.json")).unwrap();
+    let rules = crate::rules::Rules::compiled().unwrap();
+    let catalog = Catalog::compiled().unwrap();
+    let spawn = point(&fixture["spawn"]);
+    for case in fixture["hordeHomes"].as_array().unwrap() {
+        let unit = unit_spawn::initial_unit(
+            &rules,
+            catalog,
+            rules.kind("rifle").unwrap(),
+            1,
+            case["actor"]["owner"].as_u64().unwrap() as usize,
+            point(&case["actor"]),
+        )
+        .unwrap();
+        let mut buildings = std::collections::BTreeMap::new();
+        for row in case["units"].as_array().unwrap() {
+            let id = row["id"].as_u64().unwrap() as u32;
+            let mut building = unit_spawn::initial_unit(
+                &rules,
+                catalog,
+                rules.kind(row["type"].as_str().unwrap()).unwrap(),
+                id,
+                row["owner"].as_u64().unwrap() as usize,
+                point(row),
+            )
+            .unwrap();
+            building.hp = row["hp"].as_f64().unwrap();
+            building.built = row["built"].as_f64();
+            buildings.insert(id, building);
+        }
+        let players = case["players"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|row| crate::game::Player {
+                slot: row["slot"].as_u64().unwrap() as usize,
+                team: row["team"].as_i64().unwrap() as i32,
+                visible: vec![],
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            super::ground_home(
+                Mode::Horde,
+                &unit,
+                &buildings,
+                &rules,
+                spawn,
+                &players,
+                Some(case["hordeSlot"].as_u64().unwrap() as usize)
+            )
+            .unwrap(),
+            point(&case["home"]),
+            "{}",
+            case["name"],
+        );
     }
 }

@@ -3,7 +3,7 @@ use crate::{
     catalog::{Catalog, Value},
     command_destinations::{self, Context},
     economy::Mode,
-    game::{Point, Unit},
+    game::{Player, Point, Unit},
     grid::UnitId,
     match_commands::MoveOutcome,
     match_runtime::Match,
@@ -30,6 +30,8 @@ fn ground_home(
     units: &BTreeMap<UnitId, Unit>,
     rules: &Rules,
     spawn: Point,
+    players: &[Player],
+    horde_slot: Option<usize>,
 ) -> Result<Point, String> {
     if !mode.is_skirmish() && mode != Mode::Classic {
         return Ok(spawn);
@@ -38,7 +40,13 @@ fn ground_home(
     let mut home = spawn;
     let mut best = f64::INFINITY;
     for building in units.values() {
-        if building.owner != unit.owner
+        let shared_horde_home = mode == Mode::Horde
+            && horde_slot.is_some_and(|slot| unit.owner != slot && building.owner != slot)
+            && players
+                .get(unit.owner)
+                .zip(players.get(building.owner))
+                .is_some_and(|(actor, owner)| actor.team == owner.team);
+        if (building.owner != unit.owner && !shared_horde_home)
             || building.hp <= 0.0
             || !building.built.is_some_and(|b| b >= 1.0)
         {
@@ -87,7 +95,7 @@ impl Match {
         Ok(())
     }
 
-    /// Select the mode's finished owned home, with the spawn as the ordinary fallback.
+    /// Select the mode's finished home, including shared allied Horde HQs.
     pub fn reaction_home(&self, id: UnitId) -> Result<Point, String> {
         let unit = self
             .world
@@ -114,6 +122,8 @@ impl Match {
             &self.world.game.units,
             &self.rules,
             spawn,
+            &self.world.game.players,
+            self.horde.as_ref().map(|horde| horde.slot),
         )
     }
 

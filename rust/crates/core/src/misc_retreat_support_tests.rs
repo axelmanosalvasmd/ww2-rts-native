@@ -128,14 +128,22 @@ fn mov48_ordinary_retreat_reaches_owned_home_through_ticks_and_every_seat_delive
         assert!(state.world.game.units[&id].retreating);
         assert_eq!(state.world.game.units[&id].world_goal, Some(home));
         assert_eq!(state.rules.movement.retreat_speed, 1.5);
-        let home_radius = Catalog::compiled().unwrap().table("CFG").unwrap()
-            .get("reinforceRadius").and_then(Value::number).unwrap();
+        let home_radius = Catalog::compiled()
+            .unwrap()
+            .table("CFG")
+            .unwrap()
+            .get("reinforceRadius")
+            .and_then(Value::number)
+            .unwrap();
         let mut reached = false;
         for _ in 0..600 {
             delivered_tick(&mut state, &mut delivery, &selected);
             let unit = &state.world.game.units[&id];
             assert_eq!(state.firing.get(id).unwrap().target_id, 0);
-            if matches!(state.commands.units[&id].move_result, Some(MoveResult::Completed { .. })) {
+            if matches!(
+                state.commands.units[&id].move_result,
+                Some(MoveResult::Completed { .. })
+            ) {
                 assert!(!unit.retreating);
                 assert!(unit.world_goal.is_none());
                 // Completion runs before idle spacing, which may assign a new path this tick.

@@ -16,22 +16,29 @@ use crate::{
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 
+fn sorted_ids(mut ids: Vec<UnitId>) -> Vec<UnitId> {
+    ids.sort_unstable();
+    ids
+}
+
 pub(crate) fn assert_current(game: &Game, grid: &SpatialGrid) {
     let units = &game.units;
     let fresh = SpatialGrid::new(units, 16.0);
+    // A fresh BTreeMap index has ID order; the live index retains first-seen order.
+    // Compare membership here. The Source placement fixture checks exact query order.
     for owner in 0..game.players.len() {
         assert_eq!(
-            grid.owned_by(units, owner as i32),
-            fresh.owned_by(units, owner as i32)
+            sorted_ids(grid.owned_by(units, owner as i32)),
+            sorted_ids(fresh.owned_by(units, owner as i32))
         );
     }
     for z in -1..=(game.h as i64 * 2 / 16 + 1) {
         for x in -1..=(game.w as i64 * 2 / 16 + 1) {
             let at = (x as f64 * 16.0 + 8.0, z as f64 * 16.0 + 8.0);
             assert_eq!(
-                grid.in_order(units, at, 0.0, |_, _| true),
-                fresh.in_order(units, at, 0.0, |_, _| true),
-                "ordered bucket {at:?}"
+                sorted_ids(grid.in_order(units, at, 0.0, |_, _| true)),
+                sorted_ids(fresh.in_order(units, at, 0.0, |_, _| true)),
+                "ordered query membership {at:?}"
             );
             let mut actual = grid.unordered(units, at, 0.0, |_, _| true);
             let mut expected = fresh.unordered(units, at, 0.0, |_, _| true);
@@ -56,12 +63,16 @@ pub(crate) fn assert_current(game: &Game, grid: &SpatialGrid) {
     for unit in units.values() {
         let at = (unit.x, unit.z);
         assert_eq!(
-            grid.radius(units, at, 20.0, |_, _| true),
-            fresh.radius(units, at, 20.0, |_, _| true)
+            sorted_ids(grid.radius(units, at, 20.0, |_, _| true)),
+            sorted_ids(fresh.radius(units, at, 20.0, |_, _| true))
         );
+        let distance = |id| {
+            let target = &units[&id];
+            crate::math::hypot(target.x - at.0, target.z - at.1).to_bits()
+        };
         assert_eq!(
-            grid.nearest(units, at, 20.0, |_, _| true),
-            fresh.nearest(units, at, 20.0, |_, _| true)
+            grid.nearest(units, at, 20.0, |_, _| true).map(distance),
+            fresh.nearest(units, at, 20.0, |_, _| true).map(distance)
         );
     }
 }
