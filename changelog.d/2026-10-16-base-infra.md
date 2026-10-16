@@ -1,4 +1,5 @@
 - Add paid three-cell Gate jobs, grid-aligned placement, timed opening and closing, and existing recipient flags in ordinary Default and Conquest matches.
 - Keep open and closed Gate actors in traffic, vehicle contact and crowd separation, matching the prototype. Replace the open-Gate crossing test with terrain-route and body-obstruction checks with passage controls that contain no Gate actors; retain the full-match snapshot lifecycle.
 - Replace the old unsupported Gate command test with a tier refusal that preserves existing work. Add exact prototype component checks and ordinary match histories through Gate destruction, victory and every seat's snapshots.
+- Update `intent_ai33_fortification_state_survives_full_match_and_every_seat_snapshot` to expect `NoBuilders` for its Gate request using actor 3, an MG rather than a fortification builder. Gate commands are now supported, matching prototype `shared/sim.js:442,3635-3640`; all full-match, every-seat snapshot, fortification-state and fault assertions remain unchanged.
 - Depot claims and release still need construction-mode admission and its canonical node owner. AI holder and HQ fortification remain deferred.
