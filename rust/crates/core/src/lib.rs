@@ -49,6 +49,7 @@ pub mod fog;
 pub mod formation;
 pub mod game;
 pub mod grid;
+pub mod horde_commander;
 pub mod human_commander;
 pub mod human_commander_inputs;
 pub mod human_commander_policy;
@@ -67,6 +68,7 @@ pub mod match_companion_effects;
 mod match_companion_tick;
 pub mod match_companions;
 pub mod scenario_validation;
+pub mod seat_commander;
 
 pub(crate) mod existing_observers;
 pub mod logistics;
