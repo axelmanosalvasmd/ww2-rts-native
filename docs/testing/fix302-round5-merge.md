@@ -93,3 +93,57 @@ Raw local logs: `/tmp/fix302-focused.log`, `/tmp/fix302-workspace.log`,
 `/tmp/fix302-clippy.log`, `/tmp/fix302-clippy-verbose.log` and
 `/tmp/fix302-clippy-rebuild.log`. No prototype, Unreal, or hosted CI run was
 performed by this task. Hermes acknowledgment remains pending.
+
+## Round 6
+
+Merge PR head `8a5c90e199663131e71d333afdd5a3ec56a11df4` with main
+`788d911ff00f5a01c1ebc6527166bb51e445f77b`, retaining both parents.
+The shared PR branch is checked out elsewhere, so local branch
+`fix/302-round6-merge` pushes normally to `runtime/mov-batch2-20261016`.
+
+Three textual conflict hunks required hand editing:
+
+| Resolved location | Main side | PR #302 side | Resolution |
+| --- | --- | --- | --- |
+| `rust/crates/core/src/match_runtime.rs:656` | `classic_known_buildings` and its team-shared memory comment. | `rail_runs` keyed by train ID. | Keep both fields and the complete memory comment. |
+| `rust/crates/core/src/match_runtime.rs:845` | Initialize ordinary match building memory with `Default::default()`. | Initialize ordinary match train runs with `BTreeMap::new()`. | Keep both initializers. |
+| `rust/crates/core/src/match_world.rs:317` | Initialize World match building memory with `Default::default()`. | Initialize World match train runs with `BTreeMap::new()`. | Keep both initializers. |
+
+No helper or behavior is replaced in these hunks. Existing tests, guards and
+`#[cfg(test)]` gates remain intact. Main's automatic merges retain its combat,
+logistics and building-memory changes alongside the movement batch.
+
+Acknowledged locally: `julio-302-ack-3899de53` requests acknowledgment for an
+older head. That request and the historical ACCEPT do not qualify this new
+merge. Pending capability groups stay closed; this merge adds no ABI, header,
+wire, contract, public ingress or privacy policy. No GitHub issue post is made.
+The 28 claimed rows and 21 excluded rows are unchanged.
+
+Validation is limited to formatting, strict workspace all-target Clippy and
+focused core/simtest tests, from `rust/`, with four jobs. Cargo runs under a
+shared S1/S2/S3 lock with MemoryMax=6G, MemorySwapMax=0 and the acquired slot's
+target directory. No full workspace test suite is run in Round 6.
+
+The independent read-only source audit found no actionable integration issue.
+It performed no edits, Cargo execution or GitHub writes. Comparing the resolved
+source with Git's automatic merge tree
+`4507aa97d487f8e15cd7ab7989ad0f6e3bad650d` shows only the removal of the nine
+conflict-marker lines across the three hunks above. Both sides' source lines
+are preserved exactly.
+
+Round 6 validation passed on Rust tree
+`23484f7bcaa3e804e570560d1c6fdd7f3a2a8e56`:
+
+```text
+cargo fmt --all --check
+cargo clippy --workspace --all-targets -j4 -- -D warnings
+cargo nextest run --locked --cargo-profile ci-test -p ww2-core -p ww2-simtest -j4 -E 'test(mov) | test(movement) | test(traffic) | test(garrison) | test(carrier) | test(recipient_snapshot) | test(recipient_effects) | test(tutorial) | test(rail) | test(aviation) | test(aircraft) | test(match_tick) | test(world)'
+Summary [282.432s] 420 tests run: 420 passed (1 slow), 846 skipped
+```
+
+Formatting and strict workspace all-target Clippy passed. The focused run
+includes all twelve core Tutorial MODE-59 through MODE-70 checks, 52 tests with
+`recipient_snapshot` in their names and both `recipient_effects` tests. These
+counts overlap the total. All Cargo commands used S1; the wrapper released the
+lock after successful completion. No check failed or needed a retry. Only this
+record and the changelog fragment changed after validation.

@@ -654,6 +654,8 @@ pub struct Match {
     pub companions: crate::companions::Companions,
     pub world_runtime: Option<crate::match_world::WorldRuntime>,
     pub rail_runs: BTreeMap<u32, crate::match_world_rails::RailRun>,
+    /// Team-shared last observed buildings for ordinary rooms and the explicit Classic core phase.
+    pub classic_known_buildings: crate::vision::BuildingMemory,
     pub world: World,
     pub start: StartPlan,
     pub options: MatchOptions,
@@ -841,6 +843,7 @@ impl Match {
             companions: crate::companions::Companions::default(),
             world_runtime: None,
             rail_runs: BTreeMap::new(),
+            classic_known_buildings: Default::default(),
             grid: SpatialGrid::new(&world.game.units, 16.0),
             recipients: Vec::new(),
             routing_fog: crate::fog::Fog::default(),
