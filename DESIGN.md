@@ -4820,3 +4820,7 @@ fixture, provider, registry, guard, FFI, wire, contract or reference.
 Root owns fresh exact-child review, incoming-main preservation, any hosted
 gates and publication. Wider terrain features, World, recipient delivery
 and Unreal acceptance are not completed by these selected component rows.
+
+## AI sighting test lint correction (2026-10-16)
+
+PR #274 strict Clippy rejected a nested conditional in the stillness-reset assertion. Combine the existing option match and movement threshold with a let chain. The condition, assertions and authored inputs stay the same.

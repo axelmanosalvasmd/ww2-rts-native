@@ -558,11 +558,11 @@ fn intent_ai08_delivered_sightings_expire_and_stillness_restarts() {
             if !view.visible.contains(&old.id) {
                 assert!(!memory.still.iter().any(|current| current.id == old.id));
                 saw_lost_stillness = true;
-            } else if let Some(current) = memory.still.iter().find(|current| current.id == old.id) {
-                if math::hypot(old.at.x - current.at.x, old.at.z - current.at.z) > 0.1 + 1e-9 {
-                    assert_eq!(current.since, now);
-                    saw_motion_reset = true;
-                }
+            } else if let Some(current) = memory.still.iter().find(|current| current.id == old.id)
+                && math::hypot(old.at.x - current.at.x, old.at.z - current.at.z) > 0.1 + 1e-9
+            {
+                assert_eq!(current.since, now);
+                saw_motion_reset = true;
             }
         }
         for current in &memory.still {

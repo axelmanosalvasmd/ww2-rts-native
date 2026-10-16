@@ -2,6 +2,8 @@
 
 Unreleased entries that are not yet collected live in `changelog.d/`, one file per change.
 
+- Fix a nested condition in the AI sighting test that strict Clippy rejected. The assertions and behavior are unchanged.
+
 - Add nine native tests for AI sightings, camera attention and paced inputs. The focused batch passes 14 tests; seven row intents are accepted for a separate status update after the test PR merges.
 
 ## Unreleased
