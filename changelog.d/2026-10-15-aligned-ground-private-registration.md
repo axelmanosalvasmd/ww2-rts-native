@@ -1,0 +1,1 @@
+- Register the existing private ground replay tests under `aligned_replay::ground_commands`; preserve their bodies and prior Source receipts. Native qualification remains unrun and needs a new exact-head grant.

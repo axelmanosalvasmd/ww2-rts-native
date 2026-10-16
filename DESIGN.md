@@ -1,5 +1,13 @@
 # Three Crossroads Native: design decisions
 
+## Private ground replay registration (2026-10-15, native unrun)
+
+Register the existing `aligned_retreat_scuttle.rs` test module as `aligned_replay::ground_commands` after `startup_state`. This source-only child of `614e7a6ce84449bbfcf387715da1673993051586` adds exactly the three-line private registration that Root authorized. Removing those three lines reproduces the complete parent adapter byte for byte, including Replay::new's 16,384-value validation, draw/layout/startup/shot receipts and comparison behavior. Existing observer bodies, test hooks, runtime providers, callers, schemas, fixtures, registries and parity cells remain unchanged. AUDIT_COMBAT separately owns only the PR269 rebase and does not import this child.
+
+The four paid-work Source cases each passed authentic generation and check at producing head `614e7a6c`, Rust tree `7322ccb53d7a609b68ef62d13f706100c777395c`. Their raw captures, inputs, process receipts and terminal/lock-release evidence remain in the private proof packet. Those eight historical Source phases do not become execution evidence for this registration head. Its Source, native, formatting, lint, discovery and CI execution counts are zero. The four future native filters use `ground_commands::work_cancellation` and `ground_commands::destroy_work`; all 33 typed faults across four selection orders and 136 planned atomicity attempts remain UNRUN, as do the 19 input and 22 prefix controls.
+
+Original Retreat, Stop and loaded/unloaded scuttle are not executed here. CMB-144's original six-tick check and literal original-fixture equivalence remain unproved; the four work captures do not complete that row. Stop numeric/null mappings and loaded-carrier ejection stay held. Preserve approved CMB-83/91 combat sibling `7a06e508` and MOV-49 sibling `0a835373` in their serial PR269/268 file queues. Root owns independent exact-child review, any new literal head/selection/slot grant and publication. Receipt grants no owner consent, runtime adapter or provider adoption.
+
 ## Owned ground source on PR271 main (2026-10-15, unrun)
 
 Integrate the owned ground delta from preserved `ad658b7521cc74ecf0ddb8e9de738f5c85d468b9` onto literal PR271 main `f7c51b1a0ebf850c5c22b560a595e4095ce39fdc`. Retain every incoming typed tree entry except the three declared ground providers and this additive design history. Build independent three-way expected providers and compare their full bytes. All owned recorder, receipt validator, scenario, consumer and typed-fault bodies remain exact to that producer. Preserve all incoming fixtures, registrations, parity rows, Acceptance cells and historical failures.

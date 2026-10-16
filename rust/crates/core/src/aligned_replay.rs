@@ -16,6 +16,9 @@ mod canonical;
 #[path = "aligned_replay_startup.rs"]
 mod startup_state;
 
+#[path = "aligned_retreat_scuttle.rs"]
+mod ground_commands;
+
 #[derive(Clone, Debug)]
 pub struct Replay(Arc<Mutex<Tape>>);
 impl PartialEq for Replay {
