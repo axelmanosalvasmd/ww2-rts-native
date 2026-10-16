@@ -183,6 +183,7 @@ fn emit_destroy(
 impl Match {
     /// Preflight only the migrated public legacy-trigger subset used by the tick and snapshot.
     pub fn preflight_legacy_scenario(&self) -> Result<(), String> {
+        self.preflight_authored_scenario()?;
         let Some(scenario) = &self.scenario else {
             return Ok(());
         };

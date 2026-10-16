@@ -14,3 +14,12 @@ Every conflicted path and resolution:
 - `server/src/main.rs`, one hunk: describe optional sandbox and enabled logistics together.
 
 All unlisted paths merged automatically. No tests or assertions were removed. No World admission guard was opened.
+
+## Scenario engine merge
+
+Parents: the sandbox merge `f2481f96` and #386 `9aa5438826ce032462c94f9c312189b1623eff8f`.
+
+- `docs/contracts/README.md`, one hunk: retain the incoming shared authored-v2 save description and the sandbox contract row.
+- `server/src/lobby.rs`, one hunk: retain #386's custom authoring-map load path, #404's map-dependent logistics option and #393's sandbox flag. Resolve the map once before constructing options, then construct the same canonical Match from that map.
+
+All other paths merged automatically, including scenario tests, registrations, save compatibility and command/runtime guards.

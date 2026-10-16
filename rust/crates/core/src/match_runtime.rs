@@ -208,9 +208,12 @@ impl StartPlan {
         }
         let world_mode = matches!(&profile, StartupProfile::World(_));
         let tutorial = matches!(&profile, StartupProfile::Tutorial);
-        // Validation permits saving authored missions. Their executor is not admitted yet.
-        if map.source().get("scenario").is_some() {
-            return Err("native startup does not yet execute authored scenarios".into());
+        if let Some(data) = map.source().get("scenario") {
+            crate::authored_scenario::validate_definition(
+                data,
+                options.players.len(),
+                options.mode,
+            )?;
         }
         let horde_mode = matches!(&profile, StartupProfile::Horde);
         let defender_team = match &profile {
@@ -675,6 +678,7 @@ pub struct Match {
     pub abilities: crate::match_abilities::AbilityState,
     pub recovery: crate::match_recovery::RecoveryState,
     pub assault: Option<crate::assault_runtime::AssaultState>,
+    #[serde(default)]
     pub elimination: Option<crate::elimination_modes::EliminationState>,
     pub horde: Option<crate::match_horde::HordeState>,
     pub commands: crate::match_commands::MatchCommands,
@@ -699,6 +703,8 @@ pub struct Match {
     pub recruit_metadata: BTreeMap<u32, RecruitMetadata>,
     pub(crate) produced_placer: crate::produced_units::ProducedPlacer,
     pub scenario: Option<crate::legacy_scenario::LegacyScenario>,
+    #[serde(default)]
+    pub authored_scenario: Option<crate::authored_scenario::AuthoredScenario>,
     pub logistics: crate::logistics::LogisticsState,
     pub convoys: Option<crate::supply_convoys::ConvoyState>,
     pub supply_net: crate::supply_network::GroundSupplyNetwork,
@@ -840,7 +846,12 @@ impl Match {
             .collect::<Result<Vec<_>, String>>()?;
         let production =
             crate::production::ProductionState::new(initial_research).map_err(|e| e.to_string())?;
-        let scenario = if map.triggers().is_empty() {
+        let authored_scenario = map
+            .source()
+            .get("scenario")
+            .cloned()
+            .map(crate::authored_scenario::AuthoredScenario::new);
+        let scenario = if authored_scenario.is_some() || map.triggers().is_empty() {
             None
         } else {
             let owners = start
@@ -889,6 +900,7 @@ impl Match {
             recruit_metadata: BTreeMap::new(),
             produced_placer: crate::produced_units::ProducedPlacer::new(),
             scenario,
+            authored_scenario,
             logistics: crate::logistics::LogisticsState::default(),
             convoys: None,
             supply_net: crate::supply_network::GroundSupplyNetwork::default(),
@@ -931,6 +943,7 @@ impl Match {
             self.initialize_recipient_routing()?;
             self.initialize_logistics()?;
         }
+        self.setup_authored_scenario()?;
         Ok(())
     }
 

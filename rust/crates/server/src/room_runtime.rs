@@ -460,3 +460,7 @@ impl RoomRuntime {
 #[cfg(test)]
 #[path = "room_runtime_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "scenario_recipient_tests.rs"]
+mod scenario_recipient_tests;

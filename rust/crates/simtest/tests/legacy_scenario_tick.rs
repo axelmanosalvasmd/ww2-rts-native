@@ -76,6 +76,9 @@ fn shots(state: &Match, events: &[TickEvent]) -> Value {
             .iter()
             .map(|event| match event {
                 TickEvent::Scenario(say) => say.shot_json(),
+                TickEvent::AuthoredScenario(_) => {
+                    panic!("five-map legacy fixture has no authored scenario producer")
+                }
                 TickEvent::Environment(effect) => effect.to_json(),
                 TickEvent::Firing(event) => event.to_json(&state.rules),
                 TickEvent::Support(_) | TickEvent::Aviation(_) => {
