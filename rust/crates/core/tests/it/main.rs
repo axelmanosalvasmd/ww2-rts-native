@@ -37,6 +37,8 @@ mod field_projects;
 mod field_works;
 #[path = "../formation.rs"]
 mod formation;
+#[path = "../fps_intent.rs"]
+mod fps_intent;
 #[path = "../grid.rs"]
 mod grid;
 #[path = "../human_commander_inputs.rs"]
@@ -45,6 +47,8 @@ mod human_commander_inputs;
 mod human_commander_state;
 #[path = "../human_commander_timing.rs"]
 mod human_commander_timing;
+#[path = "../interface_intent.rs"]
+mod interface_intent;
 #[path = "../legacy_scenario.rs"]
 mod legacy_scenario;
 #[path = "../logistics.rs"]

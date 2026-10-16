@@ -2470,3 +2470,7 @@ mod world_ground_actor_tests;
 #[cfg(test)]
 #[path = "mov_audit_reaction_tests.rs"]
 mod mov_audit;
+
+#[cfg(test)]
+#[path = "audit_combat_native.rs"]
+mod audit_native;
