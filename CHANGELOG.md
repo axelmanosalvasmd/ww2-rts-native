@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Check native barrage shell counts and exact family cooldowns in the new combat suite. Compare snapshot cooldowns through their numeric value so JSON float storage does not change the intended assertion. These tests remain unrun.
+
 - Format the new native combat test module with the existing pinned Rust 1.99.0 formatter, preserving literals and assertions. Native execution remains pending Root's grant.
 
 - Add 43 authored native combat tests for the first 50-row candidate window, with literal mappings for all 66 owned remaining rows. Cover orders, targeting, reactions, formation, abilities and sight without new behavior captures. Keep incomplete rows pending and retain every historical result. Native execution and review remain unrun.

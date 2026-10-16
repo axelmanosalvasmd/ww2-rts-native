@@ -4247,3 +4247,10 @@ assertion macro names remain exact. The formatter also reorders one import
 and braces one closure body. Formatting and `git diff --check` pass; native
 execution remains unrun. An initial token-identity diagnostic rejected
 those expected formatting changes and is not a native result.
+
+Before the first native attempt, source inspection of serde_json's numeric
+comparisons found that native float cooldown 13.0 would not compare equal
+to integer 13 through Value's integer overload. Read the numeric value
+explicitly, preserving the intended 13-second assertion. Strengthen the
+barrage test to require 8/4/4 shells and 20/40/50-second cooldowns for
+rocket/mortar/howitzer. No native failure or semantic retry occurred.

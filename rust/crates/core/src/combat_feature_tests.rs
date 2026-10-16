@@ -615,16 +615,19 @@ fn cmb107_smoke_uses_unit_id_radius_duration_and_cooldown() {
 
 #[test]
 fn cmb108_barrage_uses_family_shell_count_and_reload() {
-    for kind in ["rocket", "mortar", "howitzer"] {
+    for (kind, count, cooldown) in [("rocket", 8, 20.), ("mortar", 4, 40.), ("howitzer", 4, 50.)] {
         let mut m = scene(&[(kind, 0, 40., 40.)]);
         assert_eq!(
             command(&mut m, json!({"t":"ability","ids":[1],"x":50,"z":40})),
             None
         );
         m.step_aimed_ability(1).unwrap();
-        assert!(m.abilities.get(1).unwrap().cooldown > 0.);
+        assert_eq!(m.abilities.get(1).unwrap().cooldown, cooldown);
         assert!(m.firing.get(1).unwrap().cooldown > 0.);
-        assert!(!m.firing.take_events().is_empty());
+        assert!(m.firing.take_events().iter().any(|event| matches!(
+            event,
+            crate::match_firing::LaunchEvent::Salvo { count: actual, .. } if *actual == count
+        )));
         assert!(m.commands.units[&1].nade.is_none());
     }
 }
@@ -1331,6 +1334,6 @@ fn cmb134_snapshot_filters_visibility_locked_target_private_timers_and_flags() {
         .iter()
         .find(|r| r[0] == 2)
         .unwrap();
-    assert_eq!(own_row[11], 13);
+    assert_eq!(own_row[11].as_f64(), Some(13.));
     assert_ne!(own_row[12].as_u64().unwrap() & 2048, 0);
 }
