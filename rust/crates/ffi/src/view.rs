@@ -276,35 +276,6 @@ fn view_error(error: ViewError) -> Failure {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn panic_poisons_all_view_operations_but_free() {
-        let mut view = std::ptr::null_mut();
-        // SAFETY: the handle is allocated here, exclusively used, and freed exactly once.
-        unsafe {
-            assert_eq!(ww2_view_new(&mut view), WW2_OK);
-            assert_eq!(
-                view_guard(view, |_| panic!("injected view panic")),
-                WW2_ERR_PANIC
-            );
-            let mut count = 42;
-            let mut resync = 42;
-            assert_eq!(ww2_view_apply(view, std::ptr::null(), 0), WW2_ERR_POISONED);
-            assert_eq!(ww2_view_unit_count(view, &mut count), WW2_ERR_POISONED);
-            assert_eq!(
-                ww2_view_units(view, std::ptr::null_mut(), 0, &mut count),
-                WW2_ERR_POISONED
-            );
-            assert_eq!(ww2_view_needs_resync(view, &mut resync), WW2_ERR_POISONED);
-            assert_eq!((count, resync), (42, 42));
-            assert_eq!(ww2_view_free(view), WW2_OK);
-        }
-    }
-}
-
 /// Checks placement using only this recipient's delivered map, cells, units and snapshot fields.
 /// Request JSON: {kind,x,z,dir,team}. Output follows placementCheck: {ok,reason?,cells?,x,z,c?,node?}.
 /// Uses the JSON buffer rules of ww2_authoring_validate_map. No view state changes on success or
@@ -335,5 +306,34 @@ pub unsafe extern "C" fn ww2_view_placement_check(
                 ww2_core::recipient_placement::placement_check(state, request)
             })
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn panic_poisons_all_view_operations_but_free() {
+        let mut view = std::ptr::null_mut();
+        // SAFETY: the handle is allocated here, exclusively used, and freed exactly once.
+        unsafe {
+            assert_eq!(ww2_view_new(&mut view), WW2_OK);
+            assert_eq!(
+                view_guard(view, |_| panic!("injected view panic")),
+                WW2_ERR_PANIC
+            );
+            let mut count = 42;
+            let mut resync = 42;
+            assert_eq!(ww2_view_apply(view, std::ptr::null(), 0), WW2_ERR_POISONED);
+            assert_eq!(ww2_view_unit_count(view, &mut count), WW2_ERR_POISONED);
+            assert_eq!(
+                ww2_view_units(view, std::ptr::null_mut(), 0, &mut count),
+                WW2_ERR_POISONED
+            );
+            assert_eq!(ww2_view_needs_resync(view, &mut resync), WW2_ERR_POISONED);
+            assert_eq!((count, resync), (42, 42));
+            assert_eq!(ww2_view_free(view), WW2_OK);
+        }
     }
 }

@@ -323,6 +323,9 @@ pub unsafe extern "C" fn ww2_formation_spots(
     })
 }
 
+mod queries;
+pub use queries::*;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -341,6 +344,3 @@ mod tests {
         assert_eq!(message, b"panic: boom");
     }
 }
-
-mod queries;
-pub use queries::*;
