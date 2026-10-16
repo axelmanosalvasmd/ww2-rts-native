@@ -126,4 +126,3 @@ fn authored_mine_is_masked_before_ai_terrain_memory_starts() {
     assert_eq!(memory.current.chars[210], b'.');
     assert_eq!(memory.current.flags[210], terrain_flag(b'.').unwrap());
 }
-
