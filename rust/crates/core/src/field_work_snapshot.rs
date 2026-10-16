@@ -68,10 +68,12 @@ impl FieldWorksRuntime {
                 || !job.elapsed.is_finite()
                 || job.elapsed < 0.0
                 || job.waits > 23
-                || job.kind != super::FortKind::Wall && job.waits != 0
-                || job
-                    .step_back
-                    .is_some_and(|p| !position(p) || job.kind != super::FortKind::Wall)
+                || !matches!(job.kind, super::FortKind::Wall | super::FortKind::Gate)
+                    && job.waits != 0
+                || job.step_back.is_some_and(|p| {
+                    !position(p)
+                        || !matches!(job.kind, super::FortKind::Wall | super::FortKind::Gate)
+                })
                 || job.front.is_some_and(|value| !value.is_finite())
                 || job
                     .reach

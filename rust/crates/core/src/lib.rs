@@ -25,6 +25,7 @@ mod mov_runtime_batch;
 #[cfg(test)]
 mod native_order_intent_tests;
 
+pub mod ai_schedule;
 pub mod ai_view;
 pub mod assault_runtime;
 pub mod catalog;
@@ -102,6 +103,8 @@ mod match_destroy;
 pub mod match_end;
 pub mod match_firing;
 pub mod match_garrison;
+
+mod match_gates;
 pub mod match_ground_contact;
 pub mod match_ground_orders;
 pub mod match_ground_support;
