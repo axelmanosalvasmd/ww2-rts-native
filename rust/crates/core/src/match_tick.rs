@@ -617,6 +617,9 @@ impl crate::match_runtime::Match {
                 events.push(TickEvent::Environment(effect));
             })?;
             let unit = &self.world.game.units[&id];
+            if unit.hp <= 0.0 {
+                continue;
+            }
             let moving = !unit.path.is_empty()
                 || crate::math::hypot(unit.x - before.x, unit.z - before.z) > 0.001;
             let result = self.apply_unit_firing(id, moving, dt);

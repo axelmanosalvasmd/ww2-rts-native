@@ -353,7 +353,7 @@ fn world_contact_refusals_preserve_state_and_restore_precontact_dust() {
             .apply_moved_ground_contact(id, before, Some(-5.0))
             .unwrap_err();
         if boundary == "hostile-mine" {
-            assert!(error.contains("not connected"));
+            assert!(error.contains("unit combat metadata"), "{error}");
         }
         assert_eq!(
             format!("{:?}", m.world),
@@ -416,7 +416,7 @@ fn mine_alliances_keep_ordinary_commanders_and_world_local_identity_distinct() {
         assert_eq!(m.world.game.chars[c], b'N');
         assert_eq!(m.world.game.wear.as_ref().unwrap()[c], wear);
         assert!(m.world.journal().is_empty() && m.world.new_cells().is_empty());
-        for invalid_owner in [-1, -2] {
+        for invalid_owner in [-2, 2] {
             m.world.mines.insert(c, invalid_owner);
             let prior_dust = m.world.game.units[&id].dust;
             let world = format!("{:?}", m.world);
