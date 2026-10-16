@@ -78,7 +78,8 @@ fn capture(state: &mut Match, delivery: &mut DeliveryState, events: &[TickEvent]
 #[test]
 fn aircraft_owner_rows_and_plans_match_wire_codes_without_leaking_to_allies_or_enemies() {
     let mut state = scene();
-    let id = state.spawn_aircraft(0, "fighter").unwrap();
+    // The projection matrix includes Area, which requires a bomber salvo weapon.
+    let id = state.spawn_aircraft(0, "bomber").unwrap();
     let point = Point { x: 41.25, z: 53.26 };
     for (air, code, hidden) in [
         (PlaneState::Base, 0, true),

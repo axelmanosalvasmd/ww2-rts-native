@@ -1075,7 +1075,7 @@ impl crate::match_runtime::Match {
             }
             self.preflight_ability_selection(&selected, *at, *queue, *automatic)?;
         }
-        // New variants currently actuate their aircraft branches only.
+        // Validate shared targets before preparing either command branch.
         match command {
             Command::Attack { target, .. } => {
                 let target = u32::try_from(*target)
@@ -1087,9 +1087,6 @@ impl crate::match_runtime::Match {
                 }) else {
                     return Ok(Some(Denial::Unseen));
                 };
-                if target.air.is_none() {
-                    return Ok(Some(Denial::Unsupported));
-                }
                 if target.hp <= 0.0 {
                     return Ok(Some(Denial::Unseen));
                 }
@@ -1179,13 +1176,8 @@ impl crate::match_runtime::Match {
                             u32::try_from(*target).expect("validated escort target"),
                         ),
                         Command::Retreat { .. } => AircraftOrder::Retreat,
-                        Command::Stance { stance, on, .. } => {
+                        Command::Stance { .. } => {
                             self.validate_aviation()?;
-                            if *stance == Stance::HoldFire && !*on {
-                                return Err(crate::match_aviation::AviationError::Unsupported(
-                                    "aircraft automatic weapons are unavailable",
-                                ));
-                            }
                             continue;
                         }
                         _ => unreachable!(),
@@ -1202,6 +1194,35 @@ impl crate::match_runtime::Match {
             }
             Err(e) => return Err(e.to_string()),
         };
+        if let Command::Attack {
+            ids, target, queue, ..
+        } = command
+        {
+            // Aircraft preparation is read-only. The ground transaction prepares
+            // every ground row before writing, then aircraft application cannot fail.
+            // Keep raw rows so missing ground controls still fail canonical preflight.
+            let ground: Vec<_> = ids
+                .iter()
+                .take(limit)
+                .copied()
+                .filter(|raw| {
+                    u32::try_from(*raw)
+                        .ok()
+                        .and_then(|id| self.world.game.units.get(&id))
+                        .is_none_or(|u| !self.is_aircraft_command_unit(u.id))
+                })
+                .collect();
+            if !ground.is_empty()
+                && let Some(denial) = self.ground_attack_command(owner, &ground, *target, *queue)?
+                && !matches!(denial, Denial::Needs | Denial::QueueFull)
+            {
+                return Ok(Some(denial));
+            }
+            for prepared in aircraft {
+                self.apply_aircraft_order(prepared);
+            }
+            return Ok(None);
+        }
         if matches!(
             command,
             Command::Stop { .. } | Command::Move { queue: false, .. }
@@ -1354,7 +1375,7 @@ impl crate::match_runtime::Match {
                     None
                 });
             }
-            Command::Attack { .. } | Command::Escort { .. } | Command::Retreat { .. } => {
+            Command::Escort { .. } | Command::Retreat { .. } => {
                 if aircraft.is_empty() {
                     return Ok(Some(Denial::Needs));
                 }
@@ -1390,7 +1411,8 @@ impl crate::match_runtime::Match {
                     self.commands.units.get_mut(&id).unwrap().auto_cast = *on;
                 }
             }
-            Command::Build { .. }
+            Command::Attack { .. }
+            | Command::Build { .. }
             | Command::Assist { .. }
             | Command::Cancel { .. }
             | Command::CancelProduction { .. }

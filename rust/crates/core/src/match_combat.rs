@@ -1397,6 +1397,8 @@ impl crate::match_runtime::Match {
             .filter(|id| self.world.game.units.contains_key(id))
             .collect::<Vec<_>>();
         self.validate_retirement_sidecars(&ordered)?;
+        self.validate_carrier_ejections(&ordered)
+            .map_err(|_| CombatError::InvalidInput("carrier ejection preflight"))?;
         for id in &ordered {
             let u = &self.world.game.units[id];
             if self.actor_policy(u.owner).is_err() || u.kind >= self.rules.kinds.len() {
@@ -1524,6 +1526,14 @@ impl crate::match_runtime::Match {
                 continue;
             };
             let metadata = self.combat.get(u.id).unwrap().clone();
+            if !metadata.cargo.is_empty() {
+                for effect in self
+                    .eject_carrier_riders(id)
+                    .map_err(|_| CombatError::InvalidInput("carrier ejection"))?
+                {
+                    emit(effect);
+                }
+            }
             let bounty = self.retirement_bounty(&u, metadata.last_hit)?;
             self.retire_unit_sidecars(&mut u)?;
             self.world.game.units.remove(&u.id);

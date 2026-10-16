@@ -80,25 +80,15 @@ impl Match {
             }),
             AircraftOrder::Stop | AircraftOrder::Retreat => None,
         };
-        if let Some(m) = mission {
-            if !self.commands.units[&id].hold_fire {
-                return Err(AviationError::Unsupported(
-                    "aircraft automatic weapon command is unavailable",
-                ));
-            }
-            if matches!(order, AircraftOrder::Attack(_)) {
-                let t = &self.world.game.units[&m.target.expect("attack target")];
-                if self.rules.kinds[u.kind].name != "fighter" || t.air.is_none() {
-                    return Err(AviationError::Unsupported(
-                        "aircraft ground-attack command is unavailable",
-                    ));
-                }
-                if t.hp <= 0.0
-                    || self.world.game.allied(owner, t.owner)
-                    || !self.world.game.players[owner].sees(t.id)
-                {
-                    return Err(AviationError::Invalid("invalid aircraft attack target"));
-                }
+        if let Some(m) = mission
+            && matches!(order, AircraftOrder::Attack(_))
+        {
+            let t = &self.world.game.units[&m.target.expect("attack target")];
+            if t.hp <= 0.0
+                || self.world.game.allied(owner, t.owner)
+                || !self.world.game.players[owner].sees(t.id)
+            {
+                return Err(AviationError::Invalid("invalid aircraft attack target"));
             }
         }
         let send = mission

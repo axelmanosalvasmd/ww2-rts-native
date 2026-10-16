@@ -1,5 +1,12 @@
 //! Aircraft unit-phase hooks for the sole Match tick owner, without clock or scheduling ownership.
-use crate::{grid::UnitId, match_aviation::AviationError, match_runtime::Match};
+use crate::{
+    catalog::{Catalog, Value},
+    game::PlaneState,
+    grid::UnitId,
+    match_aviation::{AviationError, MissionKind},
+    match_runtime::Match,
+    math,
+};
 impl Match {
     /// Pure complete-current admission for the sole recorded runner boundary.
     /// Commands retain ordinary denial semantics; their AIR branches preflight before selection writes.
@@ -139,6 +146,99 @@ impl Match {
             ));
         }
         self.step_aircraft(id, dt)?;
+        if self.tick_state.aircraft_weapons_allowed() {
+            self.step_aircraft_weapons(id)?;
+        }
         Ok(true)
     }
 }
+
+impl Match {
+    /// Aircraft fire after moving. Their sortie ammunition counts volleys, not rounds.
+    pub fn step_aircraft_weapons(&mut self, id: UnitId) -> Result<(), AviationError> {
+        self.validate_aviation()?;
+        let u = self
+            .world
+            .game
+            .units
+            .get(&id)
+            .ok_or(AviationError::Invalid("missing weapon aircraft"))?;
+        if u.hp <= 0.0 || !matches!(u.air, Some(PlaneState::Out | PlaneState::Station)) {
+            return Ok(());
+        }
+        let a = self.aviation.planes[&id];
+        if a.ammo <= 0.0 {
+            return Ok(());
+        }
+        let def = Catalog::compiled()
+            .map_err(|e| AviationError::Actuation(e.to_string()))?
+            .unit(&self.rules.kinds[u.kind].name)
+            .map_err(|e| AviationError::Actuation(e.to_string()))?;
+        let Some(w) = def.get("w").filter(|w| {
+            w.get("range")
+                .and_then(Value::number)
+                .is_some_and(|r| r > 0.0)
+        }) else {
+            return Ok(());
+        };
+        let salvo = w.get("salvo").and_then(Value::boolean).unwrap_or(false);
+        if let Some(mission) = a.mission.filter(|m| m.kind == MissionKind::Area && salvo) {
+            if u.air == Some(PlaneState::Station) && self.firing.get(id).unwrap().cooldown <= 0.0 {
+                self.launch_weapon_salvo(id, mission.at, None)
+                    .map_err(AviationError::Actuation)?;
+                self.firing.get_mut(id).unwrap().cooldown = w
+                    .get("interval")
+                    .and_then(Value::number)
+                    .ok_or(AviationError::Invalid("missing aircraft interval"))?;
+                self.aviation.planes.get_mut(&id).unwrap().ammo -= 1.0;
+            }
+            return Ok(());
+        }
+        let ordered = a
+            .mission
+            .filter(|m| m.kind == MissionKind::Attack)
+            .and_then(|m| m.target);
+        let ordered = match ordered {
+            Some(target)
+                if self
+                    .can_shoot_target(id, target)
+                    .map_err(AviationError::Actuation)? =>
+            {
+                Some(target)
+            }
+            _ => None,
+        };
+        if self.commands.units[&id].hold_fire && ordered.is_none() {
+            self.firing.get_mut(id).unwrap().target_id = 0;
+            return Ok(());
+        }
+        if ordered.is_none() && self.firing.get(id).unwrap().retarget <= 0.0 {
+            let picked = self
+                .pick_firing_target(id)
+                .map_err(AviationError::Actuation)?;
+            self.aviation.attack_picks.insert(id, picked);
+            self.firing.get_mut(id).unwrap().retarget = 0.5;
+        }
+        let target =
+            ordered.unwrap_or_else(|| self.aviation.attack_picks.get(&id).copied().unwrap_or(0));
+        if target != 0
+            && self
+                .can_shoot_target(id, target)
+                .map_err(AviationError::Actuation)?
+        {
+            let u = &self.world.game.units[&id];
+            let t = &self.world.game.units[&target];
+            self.commands.units.get_mut(&id).unwrap().aim = math::atan2(t.z - u.z, t.x - u.x);
+            self.firing.get_mut(id).unwrap().target_id = target;
+            if self.firing.get(id).unwrap().cooldown <= 0.0 {
+                self.fire_weapon(id, target, true)
+                    .map_err(AviationError::Actuation)?;
+                self.aviation.planes.get_mut(&id).unwrap().ammo -= 1.0;
+            }
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod tests;

@@ -663,7 +663,13 @@ fn unsupported_reaction_actors_reject_before_clock_commands_or_timers() {
         "mode mismatch",
         "unsupported mode",
     ] {
-        let mut m = make(&fixture["cases"][0]);
+        let mut case = fixture["cases"][0].clone();
+        if actor == "garrison" {
+            let mut row = case["map"]["rows"][12].as_str().unwrap().to_owned();
+            row.replace_range(12..13, "B");
+            case["map"]["rows"][12] = json!(row);
+        }
+        let mut m = make(&case);
         let id = *m.world.game.units.keys().next().unwrap();
         let rail_kind = m.rules.kinds.iter().position(|kind| kind.rail).unwrap();
         let unit = m.world.game.units.get_mut(&id).unwrap();
@@ -673,7 +679,7 @@ fn unsupported_reaction_actors_reject_before_clock_commands_or_timers() {
         unit.sprint = 0.25;
         match actor {
             "garrison" => {
-                unit.garrison = Some(166);
+                unit.garrison = Some(252);
                 unit.hp = 34.0;
             }
             "rail" => unit.kind = rail_kind,
@@ -739,10 +745,45 @@ fn unsupported_reaction_actors_reject_before_clock_commands_or_timers() {
             .iter()
             .map(|player| player.support.clone())
             .collect::<Vec<_>>();
+        if actor == "garrison" {
+            m.grid.rebuild(&m.world.game.units);
+            assert!(m.automatic_retreat_candidate(id).unwrap());
+            let home = m.reaction_home(id).unwrap();
+            let path_gen = m.world.game.units[&id].path_gen;
+            for tick in 1..=3 {
+                let report = m.advance_tick().unwrap();
+                assert_eq!(m.world.game.tick, tick);
+                assert_eq!(report.commands.len(), usize::from(tick <= 2));
+                assert!(report.commands.iter().all(|result| result.denial.is_none()));
+                let unit = &m.world.game.units[&id];
+                assert_eq!(unit.garrison, None);
+                assert!(unit.retreating);
+                assert_eq!(unit.world_goal, Some(home));
+                assert!(unit.path_gen > path_gen);
+                assert!(!unit.path.is_empty());
+                assert!(unit.sprint < 0.25);
+                assert!(m.commands.units[&id].react < 0.75);
+                assert!(m.firing.get(id).unwrap().cooldown < 1.0);
+                assert!(m.abilities.get(id).unwrap().cooldown < 2.0);
+                assert_eq!(m.commands.pending_commands(), usize::from(tick == 1));
+                assert!(m.tick_state.fault().is_none());
+                let recipient = ww2_core::recipient_snapshot::SnapshotCache::new(&m)
+                    .unwrap()
+                    .recipient(0)
+                    .unwrap();
+                assert!(
+                    recipient.fields["units"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .any(|row| row[0].as_u64() == Some(u64::from(id)))
+                );
+            }
+            continue;
+        }
         let error = m.advance_tick().unwrap_err();
         assert!(
             error.reason.contains(match actor {
-                "garrison" => "automatic garrison retreat tick exit",
                 "logistics" | "convoys" => "reserve and convoy tick phases",
                 "mode mismatch" | "unsupported mode" => {
                     "tick execution requires represented ordinary or World mode"
