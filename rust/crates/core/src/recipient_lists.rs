@@ -328,7 +328,8 @@ impl crate::match_runtime::Match {
                 ];
                 if node.cell < self.world.game.chars.len()
                     && [node.at.x, node.at.z].iter().all(|value| value.is_finite())
-                    && row.iter().all(|value| value.is_finite()) {
+                    && row.iter().all(|value| value.is_finite())
+                {
                     Ok(row)
                 } else {
                     Err("invalid Classic node display facts".into())

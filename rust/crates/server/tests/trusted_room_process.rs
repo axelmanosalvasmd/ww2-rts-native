@@ -178,11 +178,24 @@ fn ordinary_binary_two_seats_move_stop_takeover_and_restart_with_private_seed() 
     clients[0].barrier();
     let receipts = server.receipts();
     assert_eq!(receipts.len(), 2);
-    assert_eq!(receipts[0]["options"], receipts[1]["options"]);
+    // Restart obtains a new private weather seed; the remaining selected options persist.
+    let mut first_options = receipts[0]["options"].clone();
+    let mut second_options = receipts[1]["options"].clone();
+    first_options.as_object_mut().unwrap().remove("weatherSeed");
+    second_options
+        .as_object_mut()
+        .unwrap()
+        .remove("weatherSeed");
+    assert_eq!(first_options, second_options);
     for receipt in receipts {
         let options = &receipt["options"];
         assert_eq!(options["seed"].as_u64(), Some(u64::MAX));
-        assert_eq!(options["weatherSeed"], Value::Null);
+        assert!(
+            options["weatherSeed"]
+                .as_u64()
+                .is_some_and(|seed| seed < 1 << 31)
+        );
+        assert_eq!(options["weatherSeed"], receipt["derivedWeatherSeed"]);
         for key in ["shuffle", "tech", "supply", "livingWeather", "logistics"] {
             assert_eq!(options[key], true);
         }

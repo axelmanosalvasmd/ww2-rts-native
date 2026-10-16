@@ -145,7 +145,10 @@ pub(crate) fn validate_definition(data: &Value, count: usize, mode: Mode) -> Res
     }
     if !data.is_object()
         || data["version"].as_f64() != Some(1.0)
-        || !matches!(mode, Mode::Default | Mode::Conquest)
+        || !matches!(
+            mode,
+            Mode::Default | Mode::Conquest | Mode::Assault | Mode::Annihilation | Mode::Classic
+        )
         || list(data, "objectives")
             .iter()
             .any(|o| !side_exists(o, count))

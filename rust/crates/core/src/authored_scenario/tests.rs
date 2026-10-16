@@ -3,14 +3,16 @@ use super::*;
 #[test]
 fn authored_scenarios_validate_ordinary_sides_and_localization_before_startup() {
     let mut data = json!({"version":1,"objectives":[],"groups":[],"triggers":[]});
-    assert!(validate_definition(&data, 2, Mode::Conquest).is_ok());
     for mode in [
-        Mode::World,
-        Mode::Classic,
+        Mode::Default,
+        Mode::Conquest,
+        Mode::Assault,
         Mode::Annihilation,
-        Mode::Horde,
-        Mode::Tutorial,
+        Mode::Classic,
     ] {
+        assert!(validate_definition(&data, 2, mode).is_ok());
+    }
+    for mode in [Mode::World, Mode::Horde, Mode::Tutorial] {
         assert!(validate_definition(&data, 2, mode).is_err());
     }
     data["groups"] = json!([{"id":"g","units":[]}]);

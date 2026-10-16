@@ -5,9 +5,13 @@ impl Room {
     pub(super) fn native_match_options(
         &self,
         seed: u64,
+        weather_seed: u32,
         players: Vec<PlayerConfig>,
         map: &Value,
     ) -> Result<MatchOptions, String> {
+        if weather_seed >= 1 << 31 {
+            return Err("weather seed must be a 31-bit constructor input".into());
+        }
         let mode = match self.mode.as_str() {
             "conquest" => Mode::Conquest,
             "assault" => Mode::Assault,
@@ -32,7 +36,7 @@ impl Room {
             shuffle: true,
             army,
             weather: WeatherChoice::from_reference(Some(&self.weather)),
-            weather_seed: None,
+            weather_seed: Some(weather_seed),
             living_weather: true,
             map_key: Some(self.map.clone()),
             tech: self.loaded_tech != Some(false),

@@ -1720,14 +1720,20 @@ impl Hub {
             .map(|raw| {
                 ww2_core::map::AuthoritativeMap::from_json(
                     &serde_json::to_vec(&raw).map_err(|error| error.to_string())?,
-                ).map_err(|error| error.to_string())
+                )
+                .map_err(|error| error.to_string())
             })
             .transpose()?;
         let map = match authored.as_ref() {
             Some(map) => map,
             None => crate::authoritative_maps::load(&room.map).map_err(|e| e.to_string())?,
         };
-        let options = room.native_match_options(trusted.seed, players, map.source())?;
+        // Prototype server.js:381 supplies a fresh seed outside the deterministic rules core.
+        let mut weather_bytes = [0_u8; 4];
+        getrandom::fill(&mut weather_bytes).map_err(|error| error.to_string())?;
+        let weather_seed = u32::from_le_bytes(weather_bytes) & 0x7fff_ffff;
+        let options =
+            room.native_match_options(trusted.seed, weather_seed, players, map.source())?;
         let state = room.create_native_match(map, options)?;
         let mut prepared = self.prepare_native(code, state, now, restart)?;
         prepared.attached.receipt =
@@ -2549,8 +2555,11 @@ mod save_runtime;
 #[path = "lobby_options.rs"]
 mod lobby_options;
 #[cfg(test)]
-#[path = "mode_options_tests.rs"]
-mod mode_options_tests;
+#[path = "logistics3_tests.rs"]
+mod logistics3_tests;
 #[cfg(test)]
 #[path = "mode_hosting_tests.rs"]
 mod mode_hosting_tests;
+#[cfg(test)]
+#[path = "mode_options_tests.rs"]
+mod mode_options_tests;
