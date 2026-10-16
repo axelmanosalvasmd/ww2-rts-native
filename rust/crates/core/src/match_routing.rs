@@ -32,6 +32,11 @@ pub struct RecipientRouting {
     wrecks: Vec<Wreck>,
 }
 impl RecipientRouting {
+    pub(crate) fn independent_delivery(&self) -> Self {
+        let mut result = self.clone();
+        let _ = result.memory.take_changes();
+        result
+    }
     fn save_storage_pointers(&self) -> [usize; 2] {
         self.routes.storage_pointers()
     }

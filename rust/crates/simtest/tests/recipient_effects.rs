@@ -19,7 +19,9 @@ use ww2_core::{
     match_support::{SupportEvent, SupportKind, SupportTiming},
     match_tick::TickEvent,
     projectiles::{Flight, Point3},
-    recipient_snapshot::{DeliveryState, SelectedSeat, SnapshotCapability, SnapshotError},
+    recipient_snapshot::{
+        DeliveryState, SelectedSeat, SnapshotCache, SnapshotCapability, SnapshotError,
+    },
     rules::Rules,
 };
 
@@ -579,6 +581,18 @@ fn original_ordinary_batches_match_selected_shot_rows_and_numeric_bits() {
                                 .unwrap()
                                 .is_some()
                         );
+                        if !before["flights"].as_array().unwrap().is_empty() {
+                            let partial = SnapshotCache::new(&state)
+                                .unwrap()
+                                .recipient(selected[0].slot)
+                                .unwrap();
+                            assert!(!partial.fields.contains_key("flights"));
+                            assert!(
+                                partial
+                                    .missing
+                                    .contains(&SnapshotCapability::ShotsAndFlights)
+                            );
+                        }
                     }
                     // Each boundary has a fresh receipt owner on this same
                     // Match. Delivery-history parity is outside this test.

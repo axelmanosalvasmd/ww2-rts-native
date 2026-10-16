@@ -363,11 +363,20 @@ fn raw_event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
                     owner: seat,
                     at,
                 } => {
-                    identity(u64::from(*shooter))?;
-                    owner(state, *seat)?;
+                    operative_flights::shooter(state, *shooter, *seat)?;
                     numbers(&[at.x, at.z])?;
                 }
-                LaunchEvent::SmallArms(_) => return Err(refused()),
+                LaunchEvent::SmallArms(value) => {
+                    operative_flights::shooter(state, value.shooter, value.owner)?;
+                    point(value.at)?;
+                    if !matches!(value.effect, "sniper" | "commando") {
+                        return Err(refused());
+                    }
+                    if let Some(hit) = value.hit {
+                        identity(u64::from(hit.target))?;
+                        owner(state, hit.owner)?;
+                    }
+                }
                 LaunchEvent::Contact(value) => {
                     kind(state, value.kind)?;
                     identity(value.flight)?;
