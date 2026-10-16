@@ -173,7 +173,7 @@ fn base53_fortified_start_has_exact_arcs_gaps_bunker_and_four_finished_corners()
             .iter()
             .map(|u| (u.x as i32, u.z as i32))
             .collect::<Vec<_>>(),
-        vec![(48, 96), (48, 64), (18, 92), (18, 70)]
+        vec![(48, 96), (48, 64), (18, 90), (18, 70)]
     );
     for flak in flaks {
         assert_eq!((flak.built, flak.hp), (Some(1.0), 1500.0));
