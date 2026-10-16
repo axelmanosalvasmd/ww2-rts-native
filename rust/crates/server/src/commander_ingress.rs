@@ -46,7 +46,9 @@ impl CommanderIngress {
         let command = Command::from_json(raw)?;
         // Every attached room uses the same recipient snapshot adapter. These
         // core states have no representation there, so refuse before reserving.
-        if matches!(&command, Command::Support { kind, .. } if kind == "recon")
+        if matches!(&command, Command::Support { kind, .. }
+            if !ww2_core::recipient_snapshot::SUPPORTED_SUPPORT_KINDS
+                .iter().any(|supported| supported.name() == kind))
             || matches!(&command, Command::Cover { queue: true, .. })
         {
             return Err(Denial::Unsupported);

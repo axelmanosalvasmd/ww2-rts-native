@@ -6,3 +6,5 @@
 - Update the existing socket-control test: attacks now reach the core and refuse hidden targets with `unseen`, replacing the old server-wide `blocked` capability expectation.
 - Validate 83 server tests, formatting and strict workspace all-target Clippy on the Vostro.
 - Refuse Recon and queued Cover before they can fault snapshots, retain socket write ledgers across manual end and restart, and strengthen p95 telemetry and map-ping role exclusion tests. Update the merged command-window test to expect in-play pong telemetry.
+- Refuse every support kind absent from the snapshot adapter's allowed list before reserving input. Test every catalog kind with funded ordinary and trusted R1 rooms and scheduled snapshots.
+- Record the unchanged socket resync test's ClientView mismatch for follow-up; the support fix passes 11 focused tests, formatting and strict workspace all-target Clippy.

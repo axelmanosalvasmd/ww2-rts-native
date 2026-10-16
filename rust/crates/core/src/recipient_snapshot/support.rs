@@ -1,5 +1,12 @@
 use super::*;
 
+/// Support actors represented by the current recipient snapshot adapter.
+pub const SUPPORTED_SUPPORT_KINDS: &[crate::match_support::SupportKind] = &[
+    crate::match_support::SupportKind::Artillery,
+    crate::match_support::SupportKind::Smoke,
+    crate::match_support::SupportKind::Cover,
+];
+
 pub(super) fn capture(state: &Match) -> Result<Vec<Map<String, Value>>, SnapshotError> {
     let g = &state.world.game;
     // Read the single canonical actor list in Source insertion order. Query-only
@@ -11,12 +18,7 @@ pub(super) fn capture(state: &Match) -> Result<Vec<Map<String, Value>>, Snapshot
             capability: SnapshotCapability::TeamEffects,
         })?;
         if strike.kind != crate::game::StrikeKind::Other
-            || !matches!(
-                timing.kind,
-                crate::match_support::SupportKind::Artillery
-                    | crate::match_support::SupportKind::Smoke
-                    | crate::match_support::SupportKind::Cover
-            )
+            || !SUPPORTED_SUPPORT_KINDS.contains(&timing.kind)
         {
             return Err(SnapshotError::Unsupported {
                 unit: 0,

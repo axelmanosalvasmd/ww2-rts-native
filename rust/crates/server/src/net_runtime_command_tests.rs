@@ -240,6 +240,107 @@ fn intent_net43_paused_orders_are_ignored_and_replacement_keeps_stable_issuer_an
 }
 
 #[test]
+fn every_support_kind_keeps_ordinary_r1_scheduled_snapshots_flowing() {
+    let catalog = ww2_core::catalog::Catalog::compiled().unwrap();
+    for kind in catalog.table("SUPPORT").unwrap().object().unwrap().keys() {
+        for trusted in [false, true] {
+            let mut hub = Hub::new(32, String::new());
+            if trusted {
+                hub.configure_trusted_room(Some(
+                    crate::TrustedRoomConfig::new("ABC", 3936341).unwrap(),
+                ));
+            }
+            let (a, mut ra) = client(1);
+            let (b, mut rb) = client(2);
+            join(&mut hub, &a, "a", 0);
+            join(&mut hub, &b, "b", 0);
+            if trusted {
+                hub.start_trusted("ABC", a.id, false, 0).unwrap();
+            } else {
+                hub.attach_native("ABC", native_tests::native_match(), 0)
+                    .unwrap();
+            }
+            drain(&mut ra);
+            drain(&mut rb);
+            let native = hub.rooms.get_mut("ABC").unwrap().native.as_mut().unwrap();
+            let setup = native.runtime.state_mut();
+            *setup.start.players[0].support.get_mut(kind).unwrap() = 0.;
+            let cost = ww2_core::economy::sup_cost(setup.options.mode, kind)
+                .unwrap()
+                .cost;
+            let funds = cost.max(200.);
+            setup.start.economy.players[0].mp = funds;
+            send(
+                &mut hub,
+                &a,
+                json!({"t":"support","kind":kind,"x":1,"z":2}),
+                0,
+            );
+            assert_eq!(state(&hub).start.economy.players[0].mp, funds);
+            let pending = state(&hub).commands.pending_commands();
+            let replies = drain(&mut ra);
+            let mut snapshots = [0; 2];
+            for callback in 0..8 {
+                hub.poll_native(callback * 50, callback * 50_000_000);
+                let status = hub.native_status("ABC").unwrap();
+                assert!(
+                    status.fault.is_none(),
+                    "kind={kind}, trusted={trusted}: {:?}",
+                    status.fault
+                );
+                assert_eq!(status.tick, callback as i64 + 1);
+                for (slot, rx) in [&mut ra, &mut rb].into_iter().enumerate() {
+                    while let Ok(output) = rx.try_recv() {
+                        let Output::Snapshot(write) = output else {
+                            panic!("kind={kind}, trusted={trusted}: {output:?}");
+                        };
+                        let message: Value = serde_json::from_str(&write.json).unwrap();
+                        assert_eq!(message["t"], "s");
+                        assert!(message["strikes"].is_array());
+                        snapshots[slot] += 1;
+                        hub.complete_snapshot(&write, true, callback * 50);
+                    }
+                }
+            }
+            assert!(snapshots.iter().all(|count| *count >= 2), "{snapshots:?}");
+            assert_eq!(state(&hub).commands.pending_commands(), 0);
+            // Supported calls must create real state; refusal cannot pass by poverty.
+            if matches!(kind.as_str(), "artillery" | "smoke" | "cover") {
+                assert_eq!(pending, 1);
+                assert!(replies.is_empty());
+                assert_eq!(state(&hub).world.game.strikes.len(), 1);
+                assert!(state(&hub).start.players[0].support[kind] > 0.);
+            } else {
+                assert_eq!(pending, 0);
+                assert_eq!(
+                    replies,
+                    vec![json!({"t":"deny","cmd":"support","reason":"unsupported"})]
+                );
+                assert!(state(&hub).world.game.strikes.is_empty());
+                assert!(state(&hub).start.players[0].support[kind] <= 0.);
+                let actor = rifles(&hub, 0)[0];
+                send(&mut hub, &a, json!({"t":"stop","ids":[actor]}), 400);
+                assert_eq!(
+                    state(&hub)
+                        .commands
+                        .pending_tick(9)
+                        .next()
+                        .unwrap()
+                        .0
+                        .sequence,
+                    1
+                );
+            }
+            assert!(
+                hub.accounts
+                    .values()
+                    .all(|account| account.pressure.inflight() == 0)
+            );
+        }
+    }
+}
+
+#[test]
 fn recon_and_queued_cover_refuse_before_reservation_and_keep_ordinary_r1_snapshots_flowing() {
     for trusted in [false, true] {
         let mut hub = Hub::new(32, String::new());
