@@ -169,12 +169,33 @@ fn base54_world_fort_ranks_are_confined_to_source_shares() {
         let mut has_tower = false;
         let mut has_wall = false;
         let mut counts = [0; 3];
-        for id in fort_ids(&m, region) {
-            match m.rules.kinds[m.world.game.units[&id].kind].name.as_str() {
+        let definition = &m.world.geography().unwrap().regions[region];
+        let at = Point {
+            x: (definition.x as f64 + 0.5) * CELL,
+            z: (definition.y as f64 + 0.5) * CELL,
+        };
+        let home = m.start.players.iter().map(|p| p.spawn).min_by(|a, b| {
+            math::hypot(a.x - at.x, a.z - at.z)
+                .total_cmp(&math::hypot(b.x - at.x, b.z - at.z))
+        }).unwrap();
+        let face = math::atan2(home.z - at.z, home.x - at.x);
+        let (fx, fz) = (math::cos(face), math::sin(face));
+        let forts = fort_ids(&m, region);
+        let pillbox = forts.iter().map(|id| &m.world.game.units[id])
+            .find(|u| m.rules.kinds[u.kind].name == "pillbox");
+        let mut wall_sides = [0; 2];
+        for id in forts {
+            let fort = &m.world.game.units[&id];
+            assert_eq!(fort.built, Some(1.0));
+            match m.rules.kinds[fort.kind].name.as_str() {
                 "pillbox" => {
                     assert!(rank < pillbox_limit);
                     has_box = true;
                     counts[0] += 1;
+                    assert_eq!(fort.rot.to_bits(), face.to_bits());
+                    let target = Point { x: at.x + fx * 14.0, z: at.z + fz * 14.0 };
+                    assert!(math::hypot(fort.x - target.x, fort.z - target.z) < 2.0 * CELL,
+                        "Pillbox must be near the 14 m target toward its nearest home");
                 }
                 "tower" => {
                     assert!(rank < strong_limit);
@@ -185,6 +206,11 @@ fn base54_world_fort_ranks_are_confined_to_source_shares() {
                     assert!(rank < strong_limit);
                     has_wall = true;
                     counts[2] += 1;
+                    let box_at = pillbox.unwrap().at();
+                    let side = (fort.x - box_at.x) * -fz + (fort.z - box_at.z) * fx;
+                    assert!(side.abs() > CELL);
+                    wall_sides[usize::from(side > 0.0)] += 1;
+                    assert_eq!(fort.rot.to_bits(), (face + std::f64::consts::FRAC_PI_2).to_bits());
                 }
                 _ => unreachable!(),
             }
@@ -198,6 +224,7 @@ fn base54_world_fort_ranks_are_confined_to_source_shares() {
             ],
             "fort population at rank {rank}"
         );
+        assert_eq!(wall_sides, if rank < strong_limit { [4, 4] } else { [0, 0] });
         if has_box {
             pillbox_sites.push(rank);
         }
@@ -226,6 +253,11 @@ fn base54_capture_transfers_live_fort_owner_and_footprint_without_healing() {
                 .any(|id| m.rules.kinds[m.world.game.units[id].kind].name == kind)
         );
     }
+    m.refresh_world_visibility().unwrap();
+    m.refresh_world_memory(0).unwrap();
+    let remembered = &m.world_runtime.as_ref().unwrap().known_buildings;
+    let our_team = remembered.iter().find(|(team, _)| *team == 0).unwrap();
+    assert!(our_team.1.iter().any(|row| forts.contains(&row.id) && row.owner == LOCAL_DEFENDER_OWNER));
     let first = forts[0];
     m.world.game.units.get_mut(&first).unwrap().hp *= 0.5;
     let before = forts
@@ -429,7 +461,16 @@ fn base54_elimination_refusal_keeps_transfer_atomic() {
     let wallets = m.start.economy.clone();
     let order = m.world.game.units.keys().copied().collect::<Vec<_>>();
     assert!(m.apply_world_regions(&order, 0.05).is_err());
-    assert_eq!(m.world.game.units, units);
+    assert_eq!(
+        m.world.game.units.keys().collect::<Vec<_>>(),
+        units.keys().collect::<Vec<_>>()
+    );
+    // Canonical units contain NaN pace values, so structural PartialEq is unsuitable.
+    for (id, before) in units {
+        let after = &m.world.game.units[&id];
+        assert_eq!(format!("{after:?}"), format!("{before:?}"), "unit {id}");
+        assert_eq!(after.pace.to_bits(), before.pace.to_bits(), "unit {id} pace");
+    }
     assert_eq!(m.world_runtime.as_ref().unwrap().regions, regions);
     assert_eq!(m.start.economy, wallets);
     for &cell in m.world.game.units[&id].cells.as_ref().unwrap() {

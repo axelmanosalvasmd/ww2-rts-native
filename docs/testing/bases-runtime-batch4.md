@@ -4,7 +4,9 @@ BASE-54 World core transfers live Pillboxes, Towers, Walls and Gates to the capt
 at their current HP. Source intent is `shared/sim.js:1197-1225` and `:1324`.
 The clear, flat rural World test retains the native constructor actors. It requires
 Pillboxes in exactly the farthest 40% of guard regions and Towers and wall runs in
-exactly the farthest 15%, with fractional rank cutoffs rounded upward.
+exactly the farthest 15%, with fractional rank cutoffs rounded upward. It also
+checks finished forts, the Pillbox bearing and 14 m target toward the nearest
+home, and four walls on each side with the matching crosswise bearing.
 
 Capture stages a validated fort-owner map before army elimination and finish
 preparation. The transaction updates units and the spatial grid. Publication
