@@ -77,7 +77,9 @@ fn context<'a>(
     Context {
         mode: ModeContext {
             kind: options.mode,
-            ..Default::default()
+            defender_team: (options.mode == Mode::Horde).then_some(0),
+            income_excluded_slot: (options.mode == Mode::Horde)
+                .then(|| options.players.len().saturating_sub(1)),
         },
         army: options.army,
         tech_enabled: options.tech,
@@ -117,6 +119,7 @@ impl Match {
             Mode::Annihilation => self.world.game.mode == Some(ModeKind::Annihilation),
             Mode::Classic => self.world.game.mode == Some(ModeKind::Classic),
             Mode::Tutorial => self.validate_tutorial_state().is_ok(),
+            Mode::Horde => self.validate_horde_economy().is_ok(),
             Mode::World => {
                 self.world.game.mode == Some(ModeKind::World) && self.world_runtime.is_some()
             }

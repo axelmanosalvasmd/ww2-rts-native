@@ -1,0 +1,7 @@
+- Hosted Horde now starts and restarts from eligible maps, preserves the previous match when a freshly read map loses defender spawns, and accepts the host's unpaused next-wave control.
+- Room AI and the scripted Horde director retain recipient views between actual snapshot beats. Start and result rosters include the internal Horde seat, and Horde matches complete the server's ending hold.
+- Replaced the old hosted-Horde refusal assertion with canonical full-tick and recipient-snapshot coverage. World admission and aircraft weapon delivery remain guarded.
+- Paused snapshot sends now reset the AI alert event cursor with the cleared event batch, so resuming cannot fault on a shorter batch.
+- Ground projectile flights and grenade throws now survive recipient delivery through impact and cleanup, with fog and shooter privacy preserved. Internal AI support orders use the existing hosted capability restriction before payment.
+- The delivered Horde policy regression now follows the first normal reserve spawn before checking populated views.
+- Hosted Horde now passes the global snapshot-list preflight through canonical Horde validation; mismatched and unsupported modes remain refused.

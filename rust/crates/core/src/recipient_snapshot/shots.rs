@@ -19,6 +19,7 @@ pub enum ShotRef<'a> {
     Support(&'a SupportEvent),
     Environment(&'a Effect),
     Scenario(&'a SayAction),
+    Horde(&'a crate::match_horde::HordeEvent),
 }
 
 impl<'a> TryFrom<&'a TickEvent> for ShotRef<'a> {
@@ -30,6 +31,7 @@ impl<'a> TryFrom<&'a TickEvent> for ShotRef<'a> {
             TickEvent::Support(value) => Ok(Self::Support(value)),
             TickEvent::Environment(value) => Ok(Self::Environment(value)),
             TickEvent::Scenario(value) => Ok(Self::Scenario(value)),
+            TickEvent::Horde(value) => Ok(Self::Horde(value)),
             TickEvent::Aviation(_) => Err(SnapshotError::Unsupported {
                 unit: 0,
                 capability: SnapshotCapability::Air,
@@ -65,8 +67,8 @@ impl DeliveryState {
 
     /// Project the complete supplied batch before any selected memory owner
     /// publishes. The host retains the scheduled global batch-reset policy.
-    /// Persistent flight/AIR/debris actors and undrained producer buffers still
-    /// refuse through the existing complete-frame admission.
+    /// Retained flights pass their canonical validation before delivery.
+    /// Unsupported AIR/debris actors and undrained producer buffers still refuse.
     pub fn capture_selected_with_shots<'a>(
         &mut self,
         state: &'a mut Match,
@@ -202,6 +204,15 @@ fn event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
 
 fn raw_event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
     match shot {
+        ShotRef::Horde(value) => {
+            if state.options.mode != Mode::Horde {
+                return Err(SnapshotError::Rules);
+            }
+            match value {
+                crate::match_horde::HordeEvent::BossSurfaced { at } => finite(&[at.x, at.z])?,
+            }
+            Ok(value.shot_json())
+        }
         ShotRef::Scenario(value) => {
             validate_public_say(value).map_err(|_| SnapshotError::Rules)?;
             if state.scenario.is_none()
@@ -270,13 +281,38 @@ fn raw_event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
                     owner(state, *seat)?;
                     numbers(&[at.x, at.z, *spread])?;
                 }
-                // SmallArms is an operative payload. Throw is shared by ordinary
-                // abilities and operatives, with no retained source provenance.
-                // Horde breath effects also remain outside ordinary recipient admission.
-                LaunchEvent::Throw { .. }
-                | LaunchEvent::SmallArms(_)
-                | LaunchEvent::Breath { .. }
-                | LaunchEvent::BreathShell { .. } => return Err(refused()),
+                LaunchEvent::Throw {
+                    shooter,
+                    owner: seat,
+                    at,
+                } => {
+                    identity(u64::from(*shooter))?;
+                    owner(state, *seat)?;
+                    numbers(&[at.x, at.z])?;
+                }
+                LaunchEvent::SmallArms(_) => return Err(refused()),
+                LaunchEvent::Breath {
+                    shooter,
+                    target,
+                    owner: from,
+                    target_owner: to,
+                    at,
+                } => {
+                    if state.options.mode != Mode::Horde {
+                        return Err(refused());
+                    }
+                    identity(u64::from(*shooter))?;
+                    identity(u64::from(*target))?;
+                    owner(state, *from)?;
+                    owner(state, *to)?;
+                    numbers(&[at.x, at.z])?;
+                }
+                LaunchEvent::BreathShell { at } => {
+                    if state.options.mode != Mode::Horde {
+                        return Err(refused());
+                    }
+                    numbers(&[at.x, at.z])?;
+                }
                 LaunchEvent::Contact(value) => {
                     kind(state, value.kind)?;
                     identity(value.flight)?;
@@ -321,7 +357,7 @@ fn allied(state: &Match, slot: usize, row: &Value, key: &str) -> bool {
         .is_some_and(|owner| state.world.game.allied(owner, slot))
 }
 
-fn flight_visible(state: &Match, visible: &[u8], at: Point) -> bool {
+pub(super) fn flight_visible(state: &Match, visible: &[u8], at: Point) -> bool {
     state.world.game.reveal
         || state
             .world
@@ -330,7 +366,7 @@ fn flight_visible(state: &Match, visible: &[u8], at: Point) -> bool {
             .is_some_and(|cell| visible[cell] != 0)
 }
 
-fn until(state: &Match, visible: &[u8], shot: &Value) -> Result<f64, SnapshotError> {
+pub(super) fn until(state: &Match, visible: &[u8], shot: &Value) -> Result<f64, SnapshotError> {
     let value = |key: &str| shot[key].as_f64().ok_or(SnapshotError::Rules);
     let time = value("time")?;
     let expires = value("expires")?;
@@ -636,11 +672,6 @@ mod tests {
                 owner: 0,
                 at: Point { x: 13.0, z: 13.0 },
                 direction: 0.0,
-            }),
-            TickEvent::Firing(LaunchEvent::Throw {
-                shooter: 1,
-                owner: 0,
-                at: Point { x: 13.0, z: 13.0 },
             }),
             TickEvent::Environment(metadata.clone()),
         ] {

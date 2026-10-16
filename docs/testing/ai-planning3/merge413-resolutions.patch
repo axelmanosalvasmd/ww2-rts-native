@@ -1,0 +1,277 @@
+diff --git a/rust/crates/core/src/match_construction.rs b/rust/crates/core/src/match_construction.rs
+index 247158a7..10b1cb13 100644
+--- a/rust/crates/core/src/match_construction.rs
++++ b/rust/crates/core/src/match_construction.rs
+@@ -47,7 +47,6 @@ fn number(value: &Value, key: &str) -> Result<f64, String> {
+ }
+ 
+ impl Match {
+-<<<<<<< HEAD
+     /// Claims belong to the canonical mode node owner and only to this exact depot.
+     pub(crate) fn release_depot_claim(&mut self, id: UnitId) {
+         if let Some(state) = self.elimination.as_mut() {
+@@ -63,7 +62,9 @@ impl Match {
+                     node.depot = None;
+                 }
+             }
+-=======
++        }
++    }
++
+     fn validate_construction_mode(&self) -> Result<(), String> {
+         if self.options.mode == crate::economy::Mode::Horde {
+             self.validate_horde_economy()
+@@ -71,7 +72,6 @@ impl Match {
+             self.validate_actor_mode()
+         } else {
+             Err("construction phases require ordinary ground or canonical Horde".into())
+->>>>>>> origin/runtime/horde-lifecycle2-20261016
+         }
+     }
+ 
+diff --git a/rust/crates/core/src/recipient_lists.rs b/rust/crates/core/src/recipient_lists.rs
+index fa4c856f..46245df6 100644
+--- a/rust/crates/core/src/recipient_lists.rs
++++ b/rust/crates/core/src/recipient_lists.rs
+@@ -335,8 +335,12 @@ impl crate::match_runtime::Match {
+ 
+     pub fn ordinary_snapshot_raw_lists(&self) -> Result<OrdinaryRawLists, String> {
+         let game = &self.world.game;
+-<<<<<<< HEAD
+-        if !matches!(
++        let horde =
++            self.options.mode == crate::economy::Mode::Horde && game.mode == Some(ModeKind::Horde);
++        if horde {
++            self.validate_actor_mode()?;
++            self.validate_horde_economy()?;
++        } else if !matches!(
+             (self.options.mode, game.mode),
+             (
+                 crate::economy::Mode::Default | crate::economy::Mode::Conquest,
+@@ -349,19 +353,6 @@ impl crate::match_runtime::Match {
+                 )
+         ) {
+             return Err("global ordinary lists require a represented ordinary mode".into());
+-=======
+-        let horde =
+-            self.options.mode == crate::economy::Mode::Horde && game.mode == Some(ModeKind::Horde);
+-        if horde {
+-            self.validate_actor_mode()?;
+-            self.validate_horde_economy()?;
+-        } else if !matches!(
+-            self.options.mode,
+-            crate::economy::Mode::Default | crate::economy::Mode::Conquest
+-        ) || game.mode.is_some()
+-        {
+-            return Err("global ordinary lists require Conquest or canonical Horde".into());
+->>>>>>> origin/runtime/horde-lifecycle2-20261016
+         }
+         let mut ids = std::collections::BTreeSet::new();
+         let mut rows = Vec::with_capacity(game.wrecks.len());
+diff --git a/rust/crates/core/src/recipient_snapshot.rs b/rust/crates/core/src/recipient_snapshot.rs
+index eedc87f6..59a0af97 100644
+--- a/rust/crates/core/src/recipient_snapshot.rs
++++ b/rust/crates/core/src/recipient_snapshot.rs
+@@ -98,15 +98,9 @@ pub fn horde_mode_row(state: &Match) -> Result<Value, SnapshotError> {
+         "left": mode.left, "active": mode.active,
+         "slot": horde.slot
+     });
+-<<<<<<< HEAD
+     if mode.wave > 0 {
+         row["profile"] = json!(mode.profile.as_str());
+         row["boss"] = json!(mode.boss);
+-=======
+-    if mode.wave == 0 {
+-        row.as_object_mut().unwrap().remove("profile");
+-        row.as_object_mut().unwrap().remove("boss");
+->>>>>>> origin/runtime/horde-lifecycle2-20261016
+     }
+     if let Some(profile) = mode.next_profile {
+         row["nextProfile"] = json!(profile.as_str());
+@@ -124,7 +118,6 @@ pub struct SnapshotCache<'a> {
+ }
+ impl<'a> SnapshotCache<'a> {
+     pub fn new(state: &'a Match) -> Result<Self, SnapshotError> {
+-<<<<<<< HEAD
+         let ordinary = matches!(
+             (state.options.mode, state.world.game.mode),
+             (Mode::Default | Mode::Conquest, None)
+@@ -135,21 +128,15 @@ impl<'a> SnapshotCache<'a> {
+                 )
+                 | (Mode::Assault, Some(crate::game::ModeKind::Assault))
+         );
+-        if !ordinary
+-=======
+         let horde = state.options.mode == Mode::Horde
+             && state.world.game.mode == Some(crate::game::ModeKind::Horde);
+-        if !(horde
+-            || matches!(state.options.mode, Mode::Default | Mode::Conquest)
+-                && state.world.game.mode.is_none())
+->>>>>>> origin/runtime/horde-lifecycle2-20261016
++        if !(ordinary || horde)
+             || state.world.geography().is_some()
+             || state.world_runtime.is_some()
+             || (state.options.mode == Mode::Assault) != state.assault.is_some()
+         {
+             return Err(SnapshotError::UnsupportedMode);
+         }
+-<<<<<<< HEAD
+         if matches!(state.options.mode, Mode::Classic | Mode::Annihilation) {
+             state
+                 .validate_elimination_state()
+@@ -163,13 +150,11 @@ impl<'a> SnapshotCache<'a> {
+         {
+             return Err(SnapshotError::Rules);
+         }
+-=======
+         if horde {
+             state
+                 .validate_horde_economy()
+                 .map_err(|_| SnapshotError::Rules)?;
+         }
+->>>>>>> origin/runtime/horde-lifecycle2-20261016
+         let g = &state.world.game;
+         let cells = g.w.checked_mul(g.h).ok_or(SnapshotError::Rules)?;
+         if g.tick < 0 {
+diff --git a/rust/crates/core/src/recipient_snapshot/public_state.rs b/rust/crates/core/src/recipient_snapshot/public_state.rs
+index 10bf0329..6279cc49 100644
+--- a/rust/crates/core/src/recipient_snapshot/public_state.rs
++++ b/rust/crates/core/src/recipient_snapshot/public_state.rs
+@@ -65,7 +65,6 @@ pub(super) fn capture(state: &Match) -> Result<Vec<Map<String, Value>>, Snapshot
+     let mut result = Vec::with_capacity(g.players.len());
+     for slot in 0..g.players.len() {
+         let mut fields = Map::new();
+-<<<<<<< HEAD
+         let mode = super::mode_row(state)?;
+         if !mode.is_null() {
+             fields.insert("mode".into(), mode);
+@@ -77,10 +76,6 @@ pub(super) fn capture(state: &Match) -> Result<Vec<Map<String, Value>>, Snapshot
+                 .ok_or(SnapshotError::Rules)?;
+             fields.insert("nodes".into(), json!(nodes));
+             fields.insert("ghosts".into(), json!([]));
+-=======
+-        if state.options.mode == Mode::Horde {
+-            fields.insert("mode".into(), horde_mode_row(state)?);
+->>>>>>> origin/runtime/horde-lifecycle2-20261016
+         }
+         // Reuse Source's six-field ghost rows. Never consult a hidden live building here.
+         if matches!(state.options.mode, Mode::Classic | Mode::World)
+diff --git a/rust/crates/server/src/lobby.rs b/rust/crates/server/src/lobby.rs
+index 881abb9b..9555946b 100644
+--- a/rust/crates/server/src/lobby.rs
++++ b/rust/crates/server/src/lobby.rs
+@@ -2104,26 +2104,16 @@ fn result_number(value: f64) -> Value {
+     if value == 0.0 { json!(0) } else { json!(value) }
+ }
+ fn result_message(result: MatchResult, names: Vec<String>) -> Result<Value, String> {
+-<<<<<<< HEAD
+-    if crate::native_startup::ordinary_mode(result.mode).is_none() {
+-=======
+-    if !matches!(result.mode, "conquest" | "horde") {
+->>>>>>> origin/runtime/horde-lifecycle2-20261016
++    if crate::native_startup::ordinary_mode(result.mode).is_none() && result.mode != "horde" {
+         return Err("result serializer requires represented ordinary mode".into());
+     }
+     let conquest = result.mode == "conquest";
+     let timeline = result.timeline.into_iter().map(|sample| match sample {
+-<<<<<<< HEAD
+         MatchSample::Conquest { t, vp } if conquest => Ok(json!({"t":result_number(t), "vp":vp.into_iter().map(result_number).collect::<Vec<_>>()})),
+         MatchSample::Territories { t, points, structures } if !conquest => Ok(json!({"t":result_number(t),
+             "points":points.into_iter().map(result_number).collect::<Vec<_>>(),
+             "structures":structures.into_iter().map(result_number).collect::<Vec<_>>()})),
+         _ => Err("ordinary result timeline disagrees with its mode".to_owned()),
+-=======
+-        MatchSample::Conquest { t, vp } => Ok(json!({"t":result_number(t), "vp":vp.into_iter().map(result_number).collect::<Vec<_>>()})),
+-        MatchSample::Territories { t, points, structures } if result.mode == "horde" => Ok(json!({"t":result_number(t), "points":points.into_iter().map(result_number).collect::<Vec<_>>(), "structures":structures.into_iter().map(result_number).collect::<Vec<_>>()})),
+-        MatchSample::Territories { .. } => Err("ordinary result cannot serialize a territory timeline".to_owned()),
+->>>>>>> origin/runtime/horde-lifecycle2-20261016
+     }).collect::<Result<Vec<_>, _>>()?;
+     let story = result
+         .story
+@@ -2545,11 +2535,9 @@ mod save_load_tests;
+ #[path = "lobby_saves.rs"]
+ mod save_runtime;
+ 
+-<<<<<<< HEAD
+ #[cfg(test)]
+ #[path = "mode_hosting_tests.rs"]
+ mod mode_hosting_tests;
+-=======
++
+ #[path = "horde_host.rs"]
+ mod horde_host;
+->>>>>>> origin/runtime/horde-lifecycle2-20261016
+diff --git a/rust/crates/server/src/main.rs b/rust/crates/server/src/main.rs
+index 6a96fcfc..6ae7f202 100644
+--- a/rust/crates/server/src/main.rs
++++ b/rust/crates/server/src/main.rs
+@@ -18,11 +18,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+             "--seed" if seed.is_none() => seed = Some(args.next().ok_or("--seed requires U64")?),
+             "--help" | "-h" => {
+                 println!(
+-<<<<<<< HEAD
+-                    "ww2-server [--bind HOST:PORT] [--trusted-room CODE --seed U64]\nAddress priority: --bind, WW2_BIND, HOST/PORT, 127.0.0.1:3000. Port 0 selects a free port.\nWW2_SHARDS: 1-64 isolated game threads (default 1).\nTrusted mode: one private two-human Conquest room, named armies, sandbox off, logistics off (temporary). Seeds/receipts stay host-private."
+-=======
+-                    "ww2-server [--bind HOST:PORT] [--trusted-room CODE --seed U64]\nAddress priority: --bind, WW2_BIND, HOST/PORT, 127.0.0.1:3000. Port 0 selects a free port.\nWW2_SHARDS: 1-64 isolated game threads (default 1).\nHosted Horde: one through five defenders, with recipient-only server AI.\nWW2_AUTHORED_MAPS_DIR: optional private maps reread at Horde Start/Restart.\nTrusted Conquest: one private two-human room, standard army, sandbox off, logistics off (temporary). Seeds/receipts stay host-private."
+->>>>>>> origin/runtime/horde-lifecycle2-20261016
++                    "ww2-server [--bind HOST:PORT] [--trusted-room CODE --seed U64]\nAddress priority: --bind, WW2_BIND, HOST/PORT, 127.0.0.1:3000. Port 0 selects a free port.\nWW2_SHARDS: 1-64 isolated game threads (default 1).\nHosted Horde: one through five defenders, with recipient-only server AI.\nWW2_AUTHORED_MAPS_DIR: optional private maps reread at Horde Start/Restart.\nTrusted mode: one private two-human Conquest room, named armies, sandbox off, logistics off (temporary). Seeds/receipts stay host-private."
+                 );
+                 return Ok(());
+             }
+diff --git a/rust/crates/server/src/native_startup.rs b/rust/crates/server/src/native_startup.rs
+index f55dbe2a..413b7f0b 100644
+--- a/rust/crates/server/src/native_startup.rs
++++ b/rust/crates/server/src/native_startup.rs
+@@ -70,20 +70,13 @@ impl NativeStartup {
+         settings: StartupSettings<'_>,
+         authored: &ww2_core::map::AuthoritativeMap,
+     ) -> Result<Self, String> {
+-<<<<<<< HEAD
+-        let expected = ordinary_mode(settings.mode);
+-        if expected.is_none()
+-            || !(expected == Some(state.options.mode)
+-                || expected == Some(Mode::Conquest) && state.options.mode == Mode::Default)
+-=======
+         let horde = settings.mode == "horde"
+             && state.options.mode == Mode::Horde
+             && state.world.game.mode == Some(ww2_core::game::ModeKind::Horde);
+-        let conquest = settings.mode == "conquest"
+-            && matches!(state.options.mode, Mode::Default | Mode::Conquest)
+-            && state.world.game.mode.is_none();
+-        if !(horde || conquest)
+->>>>>>> origin/runtime/horde-lifecycle2-20261016
++        let expected = ordinary_mode(settings.mode);
++        if !horde && (expected.is_none()
++            || !(expected == Some(state.options.mode)
++                || expected == Some(Mode::Conquest) && state.options.mode == Mode::Default))
+             || state.options.map_key.as_deref() != Some(settings.map)
+             || state.options.weather != WeatherChoice::from_reference(Some(settings.weather))
+             || state.options.sandbox != settings.sandbox
+@@ -120,7 +113,6 @@ impl NativeStartup {
+         {
+             return Err("native startup authoring map binding changed".into());
+         }
+-<<<<<<< HEAD
+         let plan = match state.options.mode {
+             Mode::Default | Mode::Conquest => {
+                 StartPlan::prepare(authored, &state.options, &state.rules)?
+@@ -137,18 +129,12 @@ impl NativeStartup {
+                     .ok_or("missing Assault startup state")?
+                     .defender_team,
+             )?,
++            Mode::Horde if horde => StartPlan::prepare_horde(authored, &state.options, &state.rules)?,
+             _ => return Err("native startup requires a represented ordinary mode".into()),
+         };
+         // Validate the canonical mode pair even when this API is used before RoomRuntime.
+         ww2_core::recipient_snapshot::mode_row(state)
+             .map_err(|e| format!("native startup mode: {e:?}"))?;
+-=======
+-        let plan = if horde {
+-            StartPlan::prepare_horde(authored, &state.options, &state.rules)?
+-        } else {
+-            StartPlan::prepare(authored, &state.options, &state.rules)?
+-        };
+->>>>>>> origin/runtime/horde-lifecycle2-20261016
+         if plan.players.len() != state.start.players.len()
+             || plan
+                 .players

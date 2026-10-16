@@ -370,18 +370,24 @@ impl Room {
             return Err("native result precedes final hold callback".into());
         }
         let result = native.runtime.finished_result()?;
-        if result.teams.len() != self.players.len()
-            || result.names.len() != self.players.len()
-            || result.story.len() != self.players.len()
+        let count = self.players.len() + usize::from(result.mode == "horde");
+        if result.teams.len() != count || result.names.len() != count || result.story.len() != count
         {
             return Err("native result seat rows disagree with the stable roster".into());
         }
         let outcomes = result.teams.iter().map(|team| json!({"team":team,
             "outcome":if result.winner == -1 { "draw" } else if result.winner == *team { "victory" } else { "defeat" }})).collect::<Vec<_>>();
-        let report = result_message(
-            result,
-            self.players.iter().map(|p| p.name.clone()).collect(),
-        )?;
+        let names = result
+            .names
+            .iter()
+            .enumerate()
+            .map(|(slot, name)| {
+                self.players
+                    .get(slot)
+                    .map_or_else(|| name.clone(), |p| p.name.clone())
+            })
+            .collect();
+        let report = result_message(result, names)?;
         let status = crate::NativeRoomStatus {
             epoch: native.epoch,
             tick: native.runtime.state().world.game.tick,
@@ -830,6 +836,7 @@ pub(crate) struct Hub {
     diagnostics: Option<crate::diagnostics::Recorder>,
     tick_log: bool,
     saves: crate::saves::SaveStore,
+    authored_maps_dir: Option<std::path::PathBuf>,
 }
 impl Hub {
     pub fn new(max_rooms: usize, public_url: String) -> Self {
@@ -847,6 +854,7 @@ impl Hub {
             diagnostics: None,
             tick_log: false,
             saves: crate::saves::SaveStore::new("saves".into()),
+            authored_maps_dir: None,
         }
     }
     pub(crate) fn configure_saves(&mut self, dir: std::path::PathBuf) {
@@ -900,20 +908,22 @@ impl Hub {
         if room.native.is_some() && !replace {
             return Err("room already has a native runtime".into());
         }
+        let horde = room.mode == "horde" && state.options.mode == Mode::Horde;
+        let count = room.players.len() + usize::from(horde);
         if !room.spectators.is_empty()
             || room.players.is_empty()
-            || room.players.iter().any(|p| p.ai)
+            || (!horde && room.players.iter().any(|p| p.ai))
         {
             return Err("native attachment needs commander human seats without spectators".into());
         }
-        if state.start.players.len() != room.players.len()
-            || state.options.players.len() != room.players.len()
-            || state.world.game.players.len() != room.players.len()
+        if state.start.players.len() != count
+            || state.options.players.len() != count
+            || state.world.game.players.len() != count
             || room.players.iter().enumerate().any(|(slot, person)| {
                 let start = &state.start.players[slot].config;
                 let config = &state.options.players[slot];
                 let live = &state.world.game.players[slot];
-                start.team != person.team as i32
+                start.team != if horde { 0 } else { person.team as i32 }
                     || config.team != start.team
                     || live.slot != slot
                     || live.team != start.team
@@ -948,21 +958,37 @@ impl Hub {
         };
         // Canonical runtime admission completes before changing the room or accounts.
         let mut runtime = RoomRuntime::new(state, now)?;
+        let ai = room
+            .players
+            .iter()
+            .enumerate()
+            .filter(|(_, p)| p.ai)
+            .map(|(slot, p)| {
+                (
+                    slot,
+                    ww2_core::commander_ai::Level::from_key(p.level).unwrap(),
+                )
+            })
+            .collect::<Vec<_>>();
+        runtime.configure_ai(&ai)?;
         let resume = runtime.resume(now);
         for (slot, person) in room.players.iter().enumerate() {
-            if person
-                .connection
-                .as_ref()
-                .is_none_or(|connection| !connection.ready())
-            {
+            if !person.online() {
                 runtime.auto_pause(slot, &person.name, now)?;
             }
         }
         let slots = (0..room.players.len()).collect::<Vec<_>>();
-        let names = room
+        let names = runtime
+            .state()
+            .start
             .players
             .iter()
-            .map(|p| p.name.clone())
+            .enumerate()
+            .map(|(slot, p)| {
+                room.players
+                    .get(slot)
+                    .map_or_else(|| p.config.name.clone(), |p| p.name.clone())
+            })
             .collect::<Vec<_>>();
         let starts = runtime.collect_starts(&slots, &startup, &names, epoch)?;
         let pause = runtime.paused().then(|| runtime.pause_message(now));
@@ -1358,11 +1384,8 @@ impl Hub {
                     native.ingress.discard_feedback();
                     continue;
                 }
-                let connected = room
-                    .players
-                    .iter()
-                    .map(|p| p.connection.as_ref().is_some_and(Connection::ready))
-                    .collect::<Vec<_>>();
+                let mut connected = room.players.iter().map(Person::online).collect::<Vec<_>>();
+                connected.resize(native.runtime.state().world.game.players.len(), true);
                 let pause = match native.runtime.poll_pause(&connected, now_ms) {
                     Ok(pause) => pause,
                     Err(error) => {
@@ -1394,11 +1417,23 @@ impl Hub {
                     }
                     continue;
                 }
-                let away = room
+                let mut away = room
                     .players
                     .iter()
-                    .map(|person| person.connection.is_none())
+                    .map(|person| !person.online())
                     .collect::<Vec<_>>();
+                away.resize(
+                    room.native
+                        .as_ref()
+                        .unwrap()
+                        .runtime
+                        .state()
+                        .world
+                        .game
+                        .players
+                        .len(),
+                    false,
+                );
                 let native = room.native.as_mut().unwrap();
                 if let Err(error) = native.runtime.set_away(&away) {
                     native.runtime.fault_stop(error);
@@ -1469,6 +1504,12 @@ impl Hub {
                     }
                 }
                 let sent = native.runtime.should_snapshot(report.tick);
+                let think_at = Instant::now();
+                if let Err(error) = native.runtime.think(sent) {
+                    native.runtime.fault_stop(format!("AI scheduling: {error}"));
+                    continue;
+                }
+                let think = think_at.elapsed().as_secs_f64() * 1000.0;
                 let snapshot_at = Instant::now();
                 let mut costs = (0.0, 0.0);
                 if sent {
@@ -1496,7 +1537,7 @@ impl Hub {
                     durations: [
                         began.elapsed().as_secs_f64() * 1000.0,
                         step,
-                        0.0,
+                        think,
                         snapshot_at.elapsed().as_secs_f64() * 1000.0,
                         costs.0,
                         costs.1,
@@ -1675,7 +1716,9 @@ impl Hub {
     }
 
     fn trusted_command(&mut self, code: &str, connection_id: u64, msg: &Value, now: u64) -> bool {
-        if self.trusted.as_ref().is_none_or(|p| p.code != code) {
+        if self.trusted.as_ref().is_none_or(|p| p.code != code)
+            || self.rooms.get(code).is_some_and(|r| r.mode == "horde")
+        {
             return false;
         }
         let Some(command) = msg["t"].as_str() else {
@@ -1737,7 +1780,8 @@ impl Hub {
         }
         if let Some(room) = self.rooms.get(code)
             && !room.players.iter().any(|p| p.token == token)
-            && (room.native.is_some() || room.players.len() >= 2)
+            && (room.native.is_some()
+                || room.players.len() >= if room.mode == "horde" { 5 } else { 2 })
         {
             return Err("trusted commander roster is fixed");
         }
@@ -1755,6 +1799,9 @@ impl Hub {
             return;
         }
         if *joined {
+            if self.horde_command(code, connection.id, &msg, now) {
+                return;
+            }
             if self.save_command(code, connection.id, &msg, now) {
                 return;
             }
@@ -1859,10 +1906,18 @@ impl Hub {
         if let Some(slot) = returning
             && let Some(native) = &mut room.native
         {
-            let mut names = room
+            let mut names = native
+                .runtime
+                .state()
+                .start
                 .players
                 .iter()
-                .map(|p| p.name.clone())
+                .enumerate()
+                .map(|(slot, p)| {
+                    room.players
+                        .get(slot)
+                        .map_or_else(|| p.config.name.clone(), |p| p.name.clone())
+                })
                 .collect::<Vec<_>>();
             names[slot] = name.clone();
             match native
@@ -2049,7 +2104,7 @@ fn result_number(value: f64) -> Value {
     if value == 0.0 { json!(0) } else { json!(value) }
 }
 fn result_message(result: MatchResult, names: Vec<String>) -> Result<Value, String> {
-    if crate::native_startup::ordinary_mode(result.mode).is_none() {
+    if crate::native_startup::ordinary_mode(result.mode).is_none() && result.mode != "horde" {
         return Err("result serializer requires represented ordinary mode".into());
     }
     let conquest = result.mode == "conquest";
@@ -2483,3 +2538,6 @@ mod save_runtime;
 #[cfg(test)]
 #[path = "mode_hosting_tests.rs"]
 mod mode_hosting_tests;
+
+#[path = "horde_host.rs"]
+mod horde_host;

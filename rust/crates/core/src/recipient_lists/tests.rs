@@ -17,6 +17,106 @@ use crate::{
 fn fixture() -> Value {
     serde_json::from_str(include_str!("../../tests/fixtures/recipient-lists.json")).unwrap()
 }
+
+#[test]
+fn canonical_horde_global_lists_survive_ticks_and_every_seat_delivery() {
+    use crate::recipient_snapshot::{DeliveryState, SelectedSeat};
+    let map = AuthoritativeMap::from_json(
+        &serde_json::to_vec(&json!({
+            "name":"Hosted Horde list admission", "w":60,"h":60,"rows":vec![".".repeat(60);60],
+            "spawns":[{"x":30,"y":5},{"x":10,"y":54},{"x":50,"y":54}],
+            "defend":[0],"points":[{"x":30,"y":30}]
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let mut state = Match::new_horde(
+        &map,
+        MatchOptions {
+            seed: 701,
+            mode: Mode::Horde,
+            players: vec![PlayerConfig {
+                name: "Defender".into(),
+                team: 0,
+                faction: Faction::Usa,
+            }],
+            shuffle: false,
+            army: ArmySize::Standard,
+            weather: WeatherChoice::Map,
+            weather_seed: Some(1),
+            living_weather: false,
+            map_key: None,
+            tech: true,
+            supply: false,
+            logistics: false,
+            sandbox: false,
+        },
+    )
+    .unwrap();
+    state.restrict_to_ordinary_snapshots().unwrap();
+    let initial = state.ordinary_snapshot_raw_lists().unwrap();
+    assert_eq!(initial.wrecks, json!([]));
+    assert!(initial.nodes.is_none());
+    let mut delivery = DeliveryState::new(&state).unwrap();
+    let seats = (0..2)
+        .map(|slot| SelectedSeat {
+            slot,
+            full: true,
+            omit: false,
+        })
+        .collect::<Vec<_>>();
+    assert!(state.end_horde_break().unwrap());
+    for _ in 0..16 {
+        let report = state.advance_tick().unwrap();
+        let raw = state.ordinary_snapshot_raw_lists().unwrap();
+        assert!(raw.wrecks.is_array() && raw.nodes.is_none());
+        let frame = delivery
+            .capture_selected_with_tick_events(&mut state, &seats, &report.events)
+            .unwrap()
+            .unwrap();
+        for slot in 0..2 {
+            let snap = frame.recipient(slot).unwrap().into_json();
+            assert_eq!(snap["tick"], report.tick);
+            assert_eq!(snap["mode"]["kind"], "horde");
+        }
+    }
+    assert!(state.world.game.units.values().any(|u| u.owner == 1));
+    assert!(state.tick_state.fault().is_none());
+    // A matching mode tag alone cannot admit a missing or corrupted Horde owner.
+    let horde = state.horde.take().unwrap();
+    assert!(state.ordinary_snapshot_raw_lists().is_err());
+    state.horde = Some(horde);
+    state.horde.as_mut().unwrap().slot = 0;
+    assert!(state.ordinary_snapshot_raw_lists().is_err());
+    state.horde.as_mut().unwrap().slot = 1;
+    state.world.game.players[0].team = 1;
+    assert!(state.ordinary_snapshot_raw_lists().is_err());
+    state.world.game.players[0].team = 0;
+    for (mode, game_mode) in [
+        (Mode::Horde, None),
+        (Mode::Conquest, Some(ModeKind::Horde)),
+        (Mode::World, Some(ModeKind::World)),
+        (Mode::Tutorial, Some(ModeKind::Tutorial)),
+    ] {
+        state.options.mode = mode;
+        state.world.game.mode = game_mode;
+        assert!(state.ordinary_snapshot_raw_lists().is_err());
+    }
+    state.options.mode = Mode::Horde;
+    state.world.game.mode = Some(ModeKind::Horde);
+    state.ordinary_snapshot_raw_lists().unwrap();
+    state.world.game.wrecks.push(Wreck {
+        id: Some(0),
+        cell: None,
+        x: 20.0,
+        z: 20.0,
+        moving: false,
+    });
+    assert!(
+        state.ordinary_snapshot_raw_lists().is_err(),
+        "wreck identity validation remains active"
+    );
+}
 fn index(v: &Value) -> usize {
     v.as_u64().unwrap() as usize
 }
