@@ -42,3 +42,52 @@ The first S2 invocation passed formatting, then nextest rejected a duplicated `-
 The first compiled S2 run executed 15 of 25 tests: 13 passed, including both handover tests, and two weather tests failed because their shared test map had no capture points. The map loader correctly reported `needs 1-9 capture points`; 10 tests were unrun after fail-fast. The scene now includes one neutral capture point, with no loader or runtime guard change. The successful fresh run described above used that repaired scene.
 
 The coordinator owns review, runtime acknowledgment, parity status, hosted checks and merge.
+
+## REFRESH-315 (2026-10-16)
+
+Merge `f538b606` has parents `abadc492579e70b85484602341acf0d518fd058b`
+and `4edfcd5e8b795aa47fde114de7d51d7eb6430078` (#373). Its tree is
+`3dfd69d6a7f41d0721830bd6d881d40aa37e0c48`, identical to
+`git merge-tree --write-tree` for those parents. There were no conflicts or
+hand-edited merge hunks. Main's guards, assertions and test registrations survive.
+
+The refresh extends the existing MODE-09 accepted-input handover test, retaining
+every original assertion. It now runs eight ordinary ticks with the returned
+Normal commander, captures both seats after every tick, and checks for faults.
+This is bounded lifecycle coverage, not a full room AI match-completion claim.
+Shipping source is unchanged from the automatic merge. Owner decision L remains
+in force: the existing policy consumes the recipient-derived observation from
+`opening_commander_observation`, never an omniscient policy input.
+
+Both full rows remain partial:
+
+- MODE-07: the three core tests above cover replay, startup and transitions.
+  `server/src/lobby.rs::start_trusted` still uses the configured host seed and
+  `weather_seed: None`. Fresh per-match server weather entropy, its recorded
+  replay input, and server start/restart coverage remain. The prototype samples
+  a new seed at `server.js:381`. The existing host-only lobby weather setting
+  rejects changes during play; this refresh does not add socket coverage of that
+  rule. Unreal weather-picker coverage also remains with the client owner.
+- MODE-09: the two handover tests above cover the bounded core operation.
+  Lobby storage already supports easy/normal/hard on AI seats, but trusted R1
+  admission still requires two human commanders and refuses `addAi`/`level`.
+  Server departure/host handover, Normal reset, recipient delivery scheduling,
+  pause/token cleanup and match completion need the separate ROOM-AI path.
+  Unreal level-picker and human-controller handoff coverage remain with the
+  client owner. Prototype sources: `server.js:521-532,640-648` and
+  `shared/ai.js:220-239`.
+
+Overlap: #342 changes `core/src/match_commander.rs` to consume detached seat
+delivery and also owns `ai_seat_view`, scheduler tests and Classic planning.
+Its scheduler and view infrastructure overlap the handover's eventual caller;
+it does not supply `handover_to_normal_ai`. ROOM-AI owns `server/src/lobby.rs`,
+`room_runtime.rs`, `room_ai.rs`, native startup and socket tests. It activates AI
+and handles departure/reconnect through recipient snapshots. Those changes are
+not imported here. Its recorded flight-delivery dependency is separate from
+this bounded core handover.
+
+Validation for this refresh is reported with the pushed head in the final
+handoff: focused core nextest at `-j4`, fmt and strict workspace Clippy from
+`rust/`, all under the shared flock slot, matching target directory, 6 GiB cap
+and zero swap. This PR merges after #373 and needs Hermes' exact-head runtime
+ack; historical 9/9 checks do not qualify the refreshed head.

@@ -110,6 +110,7 @@ mod tests {
             keys.iter()
                 .all(|key| key.tick == 1 && key.issuer == 0 && key.sequence > 180)
         );
+        let mut delivery = crate::recipient_snapshot::DeliveryState::new(&m).unwrap();
         let report = m.advance_tick().unwrap();
         assert!(report.commands.iter().any(|result| result.key == accepted));
         for key in keys {
@@ -128,6 +129,24 @@ mod tests {
                 .any(|u| u.owner == 0 && !u.path.is_empty())
         );
         assert_eq!(m.commands.queue.snapshot().pending.len(), 2);
+        let mut report = report;
+        for tick in 1..=8 {
+            assert_eq!(report.tick, tick);
+            assert!(m.tick_state.fault().is_none());
+            let effects = report.environment().cloned().collect::<Vec<_>>();
+            let frame = delivery
+                .capture_with_lists(&mut m, &[true; 2], &[false; 2], &effects)
+                .unwrap();
+            for slot in 0..2 {
+                assert_eq!(frame.recipient(slot).unwrap().into_json()["t"], "s");
+            }
+            if tick < 8 {
+                m.tick_opening_commander(&mut previous).unwrap();
+                report = m.advance_tick().unwrap();
+            }
+        }
+        assert_eq!(previous.level(), Level::Normal);
+        assert!(previous.delivered().is_some());
     }
 
     #[test]
