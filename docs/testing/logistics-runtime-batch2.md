@@ -34,9 +34,9 @@ Prototype correspondence: `shared/supply-convoys.js:43-77` (payer pools and gran
 
 Independent read-only reviewers inspected the pinned prototype and accepted all five row intents with no must-fix findings. They ran no execution gates.
 
-On the Vostro, the 13 selected checks pass. The broader affected filter passes 96 tests across core and simtest, with 650 skipped. Strict locked workspace/all-target Clippy, formatting and `git diff --check` pass. Each Cargo invocation uses an exclusive shared slot, that slot's target directory, a 6 GiB memory limit, zero swap and at least 20 GiB free. No full-workspace test run or Source execution was performed.
+On the Vostro, 13 selected checks and 96 broader core/simtest regressions passed before the final test-only main refresh (650 skipped in the broader run). After that refresh, all 14 selected-row and registration checks pass, with 503 skipped. Strict locked workspace/all-target Clippy, formatting and `git diff --check` pass. Each Cargo invocation uses an exclusive shared slot, that slot's target directory, a 6 GiB memory limit, zero swap and at least 20 GiB free. No full-workspace test run or Source execution was performed.
 
-The branch incorporates main `40020946731a2ea17bd85f6ef0ebf8f14e00e493`. Its incoming changes do not overlap the five edited logistics source/test files.
+The 96-test run incorporates main `40020946731a2ea17bd85f6ef0ebf8f14e00e493`. The final merge adds main `dc191ab8`, whose delta contains FPS/interface tests, their registration and parity documentation. Neither incoming update changes the five owned logistics source/test files.
 
 ## Limits and follow-ups
 
