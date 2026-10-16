@@ -1,0 +1,1 @@
+- Use Clippy's byte-string array spelling in the existing engineering terrain loop, preserving its values, order and all test predicates. The cd6 fourteen native passes and strict Clippy failure retain their producing head; this child is unexecuted.

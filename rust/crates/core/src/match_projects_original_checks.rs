@@ -83,7 +83,7 @@ fn remove_scene_unit(m: &mut Match, id: u32) {
 #[test]
 fn hidden_placement_and_queued_sight_loss_do_not_reveal_or_pay() {
     let order = json!({"t":"entrench","pattern":"line","ids":[1],"x":120,"z":120,"queue":true});
-    for ch in [b'.', b'K', b'W'] {
+    for ch in *b".KW" {
         let mut m = scene(80, &[(1, 5., 5.)]);
         // Match the original check's g.chars.fill input exactly. The check
         // requires refusal before terrain inspection, not a terrain mutation.

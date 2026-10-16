@@ -1,5 +1,13 @@
 # Three Crossroads Native: design decisions
 
+## Engineering byte-array Clippy repair (2026-10-15, source only)
+
+At frozen `cd6dda0cf5cc5e3865c0c003255845e50aba0028` (Rust tree `67b1570e5b640af29443c57e54ecf4d63fa1c14a`), formatting passed and all fourteen selected native checks passed once. Strict core all-target Clippy then failed with `byte_char_slices` at `match_projects_original_checks.rs:86`. Preserve that head's complete report and raw diagnostic in `/tmp/eng-five-native-cd6-2333-e92ceac8/`; those results remain attributed to cd6.
+
+Apply only Clippy's literal help: replace `[b'.', b'K', b'W']` with `*b".KW"` in the same `for` expression. Both arrays contain the same three u8 values in the same order. Every other test byte, predicate, input, assertion, runtime provider and the full 49-field plus 17-nested-field unit-bit helper remains exact. All fourteen names, order and argv, the immutable ada3b28c queued fixture (260389 bytes, mode 0444, optional only for selection 7), the twelve-trace baseline, every parity and Acceptance cell, registries and protected contracts remain unchanged. Historical ca56, a52, ef81, 397 and 0604 evidence is retained.
+
+This private child performs zero Source, Node, Cargo, rustc, native, formatting, lint, discovery or CI jobs. Its formatting, fourteen native checks and strict Clippy remain UNRUN pending a new literal exact-head, selection and slot grant from Root. No prior grant transfers. ENG-15/16/17/23/24 remain in progress; owner-view and MOV bridge proposals remain unapplied. Receipt of issue #5 and PR #16/#195 replies is separate from consent, default mapping or provider adoption. Root retains the ledger, final review, publication and merge; IMPL_ENGINEERING retains first engineering publication.
+
 ## Queued-Dig full-unit preservation comparison (2026-10-15, source only)
 
 The frozen `0604aaac769176ec6d8cebf6893e05c2f666c669` qualification remains fmt PASS, native eight PASS, one FAIL and five UNRUN, with Clippy UNRUN. Selection 9 stopped at the complete unit-map equality assertion in `queued_dig_errors_preserve_queue_drift_wallet_story_and_views`. Both debug maps print `pace: NaN`; canonical `initial_unit` initializes that field to NaN and `Unit` derives ordinary `PartialEq`. The assertion therefore cannot establish unchanged state even for a clone. Debug output does not prove bit identity or provider mutation. Preserve the original report, results and failure log in `/tmp/eng-five-native-2252-e92ceac8/` without relabeling their outcome.
