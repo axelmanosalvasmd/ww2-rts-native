@@ -4240,3 +4240,10 @@ retry semantic failures. Root combines combat contributions under the
 ABI, wire, terrain policy, reference pin or intentional gameplay difference
 changes in this test-only work. Runtime changes still need exact-head
 Hermes acknowledgment and deliberate observable differences need Axel.
+
+The mechanical formatting child uses the existing pinned Rust 1.99.0
+formatter on only the new combat test module. All string literals and
+assertion macro names remain exact. The formatter also reorders one import
+and braces one closure body. Formatting and `git diff --check` pass; native
+execution remains unrun. An initial token-identity diagnostic rejected
+those expected formatting changes and is not a native result.

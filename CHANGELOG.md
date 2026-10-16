@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Format the new native combat test module with the existing pinned Rust 1.99.0 formatter, preserving literals and assertions. Native execution remains pending Root's grant.
+
 - Add 43 authored native combat tests for the first 50-row candidate window, with literal mappings for all 66 owned remaining rows. Cover orders, targeting, reactions, formation, abilities and sight without new behavior captures. Keep incomplete rows pending and retain every historical result. Native execution and review remain unrun.
 
 - Mark MAP-04/05/07/117 ported after six exact native checks pass at `7cbfcddd`: three strict original validation-message readers, the full map corpus, complete XL/Hill Assault check and affected BASE replay. Formatting recheck and strict core/simtest all-target Clippy also pass. Retain MAP-97's separate historical debug/release proof, all 140 Acceptance cells and the tested Rust tree; MAP-06/19/100 remain held.
