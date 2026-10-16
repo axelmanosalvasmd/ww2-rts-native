@@ -1,0 +1,1 @@
+- Apply the three recorded BASE13 test layout changes after the dd2 formatting failure. Preserve every assertion and fixture; all four native controls still need a new exact Root grant.

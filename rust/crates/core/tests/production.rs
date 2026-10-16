@@ -314,9 +314,17 @@ fn base13_controls_projection(
                 .rows()
                 .into_iter()
                 .map(|row| {
-                    json!([row.job.id, row.job.kind, bits(row.job.charge.mp),
+                    json!([
+                        row.job.id,
+                        row.job.kind,
+                        bits(row.job.charge.mp),
                         bits(row.job.charge.fuel),
-                        if row.status == JobStatus::Active { "active" } else { "waiting" }])
+                        if row.status == JobStatus::Active {
+                            "active"
+                        } else {
+                            "waiting"
+                        }
+                    ])
                 })
                 .collect();
             json!({"id": id, "progress": bits(maker.progress()),
@@ -420,7 +428,10 @@ fn base13_control(
                         state, before,
                         "refusal preserves the entire production component"
                     );
-                    assert_eq!(wallets, money_before, "refusal preserves every wallet field");
+                    assert_eq!(
+                        wallets, money_before,
+                        "refusal preserves every wallet field"
+                    );
                 }
             });
         } else {
@@ -490,9 +501,7 @@ fn classic_no_barracks_mg_card_refusal() {
 #[test]
 #[ignore = "held until new exact Root Source and native grants for external BASE13 controls"]
 fn classic_full_selected_maker_does_not_fall_back() {
-    let mut steps: Vec<_> = (0..5)
-        .map(|_| base13_buy("rifle", Some(1), None))
-        .collect();
+    let mut steps: Vec<_> = (0..5).map(|_| base13_buy("rifle", Some(1), None)).collect();
     steps.extend([
         base13_observe("rifle", None, 5, ""),
         base13_observe("rifle", Some(2), 5, ""),
