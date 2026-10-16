@@ -1,0 +1,2 @@
+- Cap reserve-bearing and convoy vehicle displacement at fuel-adjusted speed times tick duration, including retained momentum and clearance recovery. Ordinary vehicles keep their existing movement.
+- Replace the unbounded-momentum expectation in `log07_ordinary_depletion_limits_speed_and_debits_emergency_overrun` with `log07_ordinary_depletion_caps_travel_and_charges_actual_driving`, retaining the actual fuel-debit checks.

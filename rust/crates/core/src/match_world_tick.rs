@@ -207,10 +207,10 @@ impl Match {
             | Command::Stop { .. }
             | Command::Stance { .. }
             | Command::Destroy { .. }
+            | Command::Rally { .. }
             | Command::Technology { .. }
             | Command::Cancel { .. }
-            | Command::CancelProduction { .. }
-            | Command::Rally { .. } => Ok(()),
+            | Command::CancelProduction { .. } => Ok(()),
             Command::Autocast { ids, on }
                 if !*on
                     || ids.iter().all(|raw| {

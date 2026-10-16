@@ -87,14 +87,14 @@ pub enum Command {
         id: i64,
         job: Option<i64>,
     },
+    Destroy {
+        ids: Vec<i64>,
+        id: Option<i64>,
+    },
     Rally {
         ids: Vec<i64>,
         id: Option<i64>,
         at: Option<Point>,
-    },
-    Destroy {
-        ids: Vec<i64>,
-        id: Option<i64>,
     },
     Board {
         ids: Vec<i64>,
@@ -473,19 +473,11 @@ impl Command {
             }),
             Some("rally") => Ok(Self::Rally {
                 ids,
-                id: object
-                    .contains_key("id")
-                    .then(|| object.get("id").and_then(safe_id).unwrap_or(-1)),
+                id: object.get("id").map(|value| safe_id(value).unwrap_or(-1)),
                 at: object
                     .get("x")
                     .and_then(|v| v.as_f64())
-                    .filter(|v| v.is_finite())
-                    .zip(
-                        object
-                            .get("z")
-                            .and_then(|v| v.as_f64())
-                            .filter(|v| v.is_finite()),
-                    )
+                    .zip(object.get("z").and_then(|v| v.as_f64()))
                     .map(|(x, z)| Point { x, z }),
             }),
             Some("destroy") => Ok(Self::Destroy {
@@ -788,84 +780,6 @@ impl crate::match_runtime::Match {
         }
         Ok(results)
     }
-    fn execute_rally(
-        &mut self,
-        owner: usize,
-        ids: &[i64],
-        id: Option<i64>,
-        at: Option<Point>,
-    ) -> Result<Option<Denial>, String> {
-        let Some(at) = at.filter(|p| p.x.is_finite() && p.z.is_finite()) else {
-            return Ok(Some(Denial::Blocked));
-        };
-        let width = self.world.game.w as f64 * crate::game::CELL;
-        let height = self.world.game.h as f64 * crate::game::CELL;
-        if self.options.mode.is_construction()
-            || (self.options.mode.is_skirmish() && (id.is_some() || !ids.is_empty()))
-        {
-            let limit = 50.max(self.world.game.units.len());
-            let list = id.map_or_else(|| ids.iter().copied().take(limit).collect(), |id| vec![id]);
-            let point = Point {
-                x: at.x.clamp(0.0, width),
-                z: at.z.clamp(0.0, height),
-            };
-            let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
-            let mut targets = Vec::new();
-            let mut owned = false;
-            for raw in list {
-                let Some(unit) = u32::try_from(raw)
-                    .ok()
-                    .and_then(|id| self.world.game.units.get(&id))
-                else {
-                    continue;
-                };
-                owned |= unit.owner == owner;
-                let access = unit.owner == owner
-                    || (self.options.mode == Mode::Horde
-                        && self.horde.as_ref().is_some_and(|h| {
-                            owner != h.slot
-                                && unit.owner != h.slot
-                                && self.world.game.allied(unit.owner, owner)
-                        }));
-                let kind = self
-                    .rules
-                    .kinds
-                    .get(unit.kind)
-                    .ok_or("invalid rally producer kind")?;
-                if unit.hp > 0.0
-                    && access
-                    && catalog
-                        .unit(&kind.name)
-                        .map_err(|e| e.to_string())?
-                        .get("makes")
-                        .is_some()
-                {
-                    if !self.building_rallies.contains_key(&unit.id) {
-                        return Err("canonical rally producer missing".into());
-                    }
-                    targets.push(unit.id);
-                }
-            }
-            if targets.is_empty() {
-                return Ok(Some(if owned { Denial::Needs } else { Denial::Unseen }));
-            }
-            for id in targets {
-                self.building_rallies.insert(id, Some(point));
-            }
-        } else if id.is_none() && ids.is_empty() {
-            if at.x < 0.0
-                || at.z < 0.0
-                || at.x >= width
-                || at.z >= height
-                || self.world.game.flags_at(at.x, at.z) & crate::game::MOVE != 0
-            {
-                return Ok(Some(Denial::Blocked));
-            }
-            self.player_rallies[owner] = Some(at);
-        }
-        Ok(None)
-    }
-
     pub(crate) fn eligible_command_unit(
         &self,
         id: i64,
@@ -942,6 +856,9 @@ impl crate::match_runtime::Match {
             return Ok(Some(Denial::Unsupported));
         }
         self.validate_building_activity_rows()?;
+        if let Command::Rally { ids, id, at } = command {
+            return self.set_rally(owner, ids, *id, *at);
+        }
         if let Command::Build {
             ids,
             kind,
@@ -1006,9 +923,6 @@ impl crate::match_runtime::Match {
                 Err(e) => Err(format!("recorded production cancellation: {e:?}")),
             };
         }
-        if let Command::Rally { ids, id, at } = command {
-            return self.execute_rally(owner, ids, *id, *at);
-        }
         if let Command::Destroy { ids, id } = command {
             return self.execute_destroy(owner, ids, *id);
         }
@@ -1033,7 +947,7 @@ impl crate::match_runtime::Match {
         } = command
         {
             if *queue {
-                return Ok(Some(Denial::Unsupported));
+                return self.queue_dig(owner, ids, *kind, *at, *direction, winner_decided);
             }
             return self.execute_dig(owner, ids, *kind, *at, *direction, winner_decided);
         }
@@ -1121,8 +1035,8 @@ impl crate::match_runtime::Match {
             | Command::Assist { .. }
             | Command::Cancel { .. }
             | Command::CancelProduction { .. }
-            | Command::Rally { .. }
             | Command::Destroy { .. }
+            | Command::Rally { .. }
             | Command::Board { .. }
             | Command::Unload { .. }
             | Command::Entrench { .. }
@@ -1480,8 +1394,8 @@ impl crate::match_runtime::Match {
             | Command::Assist { .. }
             | Command::Cancel { .. }
             | Command::CancelProduction { .. }
-            | Command::Rally { .. }
             | Command::Destroy { .. }
+            | Command::Rally { .. }
             | Command::Board { .. }
             | Command::Unload { .. }
             | Command::Entrench { .. }
@@ -2441,6 +2355,11 @@ impl crate::match_runtime::Match {
         let kind = unit.kind;
         let before = unit.at();
         let dt = self.rules.movement.tick;
+        let limit_travel = self.logistics.get(id).is_some()
+            || self
+                .convoys
+                .as_ref()
+                .is_some_and(|state| state.trucks.contains_key(&id));
         let fuel_speed = self.logistics.get(id).and_then(|r| {
             r.fuel.map(|fuel| {
                 let available = fuel
@@ -2475,7 +2394,7 @@ impl crate::match_runtime::Match {
         )
         .map_err(|e| format!("movement recipient traffic: {e:?}"))?;
         // The final multiplier applies after retreat/sprint select their speed.
-        let moved = crate::movement::move_unit_with_march(
+        let moved = crate::movement::move_unit_with_march_and_limit(
             &mut self.world.game,
             &self.rules,
             &mut self.grid,
@@ -2533,6 +2452,7 @@ impl crate::match_runtime::Match {
             },
             &traffic_knowledge,
             fuel_speed.unwrap_or(1.0),
+            limit_travel,
         )
         .map_err(|e| format!("movement recipient traffic: {e:?}"))?;
         if fuel_speed.is_some()
