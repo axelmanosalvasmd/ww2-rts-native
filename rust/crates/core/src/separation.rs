@@ -71,7 +71,12 @@ pub fn separate_crowds(g: &mut Game, rules: &Rules, grid: &mut SpatialGrid) {
     for &a_id in &ids {
         let a = &g.units[&a_id];
         let radius = (rules.kinds[a.kind].radius + max_radius) * 0.8;
-        if a.garrison.is_some() || a.air.is_some() || a.riding || a.rail {
+        if a.garrison.is_some()
+            || a.air.is_some()
+            || a.riding
+            || a.rail
+            || crate::match_gates::open_passage(g, &rules.kinds[a.kind], a)
+        {
             continue;
         }
         let mut square = bounds(a.x, a.z, radius);
@@ -90,6 +95,7 @@ pub fn separate_crowds(g: &mut Game, rules: &Rules, grid: &mut SpatialGrid) {
                 || b.air.is_some()
                 || b.riding
                 || b.rail
+                || crate::match_gates::open_passage(g, &rules.kinds[b.kind], b)
             {
                 continue;
             }

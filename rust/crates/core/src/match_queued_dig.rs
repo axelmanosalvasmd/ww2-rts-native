@@ -35,6 +35,9 @@ impl Match {
         if winner_decided || player.away || player.out {
             return Ok(Some(Denial::Blocked));
         }
+        if kind == FortKind::Gate && !self.ordinary_gate_mode() {
+            return Ok(Some(Denial::Unsupported));
+        }
         self.validate_field_work_state()?;
         let tier_denial = self.dig_tier_denial(owner, kind)?;
         let Some(id) = ids.first().copied().and_then(|id| u32::try_from(id).ok()) else {

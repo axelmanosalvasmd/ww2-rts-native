@@ -344,6 +344,7 @@ impl crate::match_runtime::Match {
                 .map_err(|error| format!("production admission: {error:?}"))?;
             self.validate_carrier_tick()?;
             self.validate_construction_tick()?;
+            self.validate_gate_tick()?;
             self.validate_ground_attacks()?;
             self.validate_reaction_tick_actors()?;
             self.validate_field_project_tick(&current_order)?;
@@ -546,6 +547,9 @@ impl crate::match_runtime::Match {
             if self.options.mode == crate::economy::Mode::World && building && building_complete {
                 self.step_training(id, dt)
                     .map_err(|error| format!("training turn: {error:?}"))?;
+            }
+            if building && building_complete && self.options.mode != crate::economy::Mode::World {
+                self.step_gate(id, dt)?;
             }
             if skip_ground {
                 continue;

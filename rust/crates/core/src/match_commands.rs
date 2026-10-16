@@ -180,6 +180,8 @@ pub enum Command {
 /// Only fields absent from Unit live here. Routes, positions and hold_pos remain in Unit.
 #[derive(Clone, Debug, PartialEq)]
 pub struct UnitControl {
+    /// Gate openness and its deterministic half-second check timer.
+    pub gate: Option<crate::match_gates::GateControl>,
     /// Seconds until another idle reaction may choose a destination (`u.react`).
     pub react: f64,
     pub aim: f64,
@@ -250,6 +252,9 @@ impl UnitControl {
             return Err("nonfinite unit aim".into());
         }
         Ok(Self {
+            gate: definition
+                .get("gate")
+                .map(|_| crate::match_gates::GateControl::default()),
             react: 0.0,
             aim,
             auto_cast: ability_id != "none" && cost == 0.0,
