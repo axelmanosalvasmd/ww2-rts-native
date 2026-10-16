@@ -1,0 +1,3 @@
+- Add an internal recipient-terrain cover preview for explored ground, garrison edges, damaged cover and delivered vehicle hulls, with no C interface change.
+- Check cover queries across ordinary ticks and recipient snapshots, hidden-unit view isolation, and deterministic match streams across rooms and unrelated AI draws.
+- Leave complete availability, placement, map/editor, collection ordering, sort consumers, float keys, save/load, input timing, AI delivery and whole-match interface checks for later batches.
