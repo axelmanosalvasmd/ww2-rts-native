@@ -1,0 +1,1 @@
+- Record 13 passing BASE checks and the startup test map validation failure. Give that authored map its required central capture point while preserving every wallet and population assertion; keep parity files unchanged and require a fresh focused run.

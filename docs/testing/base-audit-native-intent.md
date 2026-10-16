@@ -25,3 +25,23 @@ This window contains 16 assigned rows. Tests are implemented but unrun pending a
 | `BASE-19` | None, held | `shared/sim.js:3798-3803` | Held: ordinary recruitment explicitly supports Conquest only; Tutorial spawn/rally branch remains absent. |
 
 The first BASE14 invocation at `fe5d456091ddd36aa79dee9e9ee56d4208ff3eb7` stopped during compilation with five E0506/E0502 borrow errors. No native test was selected or executed. The process ended with exit 101 and its inherited lock was released. Original output remains at `/tmp/native-feature-batches-0315/base_audit/native.log`. The successor gives unchanged fact transitions separate input storage; all assertions and expected values are preserved. LOG has not run. A new exact-head grant is required for either selection.
+
+## First actual native result
+
+At producing `cb6717a7c7ef1b34afc9db222f72a5f12737beef`, Rust tree
+`c4d9ea21121a35f1a5c3a5871567a63482f4f1bf`, Root's 0345 S1 grant selected
+all 14 tests once: 13 passed, one failed, 168 were skipped. The process and
+systemd launcher ended with exit 100 and the inherited lock was released.
+Normal output remains at `/tmp/native-feature-batches-0345/base_audit/`.
+
+Native-passing intent candidates remain BASE-04, BASE-06, BASE-08 and BASE-16,
+subject to prototype review. The new BASE-13 population boundary, BASE-17
+refusal ordering and BASE-18 maker component also passed, but their complete
+rows remain held for the listed gaps. All six retained exact/component checks
+passed. BASE-02/03's shared startup test failed before assertions because the
+authored map supplied zero points and validation requires one to nine. This
+is a test setup error, not a demonstrated native rule defect. Add one central
+open-ground point without changing any startup wallet/cap assertion. The
+corrected test requires a fresh exact-head grant; the 13 successful tests do
+not need another run solely for this setup correction. All parity files stay
+unchanged. LOG has not run.

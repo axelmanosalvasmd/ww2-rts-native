@@ -1,5 +1,20 @@
 # Three Crossroads Native: design decisions
 
+## BASE first native result and valid startup map (2026-10-16)
+
+Root's one 0345 S1 run at `cb6717a7` selected 14 tests: 13 passed and the
+startup army-wallet test failed before assertions. Its authored map had zero
+capture points; `map.rs` requires one to nine. Add one central open-ground
+point to the test input, preserving every expected wallet, population cap and
+assertion. No runtime or rule changes. The original 13/1 result and terminal
+lock release remain in `/tmp/native-feature-batches-0345/base_audit/`.
+
+BASE-04/06/08/16 are native-passing intent candidates, pending reviewer
+prototype confirmation. Other partial rows retain their gaps; LOG remains
+unrun. A new exact-head grant is required for the corrected startup check and
+for the separate LOG41 selection. No parity file is changed.
+
+
 ## Native feature input lifetime correction (2026-10-16)
 
 The first BASE14 grant ran once at `fe5d4560`, Rust tree `3c0e11aa`, and

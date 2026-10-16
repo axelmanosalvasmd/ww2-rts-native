@@ -382,7 +382,7 @@ fn feature_base02_03_conquest_starting_wallet_and_caps_scale_all_named_armies() 
         rules::Rules,
         weather::WeatherChoice,
     };
-    let map=AuthoritativeMap::from_json(&serde_json::to_vec(&serde_json::json!({"name":"native economy","w":40,"h":40,"rows":vec![".".repeat(40);40],"spawns":[{"x":5,"y":5},{"x":34,"y":34}],"points":[]})).unwrap()).unwrap();
+    let map=AuthoritativeMap::from_json(&serde_json::to_vec(&serde_json::json!({"name":"native economy","w":40,"h":40,"rows":vec![".".repeat(40);40],"spawns":[{"x":5,"y":5},{"x":34,"y":34}],"points":[{"x":20,"y":20}]})).unwrap()).unwrap();
     let rules = Rules::compiled().unwrap();
     for (army, income, cap) in [
         (ArmySize::Standard, 1.0, 12.0),
