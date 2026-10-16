@@ -109,3 +109,40 @@ those phases, so `core/src/logistics_runtime_tests.rs:128` retains 45 ticks and
 every-seat complete delivery while requiring that all three logistics phases
 are neither unavailable nor executed, and that convoys and reserves remain
 absent. Runtime code is unchanged by this test repair.
+
+## Final qualification
+
+Qualified source: `3b624723beea04c69d97f422b668441c468bc0ec`.
+Rust tree: `772eeae3bdb73a8d803ebaa9f6873a18825f6f64`.
+The final receipt commit changes this document and its changelog fragment only,
+retaining that exact Rust tree.
+
+Rust 1.99.0 on the Vostro, shared slot S3 and matching target directory,
+MemoryMax=6G, MemorySwapMax=0, four Cargo jobs, all checks from `rust/`:
+
+```text
+cargo nextest run --locked --cargo-profile ci-test -j4 --no-fail-fast
+  -p ww2-core -p ww2-server -p ww2-simtest -E <filter below>
+143 tests run: 143 passed, 1424 skipped
+cargo fmt --all --check: PASS
+cargo clippy --workspace --all-targets -j4 -- -D warnings: PASS
+```
+
+Exact focused filter:
+
+```text
+test(logistics) | test(log11_) | test(log22_) | test(log47_) | test(match_commands::tests::) | test(recipient_snapshot::) | test(save_load) | test(classic_save_load) | test(classic_and_annihilation) | test(garrison_retreat_ticks)
+```
+
+This covers every retained row test, the forced-stance command fixtures, typed
+queue preflight, complete private recipient delivery, ordinary full-match
+logistics through ending ticks and checkpoint restoration, server save/load,
+the trusted room, Classic/Annihilation boundaries and the preserved garrison
+pre-write refusal regression. No whole-workspace test run is claimed.
+
+The raw log is `/tmp/repair322-final-qualification.log`. The slot was released
+as soon as the final Cargo command exited. Issue #5 was reread before this
+report; the fixed-main runtime acknowledgment remains pending. This qualification
+covers the stacked repair, not the separate PR 375 head's hosted checks.
+
+merges after #373; needs fresh Hermes ack
