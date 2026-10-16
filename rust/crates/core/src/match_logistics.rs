@@ -150,7 +150,7 @@ impl Match {
             })
             .collect::<Vec<_>>();
         let initial = self.world.initial();
-        self.supply_net = GroundSupplyNetwork::compute(
+        self.supply_net = GroundSupplyNetwork::compute_for_mode(
             SupplyInput {
                 view: view(&self.world.game),
                 chars: &self.world.game.chars,
@@ -161,8 +161,30 @@ impl Match {
                 players: &players,
             },
             &mut SpawnPlacer::new(),
+            self.options.mode,
         )?;
         Ok(())
+    }
+    /// Read the same reserve transition before admitting a garrison's withdrawal exit.
+    pub(crate) fn unit_will_force_withdrawal(&self, id: u32) -> bool {
+        let Some(unit) = self.world.game.units.get(&id) else {
+            return false;
+        };
+        let Some(reserve) = self.logistics.get(id) else {
+            return false;
+        };
+        if !self.options.logistics || unit.riding {
+            return false;
+        }
+        let mut next = logistics::LogisticsState::default();
+        next.insert(id, reserve.clone());
+        next.tick_reserves(
+            reserve_context(true),
+            facts(unit, &self.rules),
+            self.rules.movement.tick,
+            0.0,
+        );
+        next.get(id).is_some_and(|r| r.forced)
     }
     /// Reserve time is charged before movement. Driving fuel is charged separately from actual powered travel.
     pub fn advance_unit_reserves(&mut self, id: u32) -> Result<(), String> {
@@ -343,12 +365,12 @@ impl Match {
         self.step_supply_convoys_with_dt(winner_decided, self.rules.movement.tick)
     }
     pub(crate) fn validate_supply(&self) -> Result<(), String> {
-        self.validate_supply_context(false)
+        self.validate_supply_context()
     }
     pub(crate) fn validate_withdrawal_supply(&self) -> Result<(), String> {
-        self.validate_supply_context(true)
+        self.validate_supply_context()
     }
-    fn validate_supply_context(&self, garrisons: bool) -> Result<(), String> {
+    fn validate_supply_context(&self) -> Result<(), String> {
         if !matches!(
             self.options.mode,
             crate::economy::Mode::Default | crate::economy::Mode::Conquest
@@ -464,13 +486,13 @@ impl Match {
                 .map_err(|e| e.to_string())?
                 .unit(&self.rules.kinds[u.kind].name)
                 .map_err(|e| e.to_string())?;
-            if u.garrison.is_some_and(|c| !garrisons || c >= n) {
-                return Err("supply garrison entry is not represented".into());
+            if u.garrison.is_some_and(|c| c >= n) {
+                return Err("invalid supply garrison entry".into());
             }
             queued_points(
                 &self.commands.units[&u.id],
                 u.id,
-                self.rules.kinds[u.kind].name != "truck",
+                self.rules.kinds[u.kind].name == "truck",
             )?;
             let c = self.combat.get(u.id).unwrap();
             if u.riding != c.carrier.is_some()
@@ -672,7 +694,7 @@ impl ConvoyWorld<'_> {
             riding: c.carrier,
             path: u.path.clone(),
             world_goal: u.world_goal,
-            orders: queued_points(&self.commands.units[&u.id], u.id, name != "truck")
+            orders: queued_points(&self.commands.units[&u.id], u.id, name == "truck")
                 .expect("validated queued convoy commands"),
             orders_pending: !self.commands.units[&u.id].orders.is_empty(),
             amove: u.amove,
@@ -923,7 +945,12 @@ impl supply_convoys::World for ConvoyWorld<'_> {
     }
 }
 
-fn queued_points(control: &UnitControl, id: u32, abilities: bool) -> Result<Vec<Point>, String> {
+fn queued_points(control: &UnitControl, id: u32, truck: bool) -> Result<Vec<Point>, String> {
+    // Only trucks price queued movement. Troop jobs read orders_pending instead;
+    // their canonical queue can also contain construction, attack and field work.
+    if !truck {
+        return Ok(Vec::new());
+    }
     use crate::match_commands::Command;
     let mut points = Vec::new();
     for command in &control.orders {
@@ -947,15 +974,6 @@ fn queued_points(control: &UnitControl, id: u32, abilities: bool) -> Result<Vec<
                 }
                 points.push(orders[0].at);
             }
-            Command::Ability {
-                ids,
-                at: Some(at),
-                queue: false,
-                automatic: false,
-            } if abilities
-                && ids.as_slice() == [i64::from(id)]
-                && at.x.is_finite()
-                && at.z.is_finite() => {}
             _ => return Err("unsupported queued convoy command projection".into()),
         }
     }

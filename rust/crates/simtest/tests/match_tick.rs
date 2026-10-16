@@ -742,7 +742,7 @@ fn unsupported_reaction_actors_reject_before_clock_commands_or_timers() {
         assert!(
             error.reason.contains(match actor {
                 "garrison" => "automatic garrison retreat tick exit",
-                "logistics" | "convoys" => "reserve and convoy tick phases",
+                "logistics" | "convoys" => "logistics option and convoy state disagree",
                 "mode mismatch" | "unsupported mode" => {
                     "tick execution requires represented ordinary or World mode"
                 }

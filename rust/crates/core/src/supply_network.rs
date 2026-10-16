@@ -1,6 +1,7 @@
 //! Ordinary ground supply distances and refill rates from explicit authoritative facts.
 use crate::{
     catalog::{Catalog, Value},
+    economy::Mode,
     game::{CELL, MOVE, Point, VBLOCK},
     math,
     navigation::TerrainView,
@@ -84,6 +85,15 @@ pub struct SupplyInput<'a> {
 impl GroundSupplyNetwork {
     /// Build a new network, leaving the caller's previous network intact on invalid inputs.
     pub fn compute(input: SupplyInput<'_>, placer: &mut SpawnPlacer) -> Result<Self, String> {
+        Self::compute_for_mode(input, placer, Mode::Conquest)
+    }
+
+    /// Annihilation treats every connected held point as a source.
+    pub fn compute_for_mode(
+        input: SupplyInput<'_>,
+        placer: &mut SpawnPlacer,
+        mode: Mode,
+    ) -> Result<Self, String> {
         let SupplyInput {
             view,
             chars,
@@ -182,7 +192,7 @@ impl GroundSupplyNetwork {
                         p.owner.is_some_and(|o| players[o].team == team)
                             && !p.cut
                             && !p.contested
-                            && p.kind.as_deref() == Some("depot")
+                            && (mode == Mode::Annihilation || p.kind.as_deref() == Some("depot"))
                     })
                     .map(|p| p.at),
             );

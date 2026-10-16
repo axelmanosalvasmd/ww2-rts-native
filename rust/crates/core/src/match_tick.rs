@@ -295,8 +295,11 @@ impl crate::match_runtime::Match {
         {
             return Err("tick execution requires represented ordinary or World mode".into());
         }
-        if self.options.logistics || self.convoys.is_some() {
-            return Err("reserve and convoy tick phases are not connected".into());
+        if self.options.logistics != self.convoys.is_some() {
+            return Err("logistics option and convoy state disagree".into());
+        }
+        if self.options.logistics {
+            self.validate_withdrawal_supply()?;
         }
         self.preflight_legacy_scenario()?;
         self.tick_state.paths.validate()?;
@@ -391,7 +394,10 @@ impl crate::match_runtime::Match {
             if unit.riding {
                 continue;
             }
-            if unit.garrison.is_some() && self.automatic_retreat_candidate(id)? {
+            if unit.garrison.is_some()
+                && !self.unit_will_force_withdrawal(id)
+                && self.automatic_retreat_candidate(id)?
+            {
                 return Err("automatic garrison retreat tick exit is not connected".into());
             }
         }
@@ -526,7 +532,10 @@ impl crate::match_runtime::Match {
                 continue;
             }
             let factor = movement::supp_speed(unit.supp);
-            // Reserve adapters attach before this pre-timer order phase.
+            if self.options.logistics {
+                self.advance_unit_reserves(id)?;
+                self.advance_supply_withdrawal(id)?;
+            }
             if self.options.mode == crate::economy::Mode::World {
                 self.apply_world_guard_home(id)?;
             }
@@ -620,6 +629,9 @@ impl crate::match_runtime::Match {
             let result = self.apply_unit_firing(id, moving, dt);
             self.take_firing_tick_events(events);
             result?;
+        }
+        if self.options.logistics {
+            phases.push(TickPhase::UnitReserves);
         }
         phases.extend([TickPhase::UnitOrders, TickPhase::Abilities]);
         if self.options.mode != crate::economy::Mode::World {
@@ -759,7 +771,13 @@ impl crate::match_runtime::Match {
             self.apply_point_supply(&unit_order)?;
             phases.push(TickPhase::PointSupply);
         }
-        // Network refresh attaches between point supply and prepared reinforcement.
+        if self.options.logistics {
+            let beat = crate::supply_network::SupplyRules::compiled()?.network_ticks;
+            if beat > 0 && tick as u64 % beat == 0 {
+                self.refresh_supply_network(&unit_order)?;
+                phases.push(TickPhase::SupplyNetwork);
+            }
+        }
         self.reinforce(&recovery, dt)?;
         phases.push(TickPhase::Reinforcement);
         self.tick_retirement(&unit_order, retirement, events)?;
@@ -779,6 +797,10 @@ impl crate::match_runtime::Match {
         } else {
             self.apply_point_capture_income(&unit_order)?;
             phases.push(TickPhase::PointCaptureIncome);
+            if self.options.logistics {
+                self.step_supply_convoys(self.finish.is_some())?;
+                phases.push(TickPhase::Convoys);
+            }
             self.apply_conquest_victory()?;
             phases.push(TickPhase::Victory);
         }
@@ -813,12 +835,9 @@ impl crate::match_runtime::Match {
                 ]
             } else {
                 vec![
-                    TickPhase::UnitReserves,
                     TickPhase::Production,
                     TickPhase::Rail,
                     TickPhase::GroundEffects,
-                    TickPhase::SupplyNetwork,
-                    TickPhase::Convoys,
                 ]
             },
         })
