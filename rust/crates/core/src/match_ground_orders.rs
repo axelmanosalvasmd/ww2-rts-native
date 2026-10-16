@@ -329,14 +329,18 @@ impl Match {
         for id in &selected {
             let unit = exits.iter().find(|exit| exit.id() == *id).unwrap().unit();
             if let Some(state) = self.convoys.as_ref().filter(|s| s.trucks.contains_key(id)) {
-                let home = state.stores.iter()
+                let home = state
+                    .stores
+                    .iter()
                     .filter(|s| s.active && s.source && self.world.game.allied(owner, s.owner))
                     .min_by(|a, b| {
                         crate::math::hypot(a.at.x - unit.x, a.at.z - unit.z)
                             .total_cmp(&crate::math::hypot(b.at.x - unit.x, b.at.z - unit.z))
                     })
                     .map(|s| s.at);
-                let Some(home) = home else { return Ok(Some(Denial::Blocked)); };
+                let Some(home) = home else {
+                    return Ok(Some(Denial::Blocked));
+                };
                 homes.push(home);
             } else {
                 homes.push(self.reaction_home_for(unit)?);
@@ -386,7 +390,10 @@ impl Match {
             );
         }
         for ((&id, &home), route) in selected.iter().zip(&homes).zip(&routes) {
-            if self.convoys.as_ref().is_some_and(|s| s.trucks.contains_key(&id))
+            if self
+                .convoys
+                .as_ref()
+                .is_some_and(|s| s.trucks.contains_key(&id))
                 && route.waypoints.is_empty()
                 && crate::math::hypot(
                     self.world.game.units[&id].x - home.x,

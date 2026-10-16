@@ -438,10 +438,12 @@ fn manual_stop_holds_paid_cargo_and_original_target_then_resume_continues_delive
     assert_eq!(truck.cargo.provisions, 25.0);
     assert_eq!(truck.destination, Some(point(170.0)));
     assert!(world.units[0].orders.is_empty());
-    assert!(world
-        .operations
-        .iter()
-        .any(|(_, op)| *op == UnitOperation::ResumeClear));
+    assert!(
+        world
+            .operations
+            .iter()
+            .any(|(_, op)| *op == UnitOperation::ResumeClear)
+    );
     assert!(world.routes.last().unwrap().2);
 }
 
