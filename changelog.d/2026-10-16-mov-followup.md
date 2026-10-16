@@ -1,0 +1,2 @@
+- Add movement speed and garrison intent tests, including reservations, queued entry, entry denials, the 3.2-metre door boundary, house removal and wounded retreat. Ordinary garrison cases collect every seat's snapshot through objective victory and eight ending ticks.
+- Keep full tick composition, logistics tick integration, World route delivery and the remaining retreat-home work outside this proof claim.
