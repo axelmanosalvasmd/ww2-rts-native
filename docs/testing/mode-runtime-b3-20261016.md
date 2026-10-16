@@ -1,7 +1,7 @@
 # MODE-RUNTIME-B3
 
 Branch: `runtime/mode-b3-20261016`, from main `92688084369ac20ef1cf77b9e1a156a2f1f9fbcb`.
-Reference: `e4e579a` (read only). Main `d505e6eb` was merged at `bd4bab16`; the firing module conflict retained both the incoming MAP tests and the new Kaiju tests.
+Reference: `e4e579a` (read only). Main `d505e6eb` was merged at `bd4bab16`; the firing module conflict retained both the incoming MAP tests and the new Kaiju tests. The final refresh merged main `9fe25aa8` at `62592b8a`.
 
 Scope: MODE-45, MODE-52 (core), MODE-54 (core), MODE-91. No parity status edits.
 
@@ -35,3 +35,7 @@ The corrected merged Rust source passed on the Vostro in slot S2, with MemoryMax
 The selection includes all Horde tests, all new Kaiju and MODE-91 tests, ordinary tick/snapshot isolation, the retained story gate, captured and represented recovery, ordinary firing and refusal, and both consolidated test-registration checks. No full workspace test run, Source capture or Unreal test ran. No Source recorder or provenance bundle is used for behavior rows.
 
 Ground combat and death validation use the existing aircraft metadata validator in observation mode, including the planes spawned on a real boss wave. Aircraft actuation and the full Horde tick retain their existing guards. A real wave-10 regression exercises breath, Kaiju retirement and the subsequent public mode components beside those aircraft.
+
+## Final refresh check
+
+At `62592b8a`, Rust tree `026f32f294dc5b24b9b32a049ccfcdad00f82b0f`, slot S3 reran the same 40 selections after the incoming combat/logistics changes: 40 passed, 0 failed, zero retries. Formatting and strict workspace clippy also passed. Slot S3 released, exit 0. The subsequent commit changes only these notes and the changelog; it retains that tested Rust tree.
