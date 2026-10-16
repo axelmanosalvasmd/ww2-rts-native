@@ -1,1 +1,3 @@
 - Add server checks for operative token takeover, ordered lobby updates, cleaned renames, silent army-command rejection and offline membership. Cover every seat and operative recipient on each tick through an ordinary VP victory, the ending hold, lobby return, a new start and restart. Spectator and save/load coverage remains separate.
+- Preserve operative membership and commander identity when composing with save/load. Keep operative commands behind their whitelist, and add the serialization derives required by the merged core.
+- Restore the compiled house structure tag when decoding a saved authored map, so operative load checks can use the ordinary default map.

@@ -287,8 +287,10 @@ fn operative_permission_whitelist_is_silent_except_name_and_latency_ping() {
         let denies = hub.rooms["ABC"].operatives[0].person.denies.clone();
         let gameplay = || {
             let state = state(&hub);
-            format!("{:?}{:?}{:?}{:?}", state.world.game.units, state.commands.units,
-                state.start.economy, state.companions)
+            format!(
+                "{:?}{:?}{:?}{:?}",
+                state.world.game.units, state.commands.units, state.start.economy, state.companions
+            )
         };
         let gameplay_before = playing.then(gameplay);
         for message in [
@@ -337,8 +339,16 @@ fn operative_permission_whitelist_is_silent_except_name_and_latency_ping() {
             assert_eq!(hub.native_status("ABC").unwrap().tick, 0);
             assert_eq!(state(&hub).commands.pending_commands(), 0);
             let state = state(&hub);
-            assert_eq!(gameplay_before.unwrap(), format!("{:?}{:?}{:?}{:?}",
-                state.world.game.units, state.commands.units, state.start.economy, state.companions));
+            assert_eq!(
+                gameplay_before.unwrap(),
+                format!(
+                    "{:?}{:?}{:?}{:?}",
+                    state.world.game.units,
+                    state.commands.units,
+                    state.start.economy,
+                    state.companions
+                )
+            );
         }
         command(&mut hub, &op, json!({"t":"ping","c":123,"rtt":18.6}), 21);
         let pong = messages(&mut receiver);

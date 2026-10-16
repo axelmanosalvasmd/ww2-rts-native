@@ -130,8 +130,10 @@ narrower FPS checks.
 
 ## OPERATIVES-3 verification scope
 
-This follow-up adds server tests without changing shipping behavior relative
-to PR #371. It proves only the operative portions of these five rows:
+This follow-up adds server tests over PR #371. The required merge of main
+also composes operative admission with save/load, retains operative membership
+when a loaded room replaces its seats, and adds serialization derives required
+by the combined core. It proves only the operative portions of these five rows:
 
 - NET-25: `net25_operative_live_takeover_preserves_person_and_ignores_old_socket_close`
   covers a live replacement in lobby and play, token precedence over the requested
@@ -173,3 +175,22 @@ loaded starts remain with save/load. FPS-39, NET-26, NET-40, NET-53 and IF-28 ar
 not claimed by this batch. No World, wire, ABI, header or privacy rule is added.
 In particular, the confirmed exact attacker position through age 10 and the
 single cached-path nonowner mask at `shared/sim.js:5903` remain unchanged.
+
+The save/load merge retains operatives transactionally: after all restoration
+checks pass, each record moves to the loaded room and its commander follows
+the same present person into the restored seat array. If that person receives
+no saved seat, the commander becomes -1. Failed loads leave the existing room
+membership untouched. Operative messages reach their whitelist before the
+save/load host handlers, so save, load and loaded-resume requests stay silent
+(`server.js:436-450,630-636`).
+`operative_load_merge_retains_membership_and_remaps_the_commander_person`
+checks a real save and load with reordered present seats, fresh starts and
+sequence resets for two operatives, host-only loaded resume and subsequent
+fault-free ticks. This is an integration check, not a claim for the full save/load
+or FPS-39 row.
+
+The default-map load check also exercises authored houses. Their existing
+`WorldStructure.kind` value is `"house"` (`structure::StructureKind::House`),
+so the compiled checkpoint-string decoder accepts that tag alongside
+`"building"` and `"bridge"`. This restores existing map content without adding
+fields or accepting arbitrary static strings.
