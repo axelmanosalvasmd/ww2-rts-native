@@ -1,6 +1,6 @@
 use super::*;
 use crate::{
-    economy::Faction,
+    economy::{Faction, Mode},
     economy_state::ArmySize,
     game::Point,
     map::AuthoritativeMap,
