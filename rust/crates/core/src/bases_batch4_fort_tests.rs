@@ -399,7 +399,7 @@ fn base54_detached_capture_keeps_damage_and_resets_only_seized_gate_controls() {
         assert!(m.grid.owned_by(&m.world.game.units, 0).contains(&id));
         assert!(
             !m.grid
-                .owned_by(&m.world.game.units, LOCAL_DEFENDER_OWNER)
+                .owned_by(&m.world.game.units, LOCAL_DEFENDER_OWNER as i32)
                 .contains(&id)
         );
     }

@@ -1136,7 +1136,7 @@ fn intent_ai66_private_streams_drive_ordinary_ai_ticks_and_every_seat_snapshot()
                 .unwrap();
             for slot in 0..2 {
                 let packet = frame.recipient(slot).unwrap().into_json();
-                assert_eq!(packet["tick"], game.world.game.tick);
+                assert_eq!(packet["tick"], report.tick);
                 snapshots += 1;
             }
             if game.finish.is_some() {

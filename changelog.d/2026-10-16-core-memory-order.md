@@ -1,3 +1,4 @@
 - Test ordinary terrain memory through reconnect, hidden changes and rescouting, including complete recipient output comparisons.
 - Allow Classic objective and announcement missions to accompany team-scoped remembered building ghosts through checkpoints and normal match endings. Keep Classic mission spawning and damage refused.
 - Update the authored-scenario validation test to accept the new Classic message subset while retaining group and actuator refusal checks.
+- Correct the new detached-fort owner assertion and AI snapshot tick assertion so the composed intent tests compile.
