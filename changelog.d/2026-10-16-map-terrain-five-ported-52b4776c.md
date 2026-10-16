@@ -1,0 +1,1 @@
+- Mark the complete selected Rust checks for MAP-25/31/47/48/50 ported after exact 170cfe00 formatting, seven native passes and strict Clippy. Record 456 ground values, nine footprints, original water/LOS/Slope coverage and unchanged historical Source evidence; preserve every Acceptance cell and all runtime inputs.
