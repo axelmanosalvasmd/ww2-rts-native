@@ -1,3 +1,4 @@
 - Add 17 native MAP feature tests and a literal test map for all 42 remaining owned map rows under Axel's approved native-intent rule. The one 36-test batch on `549b5a8c` passes 35 and fails 1; 24 candidate rows await prototype review and 18 remain in progress. Existing fixtures and historical failures remain unchanged. No runtime behavior changes.
 - Record MAP-33's authored setup failure: clearing constructor units leaves a missing production building at tick 0. Artillery and timed collapse remain unreached; preserve the failed test and output without repair or retry.
 - Apply Root's one targeted pinned-formatter grant to the four authorized MAP test modules. Preserve all test inputs, assertions and provider code.
+- Format the separate 42-row test mapping IDs as code so inventory readers still count exactly 140 canonical MAP rows.
