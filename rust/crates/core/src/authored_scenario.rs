@@ -1,5 +1,6 @@
 //! Ordinary authored objective and announcement state. Reinforcements remain unadmitted.
-use std::collections::BTreeMap;
+use crate::scenario_conditions::{ConditionState, Scope};
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::{Value, json};
 
@@ -40,6 +41,7 @@ impl ScenarioSay {
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 struct Objective {
     id: String,
+    scope: String,
     text: Value,
     state: String,
     recipients: String,
@@ -49,17 +51,41 @@ struct Objective {
 }
 impl Objective {
     fn row(&self) -> Value {
-        json!({"id":self.id,"scope":"match","text":self.text,"state":self.state,
+        json!({"id":self.id,"scope":self.scope,"text":self.text,"state":self.state,
             "recipients":self.recipients,"side":self.side,"updated":self.updated,"execution":self.execution})
     }
 }
 
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+struct TriggerState {
+    count: u32,
+    next: f64,
+    previous: bool,
+    execution: Option<String>,
+}
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+struct ArrivalUnit {
+    kind: String,
+    authored: Option<String>,
+}
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+struct Arrival {
+    group: String,
+    side: usize,
+    units: Vec<ArrivalUnit>,
+    at: [usize; 2],
+    order: Value,
+    expires: f64,
+}
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct AuthoredScenario {
     data: Value,
-    executions: BTreeMap<String, String>,
+    executions: BTreeMap<String, TriggerState>,
     // Preserve first activation order, as Object.values does in the prototype.
     objectives: Vec<Objective>,
+    facts: ConditionState,
+    owners: BTreeMap<String, i32>,
+    deferred: Vec<Arrival>,
     next_execution: u64,
 }
 
@@ -130,10 +156,21 @@ pub(crate) fn validate_definition(data: &Value, count: usize, mode: Mode) -> Res
 
 impl AuthoredScenario {
     pub(crate) fn new(data: Value) -> Self {
+        let mut facts = ConditionState::default();
+        for area in list(&data, "areas") {
+            let bounds = area["box"].as_array().unwrap();
+            facts.areas.insert(
+                area["id"].as_str().unwrap().into(),
+                std::array::from_fn(|i| bounds[i].as_f64().unwrap() as usize),
+            );
+        }
         Self {
             data,
             executions: BTreeMap::new(),
             objectives: Vec::new(),
+            facts,
+            owners: BTreeMap::new(),
+            deferred: Vec::new(),
             next_execution: 1,
         }
     }
@@ -141,11 +178,24 @@ impl AuthoredScenario {
         json!({"version":1,"objectives":self.objectives.iter()
             .filter(|o| permitted(state,&o.recipients,o.side,slot)).map(Objective::row).collect::<Vec<_>>()})
     }
-    fn step(&mut self, tick: u64) -> Vec<ScenarioSay> {
+    fn step(&mut self, tick: u64, owners: &[(String, i32)]) -> Vec<ScenarioSay> {
+        for (id, owner) in owners {
+            if *owner >= 0 && self.owners.get(id) != Some(owner) {
+                self.facts.captured.insert((id.clone(), *owner));
+            }
+            self.owners.insert(id.clone(), *owner);
+        }
         let now = tick as f64 * 0.05;
         let mut budget = 4096;
         let mut shots = Vec::new();
         for trigger in list(&self.data.clone(), "triggers") {
+            let id = trigger["id"].as_str().expect("validated trigger ID");
+            let key = format!("{id}@match");
+            self.facts
+                .trigger_counts
+                .entry((id.into(), Scope::Match))
+                .or_insert(0);
+            let record = self.executions.entry(key).or_default();
             if budget == 0 {
                 break;
             }
@@ -158,14 +208,19 @@ impl AuthoredScenario {
             if budget < actions.len() {
                 break;
             }
-            let id = trigger["id"].as_str().expect("validated trigger ID");
-            if !yes || self.executions.contains_key(id) {
+            record.previous = yes;
+            if !yes || record.count >= 1 || now < record.next {
                 continue;
             }
             budget -= actions.len();
             let execution = format!("scenario:{}", self.next_execution);
             self.next_execution += 1;
-            self.executions.insert(id.into(), execution.clone());
+            record.count += 1;
+            record.next = now + trigger["repeat"]["cooldown"].as_f64().unwrap_or(0.0);
+            record.execution = Some(execution.clone());
+            self.facts
+                .trigger_counts
+                .insert((id.into(), Scope::Match), record.count);
             for action in actions {
                 let recipients = policy(action, policy(trigger, "public"));
                 let side = side(action, side(trigger, 0));
@@ -194,6 +249,7 @@ impl AuthoredScenario {
                         .expect("validated objective");
                     let objective = Objective {
                         id: id.into(),
+                        scope: "match".into(),
                         text: def["text"].clone(),
                         state: if action["kind"] == "objectiveComplete" {
                             "complete"
@@ -206,6 +262,11 @@ impl AuthoredScenario {
                         updated: now,
                         execution: execution.clone(),
                     };
+                    if objective.state == "complete" {
+                        self.facts
+                            .completed_objectives
+                            .insert((id.into(), Scope::Match));
+                    }
                     if let Some(i) = existing {
                         self.objectives[i] = objective;
                     } else {
@@ -236,6 +297,21 @@ pub(crate) fn permitted(state: &Match, policy: &str, side: usize, slot: usize) -
         }
 }
 impl Match {
+    pub(crate) fn setup_authored_scenario(&mut self) -> Result<(), String> {
+        if let Some(scenario) = self.authored_scenario.as_mut() {
+            for point in &self.start.points {
+                scenario.owners.insert(
+                    point
+                        .id
+                        .as_str()
+                        .ok_or("scenario point identity is not a string")?
+                        .into(),
+                    point.owner.map_or(-1, |s| s as i32),
+                );
+            }
+        }
+        self.preflight_authored_scenario()
+    }
     pub(crate) fn preflight_authored_scenario(&self) -> Result<(), String> {
         let Some(s) = &self.authored_scenario else {
             return Ok(());
@@ -244,44 +320,163 @@ impl Match {
             || self.world.geography().is_some()
             || self.world_runtime.is_some()
         {
-            return Err("authored objective scenarios require an ordinary match".into());
+            return Err("authored scenarios require an ordinary match".into());
         }
         let count = self.world.game.players.len();
-        let map = json!({"w":self.world.game.w,"h":self.world.game.h,"spawns":vec![json!({});count],"scenario":s.data});
+        let points: Vec<_> = self
+            .start
+            .points
+            .iter()
+            .map(|p| json!({"id":p.id}))
+            .collect();
+        let map = json!({"w":self.world.game.w,"h":self.world.game.h,"points":points,"spawns":vec![json!({});count],"scenario":s.data});
         crate::scenario_validation::validate_scenario(
             &map,
             crate::catalog::Catalog::compiled().map_err(|e| e.to_string())?,
         )
         .map_err(|e| e.to_string())?;
         validate_definition(&s.data, count, self.options.mode)?;
-        if s.next_execution != s.executions.len() as u64 + 1 || s.next_execution > MAX_INTEGER {
-            return Err("invalid authored execution sequence".into());
+        if s.next_execution == 0 || s.next_execution > MAX_INTEGER || s.deferred.len() > 256 {
+            return Err("invalid authored execution sequence or arrival queue".into());
         }
-        let mut used = std::collections::BTreeSet::new();
-        for (id, execution) in &s.executions {
-            if !list(&s.data, "triggers").iter().any(|t| t["id"] == *id)
-                || !execution_valid(execution)
-                || !used.insert(execution)
-                || execution[9..].parse::<u64>().unwrap() >= s.next_execution
+        let valid_scope = |scope: &str| -> Option<Scope> {
+            if scope == "match" {
+                return Some(Scope::Match);
+            }
+            if let Some(slot) = scope
+                .strip_prefix("player:")
+                .and_then(|n| n.parse::<usize>().ok())
+            {
+                return (slot < count && scope == format!("player:{slot}"))
+                    .then_some(Scope::Player(slot));
+            }
+            if let Some(team) = scope
+                .strip_prefix("team:")
+                .and_then(|n| n.parse::<i32>().ok())
+            {
+                return (scope == format!("team:{team}")
+                    && self.world.game.players.iter().any(|p| p.team == team))
+                .then_some(Scope::Team(team));
+            }
+            None
+        };
+        let mut used = BTreeSet::new();
+        let mut counts = BTreeMap::new();
+        for (key, record) in &s.executions {
+            let Some((id, scope)) = key.split_once('@') else {
+                return Err("invalid authored trigger key".into());
+            };
+            let Some(def) = list(&s.data, "triggers").iter().find(|t| t["id"] == id) else {
+                return Err("unknown authored trigger".into());
+            };
+            let scope = valid_scope(scope).ok_or("invalid authored trigger scope")?;
+            let matches_scope = matches!(
+                (def["scope"].as_str(), scope),
+                (Some("match"), Scope::Match)
+                    | (Some("player"), Scope::Player(_))
+                    | (Some("team"), Scope::Team(_))
+            );
+            let max = if def["repeat"]["mode"].as_str().unwrap_or("once") == "once" {
+                1
+            } else {
+                def["repeat"]["max"].as_f64().unwrap() as u32
+            };
+            if !matches_scope
+                || !record.next.is_finite()
+                || record.next < 0.0
+                || record.count > max
+                || record.execution.as_ref().is_some_and(|e| {
+                    !execution_valid(e)
+                        || !used.insert(e.clone())
+                        || e[9..].parse::<u64>().unwrap() >= s.next_execution
+                })
+                || (record.count == 0) != record.execution.is_none()
             {
                 return Err("invalid authored trigger state".into());
             }
+            counts.insert((id.to_owned(), scope), record.count);
         }
-        let mut ids = std::collections::BTreeSet::new();
+        if counts != s.facts.trigger_counts {
+            return Err("invalid authored trigger facts".into());
+        }
+        let groups: BTreeSet<_> = list(&s.data, "groups")
+            .iter()
+            .map(|g| g["id"].as_str().unwrap().to_owned())
+            .collect();
+        let authored: BTreeSet<_> = list(&s.data, "groups")
+            .iter()
+            .flat_map(|g| list(g, "units"))
+            .map(|u| u["id"].as_str().unwrap().to_owned())
+            .collect();
+        let expected_areas: BTreeMap<_, _> = list(&s.data, "areas")
+            .iter()
+            .map(|a| {
+                (
+                    a["id"].as_str().unwrap().to_owned(),
+                    std::array::from_fn(|i| a["box"][i].as_f64().unwrap() as usize),
+                )
+            })
+            .collect();
+        let point_ids: BTreeSet<_> = self
+            .start
+            .points
+            .iter()
+            .map(|p| p.id.as_str().unwrap().to_owned())
+            .collect();
+        let deferred: BTreeSet<_> = s.deferred.iter().map(|d| d.group.clone()).collect();
+        let mut group_units = BTreeSet::new();
+        if s.facts.groups.keys().cloned().collect::<BTreeSet<_>>() != groups
+            || s.facts.areas != expected_areas
+            || s.facts.deferred_groups != deferred
+            || !s.facts.started_groups.is_subset(&groups)
+            || s.facts
+                .groups
+                .values()
+                .flatten()
+                .any(|id| *id == 0 || *id >= self.next_unit_id || !group_units.insert(*id))
+            || s.facts
+                .authored_units
+                .iter()
+                .any(|(name, id)| !authored.contains(name) || *id == 0 || *id >= self.next_unit_id)
+            || s.owners.keys().cloned().collect::<BTreeSet<_>>() != point_ids
+            || s.owners
+                .values()
+                .any(|slot| *slot < -1 || *slot >= count as i32)
+            || s.facts.captured.iter().any(|(target, slot)| {
+                !point_ids.contains(target) || *slot < 0 || *slot >= count as i32
+            })
+        {
+            return Err("invalid authored group, area or capture facts".into());
+        }
+        let mut ids = BTreeSet::new();
         for o in &s.objectives {
-            if !ids.insert(&o.id)
+            if !ids.insert((&o.id, &o.scope))
+                || o.scope != "match"
                 || o.side >= count
                 || !policy_valid(&o.recipients)
                 || !matches!(o.state.as_str(), "active" | "complete")
                 || !o.updated.is_finite()
                 || o.updated < 0.0
-                || !used.contains(&o.execution)
+                || !execution_valid(&o.execution)
+                || o.execution[9..].parse::<u64>().unwrap() >= s.next_execution
                 || !list(&s.data, "objectives")
                     .iter()
                     .any(|d| d["id"] == o.id && d["text"] == o.text)
             {
                 return Err("invalid authored objective state".into());
             }
+        }
+        let completed: BTreeSet<_> = s
+            .objectives
+            .iter()
+            .filter(|o| o.state == "complete")
+            .map(|o| (o.id.clone(), valid_scope(&o.scope).unwrap()))
+            .collect();
+        if completed != s.facts.completed_objectives {
+            return Err("invalid authored objective facts".into());
+        }
+        if !s.deferred.is_empty() {
+            return Err("authored objective scenarios do not support deferred arrivals".into());
         }
         Ok(())
     }
@@ -290,10 +485,28 @@ impl Match {
         if tick >= MAX_INTEGER {
             return Err("authored scenario tick exceeds exact integer range".into());
         }
+        if self.authored_scenario.is_none() {
+            return Ok(Vec::new());
+        }
+        let owners = self
+            .start
+            .points
+            .iter()
+            .map(|point| {
+                Ok((
+                    point
+                        .id
+                        .as_str()
+                        .ok_or("scenario point identity is not a string")?
+                        .into(),
+                    point.owner.map_or(-1, |slot| slot as i32),
+                ))
+            })
+            .collect::<Result<Vec<_>, String>>()?;
         Ok(self
             .authored_scenario
             .as_mut()
-            .map_or_else(Vec::new, |s| s.step(tick)))
+            .map_or_else(Vec::new, |s| s.step(tick, &owners)))
     }
 }
 

@@ -33,7 +33,7 @@ The root has these seven required keys. The six content owners correspond to `se
 
 | Key | Value and source |
 | --- | --- |
-| `version` | Integer `1` for existing non-authored matches, or `2` for authored objective missions. Other versions are refused before native state restoration. Version 1 carrying authored state is refused. |
+| `version` | Integer `1` for existing non-authored matches, or `2` for authored missions. Other versions are refused before native state restoration. Version 1 carrying authored state is refused. |
 | `g` | Lossless native `Match` checkpoint, described below. It owns every implemented authoritative ordinary-match component. The prototype stores the whole `g` at `server/saves.js:18`. |
 | `guard` | Separate local-defender player, corresponding to the non-enumerable `g.players[-1]` at `server/saves.js:15-26`. Currently `null`; a non-null guard is refused by room admission while World is closed. |
 | `map` | Full raw authored map, including private layers and triggers. It is never replaced with `mapForClient`. The prototype uses `null` in World (`server.js:426`); native World restoration is refused. |
@@ -104,11 +104,11 @@ The `state` struct field keys are listed below. These are native component bound
 
 `elimination` uses the existing tagged codec: `none` when inactive, otherwise `some` containing a struct map. Its timer, node positions and rates retain exact `f64` bits. These owners correspond to the prototype's `g.mode.teams`, `g.mode.bunkers`, `g.mode.timeLeft`, `g.mode.suddenDeath` and `g.nodes` (`shared/sim.js:792-795,1679,1705-1721,5760-5761`). At pin `e4e579a`, `server.js:425-426` passes the complete game to `snapshotState`, which serializes `g` at `server/saves.js:18-20`.
 
-Version remains 1. The hotfix completes serialization of the existing `Match.elimination` field and documents its nested keys; it adds no envelope or socket keys. Main `57ebeb8e`, which combined elimination modes and versioned saves, could not compile and therefore could not write a v1 checkpoint. A checkpoint from another build that omits `elimination` still deserializes that optional owner as `None`, so otherwise compatible non-elimination v1 saves remain loadable. Missing state is not reconstructed for Annihilation or Classic: their validators reject it. A present elimination record must contain its required typed fields; incomplete records are refused.
+The elimination hotfix retains version 1. It completes serialization of the existing `Match.elimination` field and documents its nested keys; it adds no envelope or socket keys. Main `57ebeb8e`, which combined elimination modes and versioned saves, could not compile and therefore could not write a v1 checkpoint. A checkpoint from another build that omits `elimination` still deserializes that optional owner as `None`, so otherwise compatible non-elimination v1 saves remain loadable. Missing state is not reconstructed for Annihilation or Classic: their validators reject it. A present elimination record must contain its required typed fields; incomplete records are refused.
 
 Annihilation and Classic remain excluded by ordinary recipient snapshot admission, including the room save/load path. Their full Match checkpoint codec is tested independently, including Classic sudden death, resource nodes and next-tick continuation. Serializing their owners does not open room admission.
 
-Authored objective missions use envelope version 2 because older binaries ignore unknown struct fields and could otherwise silently discard the new mission owner. Non-authored matches continue writing version 1. This binary accepts both versions, but refuses authored state inside a version 1 envelope. The prototype game content remains represented by the same six owners; only the already-native envelope version changes. Pending authored announcements use the new `TickEvent.AuthoredScenario` variant, and the optional owner is serialized through the existing tagged codec.
+Authored missions use envelope version 2 because older binaries ignore unknown struct fields and could otherwise silently discard the new mission owner. Non-authored matches continue writing version 1. This binary accepts both versions, but refuses authored state inside a version 1 envelope. The prototype game content remains represented by the same six owners; only the already-native envelope version changes. Pending authored announcements use the new `TickEvent.AuthoredScenario` variant, and the optional owner is serialized through the existing tagged codec.
 
 ## Admission and delivery
 
@@ -131,3 +131,17 @@ NET-12 (editor writes), MODE-55 (Horde records), NET-90 (World autosave), the fu
 The elimination serialization repair and editor/record persistence retain version 1. An absent `elimination` means no elimination owner, matching an ordinary prototype game without that mode state. Present elimination values remain lossless, and elimination modes reject missing authoritative state. Editor maps and Horde records add no match checkpoint keys.
 
 Authored missions require one version increment, to version 2. The prototype restores the saved game directly (`server/saves.js:23-26`, `server.js:434-451`); it does not restart mission execution on load. Defaulting a running mission's executions, objectives, historical captures or pending arrivals would change that game. Version 1 binaries can ignore unknown struct fields, so version 2 also prevents them from silently discarding an authored owner. Both scenario PRs must use the same complete authored checkpoint schema, including contextual trigger records, objective scopes, condition facts, current target owners and deferred arrivals. The objective-only executor writes that schema before the engine extends behavior. Non-authored saves remain version 1; readers accept versions 1 and 2, and version 1 carrying authored state is refused. There is no version 3 in this stack.
+
+The authored owner has one shared schema for the objective and engine branches:
+
+| Field | Required content when authored state is present |
+| --- | --- |
+| `data` | The validated authored definition. |
+| `executions` | `trigger@scope` keys to `{count, next, previous, execution}` records, including evaluated triggers that have not fired. |
+| `objectives` | Activation-ordered rows with `id, scope, text, state, recipients, side, updated, execution`. |
+| `facts` | `groups, authored_units, started_groups, deferred_groups, captured, completed_objectives, trigger_counts, areas`. |
+| `owners` | Current owner of every authored capture target. |
+| `deferred` | Pending arrivals with `group, side, units, at, order, expires`; units retain `kind, authored`. |
+| `next_execution` | The next deterministic `scenario:<number>` identity. |
+
+These values mirror persisted prototype scenario owners at `shared/scenarios.js:88-98,136-170`. Missing complete authored state defaults only to `None` for a non-authored match. Required nested fields are never rebuilt from empty defaults. The objective-only runtime retains empty groups and arrivals, but writes real trigger records, capture history, objective dependencies and area definitions. Old experimental objective-only v2 bodies with string execution values or missing required fields are refused, rather than silently migrated. The superseded v3 envelope is unsupported.
