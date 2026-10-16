@@ -250,13 +250,6 @@ fn unit_row(state: &Match, u: &Unit) -> Result<Value, SnapshotError> {
         unit: u.id,
         capability,
     };
-    let def = Catalog::compiled()
-        .map_err(|_| SnapshotError::Rules)?
-        .unit(&k.name)
-        .map_err(|_| SnapshotError::Rules)?;
-    if def.get("gate").is_some() {
-        return Err(unsupported(SnapshotCapability::GateState));
-    }
     let control = state
         .commands
         .units
@@ -265,6 +258,9 @@ fn unit_row(state: &Match, u: &Unit) -> Result<Value, SnapshotError> {
             unit: u.id,
             owner: "control",
         })?;
+    state
+        .validate_gate_actor(u.id)
+        .map_err(|_| unsupported(SnapshotCapability::GateState))?;
     crate::match_construction::validate_build_activity(u, control)
         .map_err(|_| unsupported(SnapshotCapability::Engineering))?;
     if control.operative {
@@ -311,6 +307,9 @@ fn unit_row(state: &Match, u: &Unit) -> Result<Value, SnapshotError> {
     let mut flags = 0u64;
     if u.air.is_some() && !vision::airborne(u) {
         flags |= 512;
+    }
+    if control.gate.is_some_and(|gate| gate.open == Some(true)) {
+        flags |= 65536;
     }
     if u.riding {
         flags |= 262144;

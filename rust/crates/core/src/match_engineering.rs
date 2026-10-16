@@ -111,6 +111,9 @@ impl Match {
         if winner_decided || player.away || player.out {
             return Ok(Some(Denial::Blocked));
         }
+        if kind == FortKind::Gate && !self.ordinary_gate_mode() {
+            return Ok(Some(Denial::Unsupported));
+        }
         self.validate_field_work_state()?;
         let tier_denial = self.dig_tier_denial(owner, kind)?;
         let Some(id) = ids.first().copied().and_then(|id| u32::try_from(id).ok()) else {
@@ -372,9 +375,9 @@ impl Match {
             .field_works
             .step_unit(&mut self.world, id, dt)
             .map_err(|e| format!("field work step: {e}"))?;
-        if let Some((cell, direction)) = result.wall {
+        if let Some((kind, cell, direction)) = result.concrete {
             let wall = self.next_unit_id;
-            self.place_starting_building(owner, "wall", cell)?;
+            self.place_starting_building(owner, kind.as_str(), cell)?;
             self.world.game.units.get_mut(&wall).unwrap().rot = direction;
         }
         if result.completed.is_some() {
