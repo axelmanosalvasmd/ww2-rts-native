@@ -417,3 +417,156 @@ fn real_section_hurt_waits_for_scheduled_frame_and_empty_schedule_discards_it() 
         .unwrap();
     assert_eq!(frame[0].message["shots"], json!([]));
 }
+
+#[test]
+fn aircraft_weapons_wait_for_contract_while_every_seat_receives_ticks_through_victory() {
+    use ww2_core::{
+        game::PlaneState,
+        match_aviation::{MissionKind, PlaneMission},
+        match_end::EndReason,
+    };
+    for name in ["attacker", "bomber"] {
+        let map = AuthoritativeMap::from_json(
+            &serde_json::to_vec(&json!({
+                "name":"Aircraft delivery boundary", "w":80, "h":80,
+                "rows":vec![".".repeat(80);80],
+                "spawns":[{"x":8,"y":8},{"x":70,"y":70}],
+                "points":[{"x":12,"y":12,"vp":5,"mp":0}]
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        let mut state = Match::new(
+            &map,
+            MatchOptions {
+                seed: 701,
+                mode: Mode::Conquest,
+                players: vec![
+                    PlayerConfig {
+                        name: "A".into(),
+                        team: 0,
+                        faction: Faction::Usa,
+                    },
+                    PlayerConfig {
+                        name: "B".into(),
+                        team: 1,
+                        faction: Faction::Germany,
+                    },
+                ],
+                shuffle: false,
+                army: ArmySize::Standard,
+                weather: WeatherChoice::Map,
+                weather_seed: Some(1),
+                living_weather: false,
+                map_key: None,
+                tech: false,
+                supply: false,
+                logistics: false,
+                sandbox: false,
+            },
+        )
+        .unwrap();
+        for control in state.commands.units.values_mut() {
+            control.hold_fire = true;
+            control.auto_cast = false;
+            control.auto_retreat = false;
+        }
+        let target = state
+            .world
+            .game
+            .units
+            .values()
+            .find(|u| u.owner == 1 && state.rules.kinds[u.kind].name == "rifle")
+            .unwrap()
+            .id;
+        state.world.game.units.get_mut(&target).unwrap().x = 40.;
+        state.world.game.units.get_mut(&target).unwrap().z = 40.;
+        state.grid.rebuild(&state.world.game.units);
+        let plane = state.spawn_aircraft(0, name).unwrap();
+        state.commands.units.get_mut(&plane).unwrap().hold_fire = false;
+        ww2_core::vision::update_vision(&mut state.world.game, &state.rules, &state.grid);
+        let initial_ammo = state.aviation.planes[&plane].ammo;
+        assert!(
+            state
+                .send_aircraft_mission(
+                    0,
+                    plane,
+                    PlaneMission {
+                        kind: if name == "bomber" {
+                            MissionKind::Area
+                        } else {
+                            MissionKind::Attack
+                        },
+                        target: (name == "attacker").then_some(target),
+                        at: Point { x: 40., z: 40. },
+                    }
+                )
+                .unwrap()
+        );
+        let capturer = state
+            .world
+            .game
+            .units
+            .values()
+            .find(|u| u.owner == 0 && state.rules.kinds[u.kind].name == "rifle")
+            .unwrap()
+            .id;
+        state
+            .enqueue_command(
+                OrderKey {
+                    tick: 1,
+                    issuer: 0,
+                    sequence: 1,
+                },
+                Command::from_json(&json!({"t":"move", "orders":[[capturer,24.,24.]]})).unwrap(),
+            )
+            .unwrap();
+        let mut room = RoomRuntime::new(state, 0).unwrap();
+        let seats = (0..2)
+            .map(|slot| SelectedSeat {
+                slot,
+                full: false,
+                omit: false,
+            })
+            .collect::<Vec<_>>();
+        let mut snapshots = 0;
+        let mut ready_to_fire = false;
+        assert!(room.state().finish.is_none());
+        assert_eq!(room.state().start.economy.players[0].vp, 0.);
+        for _ in 0..10000 {
+            let report = room.advance_tick(&[false; 2]).unwrap();
+            let m = room.state();
+            assert!(m.firing.flights.is_empty());
+            assert!(m.firing.salvos.is_empty());
+            assert_eq!(m.aviation.planes[&plane].ammo, initial_ammo);
+            ready_to_fire |= if name == "bomber" {
+                m.world.game.units[&plane].air == Some(PlaneState::Station)
+            } else {
+                m.can_shoot_target(plane, target).unwrap()
+            };
+            let frames = room.collect_frame(&seats, FrameKind::Scheduled).unwrap();
+            assert_eq!(frames.len(), seats.len());
+            snapshots += frames.len();
+            assert!(frames.iter().all(|frame| frame.message["t"] == "s"));
+            if room.state().finish.is_some() {
+                assert!(frames.iter().all(|frame| frame.message["winner"] == 0));
+                assert_eq!(snapshots, report.tick as usize * seats.len());
+                break;
+            }
+        }
+        assert!(
+            ready_to_fire,
+            "{name} must reach a genuine firing opportunity"
+        );
+        let end = room
+            .state()
+            .finish
+            .as_ref()
+            .expect("ordinary income must finish the match");
+        assert_eq!(end.reason, EndReason::VictoryPoints);
+        assert_eq!(end.winner, 0);
+        assert!(room.fault().is_none());
+        assert!(room.tick_failure().is_none());
+        assert!(room.state().tick_state.fault().is_none());
+    }
+}

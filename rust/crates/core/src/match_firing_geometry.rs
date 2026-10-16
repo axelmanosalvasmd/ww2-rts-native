@@ -1,4 +1,4 @@
-//! Weapon geometry reads the same physical field works used by the build phase.
+//! Aircraft launch cells and clipped battlefield traversal.
 use super::*;
 
 impl Match {

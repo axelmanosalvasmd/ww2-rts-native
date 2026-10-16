@@ -146,7 +146,9 @@ impl Match {
             ));
         }
         self.step_aircraft(id, dt)?;
-        self.step_aircraft_weapons(id)?;
+        if self.tick_state.aircraft_weapons_allowed() {
+            self.step_aircraft_weapons(id)?;
+        }
         Ok(true)
     }
 }

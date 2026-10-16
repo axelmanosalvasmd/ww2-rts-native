@@ -1206,7 +1206,12 @@ impl Match {
         self.world.game.units.get_mut(&id).unwrap().shot_at = Some(self.world.game.tick as f64);
         Ok(())
     }
-    pub(crate) fn fire_weapon(&mut self, id: UnitId, target: UnitId, moving: bool) -> Result<(), String> {
+    pub(crate) fn fire_weapon(
+        &mut self,
+        id: UnitId,
+        target: UnitId,
+        moving: bool,
+    ) -> Result<(), String> {
         let g = &self.world.game;
         let u = &g.units[&id];
         let t = &g.units[&target];

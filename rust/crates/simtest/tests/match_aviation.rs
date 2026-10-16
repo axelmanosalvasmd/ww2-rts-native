@@ -390,6 +390,111 @@ fn typed_aircraft_commands_match_original_selection_and_distinct_cleanup() {
     assert_eq!(checkpoints, f["checkpoints"].as_u64().unwrap());
 }
 #[test]
+fn mixed_attack_cancels_canonical_project_and_preflights_every_selected_actor() {
+    use ww2_core::{
+        match_aviation::MissionKind,
+        match_commands::{Command, Denial},
+    };
+    let f = aircraft_command_fixture();
+    let trace = json!({
+        "map": f["traces"][0]["map"],
+        "specs": [
+            {"kind":"fighter","owner":0,"x":40,"z":40},
+            {"kind":"rifle","owner":1,"x":60,"z":50},
+            {"kind":"rifle","owner":0,"x":46,"z":47},
+            {"kind":"rifle","owner":0,"x":50,"z":47}
+        ],
+        "visible": true
+    });
+    for ids in [[1000, 1002, 1003], [1002, 1003, 1000]] {
+        for case in 0..5 {
+            let mut m = scene(&trace);
+            m.start.economy.players[0].mp = 1000.;
+            let entrench = Command::from_json(&json!({
+                "t":"entrench","ids":[1002,1003],"pattern":"line",
+                "x":44,"z":52,"x2":56,"z2":52
+            }))
+            .unwrap();
+            assert_eq!(m.execute_command(0, &entrench, false).unwrap(), None);
+            let project = m.field_works.membership(1002).unwrap();
+            assert_eq!(m.field_works.membership(1003), Some(project));
+            for id in [1000, 1002, 1003] {
+                m.commands.units.get_mut(&id).unwrap().follow = 777;
+            }
+            let generation = m.world.game.units[&1002].path_gen;
+            match case {
+                1 => {
+                    // A later ground row has a scalar without its admitted membership.
+                    m.field_works.cancel(1003);
+                }
+                2 => m.world.game.units.get_mut(&1003).unwrap().path_gen = u64::MAX,
+                3 => {
+                    m.commands.units.remove(&1003);
+                }
+                4 => {
+                    m.aviation.planes.remove(&1000);
+                }
+                _ => {}
+            }
+            let state = |m: &Match| {
+                format!(
+                    "{:?}",
+                    (
+                        &m.world.game.units,
+                        &m.commands.units,
+                        &m.field_works,
+                        &m.aviation,
+                        &m.logistics,
+                        &m.firing,
+                        &m.abilities,
+                        &m.grid,
+                        m.commands.path_requests()
+                    )
+                )
+            };
+            let before = state(&m);
+            let attack =
+                Command::from_json(&json!({"t":"attack","ids":ids,"target":1001})).unwrap();
+            let result = m.execute_command(0, &attack, false);
+            if case != 0 {
+                if case == 4 {
+                    assert_eq!(result.unwrap(), Some(Denial::Unsupported));
+                } else {
+                    assert_eq!(
+                        result.unwrap_err(),
+                        match case {
+                            1 => "invalid canonical ground order actor",
+                            2 => "ground order path identity exhausted",
+                            3 => "missing construction control",
+                            _ => unreachable!(),
+                        }
+                    );
+                }
+                assert_eq!(state(&m), before, "case {case}, selection {ids:?}");
+                continue;
+            }
+            assert_eq!(result.unwrap(), None);
+            for id in [1002, 1003] {
+                assert_eq!(m.field_works.membership(id), None);
+                assert!(!m.world.game.units[&id].entrench);
+                assert!(!m.world.game.units[&id].dig);
+                assert!(m.world.game.units[&id].attack);
+                assert!(m.world.game.units[&id].path.is_empty());
+                assert_eq!(m.commands.units[&id].attack_id, 1001);
+                assert_eq!(m.commands.units[&id].follow, 0);
+            }
+            assert_eq!(m.world.game.units[&1002].path_gen, generation + 1);
+            let mission = m.aviation.planes[&1000].mission.unwrap();
+            assert_eq!(mission.kind, MissionKind::Attack);
+            assert_eq!(mission.target, Some(1001));
+            assert_eq!(mission.at, m.world.game.units[&1001].at());
+            assert_eq!(m.world.game.units[&1000].air, Some(PlaneState::Out));
+            assert_eq!(m.commands.units[&1000].follow, 0);
+        }
+    }
+}
+
+#[test]
 fn unsupported_mixed_aircraft_selections_reject_before_supply_or_control_writes() {
     use ww2_core::match_commands::{Command, Denial};
     let f = aircraft_command_fixture();
