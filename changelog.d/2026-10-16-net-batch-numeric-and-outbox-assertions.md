@@ -1,0 +1,1 @@
+- Correct three native NET test assertions after the first batch ran 14 passes and three failures: compare equal JSON numeric values, and verify that the first delta drains the outbox preserved by a full terrain read. Keep the failed producing logs and all parity statuses unchanged. The corrected child is unrun.

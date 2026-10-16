@@ -4709,3 +4709,26 @@ No one-job-per-row loop, semantic retry or old13 replay is authorized. Actual
 slot/caps/current guard/inherited flock/external target/free-g/20GiB checks
 remain Root-controlled. Runtime changes would need Hermes's exact-head ack;
 intentional player-visible differences still need DESIGN/differs/Axel agreement.
+
+## NET native batch assertion corrections (2026-10-16, unrun child)
+
+The first actual17-test batch at0f537aeb runs once under Root's new S2 grant:
+14PASS,3FAIL,76skipped, nextest exit100. No-fail-fast reaches every selected
+test. Raw outputs remain in /tmp/native-feature-batches-0345/net_impl/.
+Cargo/nextest, systemd and outer launcher terminate; the inherited flock is
+released and Root receives that notice before the compact result.
+
+Two authored assertions compare serde_json integer storage to equal floating
+values: cooldown4.0 versus4 and MP101.0 versus101. Compare their numeric
+values, retaining the exact expected numbers and all privacy/list assertions.
+The terrain test assumes a full start read drains deltas. Existing
+match_routing::observed_terrain and ObservedTerrainMemory::full_rows explicitly
+preserve the outbox. Check the complete first delta against the saved baseline,
+then require the next unchanged delta to be empty. No producer, observation,
+acknowledgment, wire or runtime policy changes.
+
+Only the three failed test bodies change. Preserve every other test and all
+50 row mappings, fixtures, parity cells and old producing logs. Failed rows
+remain held independently; the14 passes belong only to0f537aeb. This child is
+UNRUN and needs a fresh exact-head grant. No semantic retry, old13 execution,
+Source capture, extra job or new provenance bundle is performed.

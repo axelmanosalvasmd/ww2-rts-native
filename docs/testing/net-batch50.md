@@ -14,8 +14,22 @@ remain for tables, pure functions and single-component fixtures. This batch
 adds no Source recorder, captured fixture or provenance bundle. All prototype
 references below are at the existing `e4e579a` pin.
 
-All new checks are UNRUN. A candidate becomes eligible only after its mapped
-native checks pass and the required prototype review confirms coverage.
+At producing `0f537aeb`, one granted native batch ran all 17 checks:
+14 passed, three failed and 76 other tests were skipped. The privacy and
+wallet checks stopped on JSON float-versus-integer assertions; the terrain
+check wrongly expected a full read to drain the delta outbox. Original raw
+outputs stay at `/tmp/native-feature-batches-0345/net_impl/`. Process and
+inherited S2 lock release were reported to Root before these results.
+
+The successor compares numeric values without changing expected numbers,
+and checks that the first delta drains the retained baseline before requiring
+the next unchanged delta to be empty. These three corrected checks are UNRUN;
+all other passes retain attribution to `0f537aeb`, not this child. NET-53 drops
+from that producing head's potential candidates; all its dependent coverage
+stays held. A new literal Root grant is required for successor execution.
+
+A candidate becomes eligible only after its mapped native checks pass and the
+required prototype review confirms coverage.
 Partial checks never count as complete rows. Failed or incomplete rows stay
 in progress with their reasons while the other rows continue. No runtime,
 wire, FFI, reference, provider, privacy, role or default policy changes here.
@@ -24,9 +38,10 @@ The literal batch selection is `package(ww2-server) & test(net_batch50)`.
 One Root-granted focused nextest invocation runs the whole selection with
 `--no-fail-fast`, four build jobs and one test thread. This selects only the
 new modules below. It does not rerun the historical 13 or discover tests in a
-separate job. There are 17 new native checks, all uncompiled and UNRUN.
-No Cargo, nextest, fmt, lint, Source or CI command has run during source
-preparation. A fresh literal head/tree/selection/slot grant is required.
+separate job. There are 17 native checks. The original one-job result stays
+at its producing head; this correction has no execution. No fmt, lint, Source
+or CI command ran in either preparation. A fresh literal head/tree/selection/slot
+grant is required.
 The proposed command, inside Root's assigned scope, is:
 
 ```sh

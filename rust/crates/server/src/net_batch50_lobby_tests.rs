@@ -440,8 +440,8 @@ fn recipient_rows_hide_other_owners_cooldowns_stances_and_unseen_target_ids() {
     assert!(!rows.iter().any(|r| r[0] == hidden));
     let mine = rows.iter().find(|r| r[0] == own).unwrap();
     let theirs = rows.iter().find(|r| r[0] == enemy).unwrap();
-    assert_eq!(mine[11], 4);
-    assert_eq!(theirs[11], 0);
+    assert_eq!(mine[11].as_f64(), Some(4.0));
+    assert_eq!(theirs[11].as_f64(), Some(0.0));
     assert_eq!(mine[9], 0);
     assert_eq!(theirs[9], 0);
     let private = 2048 | 4096 | 8192 | 16384;
@@ -560,7 +560,7 @@ fn recipient_wallets_support_and_unit_lists_stay_with_the_owning_seat() {
     let cache = SnapshotCache::new(&state).unwrap();
     for slot in 0..2 {
         let fields = cache.recipient(slot).unwrap().fields;
-        assert_eq!(fields["mp"], 101 + slot * 100);
+        assert_eq!(fields["mp"].as_f64(), Some(101.0 + slot as f64 * 100.0));
         // Ordinary Conquest has no mun/fuel wire fields, despite internal wallets.
         assert!(fields.get("mun").is_none() && fields.get("fuel").is_none());
         assert_eq!(fields["inc"], 3.0 + slot as f64);
@@ -585,6 +585,7 @@ fn terrain_and_fog_start_baselines_do_not_repeat_in_unchanged_snapshots() {
     use ww2_core::recipient_snapshot::DeliveryState;
     let mut state = native_tests::native_match();
     let mut delivery = DeliveryState::new(&state).unwrap();
+    let mut baseline = Vec::new();
     {
         let frame = delivery.capture(&mut state, &[true, true], &[false, false]).unwrap();
         for slot in 0..2 {
@@ -592,6 +593,16 @@ fn terrain_and_fog_start_baselines_do_not_repeat_in_unchanged_snapshots() {
             assert!(fields["fog"]["v"].is_string());
             assert!(fields["fog"]["e"].is_string());
             assert!(!fields["cells"].as_array().unwrap().is_empty());
+            baseline.push(fields["cells"].clone());
+        }
+    }
+    {
+        // A full start read preserves the outbox. The first delta drains it.
+        let frame = delivery.capture(&mut state, &[false, false], &[false, false]).unwrap();
+        for (slot, expected) in baseline.iter().enumerate() {
+            let fields = frame.recipient(slot).unwrap().fields;
+            assert!(fields.get("fog").is_none());
+            assert_eq!(&fields["cells"], expected);
         }
     }
     let frame = delivery.capture(&mut state, &[false, false], &[false, false]).unwrap();
