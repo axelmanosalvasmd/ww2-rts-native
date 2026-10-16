@@ -9,3 +9,5 @@ Gate execution now uses the existing matching ordinary-ground-mode predicate, so
 World construction replaces the construction stage when delivered region facts are present; region and transport orders run only for units left free by shared retreat, defense and adaptive tactics. The common commander still owns research, shopping, support and raid memory. Older detached Classic/World component inputs retain their shared policy envelope; they do not gain region goals or World room admission.
 
 Threatened World engineers are reserved for the existing rush escape before the construction stage selects workers. This preserves the shared defensive order without first creating work that the same look would cancel. Field jobs use the combat-squad envelope, so economy engineers remain available to construction and defense.
+
+Gate admission retains World, Horde, Tutorial, mismatched-mode and logistics/convoy refusals. Logistics ticks still refuse disconnected reserve and convoy phases, so this change keeps new Gate state out of those rooms. Supported ordinary modes use real constructors and normal ticks for the Gate lifecycle checks.

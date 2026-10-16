@@ -10,7 +10,10 @@ pub struct GateControl {
 
 impl Match {
     pub(crate) fn ordinary_gate_mode(&self) -> bool {
-        crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode)
+        self.options.mode != crate::economy::Mode::Tutorial
+            && crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode)
+            && !self.options.logistics
+            && self.convoys.is_none()
     }
 
     pub(crate) fn validate_gate_actor(&self, id: UnitId) -> Result<(), String> {
@@ -27,7 +30,7 @@ impl Match {
         }
         if let Some(gate) = gate {
             if !self.ordinary_gate_mode() {
-                return Err("Gate runtime requires a matching ordinary ground mode".into());
+                return Err("Gate runtime requires a supported matching ordinary mode".into());
             }
             if !gate.remaining.is_finite() || !(0.0..=0.5).contains(&gate.remaining) {
                 return Err("invalid gate check timer".into());
