@@ -137,6 +137,13 @@ fn put<T>(
 }
 
 impl WorldRails {
+    /// Source construction excludes track and the full signed station yard.
+    pub fn excludes_footprint(&self, cells: &[usize]) -> bool {
+        cells
+            .iter()
+            .any(|&cell| i64::try_from(cell).is_ok_and(|cell| self.yard.contains(&cell)))
+    }
+
     /// Shortest currently open line sequence. Stable line order resolves equal costs.
     /// Region ownership and standing bridges are checked at command time.
     pub fn route(
@@ -334,23 +341,11 @@ impl WorldRails {
                 station.region,
             );
         }
-        let mut yard_members = BTreeSet::new();
-        for &(cell, _) in &out.rail_at {
-            let cell = cell as i64;
-            if yard_members.insert(cell) {
-                out.yard.push(cell);
-            }
-        }
-        for &(cell, _) in &out.station_at {
-            for dy in -STATION_YARD..=STATION_YARD {
-                for dx in -STATION_YARD..=STATION_YARD {
-                    let yard_cell = cell as i64 + dy * width as i64 + dx;
-                    if yard_members.insert(yard_cell) {
-                        out.yard.push(yard_cell);
-                    }
-                }
-            }
-        }
+        out.yard = rail_yard(
+            width as i64,
+            out.rail_at.iter().map(|&(cell, _)| cell as i64),
+            out.station_at.iter().map(|&(cell, _)| cell as i64),
+        );
         Ok(out)
     }
 }
@@ -1045,6 +1040,33 @@ impl Match {
         self.rail_runs.remove(&id);
         Ok(())
     }
+}
+
+/// Presentation yard cells in source Set insertion order, including signed off-map cells.
+/// Inputs must come from the recipient's known tracks and stations.
+pub fn rail_yard(
+    width: i64,
+    track: impl IntoIterator<Item = i64>,
+    stations: impl IntoIterator<Item = i64>,
+) -> Vec<i64> {
+    let mut members = BTreeSet::new();
+    let mut out = Vec::new();
+    for cell in track {
+        if members.insert(cell) {
+            out.push(cell);
+        }
+    }
+    for cell in stations {
+        for dy in -STATION_YARD..=STATION_YARD {
+            for dx in -STATION_YARD..=STATION_YARD {
+                let yard_cell = cell + dy * width + dx;
+                if members.insert(yard_cell) {
+                    out.push(yard_cell);
+                }
+            }
+        }
+    }
+    out
 }
 
 #[cfg(test)]

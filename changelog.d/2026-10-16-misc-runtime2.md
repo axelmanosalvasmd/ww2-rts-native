@@ -1,0 +1,1 @@
+- Test Horde and Tutorial enemy faction selection, including priority, all-core-factions fallback, UK players and repeated picks. Movement, starting-wallet, Kaiju breath and aircraft AI gaps remain outside this batch.

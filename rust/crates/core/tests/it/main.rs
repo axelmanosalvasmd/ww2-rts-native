@@ -5,6 +5,11 @@
 //! Windows. A new test file needs a `#[path]` module below;
 //! `every_test_file_is_compiled` fails until it has one.
 
+#[path = "../world_components.rs"]
+mod world_components;
+#[path = "../world_home_components.rs"]
+mod world_home_components;
+
 #[path = "../authoritative_maps.rs"]
 mod authoritative_maps;
 #[path = "../base_audit_features.rs"]
@@ -21,6 +26,8 @@ mod bases_batch3_training;
 mod client_view;
 #[path = "../combat.rs"]
 mod combat;
+#[path = "../combat_enemy_faction.rs"]
+mod combat_enemy_faction;
 #[path = "../commander_ai.rs"]
 mod commander_ai;
 #[path = "../convoys.rs"]
@@ -57,6 +64,8 @@ mod human_commander_state;
 mod human_commander_timing;
 #[path = "../interface_intent.rs"]
 mod interface_intent;
+#[path = "../interface_map_helpers.rs"]
+mod interface_map_helpers;
 #[path = "../interface_runtime_batch3.rs"]
 mod interface_runtime_batch3;
 #[path = "../interface_stream_consumers.rs"]
@@ -79,6 +88,8 @@ mod math;
 mod mode_intent_batch1;
 #[path = "../mode_point_services.rs"]
 mod mode_point_services;
+#[path = "../mode_runtime_batch4.rs"]
+mod mode_runtime_batch4;
 #[path = "../mov_aircraft_controls.rs"]
 mod mov_aircraft_controls;
 #[path = "../mov_aircraft_immunity.rs"]
@@ -100,6 +111,8 @@ mod produced_units;
 mod production;
 #[path = "../projectiles.rs"]
 mod projectiles;
+#[path = "../recipient_availability.rs"]
+mod recipient_availability;
 #[path = "../recruitment.rs"]
 mod recruitment;
 #[path = "../route_knowledge.rs"]
