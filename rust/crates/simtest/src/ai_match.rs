@@ -279,9 +279,11 @@ mod tests {
             Ok(_) => panic!("recipient support changed; review the retained AI-65 blocker"),
             Err(error) => error,
         };
+        // PR #351's motorpool reserve suppresses opening buys and advances movement.
+        // Retain the exact first refusal after the resulting earlier rifle flights.
         assert_eq!(
             error,
-            "AI runner tick 310 recipient pass: Unsupported { unit: 0, capability: ShotsAndFlights }"
+            "AI runner tick 298 recipient pass: Unsupported { unit: 0, capability: ShotsAndFlights }"
         );
     }
 
