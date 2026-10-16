@@ -116,6 +116,7 @@ pub mod random;
 pub mod recipient_snapshot;
 pub mod route_knowledge;
 pub mod rules;
+pub mod scenario_conditions;
 pub mod separation;
 pub mod sort;
 pub mod squad_men;
