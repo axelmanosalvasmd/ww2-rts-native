@@ -232,3 +232,6 @@ mod mov_followup_garrison_tests;
 
 mod save_codec;
 mod save_state;
+
+#[cfg(test)]
+mod results_restart_tests;
