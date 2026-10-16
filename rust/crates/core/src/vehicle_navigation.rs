@@ -4,7 +4,7 @@ use crate::math;
 use crate::navigation::{TerrainChange, TerrainView, Versions};
 use std::collections::{BTreeMap, BTreeSet};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 struct Identity {
     width: usize,
     height: usize,
@@ -25,7 +25,7 @@ impl Identity {
         }
     }
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 struct Entry {
     identity: Identity,
     versions: Versions,
@@ -35,12 +35,29 @@ struct Entry {
     incremental: bool,
     serial: u64,
 }
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub(crate) struct VehicleNavigation {
     classes: BTreeMap<(u16, u64), Entry>,
     serial: u64,
 }
 impl VehicleNavigation {
+    pub(crate) fn storage_pointers(&self) -> Vec<usize> {
+        self.classes
+            .values()
+            .map(|entry| entry.flags.as_ptr() as usize)
+            .collect()
+    }
+
+    pub(crate) fn relocate_save_storage(&mut self, bindings: &BTreeMap<usize, usize>) {
+        for entry in self.classes.values_mut() {
+            entry.identity.flags = bindings.get(&entry.identity.flags).copied().unwrap_or(0);
+            entry.identity.heights = entry
+                .identity
+                .heights
+                .map(|old| bindings.get(&old).copied().unwrap_or(0));
+        }
+    }
+
     pub(crate) fn buffers_for(&self, source: TerrainView<'_>) -> Vec<usize> {
         let identity = Identity::new(source);
         self.classes

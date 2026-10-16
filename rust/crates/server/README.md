@@ -99,3 +99,19 @@ Set `WW2_DIAG=1` to append one JSON record per active room every five seconds to
 A worker panic closes its connections and discards its rooms. The supervisor starts a fresh worker after one second; the other workers keep their rooms. A room's old match is never resumed or retried. Front shutdown stops all game workers, closes their sockets and invalidates their native controls. This also applies when the serving future is dropped. An abort that terminates the whole process still terminates all its threads.
 
 Trusted-room mode applies its existing private, code-bound admission policy to every worker. Only the room's assigned worker receives connections for the authorized code. Public starts, World admission and logistics guards stay unchanged. The internal worker channels carry sockets, directory requests and readiness; they add no client messages. Horde record persistence and mutable map editing remain unavailable, so there is no record relay or map invalidation channel. The tests and validation are listed in [the NET-96 evidence note](../../../docs/testing/ai-if-net96.md).
+
+## Versioned ordinary match saves
+
+Attached ordinary human matches accept host `save` and lobby `loadSave`. The
+executable writes beneath `SAVES_DIR`, defaulting to `saves/`; library hosts set
+`Config.saves_dir`. Each body is versioned gzipped JSON, with a separate room
+summary. Lobby save lists contain no token or authoritative map data. The format,
+all message shapes and prototype sources are in
+[`docs/contracts/save-format.md`](../../../docs/contracts/save-format.md).
+
+A load validates the match, raw map, roster and recipient starts before replacing
+the lobby. It opens an indefinite host pause; only the current host can resume
+the loaded room. World autosaves, AI planner restoration, surplus running
+spectators, editor writes and Horde records remain unavailable in this slice.
+The save and load denials described in the initial lobby section still apply
+when these admission conditions are absent.

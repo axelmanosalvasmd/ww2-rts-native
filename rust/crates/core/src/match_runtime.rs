@@ -24,14 +24,14 @@ use crate::{
     world::World,
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct PlayerConfig {
     pub name: String,
     pub team: i32,
     pub faction: Faction,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct MatchOptions {
     pub seed: u64,
     pub mode: Mode,
@@ -48,20 +48,21 @@ pub struct MatchOptions {
     pub sandbox: bool,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct PlayerStart {
     pub config: PlayerConfig,
     pub spawn: Point,
     pub support: BTreeMap<String, f64>,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, serde::Serialize, serde::Deserialize)]
 pub struct LivingWeather {
     pub raining: bool,
     pub next: f64,
 }
 
 /// Materialized startup choices. The RNG records exactly the streams used to make them.
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct StartPlan {
     pub dimensions: (usize, usize),
     pub players: Vec<PlayerStart>,
@@ -657,7 +658,7 @@ impl StartPlan {
 }
 
 /// Owner and position retained for a building footprint after its unit is removed.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct BuildingCell {
     pub unit: u32,
     pub owner: usize,
@@ -666,6 +667,7 @@ pub struct BuildingCell {
 
 /// Authoritative startup state. Each mode admits only its implemented phases.
 /// Live terrain and units have a single owner in `world.game`.
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct Match {
     pub aviation: crate::match_aviation::AviationState,
     pub support: crate::match_support::SupportState,
@@ -679,6 +681,7 @@ pub struct Match {
     pub combat: crate::match_combat::CombatState,
     pub environment: crate::environment::EnvironmentRuntime,
     pub companions: crate::companions::Companions,
+    #[serde(skip)]
     pub world_runtime: Option<crate::match_world::WorldRuntime>,
     pub rail_runs: BTreeMap<u32, crate::match_world_rails::RailRun>,
     /// Team-shared last observed buildings for ordinary rooms and the explicit Classic core phase.
@@ -712,6 +715,7 @@ pub struct Match {
     pub(crate) tutorial: Option<crate::match_tutorial::TutorialRuntime>,
     pub timeline: Vec<crate::match_end::MatchSample>,
     pub next_unit_id: u32,
+    #[serde(skip, default = "crate::save_state::compiled_rules")]
     pub rules: Rules,
 }
 
