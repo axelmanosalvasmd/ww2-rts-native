@@ -1,0 +1,2 @@
+- Include trusted aircraft state in ordinary seat snapshots: owner fuel, ammunition, rearm timers and mission plans, plus the existing plane-at-base flag and enemy visibility rules.
+- Exercise aircraft sorties through return, rearm and match finish with snapshots for every seat. Aircraft purchase placement, spectator/operative delivery and aviation shot encodings remain unavailable; support-strike and queued-order adapter expansion remains separate work.
