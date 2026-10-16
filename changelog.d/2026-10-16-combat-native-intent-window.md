@@ -4,3 +4,4 @@
 - Preserve the first batch's compile E0308 with all 39 rows unrun, then fix the inherited ignored aircraft test's unit-ID argument without changing its inputs, assertions or ignore.
 - Keep the combat parity file unchanged in the native-test candidate under the separate test and status PR workflow; retain all 39 row mappings in the testing document.
 - Record the executed combat window's 38 passes and one authored CMB53 failure, then check exact contact/terminal wall damage and unchanged ground wear as the prototype specifies. Preserve the failed producing result.
+- Record the corrected CMB53 test's focused pass without repeating the 38 prior passes. All 32 new tests now have native passing results at their producing heads; full-row review and remaining provider gaps stay explicit.

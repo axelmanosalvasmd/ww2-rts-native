@@ -4368,3 +4368,16 @@ Correct only this witness: exact22.5 contact plus90 terminal shell HP damage,
 and unchanged ground wear. Keep runtime/providers/guards intact. CMB53 stays
 held for remaining FireAt/section coverage. Any successor run needs a new
 literal Root grant; the old failure remains attributed to27b29fe6.
+
+### Final focused CMB53 result
+
+Atd6f28b5d / Rust3d332a15 one authorized focused CMB53 invocation passed:
+1selected/1PASS/0FAIL/186skipped, exit0. The prior38 passing instances were
+excluded. Both process/systemd terminal state and inherited lock release were
+reported before this compact map. Normal0353 logs/results remain unchanged.
+
+All32 new tests have producing-head PASS results (31 at27b29fe6, corrected53
+atd6f28b5d), alongside seven retained passes at27b29fe6. This does not transfer
+39-test proof to the successor. All39 owned rows remain mapped with their
+missing/partial branches, no parity-status delta and no self-promotion.
+Fresh prototype-intent review or Root's explicit integration redirect remains.
