@@ -162,7 +162,8 @@ fn sandbox_start_flag_host_authority_restart_and_every_seat_snapshots() {
     for _ in 0..6 {
         room.tick();
     }
-    for mode in ["world", "horde"] {
+    {
+        let mode = "world";
         let mut guarded = Sandbox::lobby();
         guarded.hub.rooms.get_mut("BOX").unwrap().mode = mode.into();
         guarded.send(0, json!({"t":"sandbox","v":true}));
@@ -448,5 +449,40 @@ fn sandbox_spawned_rifle_grenade_survives_throw_flight_and_expiry_for_every_seat
     assert!(room.runtime().state().firing.flights.is_empty());
     for _ in 0..6 {
         room.tick();
+    }
+}
+
+
+#[test]
+fn sandbox_horde_start_and_spawn_keep_every_canonical_seat_live() {
+    let mut room = Sandbox::lobby();
+    room.send(0, json!({"t":"mode","v":"horde"}));
+    room.send(0, json!({"t":"sandbox","v":true}));
+    room.drain();
+    room.send(0, json!({"t":"start"}));
+    for messages in room.drain() {
+        let start = messages.iter().find(|m| m["t"] == "start").unwrap();
+        assert_eq!(start["sandbox"], true);
+        assert_eq!(start["names"].as_array().unwrap().len(), 3);
+    }
+    let state = room.runtime().state();
+    let slot = state.horde.as_ref().unwrap().slot;
+    let id = state.next_unit_id;
+    let at = state.start.players[0].spawn;
+    room.send(1, json!({"t":"spawn","unit":"rifle","enemy":true,"x":at.x+20.,"z":at.z}));
+    let selected = (0..3).map(|slot| SelectedSeat {slot,full:true,omit:false}).collect::<Vec<_>>();
+    for tick in 0..6 {
+        let runtime = room.runtime();
+        let report = runtime.advance_tick(&[false;3]).unwrap();
+        if tick == 0 {
+            assert_eq!(report.commands.len(), 1);
+            assert_eq!(report.commands[0].denial, None);
+        }
+        assert_eq!(runtime.state().world.game.units[&id].owner, slot);
+        assert!(runtime.state().horde.as_ref().unwrap().active);
+        let frames = runtime.collect_frame(&selected, FrameKind::Scheduled).unwrap();
+        assert_eq!(frames.len(), 3);
+        assert!(frames.iter().all(|frame| frame.message["mode"]["kind"] == "horde"));
+        assert!(runtime.fault().is_none());
     }
 }

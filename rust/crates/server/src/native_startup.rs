@@ -65,7 +65,10 @@ impl NativeStartup {
         let conquest = settings.mode == "conquest"
             && matches!(state.options.mode, Mode::Default | Mode::Conquest)
             && state.world.game.mode.is_none();
-        if !(horde || conquest)
+        let classic = settings.mode == "classic"
+            && state.options.mode == Mode::Classic
+            && state.world.game.mode == Some(ww2_core::game::ModeKind::Classic);
+        if !(horde || conquest || classic)
             || state.options.map_key.as_deref() != Some(settings.map)
             || state.options.weather != WeatherChoice::from_reference(Some(settings.weather))
             || state.options.sandbox != settings.sandbox
@@ -104,6 +107,8 @@ impl NativeStartup {
         }
         let plan = if horde {
             StartPlan::prepare_horde(authored, &state.options, &state.rules)?
+        } else if classic {
+            StartPlan::prepare_elimination(authored, &state.options, &state.rules)?
         } else {
             StartPlan::prepare(authored, &state.options, &state.rules)?
         };

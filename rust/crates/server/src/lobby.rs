@@ -2838,6 +2838,7 @@ mod seat_lifecycle_tests;
 #[cfg(test)]
 #[path = "spectator_tests.rs"]
 mod spectator_tests;
+#[cfg(test)]
 #[path = "operative_server_tests.rs"]
 mod operative_tests;
 
@@ -2853,3 +2854,7 @@ mod save_runtime;
 mod room_command_ingress_tests;
 #[path = "horde_host.rs"]
 mod horde_host;
+
+#[cfg(test)]
+#[path = "room_command_union_tests.rs"]
+mod room_command_union_tests;

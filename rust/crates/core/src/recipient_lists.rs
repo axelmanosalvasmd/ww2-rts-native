@@ -304,15 +304,20 @@ impl crate::match_runtime::Match {
         let game = &self.world.game;
         let horde =
             self.options.mode == crate::economy::Mode::Horde && game.mode == Some(ModeKind::Horde);
+        let classic = self.options.mode == crate::economy::Mode::Classic
+            && game.mode == Some(ModeKind::Classic);
         if horde {
             self.validate_actor_mode()?;
             self.validate_horde_economy()?;
+        } else if classic {
+            self.validate_actor_mode()?;
+            self.validate_elimination_state()?;
         } else if !matches!(
             self.options.mode,
             crate::economy::Mode::Default | crate::economy::Mode::Conquest
         ) || game.mode.is_some()
         {
-            return Err("global ordinary lists require Conquest or canonical Horde".into());
+            return Err("global ordinary lists require Conquest, canonical Classic or Horde".into());
         }
         let mut ids = std::collections::BTreeSet::new();
         let mut rows = Vec::with_capacity(game.wrecks.len());
@@ -333,7 +338,24 @@ impl crate::match_runtime::Match {
         }
         Ok(OrdinaryRawLists {
             wrecks: Value::Array(rows),
-            nodes: None,
+            nodes: self.classic_snapshot_nodes()?.map(|rows| json!(rows)),
         })
+    }
+}
+
+impl crate::match_runtime::Match {
+    pub(crate) fn classic_snapshot_nodes(&self) -> Result<Option<Vec<[f64; 4]>>, String> {
+        if self.options.mode != crate::economy::Mode::Classic {
+            return Ok(None);
+        }
+        self.validate_actor_mode()?;
+        self.validate_elimination_state()?;
+        let rows = self.elimination.as_ref().ok_or("missing Classic nodes")?.nodes.iter()
+            .map(|node| [rounded(node.at.x), rounded(node.at.z), node.rate, if node.fuel { 1. } else { 0. }])
+            .collect::<Vec<_>>();
+        if rows.iter().flatten().any(|number| !number.is_finite()) {
+            return Err("unrepresentable Classic node row".into());
+        }
+        Ok(Some(rows))
     }
 }

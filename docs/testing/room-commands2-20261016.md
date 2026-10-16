@@ -30,10 +30,10 @@ Incoming #374: `0a712ac4f909f130fa3518b1586b2089e6e07b0f`.
 - `match_firing.rs` (five): retain the same canonical visible-contact owner as the sandbox merge.
 - `recipient_snapshot.rs` (three): union all modules and exports; retain canonical flights plus logistics projection.
 - Composition (two): retain ordinary flights/salvos rather than restoring operative-only restrictions. Remove the operative-only global validator; canonical firing/grenade validation remains.
-- Shots (two): retain sandbox breath handling, incoming operative SmallArms validation, and ordinary Throw validation. Horde breath still awaits its mode owner.
+- Shots (two): retain sandbox breath handling and incoming operative SmallArms validation. This intermediate merge narrows Throw to operative shooters; the following Horde merge restores general Throw identity and owner validation. Horde breath still awaits its mode owner.
 - `lobby.rs` (five): retain both spectator and operative starts, admit operative hello before commander restrictions, preserve spectator joins in running rooms, retain optional returning-seat handling, and register both test modules.
 - `room_runtime.rs` (one): retain latency telemetry and incoming operative event/list methods.
-- Incoming `operative_flights::project` delegates to the canonical projector after its dedicated operative validation. This preserves original ballistic stamps and all operative tests.
+- The intermediate incoming `operative_flights::project` delegates to the canonical projector. The implementation successor removes that unused entry point and connects its operative-flight validation through the common projectile validator, scoped to operative-produced flights so ordinary ground flights remain admitted. This preserves original ballistic stamps and all operative tests.
 
 ## Hosted Horde merge
 
@@ -49,3 +49,20 @@ Incoming #413: `a1be2f7419faa90fedfb6138e7a1a4d0e692ba5d` (#399/#357 ancestry).
 - Incoming `projectiles::for_seat` delegates to the same canonical flight projector. Its complete validator and all projectile tests remain. The duplicate geometry/contact implementation is superseded.
 
 All inherited World, aircraft-weapon, privacy, invalid-state, terminal tick and command guards remain unless their explicitly documented runtime owner replaces the old admission restriction.
+
+## Row accounting
+
+- CMB-150 (R1): `cmb150_sandbox_spawn_and_convoy_commands_share_ordinary_ticks_and_recipient_delivery`; inherited `convoy_room_shapes_preserve_selection_order_duplicates_and_uncapped_orders_fallback`, `convoy_room_supply_stop_resume_survives_pending_save_and_finishes_with_every_seat`, and `convoy_room_denials_distinguish_selection_target_disabled_and_unassignable_job`; #393 sandbox dispatch, refusal, aircraft/grenade flight and terminal-delivery tests. The new composition sends Spawn, Supply, Stop and LogisticsResume through the same recorded queue and captures every seat after each tick. Non-World Recover and unknown commands retain `blocked`. World recovery remains deferred and unclaimed.
+- NET-43: see the complete command-union mapping in `net43-roomcmds2.md`.
+- NET-58: see the event composition mapping in `net58-roomcmds2.md`.
+
+Owner decisions acknowledged: E/O/G/K/M for prototype events, operatives, Horde and commands, plus H for the inherited convoy owner. ABI 2 and prototype `e4e579a` remain unchanged. Issue #5 comments 6217590741, 6218552386, 6224738109 and 6225924617 supply the recorded grant, World deferral and current queue process. No issue write, Source recorder, FFI change or Unreal execution occurs. The orchestrator retains hosted checks and merge.
+
+Independent merge review found a missing test gate on the operative module after the additive registration merge. The implementation commit restores `#[cfg(test)]` on `operative_server_tests.rs`; the spectator module retains its own gate. This corrects the merge without changing either test body.
+The same review found that the retained Horde projectile tests depended on imports from their former parent implementation. Their module now imports `Point`, `Point3` and projectile geometry directly. No test predicate changes.
+
+The independent review also identified unused operative flight helpers after projector unification. The successor connects the retained validator to the common projectile preflight, filtering only operative-produced flights and their grenade tickets. Generic firing validation still checks every flight and grenade; operative shooter, source-kind, effect and blast checks apply to the operative subset. The unused projector entry point is removed.
+
+Independent merge-tree audit recomputed automatic trees `97bcd539` (main), `7fa4ea2a` (#393), `16ea4246` (#374) and `f392b069` (#413). The main merge matches exactly. Each dependency merge differs only in the paths recorded above and this integration record. No hidden hand-edited path was found. A successor bounded source review accepts the documented repairs and NET-58 additions; execution and a final combined-head review remain separate gates.
+
+The sandbox start test's historical Horde refusal is replaced by `sandbox_horde_start_and_spawn_keep_every_canonical_seat_live`: host-started sandbox Horde, guest enemy spawn, correct Horde owner and six ordinary ticks with all three canonical snapshots. World refusal remains. The seated/operative output adapters in `operative_server_tests.rs` and `horde_host_tests.rs` explicitly reject watcher output after composing the spectator enum variant; their earlier assertions remain.

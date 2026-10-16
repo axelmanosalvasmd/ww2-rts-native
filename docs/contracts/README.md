@@ -7,6 +7,8 @@ These files reserve contract topics; no protocol or ABI is approved by their cre
 | Document | Draft owner | Consumer reviewer | Status |
 | --- | --- | --- | --- |
 | protocol.md | Julio | Axel | v0 draft; technical answers recorded (#5); operative hit-position, spectator reference behavior and cached flag mask clarified 2026-10-16 |
+| [room-command-union.md](room-command-union.md) | Julio | Axel | Prototype-identical remaining room command admission, queued Ability and attached Classic cancellation under decision M; execution pending |
+| [room-commands2-events.md](room-commands2-events.md) | Julio | Axel | Prototype-identical operative, Horde and ordinary flight composition under decisions E/G/K/O; execution pending |
 | [r1-ingress.md](r1-ingress.md) | Julio | Axel | Prototype-identical ordinary R1 ingress candidate under the recorded groups F/M grant; exact-head runtime ack pending |
 | terrain.md | Julio | Axel | v0 draft; technical answers recorded (#5) |
 | [save-format.md](save-format.md) | Julio | Axel | Private JSON format v1; owner group I recorded in #5 comment 6217590741; implementation exact-head acknowledgement pending |

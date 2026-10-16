@@ -72,6 +72,9 @@ pub(super) fn capture_perspective(
     let mut result = Vec::with_capacity(g.players.len());
     for slot in 0..g.players.len() {
         let mut fields = Map::new();
+        if let Some(nodes) = state.classic_snapshot_nodes().map_err(|_| SnapshotError::Rules)? {
+            fields.insert("nodes".into(), json!(nodes));
+        }
         let mode = super::mode_row(state)?;
         if !mode.is_null() {
             fields.insert("mode".into(), mode);

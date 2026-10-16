@@ -130,9 +130,12 @@ pub struct SnapshotCache<'a> {
 }
 impl<'a> SnapshotCache<'a> {
     pub fn new(state: &'a Match) -> Result<Self, SnapshotError> {
+        let classic = state.options.mode == Mode::Classic
+            && state.world.game.mode == Some(crate::game::ModeKind::Classic);
         let horde = state.options.mode == Mode::Horde
             && state.world.game.mode == Some(crate::game::ModeKind::Horde);
         if !(horde
+            || classic
             || matches!(state.options.mode, Mode::Default | Mode::Conquest)
                 && state.world.game.mode.is_none())
             || state.world.geography().is_some()
@@ -140,6 +143,11 @@ impl<'a> SnapshotCache<'a> {
             || state.world_runtime.is_some()
         {
             return Err(SnapshotError::UnsupportedMode);
+        }
+        if classic {
+            state.validate_actor_mode().map_err(|_| SnapshotError::Rules)?;
+            state.validate_elimination_state().map_err(|_| SnapshotError::Rules)?;
+            state.validate_production_phases(0.0).map_err(|_| SnapshotError::Rules)?;
         }
         if horde {
             state
@@ -503,6 +511,10 @@ fn economy_fields(state: &Match, slot: usize) -> Result<Map<String, Value>, Snap
     let p = &state.start.economy.players[slot];
     finite(&[p.mp, p.mun, p.fuel, p.inc, p.vp])?;
     let mut fields = Map::new();
+    if state.options.mode.is_construction() {
+        fields.insert("mun".into(), json!(p.mun.floor()));
+        fields.insert("fuel".into(), json!(p.fuel.floor()));
+    }
     // Ordinary Conquest does not initialize the source player mun/fuel fields.
     // Canonical accounting zeros do not make those wire fields present.
     for (key, value) in [("mp", p.mp.floor()), ("inc", r(p.inc))] {

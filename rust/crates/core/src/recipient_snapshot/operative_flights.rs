@@ -25,7 +25,9 @@ pub(super) fn shooter(state: &Match, id: u32, owner: usize) -> Result<(), Snapsh
 }
 
 pub(super) fn validate(state: &Match) -> Result<(), SnapshotError> {
-    for (id, flight) in &state.firing.flights {
+    for (id, flight) in state.firing.flights.iter().filter(|(_, flight)| {
+        state.commands.units.get(&flight.shooter).is_some_and(|c| c.operative)
+    }) {
         shooter(state, flight.shooter, flight.owner)?;
         if *id == 0
             || *id != flight.id
@@ -57,7 +59,11 @@ pub(super) fn validate(state: &Match) -> Result<(), SnapshotError> {
             return Err(refused());
         }
     }
-    for ticket in &state.firing.grenades {
+    for ticket in state.firing.grenades.iter().filter(|ticket| {
+        state.firing.flights.get(&ticket.flight).is_some_and(|flight| {
+            state.commands.units.get(&flight.shooter).is_some_and(|c| c.operative)
+        })
+    }) {
         if ![ticket.at.x, ticket.at.z, ticket.remaining]
             .iter()
             .all(|n| n.is_finite())
@@ -72,9 +78,4 @@ pub(super) fn validate(state: &Match) -> Result<(), SnapshotError> {
         }
     }
     Ok(())
-}
-
-pub(super) fn project(state: &Match, slot: usize) -> Result<Value, SnapshotError> {
-    validate(state)?;
-    super::flights::project(state, slot)
 }

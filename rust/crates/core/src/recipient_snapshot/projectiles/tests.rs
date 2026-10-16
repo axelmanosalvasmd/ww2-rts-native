@@ -1,6 +1,8 @@
 use super::*;
 use crate::{
     economy::Faction,
+    game::Point,
+    projectiles::{self as geometry, Point3},
     economy_state::ArmySize,
     match_commands::Command,
     match_firing::{AbilityBlast, LaunchEvent},

@@ -54,6 +54,7 @@ fn messages(receiver: &mut mpsc::Receiver<Output>) -> Vec<Value> {
         match output {
             Output::Json(value) => result.push(value),
             Output::Snapshot(_) => panic!("operative delivery uses its own JSON stream"),
+            Output::Watcher(_) => panic!("watcher output reached a seated or operative recipient"),
             Output::Close(_, reason) => panic!("unexpected close: {reason}"),
         }
     }
@@ -74,7 +75,8 @@ fn drain_commanders(
                     result.push(serde_json::from_str(&write.json).unwrap());
                     hub.complete_snapshot(&write, true, now);
                 }
-                Output::Close(_, reason) => panic!("unexpected commander close: {reason}"),
+                Output::Watcher(_) => panic!("watcher output reached a seated or operative recipient"),
+            Output::Close(_, reason) => panic!("unexpected commander close: {reason}"),
             }
         }
         result

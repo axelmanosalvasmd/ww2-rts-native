@@ -281,6 +281,120 @@ fn operative_shots_keep_prototype_nonlocal_and_local_identity_rules() {
 }
 
 #[test]
+fn operative_sniper_and_commando_hits_and_misses_deliver_actual_small_arms_rows() {
+    use crate::{companions::Input, match_firing::LaunchEvent, match_tick::TickEvent};
+
+    let (mut state, id) = scene();
+    let target = state
+        .world
+        .game
+        .units
+        .values()
+        .find(|u| u.owner == 2 && state.rules.kinds[u.kind].name == "rifle")
+        .unwrap()
+        .id;
+    for (unit, x) in [(id, 60.0), (target, 75.0)] {
+        let actor = state.world.game.units.get_mut(&unit).unwrap();
+        actor.x = x;
+        actor.z = 40.0;
+        actor.rot = 0.0;
+        actor.vx = Some(0.0);
+        actor.vz = Some(0.0);
+        actor.move_speed = 0.0;
+        state.grid.update(unit, actor);
+    }
+    for player in &mut state.world.game.players {
+        player.visible.clear();
+    }
+    state.world.game.players[0].visible = vec![target];
+    let selected: Vec<_> = (0..3)
+        .map(|slot| SelectedSeat {
+            slot,
+            full: false,
+            omit: false,
+        })
+        .collect();
+    let mut delivery = DeliveryState::new(&state).unwrap();
+    for (weapon, effect) in [(0, "sniper"), (1, "commando")] {
+        for hit in [true, false] {
+            state.companions.soldiers.get_mut(&id).unwrap().weapon = weapon;
+            state.firing.get_mut(id).unwrap().cooldown = 0.0;
+            let before = state.world.game.units[&target].hp;
+            state
+                .fire_companion(
+                    id,
+                    &Input {
+                        forward: 0.0,
+                        strafe: 0.0,
+                        yaw: 0.0,
+                        pitch: if hit { 0.0 } else { 1.0 },
+                        fire: true,
+                        ads: true,
+                        crouch: false,
+                        sprint: false,
+                        weapon,
+                    },
+                    false,
+                )
+                .unwrap();
+            let events: Vec<_> = std::mem::take(&mut state.firing.events)
+                .into_iter()
+                .map(TickEvent::Firing)
+                .collect();
+            let Some(TickEvent::Firing(LaunchEvent::SmallArms(shot))) = events.last() else {
+                panic!("missing actual {effect} shot");
+            };
+            assert_eq!(shot.effect, effect);
+            assert_eq!(shot.hit.is_some(), hit, "{effect} hit={hit}");
+            assert_eq!(state.world.game.units[&target].hp < before, hit);
+            if let Some(contact) = shot.hit {
+                assert_eq!((contact.target, contact.owner), (target, 2));
+                assert!(contact.man.is_some(), "a drawn squad member was hit");
+            }
+            let frame = delivery
+                .capture_selected_with_tick_events(&mut state, &selected, &events)
+                .unwrap()
+                .unwrap();
+            for slot in 0..3 {
+                let mut expected = json!({
+                    "k":effect,"fo":0,"x":shot.at.x,"y":shot.at.y,"z":shot.at.z
+                });
+                if slot != 2 {
+                    expected["f"] = json!(id);
+                }
+                if let Some(contact) = shot.hit {
+                    expected["to"] = json!(2);
+                    expected["hit"] = json!(true);
+                    expected["m"] = json!(contact.man.unwrap());
+                    if slot != 1 {
+                        expected["t"] = json!(target);
+                    }
+                }
+                let snapshot = frame.recipient(slot).unwrap().into_json();
+                assert_eq!(
+                    snapshot["shots"].as_array().unwrap().last(),
+                    Some(&expected),
+                    "{effect} hit={hit}, seat {slot}"
+                );
+            }
+        }
+    }
+    assert_eq!(state.companions.get("operative").unwrap().shots, 4);
+    assert_eq!(state.companions.get("operative").unwrap().hits, 2);
+    for _ in 0..6 {
+        let report = state.advance_tick().unwrap();
+        let frame = delivery
+            .capture_selected_with_tick_events(&mut state, &selected, &report.events)
+            .unwrap()
+            .unwrap();
+        for slot in 0..3 {
+            frame.recipient(slot).unwrap();
+        }
+        assert!(state.tick_state.fault().is_none());
+    }
+}
+
+#[test]
 fn operative_grenade_flight_and_launch_rows_match_literal_shapes_and_fog_rules() {
     use crate::{
         companions::Input,
@@ -520,6 +634,10 @@ fn operative_death_respawn_and_full_match_finish_keep_every_recipient_live() {
     let mut saw_fire = false;
     let mut saw_throw = false;
     let mut saw_flight = false;
+    let mut grenade = None;
+    let mut airborne_after_death = false;
+    let mut resolved_after_death = false;
+    let mut seat_frames = [0; 3];
     let mut finish_tick = None;
     for _ in 0..400 {
         if state.world.game.tick < 2 {
@@ -534,12 +652,14 @@ fn operative_death_respawn_and_full_match_finish_keep_every_recipient_live() {
             ));
         }
         if state.world.game.tick == 3 {
-            assert!(
+            grenade = Some(
                 state
                     .firing
                     .flights
                     .values()
-                    .any(|flight| flight.shooter == first)
+                    .find(|flight| flight.shooter == first)
+                    .expect("the first soldier's grenade is still airborne")
+                    .id,
             );
             state.world.game.units.get_mut(&first).unwrap().hp = 0.;
         }
@@ -547,12 +667,24 @@ fn operative_death_respawn_and_full_match_finish_keep_every_recipient_live() {
         let id = state.companions.get("operative").unwrap().unit_id;
         dead |= id == 0;
         respawned |= id != 0 && id != first;
+        if let Some(grenade) = grenade {
+            airborne_after_death |= !state.world.game.units.contains_key(&first)
+                && state.firing.flights.contains_key(&grenade);
+            resolved_after_death |= report.events.iter().any(|event| {
+                matches!(
+                    event,
+                    crate::match_tick::TickEvent::Firing(crate::match_firing::LaunchEvent::Contact(contact))
+                        if contact.flight == grenade && contact.terminal
+                )
+            });
+        }
         let frame = commander
             .capture_selected_with_tick_events(&mut state, &selected, &report.events)
             .unwrap()
             .unwrap();
-        for slot in 0..3 {
+        for (slot, count) in seat_frames.iter_mut().enumerate() {
             let snapshot = frame.recipient(slot).unwrap().into_json();
+            *count += 1;
             saw_fire |= snapshot["shots"]
                 .as_array()
                 .unwrap()
@@ -605,6 +737,15 @@ fn operative_death_respawn_and_full_match_finish_keep_every_recipient_live() {
         }
     }
     assert!(dead && respawned && saw_fire && saw_throw && saw_flight);
+    assert!(airborne_after_death && resolved_after_death);
+    assert!(!state.firing.flights.contains_key(&grenade.unwrap()));
+    assert!(!state.commands.units.contains_key(&first));
+    assert!(state.combat.get(first).is_none());
+    assert!(
+        seat_frames
+            .iter()
+            .all(|count| *count == state.world.game.tick)
+    );
     assert_eq!(state.finish.as_ref().unwrap().winner, 0);
     assert!(state.world.game.tick >= finish_tick.unwrap() + 8);
 }

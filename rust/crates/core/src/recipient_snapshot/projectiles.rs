@@ -1,6 +1,7 @@
 //! Prototype retained flight rows. Internal grenade and salvo tickets have no wire row.
 use super::*;
 pub(super) fn validate(state: &Match) -> Result<(), SnapshotError> {
+    operative_flights::validate(state)?;
     if !state.firing.flights.is_empty() {
         state
             .routing_fog

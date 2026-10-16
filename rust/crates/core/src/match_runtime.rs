@@ -118,7 +118,8 @@ impl StartPlan {
         )
     }
 
-    pub(crate) fn prepare_elimination(
+    /// Recompute the canonical Classic or Annihilation startup layout for host binding.
+    pub fn prepare_elimination(
         map: &crate::map::AuthoritativeMap,
         options: &MatchOptions,
         rules: &Rules,
