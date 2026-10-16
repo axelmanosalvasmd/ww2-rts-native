@@ -1,6 +1,6 @@
 # AI field policy intent tests
 
-Stream AI-FIELD-POLICY owns AI-48, AI-49, AI-50, AI-56 and AI-58. The reference is ww2-rts `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`. These are native intent tests, with no Source recorder or captured behavior fixture. Validation is pending.
+Stream AI-FIELD-POLICY owns AI-48, AI-49, AI-50, AI-56 and AI-58. The reference is ww2-rts `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`. These are native intent tests, with no Source recorder or captured behavior fixture. The focused selection contains 42 tests.
 
 ## Each row literal test mapping
 
