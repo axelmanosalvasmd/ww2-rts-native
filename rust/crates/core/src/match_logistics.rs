@@ -1,5 +1,7 @@
 //! Executable ordinary-Conquest supply phases over canonical Match state.
 #[cfg(test)]
+mod batch5_tests;
+#[cfg(test)]
 mod causal_tests;
 #[cfg(test)]
 mod runtime_tests;
@@ -109,10 +111,8 @@ impl Match {
             && self.world.game.mode == Some(crate::game::ModeKind::Horde)
             && self.start.shared_defenders.is_some()
             && !self.options.logistics;
-        if !(matches!(
-            self.options.mode,
-            crate::economy::Mode::Default | crate::economy::Mode::Conquest
-        ) || horde_spawn)
+        if !(crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode)
+            || horde_spawn)
         {
             return Err("new reserves require ordinary Conquest or no-logistics Horde".into());
         }
@@ -392,10 +392,7 @@ impl Match {
         self.validate_supply_context()
     }
     fn validate_supply_context(&self) -> Result<(), String> {
-        if !matches!(
-            self.options.mode,
-            crate::economy::Mode::Default | crate::economy::Mode::Conquest
-        ) {
+        if !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode) {
             return Err("supply adapter supports ordinary Conquest only".into());
         }
         let g = &self.world.game;

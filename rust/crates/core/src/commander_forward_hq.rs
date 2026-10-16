@@ -98,6 +98,7 @@ pub(crate) fn plan(
             .iter()
             .any(|kind| kind.string() == Some(u.kind.as_str()))
             && !u.retreating
+            && !u.riding
             && !u.build
             && u.target_id == 0
             && !u.dig

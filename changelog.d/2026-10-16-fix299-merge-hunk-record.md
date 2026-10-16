@@ -1,0 +1,1 @@
+- Document all 23 differing hunks across PR #299's five branch-only merges, including earlier firing registrations, carrier admission and ejection, canonical bounty handling and audit-text additions. Correct the incomplete merge-record claim and identify the carrier dispatch and diagnostic choices. No runtime source changed.

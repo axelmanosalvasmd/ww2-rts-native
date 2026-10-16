@@ -650,9 +650,7 @@ pub fn load_game(g: &Value, rules: &Rules) -> Result<Loaded> {
         wear: floats("wear")?,
         cell_hp: floats("cellHp")?.unwrap_or_else(|| vec![0.0; n]),
         trench_front: floats("trenchFront")?,
-        tough: given(g, "tough")
-            .map(|t| numbers(t).ok_or("tough: expected numbers"))
-            .transpose()?,
+        tough: floats("tough")?,
         wet: given(g, "wx").map(|wx| js_num(wx, "wet")).transpose()?,
         reveal: flag(g, "reveal"),
         wrecks,
@@ -813,4 +811,30 @@ fn load_fog(g: &Value, game: &Game) -> Result<Fog> {
         kept,
         teams,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn toughness_loading_rounds_to_float32_and_validates_cell_count() {
+        let rules = Rules::compiled().unwrap();
+        let input: f64 = 1.0 + 3.0 / 33_554_432.0;
+        let mut state = json!({
+            "w":1,"h":1,"flags":[0],"house":[0],"players":[],
+            "units":{"$map":[]},"smokes":[],"strikes":[],"tick":0,
+            "tough":{"$Float32Array":[input]}
+        });
+        let loaded = load_game(&state, &rules).unwrap();
+        let stored = loaded.game.tough.unwrap()[0];
+        assert_eq!(stored.to_bits(), 0x3f80_0001);
+        assert_ne!(f64::from(stored).to_bits(), input.to_bits());
+        state["tough"] = json!({"$Float32Array":[]});
+        assert_eq!(
+            load_game(&state, &rules).err().as_deref(),
+            Some("tough: 0 cells, not 1")
+        );
+    }
 }

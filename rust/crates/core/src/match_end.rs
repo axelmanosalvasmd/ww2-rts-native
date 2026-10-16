@@ -6,7 +6,7 @@ use crate::{
     math,
 };
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum EndReason {
     VictoryPoints,
     Headquarters,
@@ -33,7 +33,7 @@ impl EndReason {
         }
     }
 }
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct MatchFinish {
     pub winner: i32,
     pub reason: EndReason,
@@ -42,7 +42,7 @@ pub struct MatchFinish {
 }
 /// Source `story.sample`: Conquest scores differ from other modes' objective/building counts.
 /// Team ID indexes each array, including zero-filled gaps. No transport tag is defined here.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum MatchSample {
     Conquest {
         t: f64,
@@ -82,6 +82,15 @@ impl Match {
             | (Mode::World, Some(ModeKind::World)) => Ok(()),
             _ => Err("finish/story mode tags disagree".into()),
         }
+    }
+    pub(crate) fn validate_ordinary_finish_state(&self) -> Result<(), String> {
+        if !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode) {
+            return Err("ordinary finish state requires Conquest or Tutorial".into());
+        }
+        if self.options.mode == Mode::Tutorial {
+            self.validate_tutorial_state()?;
+        }
+        self.validate_match_finish_state()
     }
     pub(crate) fn validate_match_finish_state(&self) -> Result<(), String> {
         self.validate_story_mode()?;
