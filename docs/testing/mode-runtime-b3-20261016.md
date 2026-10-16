@@ -1,7 +1,7 @@
 # MODE-RUNTIME-B3
 
 Branch: `runtime/mode-b3-20261016`, from main `92688084369ac20ef1cf77b9e1a156a2f1f9fbcb`.
-Reference: `e4e579a` (read only).
+Reference: `e4e579a` (read only). Main `d505e6eb` was merged at `bd4bab16`; the firing module conflict retained both the incoming MAP tests and the new Kaiju tests.
 
 Scope: MODE-45, MODE-52 (core), MODE-54 (core), MODE-91. No parity status edits.
 
@@ -23,6 +23,15 @@ No FFI, C header, wire schema, contract, privacy or server admission change. MOD
 
 ## Verification
 
-Pending focused nextest, formatting and strict workspace clippy on the Vostro under a shared slot with MemoryMax=6G and MemorySwapMax=0. No Source recorder or provenance bundle is used for behavior rows.
+The first focused working-tree run used slot S3 and selected 33 tests: 28 passed and 5 failed. Four Kaiju component tests were rejected by map admission (`needs 1-9 capture points`); their replacement terrain map now supplies a capture point. The recovery matrix called a startup-only scene helper at a nonzero fixture tick (`scene finish requires a fresh unfinished empty command queue`); it now uses the canonical finish preparation/publication service. These were test setup changes, with no runtime assertion weakened. That first result does not qualify the corrected merge.
+
+The corrected merged Rust source passed on the Vostro in slot S2, with MemoryMax=6G and MemorySwapMax=0:
+
+- Focused nextest with `--locked --cargo-profile ci-test -j4 -p ww2-core -p ww2-simtest`: 40 passed, 0 failed (20 new checks and 20 retained checks), with zero retries.
+- `cargo fmt --all --check`: passed.
+- `cargo clippy --locked --workspace --all-targets -j4 -- -D warnings`: passed.
+- Slot S2 released, exit 0.
+
+The selection includes all Horde tests, all new Kaiju and MODE-91 tests, ordinary tick/snapshot isolation, the retained story gate, captured and represented recovery, ordinary firing and refusal, and both consolidated test-registration checks. No full workspace test run, Source capture or Unreal test ran. No Source recorder or provenance bundle is used for behavior rows.
 
 Ground combat and death validation use the existing aircraft metadata validator in observation mode, including the planes spawned on a real boss wave. Aircraft actuation and the full Horde tick retain their existing guards. A real wave-10 regression exercises breath, Kaiju retirement and the subsequent public mode components beside those aircraft.

@@ -1097,7 +1097,9 @@ fn mode91_recovery_counts_actual_home_depot_hospital_and_carrier_charges_until_f
             let hp = m.world.game.units[&patient].hp;
             let before = m.story.clone();
             if decided {
-                let finish = m.prepare_match_finish(0, crate::match_end::EndReason::Headquarters, None).unwrap();
+                let finish = m
+                    .prepare_match_finish(0, crate::match_end::EndReason::Headquarters, None)
+                    .unwrap();
                 m.publish_match_finish(finish);
             }
             let frame = m.prepare_recovery(&order).unwrap();

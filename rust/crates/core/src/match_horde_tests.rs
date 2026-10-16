@@ -1037,7 +1037,11 @@ fn mode52_boss_waves_publish_gate_announcements_and_living_health_totals() {
         force_wave(&mut m, wave);
         m.world.game.tick = 1;
         let events = m.step_horde(0.05).unwrap();
-        let expected = if wave.is_multiple_of(10) { wave / 10 } else { 0 };
+        let expected = if wave.is_multiple_of(10) {
+            wave / 10
+        } else {
+            0
+        };
         assert_eq!(events.len(), expected as usize);
         let h = m.horde.as_ref().unwrap();
         let (slot, gates, target) = (h.slot, h.gates.clone(), m.world.game.units[&h.bunker].at());
