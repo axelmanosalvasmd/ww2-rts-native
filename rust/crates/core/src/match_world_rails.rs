@@ -88,6 +88,13 @@ fn put<T>(
 }
 
 impl WorldRails {
+    /// Source construction excludes track and the full signed station yard.
+    pub fn excludes_footprint(&self, cells: &[usize]) -> bool {
+        cells
+            .iter()
+            .any(|&cell| i64::try_from(cell).is_ok_and(|cell| self.yard.contains(&cell)))
+    }
+
     /// Build startup state atomically from `WorldDefinition.metadata["rails"]`.
     /// Missing or source-falsy metadata leaves rails absent. Malformed records fail before
     /// returning any state. Region references are checked against the explicit geography count.
