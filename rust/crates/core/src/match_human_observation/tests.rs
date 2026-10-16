@@ -519,3 +519,60 @@ fn detached_views_hide_private_facts_and_refusal_preserves_canonical_observation
     assert_eq!(control.now, 2);
     assert!(!control.winner);
 }
+
+#[test]
+fn intent_ai08_delivered_sightings_expire_and_stillness_restarts() {
+    let source = fixture();
+    let case = &source["cases"][0];
+    let mut state = instance(case);
+    let mut memory = HumanObservationMemory::new(0);
+    let mut saw_expiry = false;
+    let mut saw_lost_stillness = false;
+    let mut saw_motion_reset = false;
+    let mut saw_return = false;
+    for frame in case["frames"].as_array().unwrap() {
+        let previous = memory.clone();
+        action(&mut state, &frame["action"]);
+        let view = state.human_commander_observation(&mut memory).unwrap();
+        let now = view.tick as f64 / 20.0;
+        for sighting in &memory.sightings {
+            assert!(now - sighting.time <= 60.0);
+            if let Some(unit) = view.units.iter().find(|unit| unit.motion.id == sighting.id) {
+                let definition = Catalog::compiled().unwrap().unit(&unit.kind).unwrap();
+                let n = |key| definition.get(key).and_then(RuleValue::number).unwrap();
+                assert_eq!(
+                    sighting.worth,
+                    n("cost") * unit.hp / (n("models") * n("hpPer"))
+                );
+                assert_eq!(sighting.at, unit.motion.at);
+                assert_eq!(sighting.time, now);
+            }
+        }
+        for old in &previous.sightings {
+            if now - old.time > 60.0 && !view.visible.contains(&old.id) {
+                assert!(!memory.sightings.iter().any(|current| current.id == old.id));
+                saw_expiry = true;
+            }
+        }
+        for old in &previous.still {
+            if !view.visible.contains(&old.id) {
+                assert!(!memory.still.iter().any(|current| current.id == old.id));
+                saw_lost_stillness = true;
+            } else if let Some(current) = memory.still.iter().find(|current| current.id == old.id) {
+                if math::hypot(old.at.x - current.at.x, old.at.z - current.at.z) > 0.1 + 1e-9 {
+                    assert_eq!(current.since, now);
+                    saw_motion_reset = true;
+                }
+            }
+        }
+        for current in &memory.still {
+            if !previous.still.iter().any(|old| old.id == current.id)
+                && previous.sightings.iter().any(|old| old.id == current.id)
+            {
+                assert_eq!(current.since, now);
+                saw_return = true;
+            }
+        }
+    }
+    assert!(saw_expiry && saw_lost_stillness && saw_motion_reset && saw_return);
+}
