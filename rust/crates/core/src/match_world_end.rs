@@ -27,7 +27,6 @@ fn validate_transition(
     survivors: &[WorldFinishUnitFacts],
     removed: &[u32],
     removable_owners: &BTreeSet<usize>,
-    transfers: &BTreeMap<u32, usize>,
 ) -> Result<(), String> {
     let by_id = current
         .iter()
@@ -42,7 +41,7 @@ fn validate_transition(
             .get(&after.id)
             .ok_or("unknown staged World survivor")?;
         if !seen.insert(after.id)
-            || after.owner != transfers.get(&after.id).copied().unwrap_or(before.owner)
+            || after.owner != before.owner
             || after.kind != before.kind
             || !after.hp.is_finite()
         {
@@ -51,14 +50,11 @@ fn validate_transition(
     }
     for id in removed {
         let before = by_id.get(id).ok_or("unknown staged World removal")?;
-        if !seen.insert(*id)
-            || transfers.contains_key(id)
-            || !removable_owners.contains(&before.owner)
-        {
+        if !seen.insert(*id) || !removable_owners.contains(&before.owner) {
             return Err("invalid staged World removal".into());
         }
     }
-    if seen.len() != current.len() || transfers.keys().any(|id| !by_id.contains_key(id)) {
+    if seen.len() != current.len() {
         return Err("incomplete staged World unit coverage".into());
     }
     Ok(())
@@ -102,23 +98,6 @@ impl Match {
         survivors: &[WorldFinishUnitFacts],
         removed: &[u32],
     ) -> Result<Option<(MatchFinish, MatchSample)>, String> {
-        self.prepare_world_finish_after_transfer_and_removal(
-            wallets,
-            regions,
-            survivors,
-            removed,
-            &BTreeMap::new(),
-        )
-    }
-    /// Admit only the fort owner changes staged by this capture phase.
-    pub(crate) fn prepare_world_finish_after_transfer_and_removal(
-        &self,
-        wallets: &EconomyState,
-        regions: &[RegionState],
-        survivors: &[WorldFinishUnitFacts],
-        removed: &[u32],
-        transfers: &BTreeMap<u32, usize>,
-    ) -> Result<Option<(MatchFinish, MatchSample)>, String> {
         if self.options.mode != Mode::World || self.world.game.mode != Some(ModeKind::World) {
             return Err("World finish requires explicit canonical World mode".into());
         }
@@ -135,7 +114,7 @@ impl Match {
             .filter(|(_, p)| p.out && !regions.iter().any(|r| r.team == p.team))
             .map(|(slot, _)| slot)
             .collect();
-        validate_transition(&current, survivors, removed, &removable, transfers)?;
+        validate_transition(&current, survivors, removed, &removable)?;
         self.prepare_world_finish_with_units(wallets, regions, survivors)
     }
     fn prepare_world_finish_with_units(

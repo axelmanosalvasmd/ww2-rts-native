@@ -1,38 +1,35 @@
 # Bases runtime batch 4
 
-BASE-54 World core transfers live Pillboxes, Towers, Walls and Gates to the captor
-at their current HP. Source intent is `shared/sim.js:1197-1225` and `:1324`.
-The clear, flat rural World test retains the native constructor actors. It requires
-Pillboxes in exactly the farthest 40% of guard regions and Towers and wall runs in
-exactly the farthest 15%, with fractional rank cutoffs rounded upward. It also
-checks finished forts, the Pillbox bearing and 14 m target toward the nearest
-home, and four walls on each side with the matching crosswise bearing.
+BASE-47 is the only counted row. BASE-27 and BASE-54 remain weak and uncounted.
 
-Capture stages a validated fort-owner map before army elimination and finish
-preparation. The transaction updates units and the spatial grid. Publication
-updates only matching retained footprint entries and currently visible remembered
-building owners. Missing footprint entries and replacement buildings are preserved.
-A fort captured from a player losing their last region survives that elimination
-and the resulting last-nation match finish.
+## World scope after the CI repair
 
-The six `base54_` tests cover ranks, current HP and sections, footprint/grid/memory
-owners, capture followed by ordinary World ticks, canonical Gate transfer,
-previous-owner elimination, a replaced footprint entry and atomic refusal.
-Gate ticks and World recipient snapshots remain unadmitted. The server's existing
-attachment preflight rejects World before it can become a hosted room. No Gate
-physics, World admission, ABI, wire or privacy policy is added.
+PR #336 preserves main's World runtime. The proposed fort-owner transfer,
+elimination exemption, finish-owner transition and removed tick preflight guard
+are withdrawn. The World region, tick, elimination and finish implementations
+are restored verbatim from main. World construction, Gate ticks, recipient
+snapshots and hosted admission remain guarded.
 
-BASE-57 is dropped from this batch. Its positive recorded-convoy return test
-reached an obstructed source: the route endpoint was 4 m from the source centre,
-and the existing convoy preflight returned `Unreachable`. Accepting a route to
-the source's accessible service edge is a differs candidate, not part of this PR.
-The exploratory home-selector code and tests were removed.
+Both reported regressions remain unchanged:
+`world_epilogue::late_fort_refusal_preserves_decided_phase_and_the_original_terminal_owners`
+and
+`world_phases::combined_refusal_is_atomic_but_separate_income_is_an_explicit_committed_phase`.
+The existing `world_finish` and `world_regions` oracle tests also regain main's
+support-marker handling. Refusal and atomicity assertions remain intact.
 
-The Mac continuation ran all seven selected `base54_` checks successfully on the
-incoming candidate, including all six World fort witnesses. Formatting and strict
-Clippy found formatting changes and a collapsible capture conditional, corrected
-in this continuation. The earlier Vostro slot failures remain historical; they do
-not describe the Mac result. Final merged-head qualification is reported in the PR.
+The test-only `base54_world_fort_ranks_are_confined_to_source_shares` checks the
+constructor already on main. `base54_fort_capture_refusal_keeps_elimination_atomic`
+retains the atomicity assertions and uses a damaged fort. The four positive
+transfer tests are removed with the deferred actuator: damaged-owner/footprint
+transfer, Gate transfer, survival through previous-owner elimination, and
+replacement-footprint preservation. These are not counted evidence.
+
+The prototype transfers damaged forts in `shared/sim.js:1197-1204` at `e4e579a`.
+This repair chooses case (a), preserving main's bounded World support rather than
+changing expectations to admit more World behavior. No prototype run is claimed.
+
+BASE-57 remains dropped: accepting a recorded convoy's return to an obstructed
+source through its accessible service edge needs an owner decision.
 
 ## Building placement and tech switch
 
@@ -74,7 +71,6 @@ claiming and cancellation/destruction release are not claimed.
 - BASE-59: Classic owner production snapshots require recipient/transport work outside this stream.
 
 No Source recorder ran. All new placement facts are transient query inputs or
-outputs. Existing fort ownership uses the established Unit, grid, footprint and
-World-memory owners; no persistent field is added. The complete-logistics tick and
-snapshot guards remain closed. BASE-01, BASE-02, BASE-46, BASE-55 and BASE-57 are
+outputs. World fort ownership is unchanged; no persistent field is added. The
+complete-logistics tick and snapshot guards remain closed. BASE-01, BASE-02, BASE-46, BASE-55 and BASE-57 are
 outside the continuation's ownership.

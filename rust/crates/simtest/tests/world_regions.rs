@@ -63,10 +63,7 @@ fn original_world_capture_income_transitions_and_explicit_consequences() {
                     .map(|v| v.as_u64().unwrap() as u32)
                     .collect();
                 let result = m.apply_world_capture_income(&order, step["dt"].as_f64().unwrap());
-                // The stored support marker predates the native fort-owner actuator.
-                if case["supported"].as_bool().unwrap()
-                    || case["name"] == "unsupported fort transfer"
-                {
+                if case["supported"].as_bool().unwrap() {
                     result.unwrap();
                     assert_eq!(
                         projection(&m),

@@ -5,7 +5,6 @@ use crate::{
     game::LOCAL_DEFENDER_OWNER,
     map::AuthoritativeMap,
     match_runtime::{MatchOptions, PlayerConfig},
-    match_world_regions::WorldCapture,
     random::MatchRandom,
     weather::WeatherChoice,
     world_generation::{WorldSize, generate_world},
@@ -260,213 +259,10 @@ fn base54_world_fort_ranks_are_confined_to_source_shares() {
 }
 
 #[test]
-fn base54_capture_transfers_live_fort_owner_and_footprint_without_healing() {
-    let (mut m, region, forts) = capture_scene();
-    m.validate_world_tick_adapters(0).unwrap();
-    assert!(!forts.is_empty());
-    for kind in ["pillbox", "tower", "wall"] {
-        assert!(
-            forts
-                .iter()
-                .any(|id| m.rules.kinds[m.world.game.units[id].kind].name == kind)
-        );
-    }
-    m.refresh_world_visibility().unwrap();
-    m.refresh_world_memory(0).unwrap();
-    let remembered = &m.world_runtime.as_ref().unwrap().known_buildings;
-    let our_team = remembered.iter().find(|(team, _)| *team == 0).unwrap();
-    assert!(
-        our_team
-            .1
-            .iter()
-            .any(|row| forts.contains(&row.id) && row.owner == LOCAL_DEFENDER_OWNER)
-    );
-    let first = forts[0];
-    m.world.game.units.get_mut(&first).unwrap().hp *= 0.5;
-    let before = forts
-        .iter()
-        .map(|id| {
-            (
-                *id,
-                m.world.game.units[id].hp,
-                m.world.game.units[id].cells.clone(),
-            )
-        })
-        .collect::<Vec<_>>();
-    let sections = format!("{:?}", m.world.sections);
-    let order = m.world.game.units.keys().copied().collect::<Vec<_>>();
-    let result = m.apply_world_regions(&order, 0.05).unwrap();
-    assert_eq!(
-        result.captures,
-        vec![WorldCapture {
-            region_index: region,
-            owner: 0
-        }]
-    );
-    for (id, hp, cells) in before {
-        let fort = &m.world.game.units[&id];
-        assert_eq!(fort.owner, 0);
-        assert_eq!(fort.hp.to_bits(), hp.to_bits());
-        assert_eq!(fort.cells, cells);
-        for cell in cells.unwrap() {
-            let footprint = &m.building_cells[&(cell as usize)];
-            assert_eq!((footprint.unit, footprint.owner), (id, 0));
-        }
-    }
-    assert_eq!(format!("{:?}", m.world.sections), sections);
-    assert_eq!(m.world_runtime.as_ref().unwrap().regions[region].team, 0);
-    for id in &forts {
-        assert!(!m.grid.owned_by(&m.world.game.units, -1).contains(id));
-        assert!(m.grid.owned_by(&m.world.game.units, 0).contains(id));
-    }
-    m.refresh_world_visibility().unwrap();
-    m.refresh_world_memory(0).unwrap();
-    let remembered = &m.world_runtime.as_ref().unwrap().known_buildings;
-    let our_team = remembered.iter().find(|(team, _)| *team == 0).unwrap();
-    assert!(
-        our_team
-            .1
-            .iter()
-            .any(|row| forts.contains(&row.id) && row.owner == 0)
-    );
-    let order = m.world.game.units.keys().copied().collect::<Vec<_>>();
-    assert!(
-        m.apply_world_regions(&order, 0.05)
-            .unwrap()
-            .captures
-            .is_empty()
-    );
-    m.initialize_tick_scene(0, crate::match_tick::TickPathConfig::default())
-        .unwrap();
-    for _ in 0..3 {
-        m.advance_tick().unwrap();
-        assert!(m.tick_state.fault().is_none());
-    }
-    for id in forts {
-        assert_eq!(m.world.game.units[&id].owner, 0);
-    }
-    assert!(matches!(
-        crate::recipient_snapshot::SnapshotCache::new(&m),
-        Err(crate::recipient_snapshot::SnapshotError::UnsupportedMode)
-    ));
-    assert!(m.preflight_ordinary_snapshot().is_err());
-}
-
-#[test]
-fn base54_gate_owner_changes_in_the_bounded_world_phase() {
-    let (mut m, region, _) = capture_scene();
-    let center = &m.world.geography().unwrap().regions[region];
-    let at = Point {
-        x: (center.x as f64 + 0.5) * CELL,
-        z: (center.y as f64 + 0.5) * CELL,
-    };
-    let mut cell = None;
-    for dx in [20.0, 24.0, 28.0, 32.0] {
-        for dz in [20.0, 24.0, 28.0, 32.0] {
-            if let Some(candidate) = m.world.game.cell_of(at.x + dx, at.z + dz)
-                && world_can_stamp(&m.world.game, &m.rules, &[candidate])
-                && m.world_region_index(foot_center(&m.world.game, candidate, 1))
-                    .unwrap()
-                    == Some(region)
-            {
-                cell = Some(candidate);
-                break;
-            }
-        }
-        if cell.is_some() {
-            break;
-        }
-    }
-    let cell = cell.expect("clear rural region has a free Gate cell");
-    let gate_id = m
-        .world_building(LOCAL_DEFENDER_OWNER, "gate", cell)
-        .unwrap();
-    m.world.game.units.get_mut(&gate_id).unwrap().hp = 123.0;
-    let order = m.world.game.units.keys().copied().collect::<Vec<_>>();
-    assert_eq!(
-        m.apply_world_regions(&order, 0.05).unwrap().captures,
-        vec![WorldCapture {
-            region_index: region,
-            owner: 0
-        }]
-    );
-    let gate = &m.world.game.units[&gate_id];
-    assert_eq!((gate.owner, gate.hp), (0, 123.0));
-    assert_eq!(
-        m.building_cells[&(gate.cells.as_ref().unwrap()[0] as usize)].owner,
-        0
-    );
-    assert!(
-        m.validate_world_tick_adapters(0).is_err(),
-        "Gate tick admission remains closed"
-    );
-}
-
-#[test]
-fn base54_capture_saves_fort_before_the_previous_owner_is_eliminated() {
+fn base54_fort_capture_refusal_keeps_elimination_atomic() {
     let (mut m, region, forts) = capture_scene();
     let id = forts[0];
-    m.world.game.units.get_mut(&id).unwrap().owner = 1;
-    for &cell in m.world.game.units[&id].cells.as_ref().unwrap() {
-        m.building_cells.get_mut(&(cell as usize)).unwrap().owner = 1;
-    }
-    for state in &mut m.world_runtime.as_mut().unwrap().regions {
-        if state.team == 1 {
-            state.team = -1;
-            state.progress = 0.0;
-            state.capper = None;
-        }
-    }
-    let order = m.world.game.units.keys().copied().collect::<Vec<_>>();
-    let result = m.apply_world_regions(&order, 0.05).unwrap();
-    assert!(result.captures.contains(&WorldCapture {
-        region_index: region,
-        owner: 0
-    }));
-    assert!(m.start.economy.players[1].out);
-    assert_eq!(m.world.game.units[&id].owner, 0);
-    assert!(!result.removed.iter().any(|unit| unit.id == id));
-    assert_eq!(
-        m.finish.map(|finish| (finish.winner, finish.reason)),
-        Some((0, crate::match_end::EndReason::Nations))
-    );
-}
-
-#[test]
-fn base54_replacement_footprint_is_not_taken_from_its_new_building() {
-    let (mut m, region, forts) = capture_scene();
-    let id = forts[0];
-    let cell = m.world.game.units[&id].cells.as_ref().unwrap()[0] as usize;
-    let replacement = m
-        .world
-        .game
-        .units
-        .values()
-        .find(|u| u.owner == 1 && m.rules.kinds[u.kind].building)
-        .unwrap()
-        .id;
-    let row = m.building_cells.get_mut(&cell).unwrap();
-    row.unit = replacement;
-    row.owner = 1;
-    let order = m.world.game.units.keys().copied().collect::<Vec<_>>();
-    assert_eq!(
-        m.apply_world_regions(&order, 0.05).unwrap().captures,
-        vec![WorldCapture {
-            region_index: region,
-            owner: 0
-        }]
-    );
-    assert_eq!(m.world.game.units[&id].owner, 0);
-    assert_eq!(
-        (m.building_cells[&cell].unit, m.building_cells[&cell].owner),
-        (replacement, 1)
-    );
-}
-
-#[test]
-fn base54_elimination_refusal_keeps_transfer_atomic() {
-    let (mut m, region, forts) = capture_scene();
-    let id = forts[0];
+    m.world.game.units.get_mut(&id).unwrap().hp *= 0.5;
     let blocker = m
         .world
         .game
@@ -487,7 +283,11 @@ fn base54_elimination_refusal_keeps_transfer_atomic() {
     let regions = m.world_runtime.as_ref().unwrap().regions.clone();
     let wallets = m.start.economy.clone();
     let order = m.world.game.units.keys().copied().collect::<Vec<_>>();
-    assert!(m.apply_world_regions(&order, 0.05).is_err());
+    assert!(
+        m.apply_world_regions(&order, 0.05)
+            .unwrap_err()
+            .contains("fort")
+    );
     assert_eq!(
         m.world.game.units.keys().collect::<Vec<_>>(),
         units.keys().collect::<Vec<_>>()

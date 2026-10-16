@@ -13,7 +13,7 @@ use crate::{
     math,
     world_route_retention::prepare_world_route_retention,
 };
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct WorldCapture {
@@ -46,7 +46,7 @@ fn truthy(value: &Value) -> bool {
 
 impl Match {
     /// Source income precedes region capture. Prepare every consequence before publishing.
-    /// Fort transfer and army elimination leave the whole phase intact on refusal. Eligible
+    /// Unsupported fort transfer and army elimination leave the whole phase intact. Eligible
     /// source finish is prepared after those preflights, then published on canonical state.
     pub fn apply_world_capture_income(
         &mut self,
@@ -59,7 +59,7 @@ impl Match {
     }
     /// Run the bounded phase with actual administrative removals and building wrecks.
     /// The complete current order is distinct from the captured tick upkeep list.
-    /// Unsupported logistics and rider consequences leave every owner unchanged.
+    /// Unsupported fort, logistics and rider consequences leave every owner unchanged.
     pub fn apply_world_capture_income_and_elimination(
         &mut self,
         tick_order: &[u32],
@@ -124,7 +124,6 @@ impl Match {
         }
         let mut regions = runtime.regions.clone();
         let mut captured = Vec::new();
-        let mut transfers = BTreeMap::<u32, usize>::new();
         for (index, (r, definition)) in regions.iter_mut().zip(&geography.regions).enumerate() {
             if !r.progress.is_finite()
                 || !(0.0..=1.0).contains(&r.progress)
@@ -189,9 +188,10 @@ impl Match {
                     }) {
                         if !game.allied(fort.owner, owner)
                             && self.world_region_index(fort.at())? == Some(index)
-                            && transfers.insert(fort.id, owner).is_some()
                         {
-                            return Err("duplicate World fort transfer".into());
+                            return Err(
+                                "unsupported World capture: fort ownership and gate state".into()
+                            );
                         }
                     }
                     captured.push(WorldCapture {
@@ -234,14 +234,8 @@ impl Match {
                 spawns[slot] = best.expect("owned region").0;
             }
         }
-        let transfer_order = if live_order.is_none() && !transfers.is_empty() {
-            Some(game.units.keys().copied().collect::<Vec<_>>())
-        } else {
-            None
-        };
         let draft = live_order
-            .or(transfer_order.as_deref())
-            .map(|order| self.prepare_world_elimination(order, &regions, &transfers))
+            .map(|order| self.prepare_world_elimination(order, &regions))
             .transpose()?
             .flatten();
         let finish = if let Some(draft) = &draft {
@@ -259,9 +253,7 @@ impl Match {
                 })
                 .collect::<Vec<_>>();
             let removed = draft.removed.iter().map(|u| u.id).collect::<Vec<_>>();
-            self.prepare_world_finish_after_transfer_and_removal(
-                &wallets, &regions, &facts, &removed, &transfers,
-            )?
+            self.prepare_world_finish_after_removal(&wallets, &regions, &facts, &removed)?
         } else {
             self.prepare_world_finish(&wallets, &regions)?
         };
@@ -301,29 +293,6 @@ impl Match {
             let story = prepare_story_updates(&mut self.story, context.decided, &changes)?;
             // Every fallible guard has succeeded. Publish the single canonical owners in place.
             publication.commit();
-            for (&id, &owner) in &transfers {
-                let unit = &self.world.game.units[&id];
-                for &cell in unit.cells.as_deref().unwrap_or(&[]) {
-                    if let Some(row) = self.building_cells.get_mut(&(cell as usize))
-                        && row.unit == id
-                    {
-                        row.owner = owner;
-                    }
-                }
-                for (team, rows) in &mut runtime.known_buildings {
-                    for row in rows.iter_mut().filter(|row| row.id == id) {
-                        if self
-                            .world
-                            .game
-                            .players
-                            .iter()
-                            .any(|player| player.team == *team && player.visible.contains(&id))
-                        {
-                            row.owner = owner;
-                        }
-                    }
-                }
-            }
             self.environment = draft.environment;
             self.grid = draft.grid;
             self.combat = draft.combat;

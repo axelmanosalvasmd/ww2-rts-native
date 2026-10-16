@@ -85,10 +85,7 @@ fn world_finish_uses_actual_constructed_match_and_original_phase_order() {
                     .map(|v| v.as_u64().unwrap() as u32)
                     .collect();
                 let result = m.apply_world_capture_income(&order, step["dt"].as_f64().unwrap());
-                // Compare the existing Source result now that fort capture can finish.
-                if case["supported"] == true
-                    || case["name"] == "winning capture needing fort transfer remains refusal"
-                {
+                if case["supported"] == true {
                     result.unwrap();
                     assert_eq!(snapshot(&m), step["after"], "{} after", case["name"]);
                     if let Some(report) = m.match_result().unwrap() {
