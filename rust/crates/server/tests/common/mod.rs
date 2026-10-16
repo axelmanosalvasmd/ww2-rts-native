@@ -100,6 +100,9 @@ pub struct BinaryServer {
 }
 impl BinaryServer {
     pub fn start(trusted: bool, seed: u64) -> Self {
+        Self::start_with_public_url(trusted, seed, None)
+    }
+    pub fn start_with_public_url(trusted: bool, seed: u64, public_url: Option<&str>) -> Self {
         let log = std::env::temp_dir().join(format!(
             "ww2-r1-{}-{}.log",
             std::process::id(),
@@ -114,6 +117,9 @@ impl BinaryServer {
             .stderr(File::create(&log).unwrap());
         if trusted {
             command.args(["--trusted-room", "ABC", "--seed", &seed.to_string()]);
+        }
+        if let Some(public_url) = public_url {
+            command.env("PUBLIC_URL", public_url);
         }
         let mut child = command.spawn().unwrap();
         let stdout = child.stdout.take().unwrap();
