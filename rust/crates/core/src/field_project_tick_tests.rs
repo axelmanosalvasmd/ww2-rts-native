@@ -1,6 +1,6 @@
 use super::*;
 use crate::{
-    economy::Faction,
+    economy::{Faction, Mode},
     economy_state::ArmySize,
     field_works::{Pattern, ProjectMaterial, ProjectRequest, SegmentPreparation},
     game::{ModeKind, Point},
