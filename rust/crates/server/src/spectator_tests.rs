@@ -306,6 +306,42 @@ fn intent_net75_spectator_over_four_mib_closes_1013_but_boundary_receives() {
 
 #[test]
 fn spectator_shared_current_full_map_stream_survives_ordinary_victory_and_ending_hold() {
+    fn send_tick_frame(hub: &mut Hub) {
+        let room = hub.rooms.get_mut("ABC").unwrap();
+        let selected = Hub::select_native(room, &mut hub.accounts, false).unwrap();
+        assert_eq!(selected.len(), 2);
+        let mut dropped = Vec::new();
+        assert!(
+            Hub::send_native_frame(
+                room,
+                &mut hub.accounts,
+                &selected,
+                FrameKind::Scheduled,
+                &mut dropped,
+            )
+            .is_some()
+        );
+        assert!(dropped.is_empty());
+    }
+    fn assert_seat_tick(peer: &mut Peer, hub: &mut Hub, now: u64, tick: i64, advanced: bool) {
+        let messages = peer.drain(hub, now);
+        let snapshots = messages
+            .iter()
+            .filter(|message| message["t"] == "s")
+            .collect::<Vec<_>>();
+        assert_eq!(
+            snapshots.len(),
+            usize::from(advanced),
+            "seat {} tick {tick}",
+            peer.c.id
+        );
+        for snapshot in snapshots {
+            assert_eq!(snapshot["tick"], tick);
+            if hub.native_status("ABC").unwrap().held > 0 {
+                assert_eq!(snapshot["winner"], 0);
+            }
+        }
+    }
     let (mut hub, mut a, mut b) = room();
     let mut state = native_tests::native_match();
     state.start.economy.players[0].vp = state.start.win_vp - 1.;
@@ -316,9 +352,17 @@ fn spectator_shared_current_full_map_stream_survives_ordinary_victory_and_ending
     a.drain(&mut hub, 0);
     b.drain(&mut hub, 0);
     // Join during play after ordinary ticking has begun.
+    let initial_tick = hub.native_status("ABC").unwrap().tick;
     hub.poll_native(0, 0);
-    a.drain(&mut hub, 0);
-    b.drain(&mut hub, 0);
+    let first = hub.native_status("ABC").unwrap();
+    assert_eq!(first.tick, initial_tick + 1);
+    assert!(first.fault.is_none(), "{:?}", first.fault);
+    if a.rx.is_empty() {
+        send_tick_frame(&mut hub);
+    }
+    assert_seat_tick(&mut a, &mut hub, 0, first.tick, true);
+    assert_seat_tick(&mut b, &mut hub, 0, first.tick, true);
+    assert!(hub.native_status("ABC").unwrap().fault.is_none());
     let mut w1 = Peer::new(3);
     w1.hello(&mut hub, false, 1);
     let mut w2 = Peer::new(4);
@@ -331,11 +375,29 @@ fn spectator_shared_current_full_map_stream_survives_ordinary_victory_and_ending
     let mut saw_finish = false;
     let mut forced_full = false;
     let mut joined_after_stream = false;
+    let mut previous_tick = first.tick;
+    let mut ending_callbacks = 0;
+    let mut ending_ticks = 0;
     for callback in 1..=500u64 {
         let now = callback * 50;
         hub.poll_native(now, now * 1_000_000);
         let status = hub.native_status("ABC").unwrap();
         assert!(status.fault.is_none(), "{:?}", status.fault);
+        let advanced = status.tick != previous_tick;
+        assert_eq!(status.tick, previous_tick + i64::from(advanced));
+        if status.held > 0 {
+            ending_callbacks += 1;
+            ending_ticks += usize::from(advanced);
+            assert_eq!(status.held, ending_callbacks);
+            assert_eq!(advanced, status.held.is_multiple_of(2));
+        } else {
+            assert!(advanced, "ordinary callback must advance exactly one tick");
+        }
+        // Production cadence skips ordinary ticks. Force the existing shared
+        // delivery path on those ticks so every new state reaches every peer.
+        if advanced && !status.ending_complete && w1.rx.is_empty() {
+            send_tick_frame(&mut hub);
+        }
         let mut watchers = Vec::new();
         for peer in [&mut w1, &mut w2] {
             let mut stream = Vec::new();
@@ -352,7 +414,18 @@ fn spectator_shared_current_full_map_stream_survives_ordinary_victory_and_ending
             }
             watchers.push(stream);
         }
-        assert_eq!(watchers[0].len(), watchers[1].len());
+        assert_eq!(
+            watchers[0].len(),
+            usize::from(advanced),
+            "watcher 1 tick {}",
+            status.tick
+        );
+        assert_eq!(
+            watchers[1].len(),
+            usize::from(advanced),
+            "watcher 2 tick {}",
+            status.tick
+        );
         for (left, right) in watchers[0].iter().zip(&watchers[1]) {
             assert!(
                 Arc::ptr_eq(left, right),
@@ -409,11 +482,19 @@ fn spectator_shared_current_full_map_stream_survives_ordinary_victory_and_ending
                 assert_eq!(snapshot["all"], true);
                 forced_full = true;
             }
-            saw_finish |= snapshot["winner"].is_number();
+            if status.held > 0 {
+                assert_eq!(snapshot["winner"], 0);
+            }
+            if status.held == 0 && snapshot["winner"].is_number() {
+                assert_eq!(snapshot["winner"], 0);
+                saw_finish = true;
+            }
             frames += 1;
         }
-        a.drain(&mut hub, now);
-        b.drain(&mut hub, now);
+        assert_seat_tick(&mut a, &mut hub, now, status.tick, advanced);
+        assert_seat_tick(&mut b, &mut hub, now, status.tick, advanced);
+        assert!(hub.native_status("ABC").unwrap().fault.is_none());
+        previous_tick = status.tick;
         if frames == 1 && !joined_after_stream {
             let mut replacement = Peer::new(5);
             replacement.send(
@@ -436,6 +517,8 @@ fn spectator_shared_current_full_map_stream_survives_ordinary_victory_and_ending
         }
     }
     assert!(saw_finish && forced_full && frames >= 60);
+    assert_eq!(ending_callbacks, 120);
+    assert_eq!(ending_ticks, 60);
     assert!(hub.native_status("ABC").unwrap().ending_complete);
     assert_eq!(hub.rooms["ABC"].spectators.len(), 2);
 }

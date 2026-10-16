@@ -44,13 +44,7 @@ impl SpectatorDelivery {
             .iter()
             .map(|row| {
                 let mut row = row.as_array().unwrap().clone();
-                if !row[9]
-                    .as_u64()
-                    .and_then(|id| u32::try_from(id).ok())
-                    .is_some_and(|id| state.world.game.units.contains_key(&id))
-                {
-                    row[9] = json!(0);
-                }
+                // The prototype's EVERYTHING visibility retains stale target IDs.
                 row[11] = json!(0);
                 let flags = row[12].as_u64().unwrap();
                 row[12] = json!(if row[2].as_u64() == Some(0) {
@@ -402,8 +396,13 @@ mod tests {
     }
 
     #[test]
-    fn watcher_shots_keep_only_live_identities_and_full_flight_extrapolation() {
-        use crate::{game::Point, match_firing::LaunchEvent, projectiles::Point3};
+    fn watcher_keeps_dead_targets_and_shot_identities_with_full_flight_extrapolation() {
+        use crate::{
+            environment::{Effect, Hurt},
+            game::Point,
+            match_firing::LaunchEvent,
+            projectiles::Point3,
+        };
         let mut state = fixture();
         for player in &mut state.world.game.players {
             player.visible.clear();
@@ -429,22 +428,84 @@ mod tests {
             time: 1.,
             expires: 4.,
         });
+        // Events outlive their actors, and a surviving unit can still name one.
+        state.world.game.units.remove(&3).unwrap();
+        state.firing.get_mut(1).unwrap().target_id = 3;
+        let hurt = |local| {
+            TickEvent::Environment(Effect::Hurt(Hurt {
+                unit: 3,
+                owner: 2,
+                at: Point { x: 130., z: 130. },
+                killed: true,
+                from: Some(2),
+                local,
+            }))
+        };
+        let events = [salvo(3), salvo(999), flight, hurt(false), hurt(true)];
         let mut stream = SpectatorDelivery::new(&state).unwrap();
-        let rows = stream
-            .capture(&state, &[salvo(3), salvo(999), flight], false)
-            .unwrap();
+        let rows = stream.capture(&state, &events, false).unwrap();
+        assert_eq!(rows["units"][0][9], 3);
         assert_eq!(
             rows["shots"][0],
             json!({"f":3,"fo":2,"x":130.,"z":130.,"k":"salvo","n":3,"r":2.,"physical":true,"local":true})
         );
         assert_eq!(
             rows["shots"][1],
-            json!({"x":130.,"z":130.,"k":"salvo","n":3,"r":2.,"physical":true,"local":true})
+            json!({"f":999,"fo":2,"x":130.,"z":130.,"k":"salvo","n":3,"r":2.,"physical":true,"local":true})
         );
         super::super::tests::equal(
             &rows["shots"][2],
             &json!({"k":"flight","kind":"rifle","flight":77,"seq":0,"f":3,"fo":2,"x":130.,"y":4.,"z":130.,"v":[10.,0.,0.],"gravity":9.8,"time":1.,"expires":4.,"until":1.15,"local":true}),
             "spectator.shots.flight",
+        );
+        assert_eq!(
+            rows["shots"][3],
+            json!({"t":3,"to":2,"x":130.,"z":130.,"k":"hurt","kill":true,"fo":2})
+        );
+        assert_eq!(
+            rows["shots"][4],
+            json!({"t":3,"to":2,"x":130.,"z":130.,"k":"hurt","kill":true,"fo":2,"local":true})
+        );
+
+        // A seated recipient keeps its existing dead-identity redaction even
+        // when reveal admits these distant events and their ground cells.
+        state.world.game.reveal = true;
+        assert_eq!(
+            SnapshotCache::new(&state)
+                .unwrap()
+                .recipient(0)
+                .unwrap()
+                .fields["units"][0][9],
+            0
+        );
+        let shots = events
+            .iter()
+            .map(ShotRef::try_from)
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+        let seated = shots::project_shots_perspective(
+            &state,
+            &[SelectedSeat {
+                slot: 0,
+                full: false,
+                omit: false,
+            }],
+            &shots,
+            false,
+        )
+        .unwrap();
+        let seated = &seated[0].1;
+        for index in 0..3 {
+            assert!(seated[index].get("f").is_none());
+            assert!(seated[index].get("fo").is_none());
+        }
+        assert_eq!(
+            seated[3],
+            json!({"to":2,"x":130.,"z":130.,"k":"hurt","kill":true,"fo":2})
+        );
+        assert_eq!(
+            seated[4],
+            json!({"x":130.,"z":130.,"k":"hurt","kill":true,"local":true})
         );
     }
 

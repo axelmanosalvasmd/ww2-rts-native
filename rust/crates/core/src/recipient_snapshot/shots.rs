@@ -455,14 +455,8 @@ pub(super) fn project_shots_perspective(
             let mut row = event.clone();
             let object = row.as_object_mut().ok_or(SnapshotError::Rules)?;
             for (id, owner) in [("f", "fo"), ("t", "to")] {
-                let visible_identity = if full_map {
-                    event[id]
-                        .as_u64()
-                        .and_then(|id| u32::try_from(id).ok())
-                        .is_some_and(|id| g.units.contains_key(&id))
-                } else {
-                    seen(state, seat.slot, event, id)
-                };
+                // watchGame supplies EVERYTHING.has, including IDs whose units died.
+                let visible_identity = full_map || seen(state, seat.slot, event, id);
                 if !visible_identity {
                     object.remove(id);
                     if local {

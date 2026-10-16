@@ -4,3 +4,6 @@
 - Count queued socket bytes with diagnostics off so spectator limits always apply. Update the old test that expected this counter to be disabled.
 - Refresh spectator terrain on the prototype's terrain and vision revision boundary, including hidden ruins.
 - Replace the process test that rejected spectator joins and lobby seat release with checks that admit them, while preserving the other R1 refusals.
+- Retain spectator target IDs and shot identities after units die, matching the prototype's full visibility. Replace the test that expected dead identities to be omitted and check that seated recipients keep their existing redaction.
+- Assert delivery of every commander's and spectator's snapshot on each tick through ordinary victory and the ending hold.
+- Restore compilation after merging save support by adding the required serialization derives to elimination state and resource nodes.
