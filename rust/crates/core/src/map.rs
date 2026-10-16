@@ -194,6 +194,12 @@ impl AuthoritativeMap {
         Self::from_value(source)
     }
     pub(crate) fn from_value(source: Value) -> Result<Self> {
+        Self::from_value_mode(source, false)
+    }
+    pub(crate) fn from_editor_value(source: Value) -> Result<Self> {
+        Self::from_value_mode(source, true)
+    }
+    fn from_value_mode(source: Value, editor: bool) -> Result<Self> {
         if !source.is_object() {
             return Err(invalid("document", "expected a map object"));
         }
@@ -217,7 +223,11 @@ impl AuthoritativeMap {
             .transpose()?;
         let layers = normalize_layers(&source, w, h, &chars, true)?;
         let structures = crate::structures::parse(source.get("structures"), w, h, &layers)?;
-        let is_world = source.get("world").is_some();
+        let is_world = if editor {
+            source.get("world").is_some_and(crate::map_save::truthy)
+        } else {
+            source.get("world").is_some()
+        };
         let minimum_spawns = if is_world { 1 } else { 2 };
         let pos = |v: &Value, field: &str| -> Result<(usize, usize)> {
             Ok((
@@ -496,10 +506,24 @@ impl AuthoritativeMap {
                 return Err(invalid("triggers", "scenario work exceeds 4096"));
             }
         }
-        let geography = source
-            .get("world")
-            .map(|v| crate::world_map::parse(v, w, h, &chars, height.as_deref(), spawns.len()))
-            .transpose()?;
+        let geography = if editor {
+            if is_world {
+                crate::world_map::validate_editor(
+                    &source["world"],
+                    w,
+                    h,
+                    &chars,
+                    height.as_deref(),
+                    spawns.len(),
+                )?;
+            }
+            None
+        } else {
+            source
+                .get("world")
+                .map(|v| crate::world_map::parse(v, w, h, &chars, height.as_deref(), spawns.len()))
+                .transpose()?
+        };
         Ok(Self {
             source,
             name,
@@ -579,8 +603,13 @@ pub fn map_for_client(source: &Value) -> Result<Value> {
         .ok_or_else(|| invalid("document", "expected a map object"))?;
     object.remove("triggers");
     object.remove("scenario");
-    let map = AuthoritativeMap::from_value(result.clone())?;
-    let w = map.w;
+    // mapForClient projects authored terrain without validating gameplay fields.
+    // An editor save may intentionally omit World geography; that must not turn
+    // readable public terrain into a failed runtime-import attempt.
+    let w = integer(&result["w"], 20, 1024, "w")?;
+    let h = integer(&result["h"], 20, 1024, "h")?;
+    let chars = rows(&result["rows"], w, h, CELLS, "rows")?;
+    let layers = normalize_layers(&result, w, h, &chars, true)?;
     let strings = |cells: &[u8]| -> Value {
         serde_json::json!(
             cells
@@ -591,7 +620,7 @@ pub fn map_for_client(source: &Value) -> Result<Value> {
     };
     if source.get("layers").is_none() {
         result["worldVersion"] = serde_json::json!(2);
-        result["layers"] = serde_json::json!({"ground":strings(&map.layers.ground),"objects":strings(&map.layers.objects)});
+        result["layers"] = serde_json::json!({"ground":strings(&layers.ground),"objects":strings(&layers.objects)});
     }
     let hidden_rows = source
         .get("layers")
@@ -603,23 +632,22 @@ pub fn map_for_client(source: &Value) -> Result<Value> {
         .flat_map(|row| row.as_str().expect("validated row").bytes())
         .map(|ch| ch == b'N')
         .collect();
-    let public: Vec<_> = map
-        .chars
+    let public: Vec<_> = chars
         .iter()
         .enumerate()
         .map(|(cell, &ch)| {
             if ch != b'N' {
                 ch
-            } else if map.layers.objects[cell] != b'.' {
-                map.layers.objects[cell]
+            } else if layers.objects[cell] != b'.' {
+                layers.objects[cell]
             } else {
-                map.layers.ground[cell]
+                layers.ground[cell]
             }
         })
         .collect();
     result["rows"] = strings(&public);
-    result["layers"]["objects"] = strings(&map.layers.objects);
-    result["layers"]["mines"] = serde_json::json!(vec![".".repeat(w); map.h]);
+    result["layers"]["objects"] = strings(&layers.objects);
+    result["layers"]["mines"] = serde_json::json!(vec![".".repeat(w); h]);
     for key in ["materials", "objectMaterials"] {
         if let Some(list) = result["layers"].get_mut(key).and_then(Value::as_array_mut) {
             list.retain(|entry| {

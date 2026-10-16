@@ -104,6 +104,22 @@ pub(crate) async fn serve(
     if credential.is_some() && !authorized {
         return text(StatusCode::FORBIDDEN, "wrong password");
     }
+    if editor
+        .as_ref()
+        .is_some_and(|editor| editor.unavailable(name))
+    {
+        return text(StatusCode::NOT_FOUND, "no such map");
+    }
+    if credential.is_some()
+        && let Some(bytes) = editor.as_ref().and_then(|editor| editor.raw_bytes(name))
+    {
+        return Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "application/json")
+            .header(header::CACHE_CONTROL, "no-store")
+            .body(Body::from(bytes))
+            .unwrap();
+    }
     let raw = editor.as_ref().and_then(|e| e.raw(name)).or_else(|| {
         crate::authoritative_maps::load(name)
             .ok()

@@ -258,6 +258,117 @@ pub(crate) fn parse(
             .collect(),
     })
 }
+/// Editor acceptance follows sim.js:1139-1164. Runtime construction still uses
+/// the typed parser above, including its stronger metadata and bounds checks.
+pub(crate) fn validate_editor(
+    v: &Value,
+    w: usize,
+    h: usize,
+    chars: &[u8],
+    heights: Option<&[i8]>,
+    spawns: usize,
+) -> Result<(), MapError> {
+    let count = match v["size"].as_str() {
+        Some("huge") => 64,
+        Some("massive") => 128,
+        _ => return Err(invalid("world", "invalid world regions")),
+    };
+    if v["total"].as_f64() != Some(count as f64) || v["regionCells"].as_f64() != Some(64.0) {
+        return Err(invalid("world", "invalid world regions"));
+    }
+    let regions = v["regions"]
+        .as_array()
+        .filter(|rows| rows.len() == count)
+        .ok_or_else(|| invalid("world", "invalid world regions"))?;
+    if let Some(membership) = v.get("regionMap").filter(|v| crate::map_save::truthy(v)) {
+        let valid = membership.as_array().is_some_and(|rows| {
+            rows.len() == w * h
+                && rows.iter().all(|id| {
+                    id.as_f64()
+                        .is_some_and(|n| n.fract() == 0.0 && n >= -1.0 && n < count as f64)
+                })
+        });
+        if !valid {
+            return Err(invalid("world.regionMap", "invalid region membership"));
+        }
+    }
+    let mut ids = BTreeSet::new();
+    let mut homes = BTreeSet::new();
+    let mut sites = Vec::with_capacity(count);
+    for row in regions {
+        // Number.isInteger has no signed 32-bit restriction. Finite integer
+        // f64 bits also preserve the prototype's equality for large IDs.
+        let id = row["id"]
+            .as_f64()
+            .filter(|n| n.is_finite() && n.fract() == 0.0)
+            .ok_or_else(|| invalid("world.regions", "invalid world region"))?;
+        let id_bits = if id == 0.0 { 0 } else { id.to_bits() };
+        let coord = |key: &str, limit: usize| {
+            row[key]
+                .as_f64()
+                .filter(|n| n.fract() == 0.0 && *n >= 0.0 && *n < limit as f64)
+                .map(|n| n as usize)
+        };
+        let (Some(x), Some(y)) = (coord("x", w), coord("y", h)) else {
+            return Err(invalid("world.regions", "invalid world region"));
+        };
+        if !ids.insert(id_bits)
+            || flags(chars[y * w + x]) & MOVE != 0
+            || !row["bounds"].as_array().is_some_and(|b| b.len() == 4)
+        {
+            return Err(invalid("world.regions", "invalid world region"));
+        }
+        if let Some(home) = row.get("home") {
+            let home = home
+                .as_f64()
+                .filter(|n| n.fract() == 0.0 && *n >= 0.0 && *n < spawns as f64)
+                .ok_or_else(|| invalid("world.regions.home", "invalid world home"))?
+                as usize;
+            if !homes.insert(home) {
+                return Err(invalid("world.regions.home", "invalid world home"));
+            }
+        }
+        sites.push(y * w + x);
+    }
+    if homes.len() != spawns {
+        return Err(invalid("world.regions.home", "each player needs one home"));
+    }
+    let mut seen = vec![false; w * h];
+    let mut queue = vec![sites[0]];
+    seen[sites[0]] = true;
+    let mut i = 0;
+    while i < queue.len() {
+        let c = queue[i];
+        i += 1;
+        let x = c % w;
+        let y = c / w;
+        for next in [
+            (x + 1 < w).then_some(c + 1),
+            c.checked_sub(1).filter(|_| x > 0),
+            (y + 1 < h).then_some(c + w),
+            c.checked_sub(w),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            if !seen[next]
+                && flags(chars[next]) & (MOVE | VBLOCK) == 0
+                && heights.is_none_or(|v| (i16::from(v[next]) - i16::from(v[c])).abs() <= 1)
+            {
+                seen[next] = true;
+                queue.push(next);
+            }
+        }
+    }
+    if sites.iter().any(|c| !seen[*c]) {
+        return Err(invalid(
+            "world.regions",
+            "objectives need connected ground routes",
+        ));
+    }
+    Ok(())
+}
+
 impl WorldDefinition {
     fn value(&self) -> Result<Value, MapError> {
         if self.metadata.keys().any(|k| KEYS.contains(&k.as_str())) {
