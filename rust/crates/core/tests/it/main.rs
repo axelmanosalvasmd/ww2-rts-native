@@ -95,6 +95,8 @@ mod mode_point_services;
 mod mode_runtime_batch4;
 #[path = "../mode_runtime_world.rs"]
 mod mode_runtime_world;
+#[path = "../mode_startup_fallback.rs"]
+mod mode_startup_fallback;
 #[path = "../mov_aircraft_controls.rs"]
 mod mov_aircraft_controls;
 #[path = "../mov_aircraft_immunity.rs"]

@@ -277,8 +277,8 @@ impl Match {
         name: &str,
         from: Option<u32>,
     ) -> Result<CompletedRecruitUnit, RecruitError> {
-        // Parked planes need aircraft rows too. Refuse before payment or publication
-        // while the host uses the ordinary snapshot adapter.
+        // Aircraft AA events need the complete aviation delivery adapter before
+        // purchases may introduce planes into a bound recipient room.
         if self.ordinary_snapshot_only {
             return Err(RecruitError::Placement(
                 crate::produced_units::Error::UnsupportedAir,
@@ -298,7 +298,7 @@ impl Match {
             .prepare_recruit(&context, &mut self.start.economy, slot, faction, name, from)?
             .request()
             .clone();
-        self.validate_aviation()
+        self.validate_aviation_observation()
             .map_err(|e| RecruitError::Routing(e.to_string()))?;
         let kind = self
             .rules

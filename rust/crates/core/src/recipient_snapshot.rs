@@ -25,6 +25,8 @@ mod engineering;
 mod falling;
 #[path = "recipient_snapshot/logistics.rs"]
 mod logistics;
+#[path = "recipient_snapshot/modes.rs"]
+mod modes;
 #[path = "recipient_snapshot/owners.rs"]
 mod owners;
 #[path = "recipient_snapshot/public_state.rs"]
@@ -37,6 +39,7 @@ mod shots;
 mod support;
 pub use composition::{GroundListDeliveryFrame, QuiescentDeliveryFrame, SupportedSeatSnapshot};
 pub use delivery::{DeliveryFrame, DeliveryState};
+pub use modes::mode_row;
 pub use selected::{SelectedDeliveryFrame, SelectedGroundListFrame, SelectedSeat};
 pub use shots::{SelectedGroundShotFrame, ShotRef};
 pub use support::SUPPORTED_SUPPORT_KINDS;
@@ -95,10 +98,14 @@ pub fn horde_mode_row(state: &Match) -> Result<Value, SnapshotError> {
     let mut row = json!({
         "kind": "horde", "defenderTeam": 0, "attackerTeam": 1,
         "timeLeft": mode.time_left, "suddenDeath": false,
-        "profile": mode.profile.as_str(), "wave": mode.wave,
-        "left": mode.left, "active": mode.active, "boss": mode.boss,
+        "wave": mode.wave,
+        "left": mode.left, "active": mode.active,
         "slot": horde.slot
     });
+    if mode.wave > 0 {
+        row["profile"] = json!(mode.profile.as_str());
+        row["boss"] = json!(mode.boss);
+    }
     if let Some(profile) = mode.next_profile {
         row["nextProfile"] = json!(profile.as_str());
     }
@@ -115,7 +122,7 @@ pub struct SnapshotCache<'a> {
 }
 impl<'a> SnapshotCache<'a> {
     pub fn new(state: &'a Match) -> Result<Self, SnapshotError> {
-        if !matches!(
+        let ordinary = matches!(
             (state.options.mode, state.world.game.mode),
             (Mode::Default | Mode::Conquest, None)
                 | (Mode::Classic, Some(crate::game::ModeKind::Classic))
@@ -123,9 +130,12 @@ impl<'a> SnapshotCache<'a> {
                     Mode::Annihilation,
                     Some(crate::game::ModeKind::Annihilation)
                 )
-        ) || state.world.geography().is_some()
-            || state.assault.is_some()
+                | (Mode::Assault, Some(crate::game::ModeKind::Assault))
+        );
+        if !ordinary
+            || state.world.geography().is_some()
             || state.world_runtime.is_some()
+            || (state.options.mode == Mode::Assault) != state.assault.is_some()
         {
             return Err(SnapshotError::UnsupportedMode);
         }
@@ -133,6 +143,14 @@ impl<'a> SnapshotCache<'a> {
             state
                 .validate_elimination_state()
                 .map_err(|_| SnapshotError::Rules)?;
+        }
+        if let Some(assault) = state.assault
+            && (!(0..6).contains(&assault.defender_team)
+                || !(-1..6).contains(&assault.attacker_team)
+                || assault.defender_team == assault.attacker_team
+                || !assault.time_left.is_finite())
+        {
+            return Err(SnapshotError::Rules);
         }
         let g = &state.world.game;
         let cells = g.w.checked_mul(g.h).ok_or(SnapshotError::Rules)?;
@@ -487,27 +505,6 @@ fn economy_fields(state: &Match, slot: usize) -> Result<Map<String, Value>, Snap
         fields.insert("mun".into(), json!(p.mun.floor()));
         fields.insert("fuel".into(), json!(p.fuel.floor()));
     }
-    if matches!(state.options.mode, Mode::Classic | Mode::Annihilation) {
-        let mode = state.elimination.as_ref().ok_or(SnapshotError::Rules)?;
-        let mut row = json!({
-            "kind": if state.options.mode == Mode::Classic { "classic" } else { "annihilation" },
-            "suddenDeath": mode.sudden_death
-        });
-        if let Some(time) = mode.time_left {
-            finite(&[time])?;
-            row["timeLeft"] = json!(math::max(0., time.ceil()));
-        }
-        if state.options.mode == Mode::Annihilation {
-            row["bunkers"] = json!(mode.bunkers);
-        }
-        fields.insert("mode".into(), row);
-    }
-    if let Some(nodes) = state
-        .ordinary_snapshot_nodes()
-        .map_err(|_| SnapshotError::Rules)?
-    {
-        fields.insert("nodes".into(), json!(nodes));
-    }
     for (key, value) in [("fuelInc", p.fuel_inc), ("upkeep", p.upkeep)] {
         if let Some(value) = value {
             finite(&[value])?;
@@ -619,6 +616,20 @@ impl Match {
     /// Bind hosted purchases to the current ordinary snapshot capabilities.
     pub fn restrict_to_ordinary_snapshots(&mut self) -> Result<(), SnapshotError> {
         self.preflight_ordinary_snapshot()?;
+        // A queued plane can later emit AntiAir or PlaneDown. Keep hosted
+        // training closed until the aviation event adapter is integrated.
+        for (id, building) in self.production.buildings() {
+            if building.jobs().iter().any(|job| {
+                self.rules
+                    .kind(&job.kind)
+                    .is_some_and(|kind| self.rules.kinds[kind].air)
+            }) {
+                return Err(SnapshotError::Unsupported {
+                    unit: id,
+                    capability: SnapshotCapability::Air,
+                });
+            }
+        }
         self.ordinary_snapshot_only = true;
         Ok(())
     }
@@ -1155,3 +1166,7 @@ mod map_house_selected_tests;
 #[cfg(test)]
 #[path = "recipient_snapshot/net52_tests.rs"]
 mod net52_tests;
+
+#[cfg(test)]
+#[path = "recipient_snapshot/production_state_tests.rs"]
+mod production_state_tests;
