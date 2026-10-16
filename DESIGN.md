@@ -4784,3 +4784,30 @@ changed map_terrain_components/world_start/world_memory test modules. It exits
 0. Fixed strings, test names and assertion/call order compare unchanged;
 git diff --check passes. Freeze a mechanical successor. Cargo/native/Source
 counts remain zero and the separate World validation test is not reformatted.
+
+## Owned MAP batch actual native result (2026-10-16)
+
+The one Root S1 grant runs on exact 549b5a8cd2f5b3988277548a2fe1ee2fab8c101a,
+Rust 06efbc3b7428d9ce20f967f1f2ad5ebca7685341. Compilation passes. Nextest
+selects exactly 36 instances across four binaries and runs each once with
+no-fail-fast and retries 0: 35 pass, one fails, 513 skip, exit 100. Actual
+selection matches the literal grant. Kernel readback is CPUs 0-3, 6 GiB,
+zero swap allowance, quota 400%; build jobs 4 and test threads 1. Normal
+Root-owned output stays at /tmp/native-feature-batches-0308/map_audit.
+Runner and systemd both terminate, and the inherited slot flock is proved
+released before Root receives the compact row map.
+
+MAP33 fails before its first tick at production admission: its authored factory
+clears constructor units but retains production metadata. The precise error is
+production building missing, tick 0, no events or retirement. Artillery and the
+later timed-collapse journey are unreached. The source-only seed scatter audit
+is a separate possible authored-input issue, not this native failure or proof
+of a shipping defect. Preserve the full failed body and log without repair,
+retry or changed native state. Drop MAP33 from this candidate batch.
+
+The other 35 instances continue and pass. Twenty-four owned candidate rows
+have passing literal mappings; their prototype intent review remains pending.
+The seventeen earlier held rows retain their concrete gaps, even where partial
+component tests pass. Update only normal documentation in a same-Rust-tree
+child, promote no row, and leave all 140 Acceptance cells exact. No new Source
+job, fixture, recorder or provenance bundle is produced.
