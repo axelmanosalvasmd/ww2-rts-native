@@ -1,2 +1,3 @@
 - Include trusted aircraft state in ordinary seat snapshots: owner fuel, ammunition, rearm timers and mission plans, plus the existing plane-at-base flag and enemy visibility rules.
 - Exercise aircraft sorties through return, rearm and match finish with snapshots for every seat. Aircraft purchase placement, spectator/operative delivery and aviation shot encodings remain unavailable; support-strike and queued-order adapter expansion remains separate work.
+- Rewrite `recipient_effects::original_ordinary_batches_match_selected_shot_rows_and_numeric_bits` to check selected shot rows and numeric bits for the now-supported parked aircraft frame, retaining live-flight and aviation-event refusal checks.
