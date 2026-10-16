@@ -386,6 +386,7 @@ mod tests {
         );
         assert_eq!(state.commands.pending_commands(), 0);
     }
+
     #[test]
     fn fire_at_and_compound_orders_remain_blocked_at_public_ingress() {
         let mut state = crate::lobby::native_tests::native_match();
@@ -406,6 +407,51 @@ mod tests {
                 format!(
                     "{:?}",
                     (&state.world.game.units, &state.commands.units, &ingress)
+                ),
+                before
+            );
+        }
+    }
+
+    #[test]
+    fn base_commands_remain_outside_public_r1_ingress() {
+        let mut state = crate::lobby::native_tests::native_match();
+        let mut ingress = CommanderIngress::default();
+        let hq = state
+            .world
+            .game
+            .units
+            .values()
+            .find(|unit| unit.owner == 0 && state.rules.kinds[unit.kind].name == "hq")
+            .unwrap()
+            .id;
+        let before = format!(
+            "{:?}",
+            (
+                &state.world,
+                &state.start.economy,
+                &state.building_rallies,
+                &state.player_rallies,
+                &ingress
+            )
+        );
+        for raw in [
+            json!({"t":"cancel", "id":hq}),
+            json!({"t":"rally", "id":hq, "x":30, "z":30}),
+            json!({"t":"rally", "x":30, "z":30}),
+        ] {
+            assert_eq!(ingress.enqueue(&mut state, 0, &raw), Err(Denial::Blocked));
+            assert_eq!(state.commands.pending_commands(), 0);
+            assert_eq!(
+                format!(
+                    "{:?}",
+                    (
+                        &state.world,
+                        &state.start.economy,
+                        &state.building_rallies,
+                        &state.player_rallies,
+                        &ingress
+                    )
                 ),
                 before
             );
