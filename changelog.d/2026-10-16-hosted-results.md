@@ -1,0 +1,2 @@
+- Integrate hosted results with save/editor persistence and the hosted Horde lifecycle, preserving guards and tests.
+- Save merge: parents 9b164885 and 141fd993. The sole conflict was lobby.rs start_trusted: retain the asynchronous request/generate/prepare/publish sequence, cancellation, fresh seeds and rollback; carry the incoming editor-map lookup into StartRequest as captured JSON and parse it in generate. All other save changes and registrations merge automatically.

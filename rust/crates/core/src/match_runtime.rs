@@ -675,6 +675,7 @@ pub struct Match {
     pub abilities: crate::match_abilities::AbilityState,
     pub recovery: crate::match_recovery::RecoveryState,
     pub assault: Option<crate::assault_runtime::AssaultState>,
+    #[serde(default)]
     pub elimination: Option<crate::elimination_modes::EliminationState>,
     pub horde: Option<crate::match_horde::HordeState>,
     pub commands: crate::match_commands::MatchCommands,
