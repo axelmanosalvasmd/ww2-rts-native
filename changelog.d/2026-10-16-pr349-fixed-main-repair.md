@@ -2,3 +2,4 @@
 - Replace the recipient-effects test's obsolete live-ground-flight refusal with exact recorded shot and flight rows for every selected seat. The enabled FireAt adapter now delivers that launch frame, so the test checks 159 frames, 795 recipient outputs and 94 shot rows instead of 158 frames, 790 outputs and 90 rows. Existing malformed-batch and empty-recipient refusal assertions remain.
 - Keep AI-38 as this batch's only claimed row. CMB-150, CMB-146, LOG-05 and LOG-08 remain dropped from this batch; World, full logistics and public FireAt admission stay guarded. The complete conflict and repair record is in docs/testing/pr349-fixed-main-repair.md.
 - Format the merged flight adapter and regression assertions with the pinned Rust formatter.
+- Record successful Vostro validation: 167 focused tests, workspace formatting and strict workspace all-target Clippy. The validation receipt keeps the qualified Rust source unchanged.

@@ -110,7 +110,37 @@ regression used MatchCommands with Debug formatting, which that type does not
 implement (E0277). The regression now compares its existing serialized state;
 no production type derive was added.
 
-Focused final-tree checks, formatting and strict workspace all-target Clippy
-are pending. No whole-workspace test result or hosted-check success is claimed.
+The qualified source is `7b3e4e60a65efe2794bd932b8a6f25702b27ee60`, Rust
+tree `c9cb8655881e46377a5e433e243786abba6e6d1b`. The final receipt commit
+changes only this document and the changelog fragment, retaining that Rust tree.
+
+Rust 1.99.0 on the Vostro, slot S3 with its matching target directory,
+MemoryMax=6G, MemorySwapMax=0 and four Cargo jobs:
+
+```text
+cargo fmt --all --check: PASS
+cargo nextest run --locked --cargo-profile ci-test --no-fail-fast -j4
+  -p ww2-core -p ww2-simtest -E <filter below>: 167 passed, 0 failed, 1249 skipped
+cargo clippy --locked --workspace --all-targets -j4 -- -D warnings: PASS
+```
+
+The exact nextest filter was:
+
+```text
+test(commander_tactics::) | test(human_commander_policy::) | test(fire_at) | test(recipient_effects::) | test(match_aircraft) | test(match_aviation::) | test(match_commands::tests) | test(match_ground_orders::tests) | test(recipient_snapshot::)
+```
+
+All five AI-38 tests passed, including ordinary ticks, every seat's snapshots
+and match finish. The new mixed FireAt refusal/both-owner regression passed.
+Main's recorded aircraft Area-mission test and mixed-selection, malformed
+metadata, post-command and room-admission guards passed. Both recipient-effects
+tests passed, including the complete exact live-flight rows and numeric bits
+for all five seats and the unchanged malformed-batch atomicity assertions.
+
+The slot was released immediately after Clippy exited successfully. The raw
+local log is `/tmp/ww2-349-final-validation.log`. Issue #5 was read again at the
+report boundary; there were no new replies after the task-start snapshot's
+latest update of 2026-10-16 16:58:03 UTC. No issue post, full workspace test run,
+hosted-check success or runtime acknowledgment is claimed.
 
 merges after #373; needs fresh Hermes ack
