@@ -12,13 +12,13 @@ use crate::{
 };
 use std::collections::{BTreeMap, VecDeque};
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Facing {
     pub angle: f64,
     pub at: Point,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum MoveOutcome {
     Interrupted,
     Moving,
@@ -37,7 +37,7 @@ impl MoveOutcome {
 }
 /// The optional source result tail survives later moving/interrupted intents.
 /// Only the actual terminal path/completion operations replace it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum MoveResult {
     Unreachable { tick: i64 },
     Completed { tick: i64 },
@@ -51,13 +51,13 @@ impl MoveResult {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct MoveOrder {
     pub unit: i64,
     pub at: Point,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Stance {
     HoldFire,
     HoldPosition,
@@ -65,7 +65,7 @@ pub enum Stance {
 }
 
 /// Internal recorded input. This is not a WebSocket or C interface.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Command {
     Build {
         ids: Vec<i64>,
@@ -199,7 +199,7 @@ pub enum Command {
 }
 
 /// Only fields absent from Unit live here. Routes, positions and hold_pos remain in Unit.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct UnitControl {
     /// Gate openness and its deterministic half-second check timer.
     pub gate: Option<crate::match_gates::GateControl>,
@@ -305,6 +305,7 @@ impl UnitControl {
     }
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct MatchCommands {
     pub units: BTreeMap<UnitId, UnitControl>,
     pub(crate) queue: OrderQueue<Command>,
@@ -1015,7 +1016,7 @@ impl crate::match_runtime::Match {
             if kind == "worldbase" {
                 return Ok(Some(Denial::Blocked));
             }
-            if self.options.mode == Mode::World {
+            if self.options.mode.is_construction() {
                 if Catalog::compiled()
                     .and_then(|catalog| catalog.table("UNITS"))
                     .map_err(|e| e.to_string())?
@@ -1029,7 +1030,10 @@ impl crate::match_runtime::Match {
                     Err(crate::match_runtime::ProductionStepError::Production(
                         crate::production::Error::Denied(d),
                     )) => Ok(Some(d.into())),
-                    Err(e) => Err(format!("recorded World buy: {e:?}")),
+                    Err(crate::match_runtime::ProductionStepError::Placement(
+                        crate::produced_units::Error::UnsupportedAir,
+                    )) => Ok(Some(Denial::Unsupported)),
+                    Err(e) => Err(format!("recorded construction-mode buy: {e:?}")),
                 };
             }
             return match self.recorded_buy(owner, kind, *from) {
@@ -1054,6 +1058,7 @@ impl crate::match_runtime::Match {
                     crate::match_support::SupportDenial::Blocked => Denial::Blocked,
                     crate::match_support::SupportDenial::Cooldown => Denial::Cooldown,
                     crate::match_support::SupportDenial::Manpower => Denial::Manpower,
+                    crate::match_support::SupportDenial::Munitions => Denial::Munitions,
                     crate::match_support::SupportDenial::Unseen => Denial::Unseen,
                     crate::match_support::SupportDenial::Population => Denial::Population,
                 })),

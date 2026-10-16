@@ -135,6 +135,7 @@ fn ordinary_logistics_match_finishes_with_cache_depot_convoys_fuel_and_every_sea
         let mut saw_cache = false;
         let mut saw_depot = false;
         let mut finish_tick = None;
+        let mut checkpoint_restored = false;
         for _ in 0..750 {
             let report = m.advance_tick().unwrap();
             assert!(report.phases.contains(&TickPhase::UnitReserves));
@@ -197,7 +198,21 @@ fn ordinary_logistics_match_finishes_with_cache_depot_convoys_fuel_and_every_sea
                     );
                 }
             }
+            drop(frame);
             assert!(m.tick_state.fault().is_none());
+            if m.world.game.tick == 40 {
+                // Save while the cache is unfinished and the selected truck is active.
+                assert!(m.world.game.units[&cache].built.unwrap() < 1.);
+                assert!(m.convoys.as_ref().unwrap().trucks.contains_key(&truck));
+                let checkpoint = m.save_json().unwrap();
+                let restored = crate::match_runtime::Match::from_save_json(checkpoint).unwrap();
+                assert_eq!(restored.logistics, m.logistics);
+                assert_eq!(restored.convoys, m.convoys);
+                assert_eq!(restored.supply_net, m.supply_net);
+                m = restored;
+                delivery = DeliveryState::new(&m).unwrap();
+                checkpoint_restored = true;
+            }
             if m.finish.is_some() {
                 let start = *finish_tick.get_or_insert(m.world.game.tick);
                 if m.world.game.tick >= start + 8 {
@@ -205,6 +220,10 @@ fn ordinary_logistics_match_finishes_with_cache_depot_convoys_fuel_and_every_sea
                 }
             }
         }
+        assert!(
+            checkpoint_restored,
+            "active logistics checkpoint was never restored"
+        );
         assert!(saw_network, "network refresh was never observed");
         assert!(saw_fuel_use, "powered fuel use was never observed");
         assert!(saw_cache, "cache completion was never observed");

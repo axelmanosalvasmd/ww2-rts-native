@@ -380,7 +380,11 @@ impl Match {
         self.validate_supply_context()
     }
     fn validate_supply_context(&self) -> Result<(), String> {
-        if !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode) {
+        if !matches!(
+            self.options.mode,
+            crate::economy::Mode::Default | crate::economy::Mode::Conquest
+        ) || self.world.game.mode.is_some()
+        {
             return Err("supply adapter supports ordinary Conquest only".into());
         }
         let g = &self.world.game;

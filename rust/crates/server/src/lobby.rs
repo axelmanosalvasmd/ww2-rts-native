@@ -174,6 +174,7 @@ impl SnapshotAccount {
     }
 }
 
+#[derive(Clone)]
 struct Person {
     token: Vec<u16>,
     name: String,
@@ -214,6 +215,7 @@ struct AttachedRuntime {
     startup: crate::native_startup::NativeStartup,
     // Complete R1 options/seeds are a host receipt, never a client envelope.
     receipt: Option<Value>,
+    loaded_save: bool,
     diagnostics: crate::diagnostics::RoomDiagnostics,
 }
 
@@ -231,12 +233,14 @@ struct RoomResult {
 
 struct Room {
     code: String,
+    saves: crate::saves::SaveStore,
     listed: bool,
     title: String,
     players: Vec<Person>,
     spectators: Vec<Person>,
     mode: String,
     map: String,
+    loaded_spawns: Option<Value>,
     world_size: String,
     army: String,
     weather: String,
@@ -265,6 +269,14 @@ impl Room {
         person.is_some_and(|p| p.connection.as_ref().is_some_and(|c| c.id == id))
     }
     fn capacity(&self, maps: &Value) -> usize {
+        if !matches!(self.mode.as_str(), "world" | "horde" | "tutorial")
+            && let Some(spawns) = self.loaded_spawns.as_ref().and_then(Value::as_array)
+        {
+            return spawns
+                .iter()
+                .filter(|spawn| self.mode == "assault" || spawn["assault"] != true)
+                .count();
+        }
         match self.mode.as_str() {
             "world" => MAX_PLAYERS,
             "horde" | "tutorial" => MAX_PLAYERS - 1,
@@ -410,7 +422,7 @@ impl Room {
             "t":"lobby", "proto":0, "code": self.code, "state":if self.native.is_some() { "play" } else { "lobby" },
             "role":"commander", "operatives":[], "spectator":you.is_none(),
             "amHost":self.is_host(id), "spectators":self.spectators.iter().map(|p| &p.name).collect::<Vec<_>>(),
-            "listed":self.listed, "saves":[], "hordeBest":null,
+            "listed":self.listed, "saves":self.saves.lobby_list(&self.code), "hordeBest":null,
             "you":you.map_or(-1, |i| i as i64), "host":self.host().map_or(-1, |i| i as i64),
             "maps":maps.as_object().unwrap().keys().collect::<Vec<_>>(),
             "mapName":if self.mode == "world" { "world" } else { &self.map },
@@ -634,6 +646,7 @@ impl Room {
                     return false;
                 }
                 self.map = name.into();
+                self.loaded_spawns = None;
             }
             "mode"
                 if host
@@ -672,6 +685,7 @@ impl Room {
                     }
                 }
                 self.mode = mode.into();
+                self.loaded_spawns = None;
             }
             "worldSize" if host => {
                 let value = msg
@@ -816,6 +830,7 @@ pub(crate) struct Hub {
     trusted: Option<crate::TrustedRoomConfig>,
     diagnostics: Option<crate::diagnostics::Recorder>,
     tick_log: bool,
+    saves: crate::saves::SaveStore,
 }
 impl Hub {
     pub fn new(max_rooms: usize, public_url: String) -> Self {
@@ -832,6 +847,13 @@ impl Hub {
             trusted: None,
             diagnostics: None,
             tick_log: false,
+            saves: crate::saves::SaveStore::new("saves".into()),
+        }
+    }
+    pub(crate) fn configure_saves(&mut self, dir: std::path::PathBuf) {
+        self.saves = crate::saves::SaveStore::new(dir);
+        for room in self.rooms.values_mut() {
+            room.saves = self.saves.clone();
         }
     }
     pub(crate) fn diagnostics_enabled(&self) -> bool {
@@ -866,6 +888,16 @@ impl Hub {
             return Err("server stopped".into());
         }
         let room = self.rooms.get(code).ok_or("room does not exist")?;
+        self.prepare_native_room(room, state, now, replace, None)
+    }
+    fn prepare_native_room(
+        &self,
+        room: &Room,
+        state: Match,
+        now: u64,
+        replace: bool,
+        raw_map: Option<&Value>,
+    ) -> Result<PreparedNative, String> {
         if room.native.is_some() && !replace {
             return Err("room already has a native runtime".into());
         }
@@ -897,16 +929,18 @@ impl Hub {
             .checked_add(1)
             .filter(|epoch| *epoch <= crate::native_startup::MAX_MATCH_ID)
             .ok_or("native runtime epoch exhausted")?;
-        let startup = crate::native_startup::NativeStartup::prepare(
-            &state,
-            crate::native_startup::StartupSettings {
-                map: &room.map,
-                mode: &room.mode,
-                army: &room.army,
-                weather: &room.weather,
-                sandbox: room.sandbox,
-            },
-        )?;
+        let settings = crate::native_startup::StartupSettings {
+            map: &room.map,
+            mode: &room.mode,
+            army: &room.army,
+            weather: &room.weather,
+            sandbox: room.sandbox,
+        };
+        let startup = if let Some(raw) = raw_map {
+            crate::native_startup::NativeStartup::prepare_loaded(&state, settings, raw)?
+        } else {
+            crate::native_startup::NativeStartup::prepare(&state, settings)?
+        };
         // Canonical runtime admission completes before changing the room or accounts.
         let mut runtime = RoomRuntime::new(state, now)?;
         let resume = runtime.resume(now);
@@ -934,6 +968,7 @@ impl Hub {
                 runtime,
                 startup,
                 receipt: None,
+                loaded_save: false,
                 diagnostics: crate::diagnostics::RoomDiagnostics::default(),
             },
             starts,
@@ -951,6 +986,7 @@ impl Hub {
         } = prepared;
         let epoch = attached.epoch;
         let room = self.rooms.get_mut(code).unwrap();
+        room.loaded_spawns = Some(attached.startup.raw_map()["spawns"].clone());
         room.native = Some(attached);
         room.result = None;
         self.next_epoch = epoch;
@@ -1699,6 +1735,9 @@ impl Hub {
             return;
         }
         if *joined {
+            if self.save_command(code, connection.id, &msg, now) {
+                return;
+            }
             if self.trusted_command(code, connection.id, &msg, now) {
                 return;
             }
@@ -1756,10 +1795,12 @@ impl Hub {
         if !self.rooms.contains_key(code) {
             self.room_order.push(code.into());
         }
+        let saves = self.saves.clone();
         let room = self.rooms.entry(code.into()).or_insert_with(|| {
             let tutorial = msg["listing"]["tutorial"] == true;
             Room {
                 code: code.into(),
+                saves,
                 listed: msg["listing"]["public"] == true && !tutorial,
                 title: clean(
                     msg["listing"]["title"].as_str().unwrap_or("Open skirmish"),
@@ -1771,6 +1812,7 @@ impl Hub {
                 spectators: Vec::new(),
                 mode: if tutorial { "tutorial" } else { "conquest" }.into(),
                 map: if tutorial { "tutorial" } else { "default" }.into(),
+                loaded_spawns: None,
                 world_size: "huge".into(),
                 army: "standard".into(),
                 weather: "map".into(),
@@ -2388,6 +2430,10 @@ mod net_batch50;
 mod net83_followup_tests;
 
 #[cfg(test)]
+#[path = "mode_runtime_a_tests.rs"]
+mod mode_runtime_a_tests;
+
+#[cfg(test)]
 #[path = "net_runtime3_tests.rs"]
 mod net_runtime3;
 
@@ -2398,3 +2444,10 @@ mod net_runtime2;
 #[cfg(test)]
 #[path = "seat_lifecycle_tests.rs"]
 mod seat_lifecycle_tests;
+
+#[cfg(test)]
+#[path = "save_load_tests.rs"]
+mod save_load_tests;
+
+#[path = "lobby_saves.rs"]
+mod save_runtime;

@@ -76,7 +76,7 @@ impl std::fmt::Display for Error {
     }
 }
 impl std::error::Error for Error {}
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ProductionJob {
     pub id: u64,
     pub kind: String,
@@ -92,7 +92,7 @@ pub struct JobRow {
     pub job: ProductionJob,
     pub status: JobStatus,
 }
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct BuildingProduction {
     jobs: Vec<ProductionJob>,
     progress: f64,
@@ -122,13 +122,13 @@ impl BuildingProduction {
             .collect()
     }
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ResearchJob {
     pub kind: Technology,
     pub progress: f64,
     pub time: f64,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct PlayerResearch {
     tech: TechState,
     jobs: Vec<ResearchJob>,
@@ -141,7 +141,7 @@ impl PlayerResearch {
         &self.jobs
     }
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ProductionState {
     buildings: BTreeMap<u32, BuildingProduction>,
     players: Vec<PlayerResearch>,
@@ -559,9 +559,10 @@ impl ProductionState {
             wallets.population_cap(&context, slot)?,
         ))
     }
-    /// Prepare instant recruitment without changing wallets or queues. Horde
-    /// names its scripted seat so allied facilities retain the shared access rule.
-    /// Winner/away/out/rate admission stays with Match.
+    /// Prepare instant skirmish recruitment without changing wallets or queues.
+    /// Default represents the absent Conquest mode object. Construction modes use
+    /// training queues. Horde names its scripted seat for shared allied facilities.
+    /// Winner, away, out and rate admission stay with Match.
     pub fn prepare_recruit<'a, 'facts>(
         &'a self,
         c: &'a Context<'facts>,
@@ -577,9 +578,13 @@ impl ProductionState {
             && c.mode
                 .income_excluded_slot
                 .is_some_and(|slot| slot.checked_add(1) == Some(self.players.len()));
-        if !matches!(c.mode.kind, Mode::Default | Mode::Conquest) && !horde {
+        if !matches!(
+            c.mode.kind,
+            Mode::Default | Mode::Conquest | Mode::Assault | Mode::Annihilation
+        ) && !horde
+        {
             return Err(Error::InvalidInput(
-                "recruitment requires Conquest or initialized Horde",
+                "recruitment requires a represented skirmish mode or initialized Horde",
             ));
         }
         self.prepare_home_or_building_recruit(c, wallets, slot, faction, kind, from)

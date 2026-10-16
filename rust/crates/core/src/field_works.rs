@@ -30,7 +30,9 @@ pub use projects::{
     ProjectRequest, Segment, SegmentPreparation, entrench_plan, line_fort, segment_cost,
 };
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
 pub enum FortKind {
     Trench,
     Sandbags,
@@ -120,12 +122,12 @@ impl std::fmt::Display for Error {
     }
 }
 impl std::error::Error for Error {}
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct WorkCell {
     pub cell: usize,
     pub ch: u8,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Dig {
     pub project: Option<ProjectId>,
     pub kind: FortKind,
@@ -154,7 +156,7 @@ pub struct StartRequest {
     pub at: Point,
     pub direction: Option<f64>,
 }
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FieldWorksRuntime {
     jobs: BTreeMap<u32, Dig>,
     pits: BTreeSet<usize>,

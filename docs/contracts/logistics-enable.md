@@ -12,8 +12,9 @@ A truthy authored `scenario` overrides that table: only the literal JSON boolean
 string, array and object logistics values do not opt in.
 
 `server.js:380-381` passes that result to `createGame`, unless a loaded room has
-`room.logistics === false`. Native R1 has no loaded-room logistics override or
-public logistics switch. Its trusted Conquest start now supplies the mapped
+`room.logistics === false`. Loaded matches retain their serialized logistics switch. Native R1 still has no
+persistent loaded-false override for a later restart, and no public logistics
+switch. A fresh trusted Conquest start supplies the mapped
 option from the immutable authoritative map. Existing room, scenario, mode,
 World, AI and spectator admission stays in place. The helper's complete table
 does not admit those modes.
@@ -38,4 +39,4 @@ Focused checks:
 
 These checks cover LOG-01's server mapping and the admitted Conquest slice of
 MODE-11 and NET-39. They do not prove full mode feature switches, all createGame
-options, loaded saves or unsupported room admission.
+options, loaded-false restart parity or unsupported room admission.

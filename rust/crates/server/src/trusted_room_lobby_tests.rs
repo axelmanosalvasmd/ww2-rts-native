@@ -208,9 +208,8 @@ fn trusted_canonical_map_weather_matrix_records_options_before_publication() {
         refused.len()
     );
     assert_eq!(admitted + refused.len(), 231);
-    assert_eq!(admitted, 224);
-    assert!(refused.iter().all(|row| row.starts_with("no-mans-land/")));
-    assert_eq!(refused.len(), 7);
+    assert_eq!(admitted, 231);
+    assert!(refused.is_empty());
 }
 
 #[test]

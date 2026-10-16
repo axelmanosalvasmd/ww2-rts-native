@@ -48,8 +48,10 @@ actual producing commit and executed selection.
   direct fire, salvos and AA. Terrain firing remains held.
 - LOG-20: `ordinary_logistics_match_finishes_with_cache_depot_convoys_fuel_and_every_seat_each_tick`
   and existing `base45_paid_cache_requires_logistics_and_serves_only_when_finished`
-  cover Conquest cache admission and lifetime. Classic awaits its runner;
-  World admission is deferred.
+  cover Conquest cache admission and lifetime. Classic now has a bounded runner,
+  but its enabled logistics remains unsupported.
+  `classic_and_annihilation_keep_physical_logistics_uninitialized` checks that
+  the broader mode helper does not widen supply admission. World stays off.
 - LOG-44: `intent_log44_exact_fields_rounding_and_private_allied_stock_in_complete_frames`
   and `intent_log44_nulls_grace_cut_boundaries_and_disabled_omission_match_prototype`
   prove the ordinary seat object. The full-match test collects every seat each
@@ -78,6 +80,11 @@ actual producing commit and executed selection.
 - MOV-03: `automatic_convoys_keep_supply_routes_while_manual_trucks_use_ordinary_routes`
   checks the newly exposed convoy sequence. The complete command, terrain-fire
   and movement sequence remains held.
+
+The full-match test restores a checkpoint at tick 40 with an unfinished cache,
+an active truck, reserves and supply state. It then continues every-seat delivery
+through victory. The server save/load tests also run with logistics enabled.
+Loaded-false restart override parity remains held.
 
 Additional regressions are
 `reserve_exhaustion_cancels_live_construction_then_recovers_through_tick_and_delivery`,

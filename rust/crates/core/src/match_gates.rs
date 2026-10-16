@@ -1,7 +1,7 @@
 //! Gates reuse canonical building cells and the existing owner snapshot flag.
 use crate::{catalog::Catalog, grid::UnitId, match_runtime::Match, math};
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct GateControl {
     /// Missing until the first complete-building turn, as in Source.
     pub open: Option<bool>,
