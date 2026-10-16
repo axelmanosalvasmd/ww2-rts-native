@@ -589,7 +589,7 @@ impl Match {
             shooter: p.shooter,
             kind: p.source_kind,
             owner: p.owner as i32,
-            airborne: false,
+            airborne: self.rules.kinds[p.source_kind].air,
         };
         let impact = Impact {
             owner: p.owner as i32,

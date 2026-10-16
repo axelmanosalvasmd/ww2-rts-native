@@ -645,6 +645,8 @@ pub struct Match {
     pub firing: crate::match_firing::FiringState,
     pub capture_ticks: Vec<Option<i64>>,
     pub tick_state: crate::match_tick::TickState,
+    /// Host admission stays bound to this match across ticks and recorded commands.
+    pub(crate) ordinary_snapshot_only: bool,
     /// Canonical source counters. Event owners must record accepted effects exactly once.
     pub story: Vec<crate::match_story::PlayerStory>,
     pub fallen: crate::match_story::FallenLocations,
@@ -826,6 +828,7 @@ impl Match {
             firing: crate::match_firing::FiringState::default(),
             capture_ticks: vec![None; point_count],
             tick_state: crate::match_tick::TickState::default(),
+            ordinary_snapshot_only: false,
             story: vec![crate::match_story::PlayerStory::default(); player_count],
             fallen: crate::match_story::FallenLocations::default(),
             finish: None,

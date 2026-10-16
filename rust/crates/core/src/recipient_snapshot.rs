@@ -549,6 +549,13 @@ fn economy_fields(state: &Match, slot: usize) -> Result<Map<String, Value>, Snap
 }
 
 impl Match {
+    /// Bind hosted purchases to the current ordinary snapshot capabilities.
+    pub fn restrict_to_ordinary_snapshots(&mut self) -> Result<(), SnapshotError> {
+        self.preflight_ordinary_snapshot()?;
+        self.ordinary_snapshot_only = true;
+        Ok(())
+    }
+
     /// Read-only admission of the currently supported ordinary actor frame.
     /// Trusted attachment validates every seat before installing the match.
     pub fn preflight_ordinary_snapshot(&self) -> Result<(), SnapshotError> {

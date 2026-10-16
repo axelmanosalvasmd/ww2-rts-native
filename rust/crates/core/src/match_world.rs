@@ -305,6 +305,7 @@ impl Match {
             recipients: Vec::new(),
             routing_fog: crate::fog::Fog::default(),
             tick_state: crate::match_tick::TickState::default(),
+            ordinary_snapshot_only: false,
             world_runtime: Some(runtime),
             rail_runs: BTreeMap::new(),
             commands: crate::match_commands::MatchCommands::new(4096),
