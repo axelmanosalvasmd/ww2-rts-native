@@ -1,1 +1,1 @@
-- Add 31 native engineering intent tests and literal mappings for all 36 remaining owned rows. Keep unsupported and partially covered rows unpromoted; native execution and prototype review are pending. Preserve earlier fixtures, failures and PR272 evidence.
+- Add 31 native engineering intent tests and literal mappings for all 36 remaining owned rows. The single focused batch selects 36 tests: 34 pass and 2 fail. Preserve both failures without repair or retry; unsupported, partial and failed rows stay unpromoted pending prototype review.
