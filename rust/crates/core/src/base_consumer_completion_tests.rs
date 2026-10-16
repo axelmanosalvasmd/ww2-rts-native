@@ -96,25 +96,51 @@ fn frames() -> Json {
     assert_eq!(f["cases"].as_array().unwrap().len(), 5);
     f
 }
-fn equal(a: &Json, b: &Json) {
+fn equal(a: &Json, b: &Json, context: &str, path: &str) {
     match (a, b) {
         (Json::Number(a), Json::Number(b)) => {
-            assert_eq!(a.as_f64().unwrap().to_bits(), b.as_f64().unwrap().to_bits())
+            assert_eq!(
+                a.as_f64().unwrap().to_bits(),
+                b.as_f64().unwrap().to_bits(),
+                "{context}; fixture_json_path={path}; native_actual_bits={:016x}; fixture_expected_bits={:016x}",
+                a.as_f64().unwrap().to_bits(),
+                b.as_f64().unwrap().to_bits()
+            )
         }
         (Json::Array(a), Json::Array(b)) => {
-            assert_eq!(a.len(), b.len());
-            for (a, b) in a.iter().zip(b) {
-                equal(a, b);
+            assert_eq!(
+                a.len(),
+                b.len(),
+                "{context}; fixture_json_path={path}; left=native actual length; right=fixture expected length"
+            );
+            for (index, (a, b)) in a.iter().zip(b).enumerate() {
+                equal(a, b, context, &format!("{path}[{index}]"));
             }
         }
         (Json::Object(a), Json::Object(b)) => {
-            assert_eq!(a.keys().collect::<Vec<_>>(), b.keys().collect::<Vec<_>>());
+            assert_eq!(
+                a.keys().collect::<Vec<_>>(),
+                b.keys().collect::<Vec<_>>(),
+                "{context}; fixture_json_path={path}; left=native actual keys; right=fixture expected keys"
+            );
             for (key, a) in a {
-                equal(a, &b[key]);
+                equal(a, &b[key], context, &format!("{path}[{}]", json!(key)));
             }
         }
-        _ => assert_eq!(a, b),
+        _ => assert_eq!(
+            a, b,
+            "{context}; fixture_json_path={path}; native_actual={a:?}; fixture_expected={b:?}"
+        ),
     }
+}
+fn compare_checkpoint(m: &Match, expected: &Json, scene: &str, checkpoint: &str, path: &str) {
+    let context = format!(
+        "scene={scene:?}; mode={:?}; checkpoint={checkpoint}; native_tick={}; fixture_tick={}",
+        m.options.mode,
+        m.world.game.tick,
+        expected["tick"]
+    );
+    equal(&project(m), expected, &context, path);
 }
 fn project(m: &Match) -> Json {
     json!({"tick":m.world.game.tick,"next":m.next_unit_id,
@@ -260,19 +286,32 @@ fn contact(m: &mut Match, cell: usize, amount: f64, name: &str) -> f64 {
 }
 fn replay(name: &str) -> Match {
     let f = frames();
-    let case = f["cases"]
+    let (case_index, case) = f["cases"]
         .as_array()
         .unwrap()
         .iter()
-        .find(|c| c["name"] == name)
+        .enumerate()
+        .find(|(_, c)| c["name"] == name)
         .unwrap();
     let mut m = construct(&case["input"]);
-    equal(&project(&m), &case["initial"]);
+    compare_checkpoint(
+        &m,
+        &case["initial"],
+        name,
+        "initial",
+        &format!("$[\"cases\"][{case_index}][\"initial\"]"),
+    );
     let construction = name == "classic-sequential-sites-queued-repair-and-paid-mg";
     let mut phases = BTreeSet::new();
     let mut paid_head = None;
     for (index, row) in case["records"].as_array().unwrap().iter().enumerate() {
-        equal(&project(&m), &row["before"]);
+        compare_checkpoint(
+            &m,
+            &row["before"],
+            name,
+            &format!("record[{index}] before op={} phase={}", row["op"], row["phase"]),
+            &format!("$[\"cases\"][{case_index}][\"records\"][{index}][\"before\"]"),
+        );
         match row["op"].as_str().unwrap() {
             "command" => {
                 let slot = row["slot"].as_u64().unwrap() as usize;
@@ -435,7 +474,13 @@ fn replay(name: &str) -> Match {
             }
             _ => panic!("unexpected component action"),
         }
-        equal(&project(&m), &row["after"]);
+        compare_checkpoint(
+            &m,
+            &row["after"],
+            name,
+            &format!("record[{index}] after op={} phase={}", row["op"], row["phase"]),
+            &format!("$[\"cases\"][{case_index}][\"records\"][{index}][\"after\"]"),
+        );
     }
     m
 }

@@ -1,0 +1,1 @@
+- Add scene, mode, checkpoint, tick, exact fixture JSON path and labeled native/fixture values to the BASE consumer's unchanged comparison assertions. Preserve the e25 raw bit mismatch and its 2 PASS, 1 FAIL, 2 UNRUN result; no cause or semantic repair is established. This source-only child has no project execution.

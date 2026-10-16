@@ -4720,3 +4720,75 @@ remains three simultaneous jobs. Stop on the first genuine failure, terminate
 and release the inherited flock, then notify Root before reporting. No old
 grant transfers. No slot, runtime integration, publication or parity change
 is made here. Root owns independent review, Hermes readback and integration.
+
+
+## BASE canonical comparison failure context (2026-10-15, source only)
+
+This bounded diagnostic child starts directly at failed producer
+`e25bd189d54b7c2f38b6bad0660ffa5f6928d7b8`, Rust tree
+`4b20593e0ae4b779e9dd83c4e8749a859f68a73a`, in the persistent d699fc97
+physical checkout. The old branch and all saved refs remain at their original
+objects. No newer main is imported. Before editing, declare overlap as only
+`base_consumer_completion_tests.rs`, this appended section and one new fragment.
+The private packet is `diagnostic-context-e25bd189-v12/` under
+`/tmp/impl-bases-consumer-cycle2-d699fc97/`.
+
+Read the complete preceding REPORT and its full `native5.log`. The requested
+`rawnative5.log` path returns ENOENT; the REPORT names the retained native5.log.
+The actual e25 invocation compiled and stopped at two PASS, one FAIL and two
+UNRUN. Its independently authored Rally bookkeeping fault control passed after
+the placement-input repair. The ordinary cancellation/Rally/rifle replay failed
+at the recursive String comparison: native actual `0000000000000000`, fixture
+expected `7ff8000000000000`. That raw log names no field, scene, mode or checkpoint.
+It does not establish which projection value differs or why. All those results
+belong to e25 alone. The earlier occupied-site failure and every prior raw
+producing-head failure remain retained without normalization.
+
+Read the full actual consumer, its canonical JSON fixture reader and bit/point
+encoders, the seventh Source recipe, and the immutable canonical production-row
+reader. Add only diagnostic arguments and messages to the existing recursive
+comparison. Keep its exact numeric-bit operands, array-length assertion, zipped
+traversal, object-key assertion and key traversal, and terminal Json assertion.
+Array indices and JSON-encoded object keys extend an exact fixture JSON path.
+A borrowed checkpoint wrapper supplies scene, native mode, initial or record
+before/after checkpoint, native tick and fixture tick. Record labels include the
+original operation and phase. The existing first matching case search also
+retains its index for the fixture path. Each projection is still captured once,
+at the same point before any command or after the same original operation.
+
+Failure text labels native actual and fixture expected values. Hex strings stay
+verbatim; ordinary Number comparisons still assert the same original f64 bits,
+with both hexadecimal operands added to their diagnostic text. The path names
+the projection field and every tuple index. Existing tuple layouts, including
+wallets [mp, mun, fuel], remain unchanged. The wrapper borrows `&Match` and does
+not dispatch commands or write game state. No expected value, input, history,
+provider, assertion predicate or NaN representation is changed. This is failure
+context, not a semantic repair or evidence identifying the old failure's cause.
+
+All five newest test bodies remain byte-identical. All 33 older bodies, seven
+recipes, registries, shipping providers, FFI, wire and contracts retain their
+original blobs. Preserve all 939 IDs and complete Acceptance/Status rows, the
+full typed incoming/owned union, the 170 original and 262 inherited historical
+artifacts, every other prior packet artifact and 61 saved BASES refs. The genuine
+seventh fixture stays 486,928 bytes with SHA256
+`0a6bf3a9dbf01f1efa578a2b3b882dd1854ca96dd3533cb01063f079e31702ca`;
+Source capture stays attributed to `aaf0cf6f` and freeze to `8b6837f2`. The six
+older pending fixture paths still require actual ENOENT. No parity cell moves.
+
+Locally ACK issue #5 through 6205853764, PR16 replies 6137154230/6137379059
+and PR195 reply 6156740603 as receipt only. Root retains the separate exact-head
+PR269/270 integration and hosted gates. Six-call ABI 2 and accepted startup
+content/schema scope remain unchanged. This child adopts no provider, default,
+transport, privacy or client behavior. No public ACK is posted.
+
+Source, Node, Cargo, rustc, native, formatter, lint, discovery, release and CI
+jobs are zero. No test retry, slot acquisition or central-ledger write occurs.
+All five selected tests are UNRUN on this child; formatting and compilation are
+also unverified. Root alone may issue a new literal-head, Rust-tree, selection
+and assigned-slot grant with the current guard, external target, inherited
+exclusive flock, four actual CPUs, 6 GiB, zero swap, 400 percent CPU, jobs4/thread1,
+400-second bound and free -g plus at least 20 GiB disk before each job. Maximum
+three jobs and first-failure stop/release/notify-before-report still apply.
+Old grants and green results do not transfer. Freeze one private child with raw
+binary/full-index forward and inverse patches, typed preservation and checksums,
+then stop. Root owns independent review and any later execution or integration.
