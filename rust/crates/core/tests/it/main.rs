@@ -65,6 +65,14 @@ mod math;
 mod mode_intent_batch1;
 #[path = "../mode_point_services.rs"]
 mod mode_point_services;
+#[path = "../mov_aircraft_controls.rs"]
+mod mov_aircraft_controls;
+#[path = "../mov_aircraft_immunity.rs"]
+mod mov_aircraft_immunity;
+#[path = "../mov_hull_clearance.rs"]
+mod mov_hull_clearance;
+#[path = "../mov_wreck_journey.rs"]
+mod mov_wreck_journey;
 #[path = "../objectives.rs"]
 mod objectives;
 #[path = "../observed_memory.rs"]
