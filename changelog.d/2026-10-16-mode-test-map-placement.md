@@ -1,0 +1,1 @@
+- Keep the native MODE test and review mappings in testing documentation, with all 83 IDs and the actual results retained. Restore the inherited parity inventory exactly so test PRs introduce no status changes or duplicate rows.

@@ -1,5 +1,15 @@
 # Three Crossroads Native: design decisions
 
+## MODE proof map placement (2026-10-16)
+
+Keep native feature tests and their compact row mappings separate from parity
+status updates. Move only this task's two appended MODE mapping sections to
+docs/testing/mode-native-intent-batches.md, restoring the inherited parity
+file exactly and preventing duplicate canonical inventory rows. All 83 IDs,
+actual first-batch results and incomplete reasons remain. Rust765129ae and
+the pending four-test second-batch selection are unchanged.
+
+
 ## MODE first actual results and later window (2026-10-16)
 
 The first actual native intent batch at 5b034faa, Rust5742a3e3, ran all ten
@@ -35,7 +45,7 @@ Horde, Classic and Annihilation still have no admitted native constructors.
 Their rows remain incomplete. Tutorial tick7081 Trench failure on 8a5af066
 remains unchanged, including the full original test and its diagnostics.
 Partial tests cannot promote all-mode or server-start rows. The literal
-first-window mapping and reasons are in docs/parity/modes.md. New tests have
+first-window mapping and reasons are in docs/testing/mode-native-intent-batches.md. New tests have
 not run; Root grants the focused batch, and prototype review remains pending.
 
 
