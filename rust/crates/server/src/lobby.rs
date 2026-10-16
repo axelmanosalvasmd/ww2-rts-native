@@ -2047,5 +2047,9 @@ mod combat_deny_tests;
 mod net_batch50;
 
 #[cfg(test)]
+#[path = "net83_followup_tests.rs"]
+mod net83_followup_tests;
+
+#[cfg(test)]
 #[path = "mode_runtime_a_tests.rs"]
 mod mode_runtime_a_tests;
