@@ -49,6 +49,45 @@ fn owned(rig: &Rig, slot: usize, kind: &str) -> u32 {
     })
 }
 
+fn fort_site(rig: &Rig, actor: u32) -> Point {
+    rig.change(|hub| {
+        let state = hub.rooms["ABC"].native.as_ref().unwrap().runtime.state();
+        let actor = &state.world.game.units[&actor];
+        let mut points = (0..state.world.game.chars.len())
+            .map(|cell| Point {
+                x: (cell % state.world.game.w) as f64 * 2. + 1.,
+                z: (cell / state.world.game.w) as f64 * 2. + 1.,
+            })
+            .collect::<Vec<_>>();
+        points.sort_by(|a, b| {
+            let distance = |p: &Point| (p.x - actor.x).powi(2) + (p.z - actor.z).powi(2);
+            distance(a).total_cmp(&distance(b))
+        });
+        points
+            .into_iter()
+            .find(|&at| {
+                ww2_core::field_works::placement(
+                    &state.world,
+                    ww2_core::field_works::FortKind::Trench,
+                    at,
+                    0.,
+                    Some(state.world.game.players[0].team),
+                    |p| {
+                        ww2_core::vision::team_sees(
+                            &state.world.game,
+                            &state.rules,
+                            &state.grid,
+                            state.world.game.players[0].team,
+                            p,
+                        )
+                    },
+                )
+                .is_ok()
+            })
+            .expect("authored map must have a visible trench site")
+    })
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn r1_host_pause_freezes_commands_and_ticks_and_only_host_resumes_or_ends() {
     sockets(|rig, mut clients| {
@@ -215,6 +254,103 @@ async fn r1_public_commands_finish_an_ordinary_match_with_every_seat_snapshot_ea
     sockets(|rig, mut clients| {
         rig.capture_each_tick = true;
         let rifle = owned(rig, 0, "rifle");
+        // Declared initial fixture: a funded, quiet army and one canonical unfinished
+        // Flak site. Public Build remains closed. Later activity comes from sockets.
+        let site = rig.change(|hub| {
+            let state = hub.rooms.get_mut("ABC").unwrap().native.as_mut().unwrap().runtime.state_mut();
+            assert_eq!(state.world.game.tick, 0);
+            state.start.economy.players[0].mp = 10_000.;
+            state.start.economy.players[0].mun = 10_000.;
+            for control in state.commands.units.values_mut() {
+                control.hold_fire = true;
+                control.auto_cast = false;
+                control.auto_retreat = false;
+            }
+            for unit in state.world.game.units.values_mut() {
+                unit.hold_pos = true;
+            }
+            let origin = state.world.game.units[&rifle].at();
+            let mut site = None;
+            'search: for dz in -10..=10 {
+                for dx in -10..=10 {
+                    let at = Point { x: origin.x + f64::from(dx) * 2., z: origin.z + f64::from(dz) * 2. };
+                    let next = state.next_unit_id;
+                    if state.execute_build(0, &[i64::from(rifle)], "flakpos", Some(at), Some(0.), false).unwrap().is_none() {
+                        site = Some(next);
+                        break 'search;
+                    }
+                }
+            }
+            assert_eq!(state.execute_command(0, &ww2_core::match_commands::Command::Stop { ids: vec![i64::from(rifle)] }, false).unwrap(), None);
+            site.expect("canonical Flak fixture needs a visible free site")
+        });
+        accepted(&submit(rig, &mut clients[0], json!({"t":"assist","ids":[rifle],"id":site})));
+        rig.change(|hub| {
+            let state = hub.rooms["ABC"].native.as_ref().unwrap().runtime.state();
+            assert_eq!(state.commands.units[&rifle].build_target, Some(site));
+            assert!(state.world.game.units[&rifle].build);
+        });
+        accepted(&submit(rig, &mut clients[0], json!({"t":"cancel","id":site})));
+        rig.change(|hub| {
+            let state = hub.rooms["ABC"].native.as_ref().unwrap().runtime.state();
+            assert!(!state.world.game.units.contains_key(&site));
+            assert!(!state.world.game.units[&rifle].build);
+            assert_eq!(state.commands.units[&rifle].build_target, None);
+        });
+        accepted(&submit(rig, &mut clients[0], json!({"t":"tech","kind":"tier"})));
+        rig.change(|hub| {
+            let state = hub.rooms["ABC"].native.as_ref().unwrap().runtime.state();
+            let jobs = state.production.player(0).unwrap().jobs();
+            assert_eq!(jobs.len(), 1);
+            assert_eq!(jobs[0].kind, ww2_core::economy::Technology::Tier);
+            assert!(jobs[0].progress > 0.);
+        });
+        let rally = rig.change(|hub| hub.rooms["ABC"].native.as_ref().unwrap().runtime.state().world.game.units[&rifle].at());
+        accepted(&submit(rig, &mut clients[0], json!({"t":"rally","x":rally.x,"z":rally.z})));
+        rig.change(|hub| assert_eq!(hub.rooms["ABC"].native.as_ref().unwrap().runtime.state().player_rallies[0], Some(rally)));
+        let dig = fort_site(rig, rifle);
+        accepted(&submit(rig, &mut clients[0], json!({"t":"dig","ids":[rifle],"kind":"trench","x":dig.x,"z":dig.z,"dir":0})));
+        rig.change(|hub| {
+            let state = hub.rooms["ABC"].native.as_ref().unwrap().runtime.state();
+            assert!(state.world.game.units[&rifle].dig);
+            assert_eq!(state.field_works.jobs()[&rifle].at, dig);
+        });
+        for iteration in 0..1_000 {
+            rig.step();
+            let done = rig.change(|hub| !hub.rooms["ABC"].native.as_ref().unwrap().runtime.state().field_works.is_active(rifle));
+            if iteration % 20 == 19 || done {
+                accepted(&flush(&mut clients[0]));
+                flush(&mut clients[1]);
+            }
+            if done { break; }
+        }
+        rig.change(|hub| {
+            let state = hub.rooms["ABC"].native.as_ref().unwrap().runtime.state();
+            assert!(!state.world.game.units[&rifle].dig);
+            let cell = state.world.game.cell_of(dig.x, dig.z).unwrap();
+            assert_eq!(state.world.game.chars[cell], b'T');
+        });
+        let entrench = fort_site(rig, rifle);
+        accepted(&submit(rig, &mut clients[0], json!({"t":"entrench","ids":[rifle],"pattern":"line","x":entrench.x-4.,"z":entrench.z,"x2":entrench.x+4.,"z2":entrench.z})));
+        rig.change(|hub| {
+            let state = hub.rooms["ABC"].native.as_ref().unwrap().runtime.state();
+            assert!(state.world.game.units[&rifle].entrench);
+            assert!(state.field_works.membership(rifle).is_some());
+        });
+        accepted(&submit(rig, &mut clients[0], json!({"t":"cover","ids":[rifle],"queue":true})));
+        rig.change(|hub| {
+            let state = hub.rooms["ABC"].native.as_ref().unwrap().runtime.state();
+            assert!(state.world.game.units[&rifle].entrench);
+            assert!(matches!(state.commands.units[&rifle].orders.back(), Some(ww2_core::match_commands::Command::Cover { .. })));
+        });
+        accepted(&submit(rig, &mut clients[0], json!({"t":"cover","ids":[rifle]})));
+        rig.change(|hub| {
+            let state = hub.rooms["ABC"].native.as_ref().unwrap().runtime.state();
+            assert!(!state.world.game.units[&rifle].entrench);
+            assert_eq!(state.field_works.membership(rifle), None);
+            assert!(!state.field_works.is_active(rifle));
+            assert!(state.commands.units[&rifle].orders.is_empty());
+        });
         accepted(&submit(
             rig,
             &mut clients[0],
@@ -247,6 +383,46 @@ async fn r1_public_commands_finish_an_ordinary_match_with_every_seat_snapshot_ea
             json!({"t":"stop","ids":[rifle]}),
         ));
         flush(&mut clients[1]);
+        let house = rig.change(|hub| {
+            let state = hub.rooms["ABC"].native.as_ref().unwrap().runtime.state();
+            let unit = &state.world.game.units[&rifle];
+            state.world.game.chars.iter().enumerate()
+                .filter(|(_, ch)| **ch == b'B')
+                .map(|(cell, _)| Point { x: (cell % state.world.game.w) as f64 * 2. + 1., z: (cell / state.world.game.w) as f64 * 2. + 1. })
+                .min_by(|a,b| {
+                    let distance = |p: &Point| (p.x-unit.x).powi(2)+(p.z-unit.z).powi(2);
+                    distance(a).total_cmp(&distance(b))
+                }).unwrap()
+        });
+        // Both waiting orders enter the recorded queue before the next tick.
+        clients[0].send(json!({"t":"garrison","ids":[rifle],"x":house.x,"z":house.z,"queue":true}));
+        clients[0].send(json!({"t":"cover","ids":[rifle],"queue":true}));
+        accepted(&flush(&mut clients[0]));
+        for iteration in 0..1_600 {
+            rig.step();
+            let inside = rig.change(|hub| {
+                let state = hub.rooms["ABC"].native.as_ref().unwrap().runtime.state();
+                state.world.game.units[&rifle].garrison.is_some() && state.commands.units[&rifle].orders.is_empty()
+            });
+            if iteration % 20 == 19 || inside {
+                accepted(&flush(&mut clients[0]));
+                flush(&mut clients[1]);
+            }
+            if inside { break; }
+        }
+        rig.change(|hub| {
+            let state = hub.rooms["ABC"].native.as_ref().unwrap().runtime.state();
+            assert!(state.world.game.units[&rifle].garrison.is_some());
+            assert!(state.commands.units[&rifle].orders.is_empty());
+            assert!(state.world.game.units[&rifle].path.is_empty());
+        });
+        accepted(&submit(rig, &mut clients[0], json!({"t":"retreat","ids":[rifle]})));
+        rig.change(|hub| {
+            let state = hub.rooms["ABC"].native.as_ref().unwrap().runtime.state();
+            assert!(state.world.game.units[&rifle].retreating);
+            assert!(state.world.game.units[&rifle].garrison.is_none());
+        });
+        accepted(&submit(rig, &mut clients[0], json!({"t":"stop","ids":[rifle]})));
         let ids = rig.change(|hub| {
             hub.rooms["ABC"]
                 .native
@@ -262,8 +438,12 @@ async fn r1_public_commands_finish_an_ordinary_match_with_every_seat_snapshot_ea
                 .map(|u| u.id)
                 .collect::<Vec<_>>()
         });
-        clients[1].send(json!({"t":"destroy","ids":ids}));
-        flush(&mut clients[1]);
+        accepted(&submit(rig, &mut clients[1], json!({"t":"destroy","ids":ids})));
+        rig.change(|hub| {
+            let state = hub.rooms["ABC"].native.as_ref().unwrap().runtime.state();
+            assert!(ids.iter().all(|id| !state.world.game.units.contains_key(id)));
+        });
+        flush(&mut clients[0]);
         // Scuttling clears the opposition; Conquest still requires point capture and VP.
         // All later positions and ownership changes follow these public move orders.
         let orders = rig.change(|hub| {

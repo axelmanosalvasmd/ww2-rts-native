@@ -9,9 +9,10 @@ operatives and convoy command admission remain outside this batch.
 The owner decisions are `julio-owner-decisions-recorded-20261016`
 (issue #5, comment 6217590741), groups F and M. Julio's later owner instruction
 `julio-owner-merge-now-20261016` (6217727398) confirms the grant and says Axel's
-later written line does not gate implementation. This follows the handoff and
-preserves `axel-interface-response-004`. Hermes' exact-head content review remains
-required; no ack is claimed here.
+later written line does not gate implementation. Axel also confirmed these
+decisions on #5 in `axel-owner-confirm-a-to-p-20261016`. This follows the handoff
+and preserves `axel-interface-response-004`. Hermes' exact-head content review
+remains required; no ack is claimed here.
 
 ## Host controls and resync
 
@@ -52,16 +53,33 @@ in place (`shared/command-feedback.js:2-8`).
 | `dig`, `entrench` | `ids`, `x`,`z`, `queue`; `kind`,`dir` for dig; `pattern`,`fort`,`x2`,`z2`,`join` for entrench | `shared/sim.js:3635,3651` |
 | `assist` | `ids`, `id`, optional `x`,`z`,`queue` | `shared/sim.js:3710` |
 | `tech` | `kind` (`tier`, `inf`, `guns`, `armor`) | `shared/sim.js:3723` |
-| `cancelProduction`, `cancel`, `destroy`, `rally` | Existing `id`,`job`,`ids`,`x`,`z` fields for the respective commands | `shared/sim.js:3737,3748,3760,3766` |
+| `cancel`, `destroy`, `rally` | Existing `id`,`ids`,`x`,`z` fields for the respective commands | `shared/sim.js:3748,3760,3766` |
+
+`cancelProduction` remains refused before enqueue in R1 Conquest with
+`{"t":"deny","cmd":"cancelProduction","reason":"needs"}`. This is exactly the
+prototype's non-construction-mode result (`shared/sim.js:3737-3738`). Conquest
+training queues remain forbidden by the native tick guard.
 
 The socket denial matrix verifies a deterministic prototype denial branch per
-admitted command. Existing ground selection restrictions remain in place, and
+command. Existing ground selection restrictions remain in place, and
 client authority fields are ignored. Unknown orders in an active, unpaused seat
 now receive the prototype's `blocked` denial (`shared/sim.js:3812`).
 
+Garrison and cover retain the prototype semantics (`shared/sim.js:3420,
+3451-3452,3478-3497,3580-3606`): the raw ID list is capped at
+`max(50, unit count)` before filtering, queued cover after garrison keeps the
+queued house coordinates, queued cover leaves ongoing entrenchment intact,
+immediate cover cancels that worker's entrenchment, and Move or attack-move exits
+a house through the canonical placement path. The cap audit also covers dig
+(first ID only), entrench, cover, assist, retreat, rally and destroy. Research and
+both cancellation commands use scalar inputs rather than a selected ID list.
+
 The public lifecycle test sends commands over actual sockets from start through
-public capture orders, VP victory, final hold, result and a subsequent host end. Every tick in its
-finish continuation builds snapshots for both seats and checks for a fault.
+successful garrison, dig, entrench, cover, assist, retreat, rally, tech, cancel
+and destroy, public capture orders, VP victory, final hold, result and a subsequent
+host end. Its initial construction fixture is declared separately from socket
+input because public build remains closed. Every simulation tick builds snapshots
+for both seats and checks for a fault.
 Normal Conquest results retain `winner`, `teams`, `names`, `reason`, `at`,
 `endTick`, `story`, `timeline`, `winVp`, `mode` and recipient `you`, as in
 `server.js:348,753` and `shared/story.js:66-70`. This proves the Conquest and

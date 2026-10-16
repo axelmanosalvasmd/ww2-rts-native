@@ -82,6 +82,11 @@ impl CommanderIngress {
         if state.finish.is_some() || state_player.out || state_player.away {
             return Err(Denial::Blocked);
         }
+        // R1 admits Conquest only. The prototype refuses production cancellation
+        // there, and no training queue may enter this room's tick state.
+        if matches!(command, Command::CancelProduction { .. }) {
+            return Err(Denial::Needs);
+        }
         // This initial service slice covers ordinary ground controls. Foreign,
         // missing and source-ineligible IDs retain the core's selection rules.
         let rows = match &command {
@@ -132,7 +137,6 @@ impl CommanderIngress {
             if kind.air
                 || kind.naval
                 || unit.air.is_some()
-                || matches!(command, Command::Move { .. }) && unit.garrison.is_some()
                 || matches!(command, Command::Move { .. } | Command::Stop { .. }) && unit.build
                 || matches!(
                     command,
@@ -434,5 +438,69 @@ mod tests {
             before
         );
         assert_eq!(state.commands.pending_commands(), 0);
+    }
+    #[test]
+    fn garrisoned_move_and_amove_exit_and_keep_tick_snapshots_valid() {
+        for name in ["move", "amove"] {
+            let mut state = crate::lobby::native_tests::native_match();
+            let actor = state
+                .world
+                .game
+                .units
+                .values()
+                .find(|u| u.owner == 0 && state.rules.kinds[u.kind].name == "rifle")
+                .unwrap()
+                .id;
+            let house = state
+                .world
+                .game
+                .chars
+                .iter()
+                .position(|ch| *ch == b'B')
+                .unwrap();
+            let at = ww2_core::game::Point {
+                x: (house % state.world.game.w) as f64 * ww2_core::game::CELL + 1.,
+                z: (house / state.world.game.w) as f64 * ww2_core::game::CELL + 1.,
+            };
+            let unit = state.world.game.units.get_mut(&actor).unwrap();
+            unit.x = at.x;
+            unit.z = at.z;
+            unit.garrison = Some(house);
+            state.grid.update(actor, unit);
+            let mut ingress = CommanderIngress::default();
+            ingress
+                .enqueue(
+                    &mut state,
+                    0,
+                    &json!({"t":name,"orders":[[actor,at.x+12.,at.z+12.]]}),
+                )
+                .unwrap();
+            for _ in 0..4 {
+                let report = state.advance_tick().unwrap();
+                assert!(ingress.complete(&report.commands).is_empty());
+                assert!(state.world.game.units[&actor].garrison.is_none());
+                let cache = ww2_core::recipient_snapshot::SnapshotCache::new(&state).unwrap();
+                for slot in 0..2 {
+                    cache.recipient(slot).unwrap();
+                }
+            }
+            assert_ne!(state.world.game.units[&actor].at(), at);
+        }
+    }
+
+    #[test]
+    fn conquest_production_cancel_is_refused_without_reserving_input() {
+        let mut state = crate::lobby::native_tests::native_match();
+        let mut ingress = CommanderIngress::default();
+        assert_eq!(
+            ingress.enqueue(
+                &mut state,
+                0,
+                &json!({"t":"cancelProduction","id":1,"job":1})
+            ),
+            Err(Denial::Needs)
+        );
+        assert_eq!(state.commands.pending_commands(), 0);
+        assert!(ingress.feedback.is_empty());
     }
 }
