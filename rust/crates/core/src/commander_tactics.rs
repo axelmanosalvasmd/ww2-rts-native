@@ -174,6 +174,23 @@ pub struct Decision {
     pub buy: String,
     pub aim: Option<usize>,
 }
+// Source point selection uses a strict scan with Infinity as the initial best score.
+fn least_score(
+    indices: impl Iterator<Item = usize>,
+    mut score: impl FnMut(usize) -> f64,
+) -> Option<usize> {
+    let mut best = None;
+    let mut value = f64::INFINITY;
+    for i in indices {
+        let candidate = score(i);
+        if candidate < value {
+            best = Some(i);
+            value = candidate;
+        }
+    }
+    best
+}
+
 fn dist(a: Point, b: Point) -> f64 {
     math::hypot(a.x - b.x, a.z - b.z)
 }
@@ -628,13 +645,9 @@ fn plan_inner(
         .or_else(|| mine.first().copied())
     {
         if sit.kind == SituationKind::Push && sit.point.is_none() {
-            sit.point = (0..input.points.len())
-                .filter(|&i| available(i))
-                .min_by(|&a, &b| {
-                    point_score(scout, a, &load, false)
-                        .total_cmp(&point_score(scout, b, &load, false))
-                        .then(a.cmp(&b))
-                });
+            sit.point = least_score((0..input.points.len()).filter(|&i| available(i)), |i| {
+                point_score(scout, i, &load, false)
+            });
             if let Some(i) = sit.point {
                 sit.at = Some(input.points[i].at);
                 sit.failed_at = failures.get(i).copied().unwrap_or(0);
@@ -647,15 +660,12 @@ fn plan_inner(
                 })
             })
         {
-            sit.safe = (0..input.points.len())
-                .filter(|&i| {
+            sit.safe = least_score(
+                (0..input.points.len()).filter(|&i| {
                     available(i) && sit.at.is_none_or(|at| dist(at, input.points[i].at) > 28.0)
-                })
-                .min_by(|&a, &b| {
-                    point_score(scout, a, &load, false)
-                        .total_cmp(&point_score(scout, b, &load, false))
-                        .then(a.cmp(&b))
-                });
+                }),
+                |i| point_score(scout, i, &load, false),
+            );
         }
         if state.aim.is_none()
             && let Some(i) = if sit.kind == SituationKind::Wait {
@@ -770,11 +780,7 @@ fn plan_inner(
                     && !hurt(u, definition(u), skill)
             })
             .collect();
-        free.sort_by(|a, b| {
-            dist(a.at, at)
-                .total_cmp(&dist(b.at, at))
-                .then(a.id.cmp(&b.id))
-        });
+        crate::sort::sort_by(&mut free, |a, b| dist(a.at, at) - dist(b.at, at));
         let mut go = Vec::new();
         let mut value = 0.0;
         for u in free {
@@ -858,25 +864,17 @@ fn plan_inner(
                 continue;
             }
         }
-        let best = (0..input.points.len())
-            .filter(|&i| {
+        let best = least_score(
+            (0..input.points.len()).filter(|&i| {
                 available(i)
                     && !(allied(input.points[i].owner)
                         && dist(u.at, input.points[i].at) <= observation.point_radius() + 16.0)
                     && (sit.kind != SituationKind::Wait
                         || sit.safe == Some(i)
                         || allied(input.points[i].owner) && input.points[i].cut)
-            })
-            .min_by(|&a, &b| {
-                point_score(u, a, &load, state.aim.is_some_and(|(i, _)| i == a))
-                    .total_cmp(&point_score(
-                        u,
-                        b,
-                        &load,
-                        state.aim.is_some_and(|(i, _)| i == b),
-                    ))
-                    .then(a.cmp(&b))
-            });
+            }),
+            |i| point_score(u, i, &load, state.aim.is_some_and(|(aim, _)| aim == i)),
+        );
         if let Some(i) = best {
             load[i] += 1;
             pending[i].push(u);
@@ -1102,3 +1100,7 @@ mod tests;
 #[cfg(test)]
 #[path = "commander_tactics_strategy_tests.rs"]
 mod strategy_tests;
+
+#[cfg(test)]
+#[path = "if25_tactics_tests.rs"]
+mod if25_tests;

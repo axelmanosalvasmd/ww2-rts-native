@@ -636,7 +636,7 @@ impl Match {
                 (*at, home, distance)
             })
             .collect();
-        guarded.sort_by(|a, b| b.2.total_cmp(&a.2));
+        crate::sort::sort_by(&mut guarded, |a, b| b.2 - a.2);
         let count = guarded.len();
         for (index, (at, home, _)) in guarded.into_iter().enumerate() {
             if index as f64 >= count as f64 * 0.4 {

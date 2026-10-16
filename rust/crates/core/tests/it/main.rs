@@ -5,6 +5,8 @@
 //! Windows. A new test file needs a `#[path]` module below;
 //! `every_test_file_is_compiled` fails until it has one.
 
+#[path = "../ai_if_if25.rs"]
+mod ai_if_if25;
 #[path = "../authoritative_maps.rs"]
 mod authoritative_maps;
 #[path = "../base_audit_features.rs"]
