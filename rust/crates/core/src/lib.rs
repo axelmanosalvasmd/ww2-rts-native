@@ -90,6 +90,7 @@ pub mod match_ground_orders;
 pub mod match_ground_support;
 pub mod match_human_observation;
 pub mod match_logistics;
+mod match_rally;
 pub mod match_reactions;
 pub mod match_recovery;
 pub mod match_routing;
