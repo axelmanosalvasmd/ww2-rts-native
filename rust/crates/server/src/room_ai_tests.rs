@@ -355,7 +355,7 @@ fn net73_hosted_ai_refreshes_only_on_the_shared_snapshot_beat() {
             assert_eq!(now, current);
             delivered = now;
             refreshed += 1;
-        } else if current % u64::from(cadence) != 0 {
+        } else if !current.is_multiple_of(u64::from(cadence)) {
             ordinary_ticks += 1;
         }
         acted |= runtime(&hub).state().commands.pending_commands() > 0;

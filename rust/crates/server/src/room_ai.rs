@@ -238,19 +238,19 @@ impl RoomAi {
             .into_iter()
             .flatten()
             .map(|shot| {
-                if shot["k"] == "hurt" {
-                    if let (Some(owner), Some(unit), Some(x), Some(z)) = (
+                if shot["k"] == "hurt"
+                    && let (Some(owner), Some(unit), Some(x), Some(z)) = (
                         shot["to"].as_u64(),
                         shot["t"].as_u64(),
                         shot["x"].as_f64(),
                         shot["z"].as_f64(),
-                    ) {
-                        return ww2_core::match_human_observation::HumanShot::Hurt {
-                            owner: owner as usize,
-                            unit: unit as u32,
-                            at: ww2_core::game::Point { x, z },
-                        };
-                    }
+                    )
+                {
+                    return ww2_core::match_human_observation::HumanShot::Hurt {
+                        owner: owner as usize,
+                        unit: unit as u32,
+                        at: ww2_core::game::Point { x, z },
+                    };
                 }
                 ww2_core::match_human_observation::HumanShot::Other
             })
