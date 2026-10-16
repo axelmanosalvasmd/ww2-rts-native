@@ -1,0 +1,2 @@
+- Add nine native tests for delivered sightings and commander attention on current main, with fourteen focused selections. Propose eight rows for native execution and prototype review; account individually for all other fifty-five held rows in docs/testing.
+- Keep prior28/28 results on their original head and exclude inherited receipt runtime and diagnostic history from this test-only integration. Leave all parity files and statuses unchanged.

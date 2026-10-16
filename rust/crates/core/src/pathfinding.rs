@@ -801,3 +801,7 @@ impl Heap {
         Some(top)
     }
 }
+
+#[cfg(test)]
+#[path = "mov_audit_path_tests.rs"]
+mod mov_audit;
