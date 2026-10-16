@@ -10,11 +10,18 @@ use crate::{
 };
 use serde_json::json;
 
-fn arena(enabled: bool) -> Match {
+pub(super) fn arena(enabled: bool) -> Match {
+    arena_with_barrier(enabled, false)
+}
+pub(super) fn arena_with_barrier(enabled: bool, barrier: bool) -> Match {
+    let mut row = ".".repeat(80);
+    if barrier {
+        row.replace_range(40..42, "WW");
+    }
     let map = AuthoritativeMap::from_json(
         &serde_json::to_vec(&json!({
             "name": "logistics runtime arena", "w": 80, "h": 80,
-            "rows": vec![".".repeat(80); 80],
+            "rows": vec![row; 80],
             "spawns": [{"x":12,"y":40},{"x":68,"y":40}],
             "points": [{"x":40,"y":8,"vp":0,"mp":0}], "defend":[0]
         }))
@@ -52,7 +59,7 @@ fn arena(enabled: bool) -> Match {
     )
     .unwrap()
 }
-fn troop(m: &Match) -> u32 {
+pub(super) fn troop(m: &Match) -> u32 {
     m.world
         .game
         .units
@@ -61,7 +68,7 @@ fn troop(m: &Match) -> u32 {
         .unwrap()
         .id
 }
-fn place(m: &mut Match, id: u32, at: Point) {
+pub(super) fn place(m: &mut Match, id: u32, at: Point) {
     let u = m.world.game.units.get_mut(&id).unwrap();
     u.x = at.x;
     u.z = at.z;

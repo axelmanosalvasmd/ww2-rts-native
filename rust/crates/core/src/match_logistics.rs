@@ -1,5 +1,7 @@
 //! Executable ordinary-Conquest supply phases over canonical Match state.
 #[cfg(test)]
+mod batch5_tests;
+#[cfg(test)]
 mod causal_tests;
 #[cfg(test)]
 mod runtime_tests;

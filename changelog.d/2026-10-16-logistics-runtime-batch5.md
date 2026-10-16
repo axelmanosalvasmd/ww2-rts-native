@@ -1,0 +1,3 @@
+- Connect manual convoy retreat to the nearest active allied source, checking the full selection before changing routes and preserving carried stock. Keep full logistics ticks and complete logistics snapshots guarded.
+- Cover manual truck orders, scheduler alerts, point supply cuts and their income, radio, reinforcement and territory effects with component and Match adapter checks. Classic/World cache construction and train boarding remain held.
+- Replace the test for unconditional convoy retreat refusal with atomic refusal when no supply source exists, including trucks beyond the ordinary troop selection cap.
