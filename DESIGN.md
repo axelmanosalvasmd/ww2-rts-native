@@ -1,3 +1,102 @@
+## Owner parity decisions A, B and C (2026-10-16)
+
+The [recorded owner decisions](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6217590741) approve the differences below, the Rust-only acceptance of the listed client rows, and World deferral for milestone R1. Julio recorded both owners' decisions after Axel's voice approval; Axel's written confirmation on #5 is requested in that comment. This section records the decisions for STATUS-ABC.
+
+Approved `differs` decisions relative to prototype `e4e579a`:
+
+- CMB-159, MODE-21, MODE-22: per-purpose seeded streams and staged creation replace the prototype's global draw order, following AGENTS.md determinism so matches replay from their seed and orders.
+- IF-05: non-trench arc, ring and strongpoint dig patterns are rejected as an approved restriction of the supported dig patterns.
+- NET-15, NET-20: display names are truncated on Unicode scalar boundaries to avoid splitting a scalar.
+- IF-10: prediction and authoritative movement compare signed zero as equal, so the sign of numeric zero does not affect equality.
+- IF-23: snapshots never reorder the canonical gameplay grid, so snapshot creation cannot change gameplay query order.
+- MAP-22: validated embedded maps replace corrupt-file fallback, removing that file-loading recovery path for embedded maps.
+- NET-04: R1 keeps uncompressed JSON WebSocket v0; compression is deferred to a later version-gated proposal.
+
+For group B, `accepted` applies only to the Rust part of each row marked "Unreal-only; client parity owned by Axel". Unreal implementation and client parity remain Axel's responsibility. Existing server duties, including MOV-107's row tail, remain recorded in the rows.
+
+For group C, `dropped` means "World admission deferred for milestone R1; reopen when World opens". Rows that also describe ordinary matches retain their prototype requirements; the R1 deferral does not claim those behaviors are implemented. Ported World components MAP-59, BASE-46, LOG-26 and LOG-27 remain `ported`.
+
+## Seat lifecycle controls and metadata (2026-10-16)
+
+Socket `pause` and `resume` remain rejected through `UNAVAILABLE`, including for the host. The existing host-side `RoomRuntime` pause APIs remain available without a public client caller. The server owns the supplied wall-clock deadlines and the one-second pause/frame cadence; the deterministic core receives no timer. Paused ingress ignores new orders while preserving the queue for resume. Operative and AI room admission remain closed on R1.
+
+Every admitted seat receives the existing roster-ordered `online` and `ping` arrays, as in reference `e4e579a` (`server.js:504,774`, `server/room-tick.js:30`). AI seats project `true` and `-1`, and unknown human RTT stays null. The common frame sender applies these fields to scheduled, paused and catch-up delivery without changing recipient visibility or wire shape.
+
+AI-19 evidence covers the existing detached core state: lazy spawn camera, private RNG, sampled opening delay and explicit resets through ordinary ticks and both recipient snapshots. It does not enable room AI or its takeover/departure callers. Only AI-19 and NET-66 are claimed. NET-79 is dropped because socket pause/resume ingress needs owner approval. NET-80 remains outside the proven set because live AI handover and loaded-save pause need separate activation and save work.
+
+## Shared-enemy authored spawns (2026-10-16)
+
+Tutorial startup selects authored spawn indices 0 and 1 directly. It must not map those indices through the non-Assault spawn list, which can move both sides when a map marks its first spawns Assault-only. World already uses direct authored indices; ordinary Conquest keeps its existing filtered allocation. Horde continues to select the middle entry of the authored defender list and the first non-defender index. No persistent state, command or recipient capability is added.
+
+## Native room worker supervision (2026-10-16)
+
+`WW2_SHARDS` selects up to 64 game workers behind the existing HTTP and WebSocket routes. Each worker owns an OS thread, a current-thread Tokio runtime and an independent room hub. The front hashes the decoded room query using the prototype's FNV-1a over UTF-16 code units, dispatches the existing socket, and concatenates room lists in worker order. A worker panic closes its sockets and invalidates its host controls; its supervisor creates a fresh hub after one second. Front shutdown stops all workers.
+
+Threads replace the prototype's child processes and loopback socket replay. Private readiness and directory channels replace process IPC without adding socket messages. Immutable maps stay front-owned; native save records and map editing remain unavailable, so no record or map-invalidation protocol is introduced. Every worker retains the existing trusted-room code policy. Public start, command admission, World admission and logistics guards keep their existing scope.
+
+## Queued house entry snapshot compatibility (2026-10-16)
+
+Queued native Enter orders use the pinned prototype's existing garrison kind 9
+and stored house coordinates in the owner-only waiting-order row. Serialization
+accepts only the normalized singleton actor with `queue: false`, then applies the
+existing finite-coordinate and rounding checks. Activation, house selection and
+player command behavior stay with the canonical garrison owner. No wire meaning
+is added. A full ordinary match test keeps Enter queued behind movement, enters
+the house, captures an objective and earns a VP victory while delivering every
+seat's snapshot on each tick and during the ending hold.
+
+## Gate lifecycle in ordinary matches (2026-10-16)
+
+Gate jobs use the existing paid field-work owner. Placement rounds the line to the grid, while the paid job retains the original direction for its work row and crew escape. Each of its three cells publishes a finished Gate through the existing building factory, structural sections and shared actor allocator. The existing occupied-cell retries, construction time, cancellation and story owners apply to both concrete kinds.
+
+Gate openness and its half-second timer live in the existing unit-control metadata, with the same lifetime as other retained control facts. A completed building checks its Gate before the ordinary early continue. It reads the canonical spatial grid, retaining the prototype's bucket query for threats and its strict hull-distance predicate for occupied passages. Terrain changes use World::set_cell, including the existing version and observation journals. Snapshots use the existing 65536 owner flag and unchanged nonowner mask; no row tail, field or encoding is added. Paid and waiting Gate requests are limited to Default/Conquest without enabled logistics or convoys. Tutorial and construction modes remain guarded, as do World Gate ticks and full logistics delivery.
+
+Gate passage follows the pinned prototype. `shared/sim.js:4252-4262` changes the terrain object between open ground and K, preserving the underlying surface through `setCell` at :2731-2738. Pathfinding reads those terrain flags (:3088-3094). The Gate actor remains a traffic obstacle in `shared/local-traffic.js:101-113`, a swept vehicle obstacle in `shared/movement.js:44-50`, and an immovable crowd-separation body in `shared/sim.js:5198-5229`, whether open or closed. Native traffic, vehicle movement and separation retain those same bodies. Open terrain can therefore admit a route without allowing a squad or tank through the three adjacent Gate bodies. Tests cover passage through the same terrain gap without Gate actors, then obstruction in open, closed and reopened states on plain ground, roads, paths and mud. Component tests check traffic, separation displacement in both actor orders, and vehicle sweeps with a body-free control. The existing full-match lifecycle still collects every seat's snapshot each tick through victory and eight ending ticks. Placement, timers, hysteresis and occupied-passage protection retain the existing exact prototype component checks.
+
+Depot admission is not widened to skirmish modes. The prototype permits Depots only in construction modes, and the canonical Classic node owner and runner belong to PR #301. BASE-12/26/31/33 remain dropped from this stream until that foundation can carry paid claims, refunds and destruction release. AI-49 awaits garrison integration in PR #302; AI-50 and AI-56 still need complete holder/HQ planning and delivered facts beyond this Gate actuator. No parity status or acceptance cells are changed.
+
+## Tutorial runtime over existing Match systems (2026-10-16)
+
+The explicit `Match::new_tutorial` constructor adds the unattended Enemy seat and uses the existing `tutorial_steps` definitions. Tutorial shares the ordinary ground, routing, combat, objective and support systems. Its private step state owns only the current index, spawned IDs and pending dialogue. Lines leave through the core tick report from tick 40; no server or client transport is introduced. The runner advances at most one step per tick after capture and income, and finishes at the bridgehead through the common Match finish state.
+
+Instant Tutorial recruitment reuses the existing admission, debit and unit-publication transaction, with a separate home-placement path because Tutorial has no production buildings. The public Conquest production component keeps its existing mode gate. Tutorial reinforcements use the player's spawn and exclude the unattended enemy. The prototype's 5 MP/s base income and lack of a defeat condition are preserved. Public server admission, agreed interfaces and parity statuses stay unchanged.
+
+## Miscellaneous core components and relocation ownership (2026-10-16)
+
+The existing `prepare_map_save` component is checked against the pinned server projection on all 33 authored maps and two nested-field/default cases. Its 8 MiB limit counts incoming bytes before parsing or dropping unknown properties. Host persistence and editor network access remain outside this component.
+
+Rendered cell-centre sampling is separate from simulation height queries. `terrain_surface::FrozenSurface` retains the original nominal levels while callers supply the current terrain and road mask. It reports centre heights, frozen water lines, channel depth and cliff edges without adding Match state or replacing Unreal mesh construction, ramps, cliff rims or picking. The pinned original relief recorder covers all 33 authored maps and four synthetic cases, with 663,399 centre and water samples.
+
+`WorldRailLine::is_open` reads current physical bridge cells and current region teams on each query. Bridge collapse and repair therefore need no cached connectivity flag. This is a core line predicate, not a train scheduler or World admission change. Existing structural damage remains the sole owner of support propagation, ground casualties, terrain logs and falling debris.
+
+Admitted relocation callers now commit their prepared unit fields and spatial membership through one crate-private helper. Staged spawns and buildings retain canonical publication, and movers keep their direct updates. Starting-base clearance updates membership immediately instead of waiting for startup's final rebuild. Owner and bucket memberships and nearest distances are checked against fresh grids. Exact source fixtures retain query order, and runtime encounter order is preserved. The existing World guard-home assignment remains unchanged, as at the pin.
+
+The local retreat home selector uses finished owned HQs in skirmish modes, shared allied HQs for Horde defenders, finished owned production buildings in Classic, and spawn in other non-World modes. World keeps its existing region-aware selector. Convoy withdrawal, garrison work awaiting #302 and aircraft recipient delivery stay with their existing owners and guards. Support price/key tests do not open Classic/World support admission or the five support kinds that recipient snapshots still refuse. Editor save networking, persistence, FFI, wire formats and contracts are unchanged.
+
+## Concrete work and waiting Dig orders (2026-10-16)
+
+## Interface collection order and recipient queries (2026-10-16)
+
+Field hospitals use insertion order plus keyed membership, matching the prototype's Map semantics. Replacing an owner preserves placement order; removing and rebuilding a hospital appends it. World transactions clone both parts, and recovery and logistics consume the ordered iterator. Existing fire, soak, contact, navigation and live ascending-unit traversal keep their native implementations, with focused consumer tests for each collection. The hospital test advances an ordinary one-VP match through victory and three subsequent ticks, capturing complete snapshots for every seat without a fault. The World training test exercises the existing live unit loop without changing World admission or claiming World snapshot delivery.
+
+Availability and denial queries borrow only the reconstructed recipient ClientView. Map presentation helpers consume only the supplied received map; authoritative map validation still uses its stricter layer validation. The pure queries compare against pinned JavaScript fixtures, while collection tests assert the prototype's traversal intent. ABI exports and Unreal adoption remain separate. No header, wire, contract, privacy or public ingress change is included.
+
+Concrete cells use the existing finished-building publisher so their unit, control, combat, firing, ability, recovery, production and terrain records share the normal Match owners. The paid job retains its bounded occupancy retry count. A separate step-back goal keeps a deferred crew escape valid when the deterministic path budget is exhausted. This preserves the intended four-metre escape on a later tick without changing wall cost, build time or retry limits.
+
+Waiting Dig orders use the existing unit queue and ordinary paid Dig activation. The recipient adapter emits the existing engineering order kind for those waiting orders. Default/Conquest admission remains bounded; Classic and World field-work rooms stay guarded. No FFI, header, wire schema, contract or privacy policy changes.
+
+## AI shopping construction inputs (2026-10-16)
+
+Shopping receives the remaining budget and the reserves produced by the same detached planning pass. The observation no longer carries estimated build and fortification reserve amounts or a precomputed free-node count. Public resource positions, delivered depot memories and explicit owned-node indices provide the inputs. Node claims use only delivered depots and remembered enemy depots, at strictly less than eight metres. World engineer demand counts every unclaimed delivered node; its construction reserve considers only nodes on delivered owned ground.
+
+Construction and fortification proposals use the existing canonical command path. Builders assigned earlier in the pass remain busy, so later movement cannot replace their new jobs. Fortification still computes its reserve after base construction or repair. Assigned workers stay excluded, and proposed building positions join the fortification site exclusions so two jobs cannot spend against overlapping footprints. A delivered own-worker wall-work fact distinguishes wall Dig from ordinary Dig when deciding whether another crew may fortify. Candidate and worker ties use stable node indices and unit IDs. Fortification progress belongs to the existing private per-seat policy state, outside Match and recipient snapshots. Wall fortification dispatch remains separate work. Gate Dig remains unsupported at command admission. The planner computes their reserve thresholds but emits neither command and charges neither cost.
+
+The live observation producer remains limited to Default and Conquest. Classic and World shopping and reserve decisions can be exercised with detached inputs; this does not admit those modes or complete their construction and observation providers. Full construction, fortification and FireAt chores remain separate parity work. No FFI, C header, wire, contract or privacy change is included.
+
+## Runtime engineering: native bridge identity (2026-10-16)
+
+Paid bridges and Fill use the existing field-work jobs and canonical World mutations. Newly constructed bridge graphs use deterministic identities derived from the first cell and the append-only structure count. Repair reuses an existing bridge section identity, restores wood and 200 HP, and reconnects neighboring sections. These graph identities stay separate from the shared actor ID allocator, so construction does not advance actor IDs. Support, terrain invalidation and hull-width queries continue to use the canonical graph and physical terrain. This is an internal identity choice; no new wire or ABI shape is introduced.
+
 ## AI test-only integration on main40fe (2026-10-16, unrun)
 
 Start this candidate from literal40fe9e296b46060241693c6c627ecd615d4f8ea4 in the assigned physical checkout. Preserve prior8cb01c00 and passing0aaea3da refs. Import only nine new task tests in existing human_commander_state_tests.rs and match_human_observation/tests.rs. Main already has their complete helper types and test registration. No old81-line diagnostic helper, ai_receipt implementation, fixture, inherited runtime/history or replacement test provider is required. All docs/parity files stay exact main.
@@ -5,6 +104,71 @@ Start this candidate from literal40fe9e296b46060241693c6c627ecd615d4f8ea4 in the
 Read current main before integration: it lacks ai_receipt_input and ai_delivered_sight and their Observation/Match/vision integration. Therefore prior AI01/02/04/06 candidates remain held on main; the test PR proposes only AI08/19/20/21/22/23/24/27. AI05's authorized history successor remains on the prior preserved branch, where its actual28-test PASS belongs to0aaea3da/Rust2f9cf68c. No old result transfers to this new unrun source. The14-name focused filter selects nine new and five existing library tests. Both full63-row maps and a concrete PR body live under docs/testing. Root owns the new integrated execution grant, independent review, public PR and proven-row ledger/status follow-up.
 
 # Three Crossroads Native: design decisions
+
+## AI delivery scheduling and Horde break control (2026-10-16)
+
+The shared AI scheduler accepts the caller's tick, snapshot-delivery beat and finished flag. It retains caller-owned views and refreshes every requested view before invoking any brain. Commanders act every tick once a view exists; scripted and Horde brains use the existing difficulty and seat stagger. Horde requests a view on every delivered beat. The scheduler reads no Match authority and owns no wall-clock timer, so it can consume delivered packets without depending on the separate AI snapshot decoder. Server AI activation remains a separate integration.
+
+Horde break control changes only the existing inactive break clock to zero. The existing Horde phase starts the wave and owns its purchases and spawns. The server checks host authority and pause state before invoking the core rule. Full Horde tick, snapshot and room admission stay guarded.
+
+## MODE runtime A: shared ordinary phases (2026-10-16)
+
+Assault, Annihilation and Classic use the existing ordinary tick phases behind a
+strict option/Game mode-pair predicate. A shared EliminationState owns the two
+new modes' team count, bunker maxima, Classic clock and resource nodes; it does
+not add another clock, unit store or wallet. Annihilation's defeat phase precedes
+point capture/income, while Classic's decay, defeat and finish remain late.
+Defeat processes players in slot order and each army in unit-ID order; equal
+transfer distances break on the recipient's player slot. World fort capture stages ownership and grid changes in the existing
+terrain transaction, then updates matching footprint rows only after validation.
+No FFI, wire, contract, privacy or server admission changes accompany these core
+paths. The intent witnesses and remaining limits are in
+[MODE runtime A](docs/testing/mode-runtime-a.md).
+
+
+## Private Horde director queue (2026-10-16)
+
+The core seat dispatcher selects the human commander for ordinary seats and a
+scripted director for the internal Horde seat. The director retains its latest
+detached observation, uses Normal's 40-tick stagger and drains movement on every
+delivered observation beat. Live wave state prevents an old observation from
+dispatching after a break, wave replacement or match finish.
+
+Pending Horde movements belong to the director, outside canonical unit order
+queues. Each emitted movement is an ordinary single-unit command attempt for
+the existing admission path. Typed owner intent, including native route identity,
+replaces the prototype's JSON fingerprint. A same-cell Move or idle Stop changes
+that identity and invalidates pending work. Replacing a queued unit preserves its
+FIFO position; all callbacks for one observed tick share a four-order allowance.
+This adds core components without admitting full Horde ticking, recipient
+snapshots or hosting. Full-match lifecycle coverage uses an ordinary Conquest
+match with a detached wave context and the existing recipient snapshots.
+
+## Typed scenario conditions and core refunds (2026-10-16)
+
+Scenario condition evaluation borrows typed authored state while reading current units, point owners and World region teams from Match. A caller supplies the context and shares an explicit work budget across evaluations. This keeps condition reads separate from scenario admission, trigger scheduling, actions and recipient projection. The evaluator follows the pinned condition semantics, including historical captures, pending arrivals, context fallback and short-circuit work charges. A 64-level guard protects callers that construct trees directly; validated authored trees remain below it.
+
+Waiting-job refunds prepare small production and wallet drafts before publishing the negative MP-spent tally. Site cancellation uses the existing World transaction before the wallet, story and metadata cleanup commit. These core operations add no network admission. Full MODE-91 remains held beyond the selected refund and recovery checks. MODE-83 proves the condition component, not an admitted authored-scenario match.
+
+## Editable map drafts and bounded save preparation (2026-10-16)
+
+Map authoring uses an in-memory draft separate from `World` and `Match`. Selection moves retain the selected layer's material overrides and authored section identities, health and supports. Failed bounds or collision checks leave the draft unchanged. Removal and support pruning can leave an invalid draft, which must pass the ordinary map validator before saving. This keeps unsupported surviving sections visible as authoring errors instead of silently repairing their anchors.
+
+The map loader now calls the scenario validator added in #298. A validated scenario can be edited and prepared for saving, but every startup profile rejects explicit authored scenarios before creating match state because their executor is absent. The previous fixture assertion that scenarios were unsupported by the loader now checks their retained definition. No command, event, flag or other live match state was added.
+
+`map_save::prepare_map_save` applies the prototype's save-field projection and an 8 MiB limit to incoming bytes before parsing, including discarded properties. It prepares bytes in memory and validates the projected document again. HTTP editor authorization, persistence and server integration remain absent, so MAP-23 remains component-only. The existing 16 MiB authoritative-loader limit is unchanged. Generated World documents are outside the demonstrated save scope. MAP-57's rendered-ground sampler and MAP-90's station-yard construction integration remain unimplemented; World admission stays guarded. MAP-92 retains field-specific diagnostics and stronger bounded integer checks for region IDs and ordered bounds, reported as differs candidates rather than approved differences.
+
+
+## Movement actors and review repairs (2026-10-16)
+
+The movement runtime connects house entry and exit, carrier wreck ejection, World train passengers and aircraft purchases, orders and weapon actuation to the existing Match owners. Game keeps pose and movement state; combat keeps carrier links; rail and aviation metadata keep their actor-specific lifecycle. Public ingress admission remains bounded by its existing gates.
+
+Rooms using ordinary recipient snapshots bind that capability limit to the Match at attachment. Their aircraft purchases return the existing unsupported denial before payment or publication, including orders queued before attachment, because even parked aircraft require rows this adapter cannot carry. Standalone aircraft actuation remains available. Aircraft projectile contacts retain the source kind's air flag, so hits on surviving vehicles do not create ground-fire reaction memory.
+
+Aircraft shots keep their true off-map origin and collision segment. Only the terrain-cell traversal is clipped to the battlefield, so off-map launches neither abort the tick nor shift the shot to an unrelated edge cell. This follows the same geometry rule as the combat runtime repair in PR #299. Wounded house occupants leave through the existing ground-exit path before automatic retreat. World elimination admits validated train links and retires their metadata with the removed actors. Mixed Attack selections send orders to both aircraft and ground actors through their existing command paths.
+
+The movement witnesses discover a narrow crossing from terrain, measure arrival against the retained destination, and require a directly hit tank to die under dive bombing. These are prototype-intent repairs, with no FFI, header, wire, contract or privacy change. Owner acknowledgment and broader client adoption remain separate from these focused native checks.
+
 
 
 ## First-five engineering merged with MAP273 main (2026-10-16, source only)
@@ -2837,6 +3001,18 @@ Each room's meter keeps 200 samples for six phases and the last 50 snapshot tick
 
 Timing controls transport cadence only; the AI retains its previously recorded fixed schedule and vision beat. Non-finite or negative durations and exhausted check deadlines fail before any history changes. The original default meter and unchanged host polling loop match eight traces with 747 samples and seven traces with 34 polls, including ring wraps and exact stall/threshold boundaries. At 315f46a, 23 server debug tests and all 173 release workspace tests pass, together with strict workspace Clippy, formatting and release FFI. The same sequence retains the delta, list and backpressure tests. Fresh core compilation followed package cleanup in both profiles. Actual room-loop callbacks and diagnostic logging remain pending.
 
+## Aircraft ground fire and gun-pit range (2026-10-16)
+
+The ordinary Default/Conquest unit loop connects aircraft movement to the existing firing producer before continuing to the next actor. Aircraft choose an eligible ordered ground target first, otherwise use their half-second automatic target cache; Hold Fire suppresses automatic fire while explicit attack and area missions remain authorized. Guns and rockets use `fire_weapon`, and bomber area missions use `launch_weapon_salvo`, so rounds keep the shared physical flight, collision, damage and event owners. Aircraft launch 20 metres above the local terrain and spend one sortie ammunition unit per volley or bomber stick. The tick owner detaches launch events immediately after each aircraft turn, including before propagating errors, just as it does for ground fire. A later actor can then start a queued order without finding an undetached producer buffer. Off-map launches retain their real origins; collision traversal clips the traveled segment to the battlefield and does not exempt a border cell as if it contained the shooter.
+
+Wreck ejection during a rider turn publishes direct environment events before the ground turn continues. Carrier retirement ejects its complete cargo immediately and returns those effects to its caller; a later tick must not reproduce them. The scuttle regression checks exactly one passenger Hurt across the producing retirement and tick phases.
+
+Aircraft admission accepts automatic weapons and keeps queued sorties unsupported. Area missions require a bomber salvo weapon during both command admission and restored-state validation, so an inconsistent fighter mission cannot enter the tick. The command fixtures represent the ground unit's entrench flag with canonical project membership, preserving cancellation and consistency checks for mixed aircraft and ground Move or Stop. Mixed Attack first prepares aircraft without mutation, then uses the existing ground Attack transaction for all ground rows, then applies the prepared aircraft orders. Both selection orders cancel canonical projects; malformed field-work state still refuses before either actor changes.
+
+Gun-pit range follows the prototype's `inPit` and `rangeOf` rule: only MG, AT, mortar, flak and howitzer teams standing on a completed registered pit whose cell is still trench (`T`) receive the compiled `FORTS.nest.range` multiplier (1.25). Both target search and final range eligibility use the same helper. Other units, unfinished pits and pits whose trench has been destroyed receive ordinary weapon range. These connections use the existing internal owners and introduce no FFI, header, wire, contract or privacy changes.
+
+R1 rooms restrict aircraft weapon emission when they take ownership of a Match. The restriction lives in the canonical tick state and gates the aircraft weapon call after movement. It preserves aircraft missions, movement, fuel, rearming and command admission, while leaving the standalone core firing provider available for internal combat checks. A pre-existing live projectile still fails the unchanged recipient preflight. This restriction remains until owner decision E defines projectile-flight delivery; aviation events retain their existing refusals. An ordinary attacker/bomber room test requires a firing opportunity, unchanged sortie ammunition, no flights, a map-income victory and a recipient snapshot for every seat on every tick. Public R1 still cannot order aircraft.
+
 ## Canonical combat metadata (2026-10-13)
 
 `Match.combat` owns XP, last-hit owner, death impulse, incoming shooter/time, anti-tank hit time and ordered cargo/carrier identities. Health, suppression, position, path and garrison stay in `World.game`. `Game.riding` is the query flag kept in sync with the canonical carrier identity. Starting units and bases initialize the source defaults. Removed shooter metadata may remain until the firing producer releases its last projectile reference, preserving source XP after shooter removal. Firing keeps target/cooldown/retarget and supplies an infallible `RetargetSink`; aim and command switches belong to the separate canonical UnitControl. `Match.environment` owns the reviewed terrain/fire/debris runtime. These fields reserve internal producer ownership; they do not establish combat phase completion or change the ABI.
@@ -4824,3 +5000,94 @@ and Unreal acceptance are not completed by these selected component rows.
 ## AI sighting test lint correction (2026-10-16)
 
 PR #274 strict Clippy rejected a nested conditional in the stillness-reset assertion. Combine the existing option match and movement threshold with a let chain. The condition, assertions and authored inputs stay the same.
+
+## Native server diagnostics (2026-10-16)
+
+NET-97 uses the existing host tick meter and an opt-in bounded writer. `WW2_DIAG=1` appends room JSONL records under the process working directory's `logs/`; `WW2_TICKLOG=1` prints phase percentiles every thirty seconds. Library hosts choose a diagnostic directory through `Config`. A 64-record channel keeps file writes outside the room lock; full queues and file errors discard diagnostic records without affecting the match. Native scheduler delay measures excess over the ten-millisecond maintenance poll, providing the equivalent of the prototype's event-loop delay. Timestamps are Unix milliseconds. A separate optional socket gauge measures queued UTF-8 payload bytes for all output classes and preserves the existing UTF-16 snapshot admission threshold. Browser metrics stay host-private. None of these measurements enters the deterministic rules state or recipient snapshots.
+
+## Horde wave phase and scenario type validation (2026-10-16)
+
+`Match::step_horde` is an explicit late phase after ordinary capture, income
+and death removal. It does not advance the clock or run combat. Wave purchases,
+reserve entry and clearing use canonical Match state; newly entered units act
+on the following tick. Full Horde tick and server admission remain guarded.
+Vehicle entry must pass the current World navigation and obstruction versions
+to the persistent production placer, just as ordinary recruitment does, so
+terrain changes invalidate cached clearance between entries.
+
+Native scenario validation deliberately requires a JSON string for each authored
+unit or reinforcement roster `type`. It rejects `type: ["rifle"]`, whereas the
+prototype's `Object.hasOwn(unitTypes, v)` and `unitTypes[v]` coerce that array to
+the property name `"rifle"`. This stricter choice rejects malformed schema values
+instead of carrying JavaScript property-key coercion into the native validator.
+It does not admit or execute general authored scenarios.
+
+## MAC-AI-5: staged assaults and detached base tactics (2026-10-16)
+
+The seat tactics planner now calls a stateless skirmish construction pass before
+shopping. It finishes or repairs an existing building before searching for a
+new site, reserves the next facility's cost and removes an assigned builder
+from that look's combat candidates. The same detached geometry helper uses
+remembered terrain, delivered occupancy, building lanes and caller-supplied
+supply-node positions. Node positions are placement facts, separate from the
+Classic economy's node rates, visibility and engineer assignments in PR #342.
+No additional terrain or mine memory decoder is introduced here.
+
+Classic adaptive tactics consume delivered building ghosts and the last minute
+of strategic sighting reports. Empty current ground can invalidate a tactical
+armor contact without erasing the recent rush, depot-guard or army-value report.
+World recon skips homes marked undiscovered by the caller. This consumes
+existing delivery knowledge without discovering any new spawn. Raids retain
+two unit IDs privately and prefer armored cars. Stable unit IDs,
+building IDs and player indices break distance ties. Classic and World remain
+detached planner contexts; their existing admission boundaries stay unchanged.
+The ordinary producer supplies public naval and weather facts and leaves the
+unsupported modes' building ghosts and node positions empty.
+
+Staged assaults retain their members and release times outside canonical Match
+orders. Their breadth-first placement search uses delivered terrain and native
+LOS, the prototype's left/right/up/down neighbor order and a 2,048-cell limit.
+Assembly, advance, engagement, regroup and withdrawal use the pinned tuning.
+Operation claims and recent player releases suppress the quick movement and
+retreat orders from that look. Orders still pass through canonical admission.
+Horde scheduling, seat delivery and Classic economy construction remain the
+separate work in #340, #342 and runtime/horde-ai-20261016.
+
+The row evidence is Rust intent tests checked against the pinned prototype,
+with literal expected values for tuning and pure placement cases. No Source
+recorder is added. An ordinary Conquest lifecycle exercises private assault and
+raid state, admits their movement orders and collects both recipient snapshots
+through a natural VP finish and ending ticks. This does not admit Classic,
+World, Assault or Horde rooms and does not alter public ingress, snapshots,
+privacy, wire shapes, FFI or the full logistics guards.
+
+AI-48 is held for remembered bridge, original-ground and found-mine job inputs
+and receipt-driven field-work retries, including the pending seat-delivery work.
+AI-49 needs the missing Garrison actuator and complete holder fortification.
+AI-50 needs the currently unsupported Gate actuator and its complete lifecycle.
+AI-56 remains held for that HQ fortification dependency, despite the existing
+70-metre defender rule and the added detached bunker-target selection.
+
+## PR 352 repair after AI-33 integration (2026-10-16)
+
+PR #352 merges after #351. The merged tactics caller runs one construction
+pass in `commander_construction`, retaining AI-33's reserves and rider
+exclusion together with the skirmish repair, tech, visible-site, supply-node
+and coast rules. Forward HQ planning follows repairs within that pass.
+Later assault planning receives a detached view with this look's build,
+assist and field-work assignments mirrored into unit state, as the prototype
+does before its assault pass. Assault threats use the same live sightings
+that tactics retains after clearing visible empty ground. Recent strategic
+reports still serve the separate Classic adaptive rules.
+
+The regression tests exercise construction assignments during an assault
+phase transition and distinguish cleared contacts from armor still under
+fog. Ordinary Conquest lifecycle coverage also runs the tactics caller,
+canonical commands and every seat's snapshots through victory and ending
+ticks. Existing mode, command, tick and snapshot guards remain in force.
+
+## Construction-mode building memory (CMB-130 deferred, 2026-10-16)
+
+Building memory follows the prototype's `isConstructionMode` gate: Classic and World only (`shared/sim.js:384,4444`). World keeps its existing memory phase, and Classic keeps its explicit component refresh. Default and Conquest no longer accumulate remembered buildings. The recipient adapter also gates the existing six-field `ghosts` encoding on Classic/World, matching `shared/sim.js:6037`, so ordinary snapshots omit the field even if component memory is present.
+
+Classic full ticks and non-ordinary recipient snapshots remain guarded. CMB-130 is dropped from this batch's claim: building memory runs in Classic/World only; waits on #301 Classic runner and World admission. Its component tests retain last-observed identity, type, owner, position and construction progress, shared team sight, hidden changes, unseen destruction and ground/airborne invalidation. Default/Conquest regressions cover seeing a barracks, retreating, hidden changes, retirement, VP finish and revisit with no memory or ghosts. Ability, base dispatch, research and bunker checks retain their full-match continuations and every-seat snapshots. No ABI, wire shape, contract or public command admission changes.

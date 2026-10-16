@@ -63,7 +63,16 @@ pub struct ProduceInput {
     pub mode: Mode,
     pub tick: u64,
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct TutorialProduceInput {
+    pub id: UnitId,
+    pub owner: usize,
+    pub kind: usize,
+    pub scatter_index: u32,
+    pub home: Point,
+    pub rally: Option<Point>,
+    pub tick: u64,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum RallyKind {
     Building,
     Player,
@@ -81,7 +90,7 @@ pub struct ProducedPlacement {
     pub aim: f64,
     pub rally: Option<RallyRequest>,
 }
-#[derive(Default)]
+#[derive(Default, serde::Serialize, serde::Deserialize)]
 pub struct ProducedPlacer {
     spawn: SpawnPlacer,
     vehicles: VehicleNavigation,
@@ -108,6 +117,78 @@ fn number(v: &Value, key: &str) -> Result<f64, Error> {
 impl ProducedPlacer {
     pub fn new() -> Self {
         Self::default()
+    }
+    pub(crate) fn produce_tutorial(
+        &mut self,
+        rules: &Rules,
+        catalog: &Catalog,
+        view: TerrainView<'_>,
+        units: &BTreeMap<UnitId, Unit>,
+        input: TutorialProduceInput,
+    ) -> Result<ProducedPlacement, Error> {
+        let profile = rules
+            .kinds
+            .get(input.kind)
+            .ok_or(Error::InvalidInput("Tutorial kind"))?;
+        if profile.air {
+            return Err(Error::UnsupportedAir);
+        }
+        if units.contains_key(&input.id) {
+            return Err(Error::InvalidInput("Tutorial unit ID"));
+        }
+        point(input.home)?;
+        if let Some(at) = input.rally {
+            point(at)?;
+        }
+        let scatter =
+            self.spawn
+                .scatter_position(view, profile, input.home, input.scatter_index)?;
+        let mut unit = unit_spawn::initial_unit(
+            rules,
+            catalog,
+            input.kind,
+            input.id,
+            input.owner,
+            scatter.point,
+        )?;
+        let target = input.rally.unwrap_or(Point {
+            x: view.width as f64 * CELL / 2.0,
+            z: view.height as f64 * CELL / 2.0,
+        });
+        let at = self.step_out(
+            view,
+            rules,
+            input.kind,
+            input.id,
+            units,
+            Door {
+                at: input.home,
+                radius: 4.0,
+                heading: math::atan2(target.z - input.home.z, target.x - input.home.x),
+                origin: Some(input.home),
+            },
+            input.tick,
+        )?;
+        unit.x = at.at.x;
+        unit.z = at.at.z;
+        unit.rot = at.heading;
+        unit.ghost = at.ghost_until;
+        let rally = input
+            .rally
+            .filter(|_| !profile.structure)
+            .map(|destination| RallyRequest {
+                kind: RallyKind::Player,
+                destination,
+            });
+        if let Some(request) = rally {
+            unit.world_goal = Some(request.destination);
+            unit.drift = true;
+        }
+        Ok(ProducedPlacement {
+            unit,
+            aim: at.aim,
+            rally,
+        })
     }
     /// Thirty ordered ring candidates, followed by the source fallback, which can
     /// still overlap units or be blocked when no free location exists.

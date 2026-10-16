@@ -103,6 +103,7 @@ fn input(row: &Value) -> Input {
             .collect(),
         manpower: number(&frame["me"]["mp"]),
         research: None,
+        runtime: None,
         flags: array(&frame["flags"])
             .iter()
             .flat_map(|run| {

@@ -139,6 +139,7 @@ fn make_mode(case: &Value, mode: Mode) -> Match {
     m
 }
 fn snapshot(m: &Match) -> Value {
+    crate::unit_placement::tests::assert_current(&m.world.game, &m.grid);
     encode(json!({
         "units":m.world.game.units.values().map(|u| {
             let c=&m.commands.units[&u.id];
@@ -240,18 +241,15 @@ fn admission_guards_reject_before_payment_or_cancellation() {
     )
     .unwrap();
     let before = snapshot(&m);
-    for raw in [
-        json!({"t":"dig","ids":[1],"kind":"trench","x":20,"z":20,"queue":true}),
-        json!({"t":"dig","ids":[1],"kind":"bridge","x":20,"z":20}),
-        json!({"t":"dig","ids":[1],"kind":"wall","x":20,"z":20}),
-    ] {
-        let command = Command::from_json(&raw).unwrap();
-        assert_eq!(
-            m.execute_command(0, &command, false).unwrap(),
-            Some(Denial::Unsupported)
-        );
-        assert_eq!(snapshot(&m), before);
-    }
+    m.options.tech = true;
+    let command =
+        Command::from_json(&json!({"t":"dig","ids":[1],"kind":"gate","x":20,"z":20})).unwrap();
+    assert_eq!(
+        m.execute_command(0, &command, false).unwrap(),
+        Some(Denial::Tier)
+    );
+    m.options.tech = false;
+    assert_eq!(snapshot(&m), before);
     assert_eq!(
         Command::from_json(&json!({"t":"dig","ids":[1],"kind":"unknown","x":20,"z":20})),
         Err(Denial::Blocked)
@@ -355,3 +353,6 @@ fn ordinary_default_dig_matches_real_source_payment_and_preserves_refused_work()
         );
     }
 }
+
+#[path = "engineering_runtime_build_tests.rs"]
+mod runtime_builds;

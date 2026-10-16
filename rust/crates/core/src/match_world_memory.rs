@@ -87,59 +87,7 @@ impl Match {
         crate::vision::update_vision(&mut self.world.game, &self.rules, &self.grid);
         let game = &self.world.game;
         let runtime = self.world_runtime.as_mut().unwrap();
-        let mut teams = BTreeSet::new();
-        for player in &game.players {
-            if !teams.insert(player.team) {
-                continue;
-            }
-            let at = runtime
-                .known_buildings
-                .iter()
-                .position(|(t, _)| *t == player.team);
-            let index = at.unwrap_or_else(|| {
-                runtime.known_buildings.push((player.team, Vec::new()));
-                runtime.known_buildings.len() - 1
-            });
-            let rows = &mut runtime.known_buildings[index].1;
-            for id in &player.visible {
-                let Some(u) = game
-                    .units
-                    .get(id)
-                    .filter(|u| self.rules.kinds[u.kind].building)
-                else {
-                    continue;
-                };
-                let row = crate::match_world::KnownBuilding {
-                    id: u.id,
-                    kind: u.kind,
-                    owner: u.owner,
-                    at: u.at(),
-                    built: u.built,
-                };
-                if let Some(old) = rows.iter_mut().find(|r| r.id == *id) {
-                    *old = row;
-                } else {
-                    rows.push(row);
-                }
-            }
-            rows.retain(|row| {
-                player.visible.contains(&row.id)
-                    || game.units.contains_key(&row.id)
-                    || !game
-                        .units
-                        .values()
-                        .filter(|u| game.team_of(u) == player.team)
-                        .any(|u| {
-                            let d = math::hypot(u.x - row.at.x, u.z - row.at.z);
-                            (u.air.is_none() || airborne(u))
-                                && d <= vision_of(game, &self.rules, u)
-                                && (u.air.is_some()
-                                    || self.rules.kinds[u.kind].building
-                                    || los(game, &self.rules, (u.x, u.z), (row.at.x, row.at.z))
-                                    || d < 8.0)
-                        })
-            });
-        }
+        crate::vision::refresh_building_memory(game, &self.rules, &mut runtime.known_buildings);
         let mut seen = BTreeSet::new();
         runtime.local_defender.visible.clear();
         for guard in game.units.values() {

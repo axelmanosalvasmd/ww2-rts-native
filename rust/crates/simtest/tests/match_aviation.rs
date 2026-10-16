@@ -194,7 +194,7 @@ fn held_flights_rearming_and_continuous_aa_match_every_original_call() {
     assert_eq!(checkpoints, 3410);
 }
 #[test]
-fn unavailable_weapon_and_invalid_late_metadata_refuse_before_mutation() {
+fn invalid_late_aircraft_metadata_refuses_before_mutation() {
     use ww2_core::match_aviation::{AviationError, MissionKind, PlaneMission};
     let f = fixture();
     let mut m = scene(&f["traces"][0]);
@@ -206,20 +206,22 @@ fn unavailable_weapon_and_invalid_late_metadata_refuse_before_mutation() {
     };
     assert!(matches!(
         m.send_aircraft_mission(0, 1000, area),
-        Err(AviationError::Unsupported(_))
+        Err(AviationError::Invalid(_))
     ));
     assert_eq!(snapshot(&m, &[]), before);
     m.commands.units.get_mut(&1000).unwrap().hold_fire = false;
-    let before = snapshot(&m, &[]);
     let patrol = PlaneMission {
         kind: MissionKind::Patrol,
         ..area
     };
-    assert!(matches!(
-        m.send_aircraft_mission(0, 1000, patrol),
-        Err(AviationError::Unsupported(_))
-    ));
-    assert_eq!(snapshot(&m, &[]), before);
+    assert!(m.send_aircraft_mission(0, 1000, patrol).unwrap());
+    assert_eq!(m.aviation.planes[&1000].mission, Some(patrol));
+    assert_eq!(m.world.game.units[&1000].air, Some(PlaneState::Out));
+    assert!(!m.commands.units[&1000].hold_fire);
+    let ammo = m.aviation.planes[&1000].ammo;
+    assert!(m.step_aircraft_turn(1000, 0.05).unwrap());
+    assert_eq!(m.aviation.planes[&1000].ammo, ammo);
+    assert!(m.firing.events.is_empty());
     let trace = f["traces"]
         .as_array()
         .unwrap()
@@ -258,6 +260,37 @@ fn command_scene(trace: &Value) -> Match {
         match_commands::{Command, Facing, MoveOutcome},
     };
     let mut m = scene(trace);
+    // The source fixture installs stale entrench objects. Ground replacements
+    // must still cancel a real native project membership, rather than a bare flag.
+    let ground: Vec<_> = m
+        .world
+        .game
+        .units
+        .values()
+        .filter(|u| !m.rules.kinds[u.kind].air)
+        .map(|u| (u.id, u.owner))
+        .collect();
+    for (id, owner) in ground {
+        let project = m
+            .field_works
+            .prepare_project(
+                &m.world,
+                &m.start.economy.players[owner],
+                ww2_core::field_works::ProjectRequest {
+                    owner,
+                    pattern: ww2_core::field_works::Pattern::Line,
+                    fort: ww2_core::field_works::FortKind::Trench,
+                    from: Point { x: 30.0, z: 30.0 },
+                    to: Point { x: 36.0, z: 30.0 },
+                    back: Point { x: 30.0, z: 36.0 },
+                },
+                |_| true,
+            )
+            .unwrap()
+            .commit(&mut m.field_works)
+            .unwrap();
+        m.field_works.join_project(project, &[id]).unwrap();
+    }
     for (&id, u) in &mut m.world.game.units {
         u.path = vec![Point { x: 9.0, z: 10.0 }];
         u.traffic = Some(Traffic {
@@ -357,8 +390,116 @@ fn typed_aircraft_commands_match_original_selection_and_distinct_cleanup() {
     assert_eq!(checkpoints, f["checkpoints"].as_u64().unwrap());
 }
 #[test]
-fn unsupported_mixed_aircraft_selections_reject_before_supply_or_control_writes() {
-    use ww2_core::match_commands::{Command, Denial};
+fn mixed_attack_cancels_canonical_project_and_preflights_every_selected_actor() {
+    use ww2_core::{
+        match_aviation::MissionKind,
+        match_commands::{Command, Denial},
+    };
+    let f = aircraft_command_fixture();
+    let trace = json!({
+        "map": f["traces"][0]["map"],
+        "specs": [
+            {"kind":"fighter","owner":0,"x":40,"z":40},
+            {"kind":"rifle","owner":1,"x":60,"z":50},
+            {"kind":"rifle","owner":0,"x":46,"z":47},
+            {"kind":"rifle","owner":0,"x":50,"z":47}
+        ],
+        "visible": true
+    });
+    for ids in [[1000, 1002, 1003], [1002, 1003, 1000]] {
+        for case in 0..5 {
+            let mut m = scene(&trace);
+            m.start.economy.players[0].mp = 1000.;
+            let entrench = Command::from_json(&json!({
+                "t":"entrench","ids":[1002,1003],"pattern":"line",
+                "x":44,"z":52,"x2":56,"z2":52
+            }))
+            .unwrap();
+            assert_eq!(m.execute_command(0, &entrench, false).unwrap(), None);
+            let project = m.field_works.membership(1002).unwrap();
+            assert_eq!(m.field_works.membership(1003), Some(project));
+            for id in [1000, 1002, 1003] {
+                m.commands.units.get_mut(&id).unwrap().follow = 777;
+            }
+            let generation = m.world.game.units[&1002].path_gen;
+            match case {
+                1 => {
+                    // A later ground row has a scalar without its admitted membership.
+                    m.field_works.cancel(1003);
+                }
+                2 => m.world.game.units.get_mut(&1003).unwrap().path_gen = u64::MAX,
+                3 => {
+                    m.commands.units.remove(&1003);
+                }
+                4 => {
+                    m.aviation.planes.remove(&1000);
+                }
+                _ => {}
+            }
+            let state = |m: &Match| {
+                format!(
+                    "{:?}",
+                    (
+                        &m.world.game.units,
+                        &m.commands.units,
+                        &m.field_works,
+                        &m.aviation,
+                        &m.logistics,
+                        &m.firing,
+                        &m.abilities,
+                        &m.grid,
+                        m.commands.path_requests()
+                    )
+                )
+            };
+            let before = state(&m);
+            let attack =
+                Command::from_json(&json!({"t":"attack","ids":ids,"target":1001})).unwrap();
+            let result = m.execute_command(0, &attack, false);
+            if case != 0 {
+                if case == 4 {
+                    assert_eq!(result.unwrap(), Some(Denial::Unsupported));
+                } else {
+                    assert_eq!(
+                        result.unwrap_err(),
+                        match case {
+                            1 => "invalid canonical ground order actor",
+                            2 => "ground order path identity exhausted",
+                            3 => "missing construction control",
+                            _ => unreachable!(),
+                        }
+                    );
+                }
+                assert_eq!(state(&m), before, "case {case}, selection {ids:?}");
+                continue;
+            }
+            assert_eq!(result.unwrap(), None);
+            for id in [1002, 1003] {
+                assert_eq!(m.field_works.membership(id), None);
+                assert!(!m.world.game.units[&id].entrench);
+                assert!(!m.world.game.units[&id].dig);
+                assert!(m.world.game.units[&id].attack);
+                assert!(m.world.game.units[&id].path.is_empty());
+                assert_eq!(m.commands.units[&id].attack_id, 1001);
+                assert_eq!(m.commands.units[&id].follow, 0);
+            }
+            assert_eq!(m.world.game.units[&1002].path_gen, generation + 1);
+            let mission = m.aviation.planes[&1000].mission.unwrap();
+            assert_eq!(mission.kind, MissionKind::Attack);
+            assert_eq!(mission.target, Some(1001));
+            assert_eq!(mission.at, m.world.game.units[&1001].at());
+            assert_eq!(m.world.game.units[&1000].air, Some(PlaneState::Out));
+            assert_eq!(m.commands.units[&1000].follow, 0);
+        }
+    }
+}
+
+#[test]
+fn mixed_aircraft_selections_preserve_canonical_supply_and_control_boundaries() {
+    use ww2_core::{
+        match_aviation::MissionKind,
+        match_commands::{Command, Denial},
+    };
     let f = aircraft_command_fixture();
     let trace = f["traces"]
         .as_array()
@@ -371,6 +512,7 @@ fn unsupported_mixed_aircraft_selections_reject_before_supply_or_control_writes(
         json!({"t":"stop","ids":[1002,1000]}),
         json!({"t":"attack","ids":[1002,1000],"target":1002}),
         json!({"t":"move","queue":true,"orders":[[1002,20,21],[1000,22,23]]}),
+        json!({"t":"retreat","ids":[1000,1002]}),
         json!({"t":"stance","ids":[1002,1000],"key":"holdFire","on":false}),
     ];
     for (index, raw) in commands.iter().enumerate() {
@@ -392,16 +534,142 @@ fn unsupported_mixed_aircraft_selections_reject_before_supply_or_control_writes(
         let before = command_snapshot(&m);
         let reserves = m.logistics.get(1002).unwrap().clone();
         let command = Command::from_json(raw).unwrap();
-        assert_eq!(
-            m.execute_command(0, &command, false).unwrap(),
-            Some(Denial::Unsupported),
-            "case {index}"
+        let denial = m.execute_command(0, &command, false).unwrap();
+        if index == 3 {
+            assert_eq!(denial, None, "queued mixed selection");
+            let mut after = command_snapshot(&m);
+            for id in [1000, 1002] {
+                let control = &m.commands.units[&id];
+                assert_eq!(control.orders.len(), 2);
+                let Command::Move { orders, queue, .. } = control.orders.back().unwrap() else {
+                    panic!("queued mixed move must retain a normalized Move");
+                };
+                assert!(!queue);
+                assert_eq!(orders.len(), 1);
+                assert_eq!(orders[0].unit, i64::from(id));
+                assert_eq!(
+                    orders[0].at,
+                    if id == 1000 {
+                        Point { x: 22.0, z: 23.0 }
+                    } else {
+                        Point { x: 20.0, z: 21.0 }
+                    }
+                );
+                assert_eq!(control.follow, 0);
+                let row = after
+                    .as_array_mut()
+                    .unwrap()
+                    .iter_mut()
+                    .find(|row| row["id"] == id)
+                    .unwrap();
+                let prior = before
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .find(|row| row["id"] == id)
+                    .unwrap();
+                row["orders"] = prior["orders"].clone();
+                row["follow"] = prior["follow"].clone();
+            }
+            assert_eq!(after, before);
+            assert_eq!(m.logistics.get(1002).unwrap(), &reserves);
+            assert!(!m.commands.units[&1002].supply_hold);
+            assert!(!m.commands.units[&1002].supply_escape);
+            assert!(m.field_works.membership(1002).is_some());
+            assert_eq!(m.commands.path_requests().used(), 0);
+        } else if matches!(index, 0..=2 | 5) {
+            assert_eq!(denial, None, "case {index}");
+            assert_eq!(m.world.game.units[&1000].air, Some(PlaneState::Out));
+            let mission = m.aviation.planes[&1000].mission.unwrap();
+            assert_eq!(
+                mission.kind,
+                if index == 2 {
+                    ww2_core::match_aviation::MissionKind::Attack
+                } else {
+                    ww2_core::match_aviation::MissionKind::Patrol
+                }
+            );
+            match index {
+                0 => {
+                    assert_eq!(mission.at, Point { x: 22.0, z: 23.0 });
+                    assert!(!m.commands.units[&1002].supply_hold);
+                    assert!(m.commands.units[&1002].supply_escape);
+                    assert!(!m.world.game.units[&1002].path.is_empty());
+                    assert!(!m.logistics.get(1002).unwrap().stranded);
+                    assert_eq!(m.logistics.get(1002).unwrap(), &reserves);
+                    assert!(!m.world.game.units[&1002].entrench);
+                    assert_eq!(m.field_works.membership(1002), None);
+                }
+                1 => {
+                    assert_eq!(mission.at, m.world.game.units[&1000].at());
+                    assert!(m.commands.units[&1002].supply_hold);
+                    assert!(!m.world.game.units[&1002].entrench);
+                    assert_eq!(m.field_works.membership(1002), None);
+                    assert!(m.world.game.units[&1002].path.is_empty());
+                    assert_eq!(m.logistics.get(1002).unwrap(), &reserves);
+                }
+                2 => {
+                    assert_eq!(mission.target, Some(1002));
+                    assert_eq!(mission.at, m.world.game.units[&1002].at());
+                    assert!(m.commands.units[&1000].hold_fire);
+                    assert_eq!(command_snapshot(&m)[2], before[2]);
+                    assert_eq!(m.logistics.get(1002).unwrap(), &reserves);
+                    assert!(m.commands.units[&1002].supply_hold);
+                    assert!(!m.commands.units[&1002].supply_escape);
+                }
+                5 => {
+                    assert!(!m.commands.units[&1000].hold_fire);
+                    assert_eq!(m.logistics.get(1002).unwrap(), &reserves);
+                    assert!(m.commands.units[&1002].supply_hold);
+                    assert!(!m.commands.units[&1002].supply_escape);
+                    assert!(m.field_works.membership(1002).is_some());
+                }
+                _ => unreachable!(),
+            }
+        } else if index == 4 {
+            assert_eq!(denial, None, "mixed retreat");
+            assert_eq!(m.world.game.units[&1000].air, Some(PlaneState::Home));
+            assert_eq!(m.aviation.planes[&1000].mission, None);
+            assert_eq!(m.logistics.get(1002).unwrap(), &reserves);
+            assert!(!m.commands.units[&1002].supply_hold);
+            assert!(m.commands.units[&1002].supply_escape);
+            assert!(!m.world.game.units[&1002].entrench);
+            assert_eq!(m.field_works.membership(1002), None);
+            assert!(!m.world.game.units[&1002].path.is_empty());
+        } else {
+            assert_eq!(denial, Some(Denial::Unsupported), "case {index}");
+            assert_eq!(command_snapshot(&m), before, "case {index}");
+            assert_eq!(m.logistics.get(1002).unwrap(), &reserves);
+            assert!(m.commands.units[&1002].supply_hold);
+            assert!(!m.commands.units[&1002].supply_escape);
+            assert_eq!(m.commands.path_requests().used(), 0);
+        }
+    }
+    // A scalar without its project still fails before either selection can mutate.
+    for raw in &commands[..2] {
+        let mut m = command_scene(trace);
+        m.field_works.cancel(1002);
+        let before = format!(
+            "{:?}|{:?}|{:?}|{:?}",
+            command_snapshot(&m),
+            m.field_works,
+            m.logistics,
+            m.commands.path_requests()
         );
-        assert_eq!(command_snapshot(&m), before, "case {index}");
-        assert_eq!(m.logistics.get(1002).unwrap(), &reserves);
-        assert!(m.commands.units[&1002].supply_hold);
-        assert!(!m.commands.units[&1002].supply_escape);
-        assert_eq!(m.commands.path_requests().used(), 0);
+        let error = m
+            .execute_command(0, &Command::from_json(raw).unwrap(), false)
+            .unwrap_err();
+        assert_eq!(error, "unrepresented or inconsistent field-work activity");
+        assert_eq!(
+            format!(
+                "{:?}|{:?}|{:?}|{:?}",
+                command_snapshot(&m),
+                m.field_works,
+                m.logistics,
+                m.commands.path_requests()
+            ),
+            before
+        );
     }
     for missing_physical in [false, true] {
         let mut m = command_scene(trace);
@@ -424,7 +692,12 @@ fn unsupported_mixed_aircraft_selections_reject_before_supply_or_control_writes(
         assert_eq!(m.commands.path_requests().used(), 0);
     }
     let mut m = command_scene(trace);
-    assert!(m.start_queued_orders(1000, false).is_err());
+    m.start_queued_orders(1000, false).unwrap();
+    assert!(m.commands.units[&1000].orders.is_empty());
+    let mission = m.aviation.planes[&1000].mission.unwrap();
+    assert_eq!(mission.kind, MissionKind::Patrol);
+    assert_eq!(mission.at, Point { x: 8.0, z: 8.0 });
+    assert_eq!(m.world.game.units[&1000].air, Some(PlaneState::Out));
     m.commands.units.get_mut(&1000).unwrap().orders.clear();
     m.start_queued_orders(1000, false).unwrap();
     m.prepare_unit_commands(1000, false).unwrap();
@@ -610,8 +883,7 @@ fn aircraft_tick_hooks_match_observed_original_full_step_phases() {
 }
 
 #[test]
-fn aircraft_tick_preflight_rejects_unrepresented_phases_before_mutation() {
-    use ww2_core::match_aviation::AviationError;
+fn aircraft_tick_preflight_admits_weapons_and_queue_but_rejects_malformed_state() {
     let f = aircraft_tick_fixture();
     let mut m = scene(&f["traces"][0]);
     let before = aircraft_phase_snapshot(&m);
@@ -627,24 +899,26 @@ fn aircraft_tick_preflight_rejects_unrepresented_phases_before_mutation() {
         Some(mission(&json!({"kind":"patrol","id":0,"x":40,"z":40})));
     m.commands.units.get_mut(&1000).unwrap().hold_fire = false;
     let before = aircraft_phase_snapshot(&m);
-    assert!(matches!(
-        m.validate_aircraft_turns(0.05),
-        Err(AviationError::Unsupported(_))
-    ));
+    m.validate_aircraft_turns(0.05).unwrap();
     assert_json(
         &aircraft_phase_snapshot(&m),
         &before,
-        "automatic weapon guard",
+        "automatic weapon admission is read-only",
     );
+    assert!(m.step_aircraft_turn(1000, 0.05).unwrap());
+    assert!(!m.commands.units[&1000].hold_fire);
     m.commands.units.get_mut(&1000).unwrap().hold_fire = true;
     m.commands.units.get_mut(&1000).unwrap().orders.push_back(
         ww2_core::match_commands::Command::from_json(&json!({"t":"move","orders":[[1000,30,30]]}))
             .unwrap(),
     );
-    assert!(matches!(
-        m.validate_aircraft_turns(0.05),
-        Err(AviationError::Unsupported(_))
-    ));
+    let before = aircraft_phase_snapshot(&m);
+    m.validate_aircraft_turns(0.05).unwrap();
+    assert_json(
+        &aircraft_phase_snapshot(&m),
+        &before,
+        "queued order admission",
+    );
     m.world.game.units.get_mut(&1000).unwrap().hp = 0.0;
     let dead = aircraft_phase_snapshot(&m);
     m.validate_aircraft_turns(0.05).unwrap();

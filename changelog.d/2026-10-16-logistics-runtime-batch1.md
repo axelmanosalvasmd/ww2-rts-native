@@ -1,0 +1,1 @@
+- Fix physical supply handoffs for garrison occupants by using their recorded entry or the nearest walkable fallback. Add behavior checks for handoff reachability, truck initialization and fleet growth, retirement and replacement. R1 physical logistics remains off; full-tick logistics and the remaining runtime rows stay pending.

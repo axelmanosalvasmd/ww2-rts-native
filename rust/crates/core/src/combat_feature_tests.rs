@@ -113,6 +113,7 @@ fn scene_with_teams(rows: &[(&str, usize, f64, f64)], teams: &[i32]) -> Match {
                     timer: 0.,
                     orbit: 0.,
                     mission: None,
+                    attack_pick: 0,
                     downed: false,
                 },
             );
@@ -277,6 +278,24 @@ fn cmb84_aircraft_hold_fire_guards_patrol_anti_air_and_support_interception() {
     assert_eq!(patrol.aviation.planes[&plane].ammo, ammo);
     assert_eq!(patrol.firing.get(plane).unwrap().target_id, 0);
     assert!(patrol.firing.flights.is_empty());
+
+    // Automatic selection survives hold fire, while each step clears the displayed target.
+    patrol.commands.units.get_mut(&plane).unwrap().hold_fire = false;
+    patrol.firing.get_mut(plane).unwrap().cooldown = 10.;
+    patrol.step_aircraft(plane, 0.05).unwrap();
+    assert_eq!(patrol.aviation.planes[&plane].attack_pick, 1);
+    assert_eq!(patrol.firing.get(plane).unwrap().target_id, 1);
+    let retarget = patrol.firing.get(plane).unwrap().retarget;
+    patrol.commands.units.get_mut(&plane).unwrap().hold_fire = true;
+    patrol.step_aircraft(plane, 0.05).unwrap();
+    assert_eq!(patrol.firing.get(plane).unwrap().target_id, 0);
+    assert_eq!(patrol.aviation.planes[&plane].attack_pick, 1);
+    patrol.commands.units.get_mut(&plane).unwrap().hold_fire = false;
+    patrol.step_aircraft(plane, 0.05).unwrap();
+    assert_eq!(patrol.firing.get(plane).unwrap().target_id, 1);
+    assert_eq!(patrol.aviation.planes[&plane].attack_pick, 1);
+    assert!(patrol.firing.get(plane).unwrap().retarget < retarget);
+    assert!(patrol.firing.get(plane).unwrap().retarget > 0.);
 
     for kind in ["mg", "flak", "fighter"] {
         let mut m = if kind == "fighter" {

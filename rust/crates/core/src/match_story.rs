@@ -8,7 +8,7 @@ use crate::{
     math,
 };
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct PlayerStory {
     pub kills: f64,
     pub losses: f64,
@@ -146,7 +146,7 @@ pub fn prepare_story_updates<'a>(
     }
     Ok(PreparedStoryUpdates { story, updates })
 }
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FallenLocations {
     pub structure: Option<Point>,
     pub bunker: Option<Point>,
@@ -346,8 +346,16 @@ impl Match {
             mode: match self.options.mode {
                 crate::economy::Mode::World => "world",
                 crate::economy::Mode::Assault => "assault",
+                crate::economy::Mode::Annihilation => "annihilation",
+                crate::economy::Mode::Classic => "classic",
+                crate::economy::Mode::Horde => "horde",
+                crate::economy::Mode::Tutorial => "tutorial",
                 _ => "conquest",
             },
         }))
     }
 }
+
+#[cfg(test)]
+#[path = "match_story_intent_tests.rs"]
+mod intent_tests;

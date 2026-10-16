@@ -36,7 +36,7 @@ pub(crate) fn native_match() -> Match {
 fn client(id: u64) -> (Connection, mpsc::Receiver<Output>) {
     let (tx, rx) = mpsc::channel(64);
     let (cancel, _) = watch::channel(false);
-    (Connection { id, tx, cancel }, rx)
+    (Connection::new(id, tx, cancel), rx)
 }
 fn join(h: &mut Hub, c: &Connection, token: &str, now: u64) {
     h.message(
@@ -465,6 +465,7 @@ fn original_result_roster_rows_follow_people_across_removal_and_refill() {
                         disconnected: None,
                         denies: Vec::new(),
                         rtt: None,
+                        diagnostics: crate::diagnostics::PlayerDiagnostics::default(),
                         last_match: Some(
                             json!({"team":name.as_bytes()[0] - b'a',"outcome":"victory"}),
                         ),
@@ -482,3 +483,6 @@ fn original_result_roster_rows_follow_people_across_removal_and_refill() {
 
 #[path = "native_mode_predicates.rs"]
 mod mode_predicates;
+
+#[path = "mode_server_lifecycle_tests.rs"]
+mod mode_server_lifecycle;

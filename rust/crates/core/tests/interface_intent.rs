@@ -24,7 +24,8 @@ fn exported_squad_slots_match_every_health_transition_and_marching_position() {
     let slots = tables.get("SLOTS").unwrap().object().unwrap();
     for (kind, exported) in slots {
         let exported = exported.array().unwrap();
-        let max_hp = exported.len() as f64;
+        let slot_count = exported.len();
+        let max_hp = slot_count as f64;
         // These sine/cosine bits are recorded in fixtures/math.txt.
         for (rotation, cosine, sine) in [
             (0.0, 1.0, 0.0),
@@ -63,6 +64,50 @@ fn exported_squad_slots_match_every_health_transition_and_marching_position() {
                     assert_eq!(actual.x.to_bits(), x.to_bits(), "{kind}, hp {hp}");
                     assert_eq!(actual.z.to_bits(), z.to_bits(), "{kind}, hp {hp}");
                 }
+            }
+        }
+
+        // Catalog health is independent of the number of rendered slots.
+        let unit = tables.get("UNITS").unwrap().get(kind).unwrap();
+        let catalog_max_hp = number(unit, "hpPer") * number(unit, "models");
+        for (hp, expected_count) in [
+            (0.0, 0),
+            (catalog_max_hp, slot_count),
+            (2.0 * catalog_max_hp, 2 * slot_count),
+        ] {
+            let drawn = squad_men::drawn_men(
+                kind,
+                hp,
+                catalog_max_hp,
+                Point { x: 17.0, z: 23.0 },
+                0.0,
+                Point { x: 0.0, z: 0.0 },
+            )
+            .unwrap();
+            assert_eq!(drawn.count, expected_count as f64, "{kind}, hp {hp}");
+            assert_eq!(drawn.positions.len(), expected_count.min(slot_count));
+        }
+
+        // With this low maximum, each half hit point crosses one slot threshold.
+        let low_max_hp = slot_count as f64 / 2.0;
+        for expected_count in 1..=slot_count {
+            let boundary_hp = expected_count as f64 / 2.0;
+            for (hp, expected) in [
+                (boundary_hp - 0.25, expected_count),
+                (boundary_hp, expected_count),
+                (boundary_hp + 0.25, expected_count + 1),
+            ] {
+                let drawn = squad_men::drawn_men(
+                    kind,
+                    hp,
+                    low_max_hp,
+                    Point { x: 17.0, z: 23.0 },
+                    0.0,
+                    Point { x: 0.0, z: 0.0 },
+                )
+                .unwrap();
+                assert_eq!(drawn.count, expected as f64, "{kind}, hp {hp}");
+                assert_eq!(drawn.positions.len(), expected.min(slot_count));
             }
         }
     }

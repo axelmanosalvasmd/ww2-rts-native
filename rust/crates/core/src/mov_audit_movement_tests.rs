@@ -462,3 +462,76 @@ fn mov11_separation_checks_protected_cover_at_the_actual_displacement_phase() {
     );
     assert!(g.units[&1].at() != before || g.units[&2].at() != point(23.1, 20.1994));
 }
+
+#[test]
+fn eng12_gate_bodies_block_vehicle_sweeps_even_when_terrain_is_open() {
+    let rules = Rules::compiled().unwrap();
+    let kind = &rules.kinds[rules.kind("tank").unwrap()];
+    let gate_kind = &rules.kinds[rules.kind("gate").unwrap()];
+    for open in [true, false] {
+        let mut g = ground();
+        let cell = 15 * g.w + 15;
+        let mut gate = unit(&rules, "gate", 2, point(31., 31.));
+        gate.built = Some(1.);
+        gate.cells = Some(vec![cell as u32]);
+        g.objects = Some(vec![b'.'; g.flags.len()]);
+        if !open {
+            g.objects.as_mut().unwrap()[cell] = b'K';
+            g.flags[cell] = crate::game::MOVE | crate::game::SIGHT;
+        }
+        g.units.insert(gate.id, gate);
+        let mut grid = SpatialGrid::new(&g.units, 16.);
+        let mut tank = unit(
+            &rules,
+            "tank",
+            1,
+            point(
+                31. - kind.body_radius() - gate_kind.body_radius() - 0.01,
+                31.,
+            ),
+        );
+        tank.rot = 0.;
+        tank.move_speed = 2.;
+        let before = tank.pose();
+        let mut route = vec![point(40., 31.)];
+        drive_vehicle(
+            &g,
+            &rules,
+            &grid,
+            &mut tank,
+            kind,
+            &mut route,
+            kind.speed,
+            0.05,
+            false,
+            &Steer::default(),
+            before,
+            &TrafficKnowledge::physical(),
+            false,
+        );
+        assert_eq!(tank.at(), point(before.x, before.z), "open={open}");
+        assert_eq!(tank.move_speed, 0.);
+        if open {
+            // Same physical terrain and proposed motion, with only the Gate body removed.
+            g.units.clear();
+            grid.rebuild(&g.units);
+            tank.move_speed = 2.;
+            drive_vehicle(
+                &g,
+                &rules,
+                &grid,
+                &mut tank,
+                kind,
+                &mut route,
+                kind.speed,
+                0.05,
+                false,
+                &Steer::default(),
+                before,
+                &TrafficKnowledge::physical(),
+                false,
+            );
+            assert!(tank.x > before.x);
+        }
+    }
+}
