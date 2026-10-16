@@ -210,7 +210,7 @@ fn economy(
     let mut nodes: Vec<_> = context
         .nodes
         .iter()
-        .copied()
+        .map(|node| node.at)
         .enumerate()
         .filter(|(_, at)| {
             owned_ground(facts, team, *at)
@@ -777,7 +777,12 @@ mod tests {
             .as_mut()
             .unwrap()
             .nodes
-            .push(Point { x: 60.0, z: 100.0 });
+            .push(crate::commander_tactics::NodeObservation {
+                at: Point { x: 60.0, z: 100.0 },
+                rate: 1.0,
+                fuel: false,
+                visible: true,
+            });
         let commands = propose(input.clone(), &mut State::default());
         let builds = orders(&commands, "build");
         assert_eq!(builds.len(), 1);
