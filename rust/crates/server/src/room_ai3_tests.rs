@@ -106,7 +106,7 @@ fn assert_start(messages: &[Value], role: usize, count: usize, loaded: bool) -> 
         0 => {
             assert!(message["fog"]["v"].is_string());
             assert!(message["fog"]["e"].is_string());
-        },
+        }
         1 => {
             assert_eq!(message["role"], "operative");
             assert_eq!(message["you"], 0);
@@ -323,7 +323,10 @@ fn mode09_horde_departure_activates_normal_ai_clears_token_and_only_its_drop_pau
     assert!(hub.rooms["ABC"].players[0].connection.is_none());
     assert!(!runtime(&hub).paused());
     assert_eq!(runtime(&hub).state().start.economy.players[0], before);
-    assert_eq!(format!("{:?}", runtime(&hub).state().world.game.units), units);
+    assert_eq!(
+        format!("{:?}", runtime(&hub).state().world.game.units),
+        units
+    );
     assert!(matches!(
         runtime(&hub).ai_commander(0).unwrap().brain(),
         Brain::Human { .. }

@@ -705,7 +705,7 @@ mod tests {
         let clipped = stream.capture(&state, &[], false).unwrap();
         let until = clipped["flights"][0]["until"].as_f64().unwrap();
         assert!(
-            until >= 1. && until < 1.15,
+            (1.0..1.15).contains(&until),
             "visible contact clips watcher flight: {until}"
         );
         let saved = stream.clone();

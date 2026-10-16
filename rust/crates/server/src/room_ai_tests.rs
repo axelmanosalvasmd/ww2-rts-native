@@ -128,8 +128,17 @@ fn net48_leave_preserves_army_clears_identity_and_ignores_departed_socket() {
     hello(&mut hub, &returning, "b", 3);
     let rejoined = drain(&mut rr);
     assert!(rejoined.iter().all(|v| !matches!(v, Output::Close(..))));
-    assert!(rejoined.iter().any(|v| matches!(v, Output::Json(m) if m["t"] == "start")));
-    assert!(hub.rooms["ABC"].spectators.iter().any(|p| p.connection.as_ref().is_some_and(|c| c.id == returning.id)));
+    assert!(
+        rejoined
+            .iter()
+            .any(|v| matches!(v, Output::Json(m) if m["t"] == "start"))
+    );
+    assert!(
+        hub.rooms["ABC"]
+            .spectators
+            .iter()
+            .any(|p| p.connection.as_ref().is_some_and(|c| c.id == returning.id))
+    );
     assert_eq!(hub.rooms["ABC"].players.len(), 2);
     assert!(hub.rooms["ABC"].players[1].ai);
 }
