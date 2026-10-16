@@ -1,4 +1,4 @@
 - Add paid three-cell Gate jobs, grid-aligned placement, timed opening and closing, and existing recipient flags in ordinary Default and Conquest matches.
-- Let squads and vehicles use completed open Gate passages. The pinned prototype still blocks them with Gate bodies; ENG-12 is a differs candidate pending owner agreement.
+- Keep open and closed Gate actors in traffic, vehicle contact and crowd separation, matching the prototype. Replace the open-Gate crossing test with terrain-route and body-obstruction checks with passage controls that contain no Gate actors; retain the full-match snapshot lifecycle.
 - Replace the old unsupported Gate command test with a tier refusal that preserves existing work. Add exact prototype component checks and ordinary match histories through Gate destruction, victory and every seat's snapshots.
 - Depot claims and release still need construction-mode admission and its canonical node owner. AI holder and HQ fortification remain deferred.

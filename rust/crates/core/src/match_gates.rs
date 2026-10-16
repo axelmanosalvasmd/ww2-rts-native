@@ -8,28 +8,6 @@ pub struct GateControl {
     pub remaining: f64,
 }
 
-/// Canonical passable terrain makes a completed Gate an opening, not a traffic body.
-/// Keep building health, ownership, targeting and structural sections intact.
-pub(crate) fn open_passage(
-    g: &crate::game::Game,
-    kind: &crate::rules::UnitKind,
-    unit: &crate::game::Unit,
-) -> bool {
-    kind.name == "gate"
-        && unit.hp > 0.0
-        && unit.built.is_some_and(|built| built >= 1.0)
-        && unit.cells.as_deref().is_some_and(|cells| {
-            cells.len() == 1
-                && g.objects
-                    .as_ref()
-                    .and_then(|objects| objects.get(cells[0] as usize))
-                    == Some(&b'.')
-                && g.flags
-                    .get(cells[0] as usize)
-                    .is_some_and(|flags| flags & crate::game::MOVE == 0)
-        })
-}
-
 impl Match {
     pub(crate) fn ordinary_gate_mode(&self) -> bool {
         matches!(

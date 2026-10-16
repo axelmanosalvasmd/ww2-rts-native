@@ -649,7 +649,6 @@ fn drive_vehicle(
                     && v.air.is_none()
                     && !v.riding
                     && v.garrison.is_none()
-                    && !crate::match_gates::open_passage(g, &rules.kinds[v.kind], v)
                     && !(g.allied(me.owner, v.owner) && ghost_pair(g, me, v, true))
             },
         );

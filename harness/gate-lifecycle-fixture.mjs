@@ -85,7 +85,7 @@ trace('occupied-passage-and-eligibility', [step(),
   step({troop:{owner:1}}),step({troop:{x:90,z:90}})]);
 trace('twenty-hertz-clock', Array.from({length:35}, (_,i) => step(i === 1 ? {troop:{x:41,z:31}} : {}, .05)));
 // Diagnostic of the prototype's passable terrain still being blocked by Gate bodies.
-// This is an intentional native difference, not an exact whole-match parity claim.
+// Native passage tests retain this terrain/body distinction; this is not a whole-match comparison.
 function passage(withGates) {
   const g = make();
   const unit = sim.internals.spawnUnit(g,0,'rifle');

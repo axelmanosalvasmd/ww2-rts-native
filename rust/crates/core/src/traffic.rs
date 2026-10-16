@@ -386,7 +386,6 @@ pub fn traffic_step_with_knowledge(
             && v.air.is_none()
             && !v.riding
             && v.garrison.is_none()
-            && !crate::match_gates::open_passage(g, &rules.kinds[v.kind], v)
             && !ghost_pair(g, v, u_now, friend(v))
             && knowledge.seen_by(g, u_now.owner, v)
     };

@@ -590,32 +590,87 @@ fn eng12_occupied_paid_gate_waits_and_cancels_without_an_orphan_actor() {
     );
 }
 
+fn publish_mover(m: &mut Match, kind: &str) -> u32 {
+    let id = m.next_unit_id;
+    let draft = crate::unit_publication::StagedUnit::ordinary(
+        &m.world.game,
+        &m.rules,
+        0,
+        m.rules.kind(kind).unwrap(),
+        id,
+        m.world.game.units.len() as u32,
+        m.start.players[0].spawn,
+        Some(Point { x: 30., z: 27. }),
+    )
+    .unwrap();
+    m.publish_starting_unit(draft).unwrap();
+    id
+}
+
 #[test]
-fn eng12_squads_and_vehicle_cross_open_gates_and_wait_behind_closed_gates() {
+fn eng12_open_and_closed_gate_bodies_keep_prototype_traffic_and_separation() {
+    // Source local-traffic.js:101 and sim.js:5198-5229 never exempt an open Gate.
+    for open in [true, false] {
+        for kind in ["rifle", "tank"] {
+            for gate_first in [true, false] {
+                let (mut m, _) = scene();
+                let early = (!gate_first).then(|| publish_mover(&mut m, kind));
+                let gate = m.next_unit_id;
+                m.place_starting_building(0, "gate", 15 * 60 + 15).unwrap();
+                if open {
+                    m.step_gate(gate, 0.05).unwrap();
+                }
+                let id = early.unwrap_or_else(|| publish_mover(&mut m, kind));
+                m.world
+                    .game
+                    .units
+                    .retain(|other, _| [gate, id].contains(other));
+                m.grid.rebuild(&m.world.game.units);
+                relocate(&mut m, id, Point { x: 31., z: 27. });
+                let mut mover = m.world.game.units[&id].clone();
+                mover.ghost = 0.;
+                let steer = crate::traffic::traffic_step(
+                    &m.world.game,
+                    &m.rules,
+                    &m.grid,
+                    &mut mover,
+                    Some(Point { x: 31., z: 37. }),
+                    0.05,
+                );
+                assert!(
+                    steer.blocked,
+                    "{kind}, open={open}, gate_first={gate_first}"
+                );
+                assert!(steer.goal.is_none());
+
+                let min = (m.rules.kinds[mover.kind].radius
+                    + m.rules.kinds[m.world.game.units[&gate].kind].radius)
+                    * 0.8;
+                let distance = min * 0.75;
+                let before = 31. - distance;
+                relocate(&mut m, id, Point { x: 31., z: before });
+                let solid = m.rules.kinds[mover.kind].ground_vehicle();
+                let push = (min - distance) / 2. * if solid { 2. } else { 1. };
+                crate::separation::separate_crowds(&mut m.world.game, &m.rules, &mut m.grid);
+                assert!(
+                    (m.world.game.units[&id].z - (before - push)).abs() < 1e-12,
+                    "{kind}, open={open}, gate_first={gate_first}"
+                );
+                assert_eq!(m.world.game.units[&gate].at(), Point { x: 31., z: 31. });
+            }
+        }
+    }
+}
+
+#[test]
+fn eng12_gate_paths_follow_open_terrain_while_bodies_still_obstruct_passage() {
     let source = fixture();
     assert_eq!(number(&source["passageRuns"][0]["z"]), 37.);
     assert!(number(&source["passageRuns"][1]["z"]) < 31.);
     for surface in *b".D+M" {
         for kind in ["rifle", "tank"] {
-            let (mut m, rifle) = scene();
-            let id = if kind == "rifle" {
-                rifle
-            } else {
-                let id = m.next_unit_id;
-                let draft = crate::unit_publication::StagedUnit::ordinary(
-                    &m.world.game,
-                    &m.rules,
-                    0,
-                    m.rules.kind(kind).unwrap(),
-                    id,
-                    m.world.game.units.len() as u32,
-                    m.start.players[0].spawn,
-                    Some(Point { x: 30., z: 27. }),
-                )
-                .unwrap();
-                m.publish_starting_unit(draft).unwrap();
-                id
-            };
+            let (mut m, _) = scene();
+            let id = publish_mover(&mut m, kind);
             for control in m.commands.units.values_mut() {
                 control.auto_cast = false;
                 control.auto_retreat = false;
@@ -626,28 +681,37 @@ fn eng12_squads_and_vehicle_cross_open_gates_and_wait_behind_closed_gates() {
                     m.world.set_cell(15 * 60 + x, b'K').unwrap();
                 }
             }
-            let mut gates = Vec::new();
             for x in 14..=16 {
-                gates.push(m.next_unit_id);
                 m.world.set_cell(15 * 60 + x, surface).unwrap();
-                m.place_starting_building(0, "gate", 15 * 60 + x).unwrap();
             }
-            // Cross between adjacent Gate centers, through their actual passable cells.
-            relocate(&mut m, id, Point { x: 30., z: 27. });
-            m.advance_tick().unwrap();
-            let move_to =
-                |z| Command::from_json(&json!({"t":"move","orders":[[id,30.,z]]})).unwrap();
-            assert_eq!(m.execute_command(0, &move_to(37.), false).unwrap(), None);
+            let move_to = Command::from_json(&json!({"t":"move","orders":[[id,30.,37.]]})).unwrap();
             let mut delivery = DeliveryState::new(&m).unwrap();
+            // The retained Source control has the same terrain gap with no Gate actors.
+            assert_eq!(m.execute_command(0, &move_to, false).unwrap(), None);
             for _ in 0..160 {
                 m.advance_tick().unwrap();
                 collect(&mut m, &mut delivery);
             }
             assert!(
                 m.world.game.units[&id].z > 35.5,
-                "{kind}: {:?}",
+                "no-Gate control: {kind}, surface={}, unit={:?}",
+                char::from(surface),
                 m.world.game.units[&id]
             );
+            m.execute_command(
+                0,
+                &Command::Stop {
+                    ids: vec![i64::from(id)],
+                },
+                false,
+            )
+            .unwrap();
+            relocate(&mut m, id, Point { x: 30., z: 27. });
+            let mut gates = Vec::new();
+            for x in 14..=16 {
+                gates.push(m.next_unit_id);
+                m.place_starting_building(0, "gate", 15 * 60 + x).unwrap();
+            }
             let enemy = m
                 .world
                 .game
@@ -656,47 +720,108 @@ fn eng12_squads_and_vehicle_cross_open_gates_and_wait_behind_closed_gates() {
                 .find(|u| u.owner == 1 && m.rules.kinds[u.kind].name == "rifle")
                 .unwrap()
                 .id;
-            relocate(&mut m, enemy, Point { x: 41., z: 31. });
             m.world.game.units.get_mut(&enemy).unwrap().hold_pos = true;
-            for _ in 0..12 {
-                m.advance_tick().unwrap();
-                collect(&mut m, &mut delivery);
-            }
-            assert!(
-                gates
-                    .iter()
-                    .all(|id| m.commands.units[id].gate.unwrap().open == Some(false))
-            );
-            assert_eq!(m.execute_command(0, &move_to(27.), false).unwrap(), None);
-            for _ in 0..80 {
-                m.advance_tick().unwrap();
-                collect(&mut m, &mut delivery);
-            }
-            assert!(m.world.game.units[&id].z >= 32.);
-            relocate(&mut m, enemy, Point { x: 90., z: 90. });
-            for _ in 0..12 {
-                m.advance_tick().unwrap();
-                collect(&mut m, &mut delivery);
-            }
-            assert!(
-                gates
-                    .iter()
-                    .all(|id| m.commands.units[id].gate.unwrap().open == Some(true))
-            );
-            assert_eq!(m.execute_command(0, &move_to(27.), false).unwrap(), None);
-            for _ in 0..320 {
-                m.advance_tick().unwrap();
-                collect(&mut m, &mut delivery);
-                if m.world.game.units[&id].z < 28.5 {
-                    break;
+            for open in [true, false, true] {
+                // Keep mobile bodies outside the occupied-passage radius when changing state.
+                m.execute_command(
+                    0,
+                    &Command::Stop {
+                        ids: vec![i64::from(id)],
+                    },
+                    false,
+                )
+                .unwrap();
+                relocate(&mut m, id, Point { x: 30., z: 27. });
+                relocate(
+                    &mut m,
+                    enemy,
+                    Point {
+                        x: if open { 90. } else { 41. },
+                        z: 31.,
+                    },
+                );
+                for _ in 0..12 {
+                    m.advance_tick().unwrap();
+                    collect(&mut m, &mut delivery);
+                }
+                assert!(
+                    gates
+                        .iter()
+                        .all(|gate| m.commands.units[gate].gate.unwrap().open == Some(open))
+                );
+                for &gate in &gates {
+                    let cell = m.world.game.units[&gate].cells.as_ref().unwrap()[0] as usize;
+                    assert_eq!(m.world.game.flags[cell] & crate::game::MOVE == 0, open);
+                    if open {
+                        assert_eq!(m.world.game.chars[cell], surface);
+                    }
+                }
+                // Source findPath uses terrain, so the open cells admit a route despite actor contact.
+                assert_gate_route(&m, id, open);
+                assert_eq!(m.execute_command(0, &move_to, false).unwrap(), None);
+                for _ in 0..160 {
+                    m.advance_tick().unwrap();
+                    collect(&mut m, &mut delivery);
+                    assert!(
+                        m.world.game.units[&id].z < 30.,
+                        "{kind}, surface={}, open={open}",
+                        char::from(surface)
+                    );
+                    assert!(m.tick_state.fault().is_none());
                 }
             }
-            assert!(
-                m.world.game.units[&id].z < 28.5,
-                "{kind}: {:?}",
-                m.world.game.units[&id]
-            );
         }
+    }
+}
+
+fn assert_gate_route(m: &Match, id: u32, open: bool) {
+    use crate::{
+        navigation::TerrainView,
+        pathfinding::{PathRules, PathStatus, PathTerrain, Pathfinding},
+    };
+    let g = &m.world.game;
+    let near = vec![0; g.flags.len()];
+    let hazards = vec![false; g.flags.len()];
+    let terrain = PathTerrain {
+        navigation: TerrainView {
+            width: g.w,
+            height: g.h,
+            flags: &g.flags,
+            heights: g.height.as_deref(),
+            world_known: false,
+            knowledge_id: 0,
+            versions: Default::default(),
+            changed: None,
+            changes: &[],
+        },
+        near_walls: &near,
+        known_mines: &hazards,
+        fires: &hazards,
+        bunkers: &[],
+        wear: None,
+        wetness: 0.,
+        roads: true,
+    };
+    let path = Pathfinding::new()
+        .find_path(
+            terrain,
+            PathRules::compiled().unwrap(),
+            &m.rules.kinds[g.units[&id].kind],
+            Point { x: 30., z: 27. },
+            Point { x: 30., z: 37. },
+            None,
+        )
+        .unwrap();
+    assert_eq!(
+        path.status,
+        if open {
+            PathStatus::Found
+        } else {
+            PathStatus::Unreachable
+        }
+    );
+    if open {
+        assert_eq!(path.waypoints.last(), Some(&Point { x: 30., z: 37. }));
     }
 }
 
