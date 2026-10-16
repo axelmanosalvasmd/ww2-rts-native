@@ -4325,3 +4325,9 @@ profile-test distance: at 5 m, the launch solver's 0.025-second minimum time
 prevents those projectiles from reaching their profile speed. Their targets
 now sit 20 m away; the profile, speed bound, height, lifetime and no-early-damage
 checks are unchanged. No native or Source attempt preceded this input correction.
+
+The unrun role-choice scene also now retains the original prototype inputs:
+sniper rifle/MG distances12/30 m and AT rifle/tank distances7/28 m, with tank
+front toward the gun. Source inspection caught the authored sniper7/30 m
+copy error before any native attempt. Role weights and expected target IDs
+remain unchanged; the real native selection and firing providers are exercised.

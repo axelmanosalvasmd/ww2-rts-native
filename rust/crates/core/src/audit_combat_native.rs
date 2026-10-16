@@ -184,12 +184,15 @@ fn cmb38_unfinished_pillbox_cannot_fire_finished_one_launches() {
 
 #[test]
 fn cmb42_sniper_and_at_choose_their_jobs_over_nearer_rifles() {
-    for (name, other, distance) in [("sniper", "mg", 30.0), ("at", "tank", 28.0)] {
+    for (name, other, near, distance) in [("sniper", "mg", 12.0, 30.0), ("at", "tank", 7.0, 28.0)] {
         let mut m = scene(&[
             (name, 0, 5.0, 21.0),
-            ("rifle", 1, 12.0, 21.0),
+            ("rifle", 1, 5.0 + near, 21.0),
             (other, 1, 5.0 + distance, 21.0),
         ]);
+        if other == "tank" {
+            m.world.game.units.get_mut(&3).unwrap().rot = std::f64::consts::PI;
+        }
         m.begin_firing_tick(&[1, 2, 3]).unwrap();
         m.apply_unit_firing(1, false, 0.05).unwrap();
         assert_eq!(
