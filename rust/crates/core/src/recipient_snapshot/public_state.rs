@@ -75,8 +75,9 @@ pub(super) fn capture_perspective(
     let mut result = Vec::with_capacity(g.players.len());
     for slot in 0..g.players.len() {
         let mut fields = Map::new();
-        if state.options.mode == Mode::Horde {
-            fields.insert("mode".into(), horde_mode_row(state)?);
+        let mode = super::mode_row(state)?;
+        if !mode.is_null() {
+            fields.insert("mode".into(), mode);
         }
         // Reuse Source's six-field ghost rows. Never consult a hidden live building here.
         if matches!(state.options.mode, Mode::Classic | Mode::World) {
@@ -119,23 +120,6 @@ pub(super) fn capture_perspective(
         }
         if let Some(nodes) = &nodes {
             fields.insert("nodes".into(), json!(nodes));
-        }
-        if let Some(tutorial) = state.tutorial_state() {
-            let step = crate::tutorial_steps::TutorialStep::ALL
-                .iter()
-                .position(|s| *s == tutorial.step())
-                .ok_or(SnapshotError::Rules)?;
-            fields.insert(
-                "mode".into(),
-                json!({"kind":"tutorial", "suddenDeath":false,
-                "slot":tutorial.enemy(), "goal":tutorial.goal(), "step":step,
-                "steps":crate::tutorial_steps::TutorialStep::ALL.len()}),
-            );
-        } else if let Some(assault) = state.assault {
-            finite(&[assault.time_left])?;
-            fields.insert("mode".into(), json!({"kind":"assault", "defenderTeam":assault.defender_team,
-                "attackerTeam":assault.attacker_team, "timeLeft":math::max(0., assault.time_left.ceil()),
-                "suddenDeath":false, "total":assault.total}));
         }
         fields.insert("army".into(), json!({"pop":pop,"income":income}));
         fields.insert("wx".into(), json!(wx.map(r)));

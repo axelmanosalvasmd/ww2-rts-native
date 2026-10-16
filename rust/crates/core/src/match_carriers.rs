@@ -3,12 +3,15 @@
 
 use crate::{
     catalog::Catalog,
+    existing_observers::{ExistingObservers, PreparedGroundExit},
     game::{CELL, MOVE, Point},
     grid::UnitId,
-    match_commands::{Command, Denial, MoveOutcome},
+    match_commands::{Command, Denial, MoveOutcome, search_route},
+    match_routing::{RecipientContext, prepare_recipient_exit_routing},
     match_runtime::Match,
     math,
     navigation::TerrainView,
+    pathfinding::PathRules,
     unit_spawn::SpawnPlacer,
 };
 use std::collections::{BTreeMap, BTreeSet};
@@ -90,9 +93,11 @@ impl Match {
             || !self.commands.units.contains_key(&id)
             || self.firing.get(id).is_none()
             || u.dig != self.field_works.is_active(id)
+            || u.entrench != self.field_works.membership(id).is_some()
         {
             return Err("invalid canonical carrier unit".into());
         }
+        crate::match_construction::validate_build_activity(u, &self.commands.units[&id])?;
         if meta.cargo.len() > 4096 {
             return Err("carrier cargo resource bound exceeded".into());
         }
@@ -206,12 +211,10 @@ impl Match {
                 self.rules.kinds[u.kind].infantry && !u.retreating
             })
             .collect();
-        if squads.iter().any(|id| self.carrier_boundary(*id)) {
-            return Ok(Some(Denial::Unsupported));
-        }
         if squads.iter().any(|id| {
             let u = &self.world.game.units[id];
-            u.entrench || u.build
+            let k = &self.rules.kinds[u.kind];
+            k.rail || k.air || u.rail || u.air.is_some()
         }) {
             return Ok(Some(Denial::Unsupported));
         }
@@ -255,11 +258,64 @@ impl Match {
                 .checked_add(1)
                 .ok_or("carrier path identity exhausted")?;
         }
+        // Route from each staged physical exit, including the sight revealed by that
+        // exit. Publish exits and routing knowledge only after the whole batch validates.
         let mut routes = Vec::new();
-        for &(id, c) in &assignments {
-            let u = self.world.game.units[&id].clone();
-            let at = self.world.game.units[&c].at();
-            routes.push(self.command_route(owner, &u, at)?);
+        let mut drafts = Vec::new();
+        if !assignments.is_empty() {
+            let exits = assignments
+                .iter()
+                .map(|(id, _)| PreparedGroundExit::prepare(&self.world.game, &self.rules, *id))
+                .collect::<Result<Vec<_>, _>>()?;
+            let context = RecipientContext {
+                world: &self.world,
+                rules: &self.rules,
+                building_cells: &self.building_cells,
+                start: &self.start,
+                options: &self.options,
+                environment: &self.environment,
+            };
+            let mut preview = prepare_recipient_exit_routing(
+                context,
+                self.recipients
+                    .get_mut(owner)
+                    .ok_or("missing boarding recipient")?,
+                &mut self.routing_fog,
+                owner,
+                ExistingObservers::new(&exits[..1])?,
+            )?;
+            let mut paths = preview.fork_paths(&self.commands.paths);
+            let rules = PathRules::compiled().map_err(|e| e.to_string())?;
+            for (i, &(_, carrier)) in assignments.iter().enumerate() {
+                preview.refresh_existing_exit_prefix(
+                    context,
+                    owner,
+                    ExistingObservers::new(&exits[..=i])?,
+                )?;
+                let query = preview.query();
+                let terrain = query
+                    .path_terrain(preview.live())
+                    .map_err(|e| format!("boarding terrain: {e:?}"))?;
+                let u = exits[i].unit();
+                routes.push(
+                    search_route(
+                        &mut paths,
+                        terrain,
+                        rules,
+                        &self.rules.kinds[u.kind],
+                        u,
+                        self.world.game.units[&carrier].at(),
+                    )?
+                    .result,
+                );
+            }
+            drafts = exits
+                .into_iter()
+                .map(PreparedGroundExit::into_unit)
+                .collect();
+            let (_, receipt) = preview.prepare_publication(&mut self.world, &self.environment)?;
+            receipt.commit();
+            self.commands.paths = paths;
         }
         for id in &eligible {
             self.commands.units.get_mut(id).unwrap().follow = 0;
@@ -279,9 +335,14 @@ impl Match {
         if !free.values().any(|n| *n > 0) && assignments.is_empty() {
             return Ok(Some(Denial::Maximum));
         }
-        for ((id, carrier), route) in assignments.into_iter().zip(routes) {
+        for (((id, carrier), route), draft) in assignments.into_iter().zip(routes).zip(drafts) {
             self.cancel_field_work(id)?;
             let u = self.world.game.units.get_mut(&id).unwrap();
+            crate::unit_placement::place_unit(&mut self.grid, u, |u| {
+                u.x = draft.x;
+                u.z = draft.z;
+                u.garrison = draft.garrison;
+            });
             u.traffic = None;
             u.traffic_wait = 0.;
             u.world_goal = None;

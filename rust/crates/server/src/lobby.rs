@@ -301,6 +301,13 @@ impl Room {
         self.players.len() < MAX_PLAYERS
             && (!self.listed || self.players.len() < self.capacity(maps))
     }
+    fn start_ready(&self, maps: &Value) -> bool {
+        !self.players.is_empty()
+            && self.players.len() <= self.capacity(maps)
+            && (self.mode != "assault"
+                || (self.players.iter().any(|p| p.team == self.defender)
+                    && self.players.iter().any(|p| p.team != self.defender)))
+    }
     fn add_seat(&mut self, mut p: Person) {
         p.team = (0..MAX_PLAYERS)
             .find(|team| !self.players.iter().any(|p| p.team == *team))
@@ -2867,6 +2874,10 @@ mod native_ingress_tests;
 #[cfg(test)]
 #[path = "trusted_room_lobby_tests.rs"]
 mod trusted_room_tests;
+
+#[cfg(test)]
+#[path = "mode_startup2_tests.rs"]
+mod mode_startup2_tests;
 
 #[cfg(test)]
 #[path = "lobby_socket_tests.rs"]

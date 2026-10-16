@@ -115,3 +115,13 @@ Every conflict hunk and every additional manual integration edit is listed below
 
 
 The inherited Tutorial test rewrites replace public Start denial with successful Start or nonhost ignore, and keep role, private-room, restart and unsupported gameplay guards. No test registration was removed. The core injected Horde missing-state check now expects Rules rather than UnsupportedMode, preserving the refusal and no-mutation assertions.
+
+## Main integration
+
+Parents: Tutorial merge `2297cc6f` and main `4a88afd8b1fd33f717532f8f31f1bc87bb8ca2b3`. Automatic conflict tree `997f7e7f8a017649e7ab73f5ee7986369cf39ff9`.
+
+- `recipient_snapshot.rs`, hunk 1: keep both flights and modes modules. Hunk 2: use main's positive wave check to populate profile/boss after the first wave, preserving initial omission.
+- `recipient_snapshot/public_state.rs`, hunk 1: use main's shared mode_row producer for all modes, retaining Horde via its delegation. Additional manual edit: remove the redundant Tutorial/Assault projection below; the shared producer already contains both exact branches.
+- `lobby.rs`, hunk 1: keep the public Start roster error. Main's old synchronous trusted-start body was matched into this new public constructor; the complete newer trusted admission and restart checks remain in async_start.rs, called by start_trusted. No host or restart guard is transferred to public preparation.
+
+All other main changes merge automatically. Final validation covers shared mode rows, hosted records/AI, Tutorial and the ordinary trusted socket path.
