@@ -1,1 +1,2 @@
 - Added native World rail departures, route selection, train movement, bridge and territory cut checks, passenger carriage, and unloading. Rail orders use the existing internal command queue; station and cut denial names still need an agreed interface contract.
+- Check the exact 5 meter landing ring before later tick settlement, then verify the complete train journey leaves its passenger in that destination cell and continues the live unit loop.

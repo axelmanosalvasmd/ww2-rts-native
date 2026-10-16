@@ -1331,6 +1331,29 @@ mod intent_tests {
                 None,
             )
             .unwrap();
+        // Ordinary post-turn settlement may move the rider inside its landing cell.
+        let landed = &m.world.game.units[&id];
+        assert_eq!(m.world.game.cell_of(landed.x, landed.z), Some(cell));
+        assert_eq!(m.combat.get(id).unwrap().carrier, None);
+    }
+
+    #[test]
+    fn mov82_unload_places_passenger_on_nearest_free_cell_of_five_metre_ring() {
+        let (mut m, id, train) = world_with_rail_passenger();
+        let at = Point { x: 193.0, z: 65.0 };
+        let desired = Point {
+            x: at.x,
+            z: at.z + 5.0,
+        };
+        let cell = SpawnPlacer::new()
+            .nearest_free(
+                crate::match_runtime::terrain_view(&m.world.game),
+                desired,
+                m.rules.kinds[m.world.game.units[&id].kind].block(),
+                None,
+            )
+            .unwrap();
+        m.unload_rail_train(train, at, 0.0).unwrap();
         assert_eq!(
             m.world.game.units[&id].at(),
             Point {
@@ -1338,6 +1361,8 @@ mod intent_tests {
                 z: (cell / m.world.game.w) as f64 * CELL + CELL / 2.0,
             }
         );
+        assert!(!m.world.game.units[&id].riding);
+        assert!(!m.world.game.units.contains_key(&train));
         assert_eq!(m.combat.get(id).unwrap().carrier, None);
     }
 

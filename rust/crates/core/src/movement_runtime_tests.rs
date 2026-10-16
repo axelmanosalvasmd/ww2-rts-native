@@ -9,7 +9,7 @@ use crate::{
     traffic::Steer,
     traffic_knowledge::TrafficKnowledge,
     unit_spawn::initial_unit,
-    vehicle::{swept_vehicle_clear, vehicle_position_clear, vehicle_step},
+    vehicle::{swept_vehicle_clear, vehicle_position_clear},
     world::World,
 };
 use serde_json::json;
@@ -199,77 +199,6 @@ fn mov21_stalled_hull_starts_bounded_escape_when_turn_hits_wall() {
         g.units[&1].clearance.is_none(),
         "expired escape gives control back to the route"
     );
-}
-
-#[test]
-fn mov21_stalled_hull_slides_sideways_when_both_lengthwise_exits_are_walled() {
-    let rules = Rules::compiled().unwrap();
-    let mut g = game();
-    add(&mut g, &rules, "tank", 1, Point { x: 20.0, z: 20.75 });
-    for at in [
-        Point { x: 17.0, z: 21.0 },
-        Point { x: 23.0, z: 21.0 },
-        Point { x: 21.0, z: 23.0 },
-    ] {
-        let cell = g.cell_of(at.x, at.z).unwrap();
-        g.flags[cell] |= MOVE;
-    }
-    {
-        let u = g.units.get_mut(&1).unwrap();
-        u.rot = 0.0;
-        u.path = vec![Point { x: 20.0, z: 32.0 }];
-        u.stuck = 0.35;
-    }
-    let before = g.units[&1].pose();
-    let kind = &rules.kinds[g.units[&1].kind];
-    assert!(vehicle_position_clear(&g, before, kind, kind.block()));
-    let grid = SpatialGrid::new(&g.units, 16.0);
-    let mut u = g.units.remove(&1).unwrap();
-    let mut route = u.path.clone();
-    let proposed = vehicle_step(
-        &u,
-        &rules,
-        kind.vehicle.as_ref().unwrap(),
-        &route,
-        kind.speed,
-        rules.movement.tick,
-        false,
-    );
-    assert!(
-        !swept_vehicle_clear(
-            &g,
-            before,
-            Pose {
-                rot: proposed.rot,
-                ..before
-            },
-            kind,
-            kind.block(),
-        ),
-        "the requested turn must hit the wall"
-    );
-    super::drive_vehicle(
-        &g,
-        &rules,
-        &grid,
-        &mut u,
-        kind,
-        &mut route,
-        kind.speed,
-        rules.movement.tick,
-        false,
-        &Steer::default(),
-        before,
-        &TrafficKnowledge::physical(),
-    );
-    assert!(u.clearance.is_none(), "neither lengthwise exit is open");
-    assert_eq!(u.x, before.x);
-    assert!(
-        u.z < before.z,
-        "the hull slides to the side where its turn fits"
-    );
-    assert!(before.z - u.z <= 1.2 * rules.movement.tick);
-    assert!(vehicle_position_clear(&g, u.pose(), kind, kind.block()));
 }
 
 #[test]

@@ -597,7 +597,11 @@ fn aircraft_tick_preflight_admits_weapons_and_queue_but_rejects_malformed_state(
     );
     let before = aircraft_phase_snapshot(&m);
     m.validate_aircraft_turns(0.05).unwrap();
-    assert_json(&aircraft_phase_snapshot(&m), &before, "queued order admission");
+    assert_json(
+        &aircraft_phase_snapshot(&m),
+        &before,
+        "queued order admission",
+    );
     m.world.game.units.get_mut(&1000).unwrap().hp = 0.0;
     let dead = aircraft_phase_snapshot(&m);
     m.validate_aircraft_turns(0.05).unwrap();
