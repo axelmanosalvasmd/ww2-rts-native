@@ -1,0 +1,1 @@
+- Added native movement checks for protected-unit passing, conflict boundaries and tie order, sustained queue waits and cycle prevention, one-lane priority and route changes, yield candidate rejection and trail retention, and friendly gridlock ghosting. Wider convoy journeys remain open.

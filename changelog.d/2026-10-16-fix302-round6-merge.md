@@ -1,0 +1,1 @@
+- Preserve both movement train-run state and team-shared building memory when merging the movement batch with current main. Record all three Round 6 conflict resolutions.

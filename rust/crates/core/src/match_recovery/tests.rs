@@ -864,6 +864,51 @@ fn log09_medic_healing_multiplies_patient_and_medic_recovery_rates() {
 }
 
 #[test]
+fn intent_mov78_halted_halftrack_reinforces_nearby_infantry_at_half_pace_and_charges() {
+    let fixture: Value =
+        serde_json::from_str(include_str!("../../tests/fixtures/match-recovery.json")).unwrap();
+    let case = fixture["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|case| {
+            case["name"] == "dismounted-squad-beside-halted-halftrack-paid-ten-second-window"
+        })
+        .unwrap();
+    let (mut m, order) = make(case);
+    m.start.economy.players[0].mp = 500.;
+    let initial_hp = m.world.game.units[&1].hp;
+    for tick in 0..79 {
+        m.world.game.tick = 11 + tick;
+        let frame = m.prepare_recovery(&order).unwrap();
+        assert_eq!(frame.tracks, [2]);
+        m.reinforce(&frame, 0.05).unwrap();
+    }
+    assert_eq!(m.world.game.units[&1].hp, initial_hp);
+    assert_eq!(m.start.economy.players[0].mp, 500.);
+    for tick in 79..81 {
+        m.world.game.tick = 11 + tick;
+        let frame = m.prepare_recovery(&order).unwrap();
+        m.reinforce(&frame, 0.05).unwrap();
+    }
+    assert!(m.world.game.units[&1].hp > initial_hp);
+    assert_eq!(m.start.economy.players[0].mp, 490.);
+    assert_eq!(m.story[0].mp_spent, 10.);
+
+    let (mut moving, order) = make(case);
+    moving.start.economy.players[0].mp = 500.;
+    moving.world.game.units.get_mut(&2).unwrap().still = Some(1.9);
+    for tick in 0..81 {
+        moving.world.game.tick = 11 + tick;
+        let frame = moving.prepare_recovery(&order).unwrap();
+        assert!(frame.tracks.is_empty());
+        moving.reinforce(&frame, 0.05).unwrap();
+    }
+    assert_eq!(moving.world.game.units[&1].hp, initial_hp);
+    assert_eq!(moving.start.economy.players[0].mp, 500.);
+}
+
+#[test]
 fn medic_path_identity_capacity_rejects_before_health_or_wound_writes() {
     let fixture: Value =
         serde_json::from_str(include_str!("../../tests/fixtures/match-recovery.json")).unwrap();

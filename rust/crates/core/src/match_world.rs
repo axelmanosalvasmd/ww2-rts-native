@@ -312,7 +312,9 @@ impl Match {
             recipients: Vec::new(),
             routing_fog: crate::fog::Fog::default(),
             tick_state: crate::match_tick::TickState::default(),
+            ordinary_snapshot_only: false,
             world_runtime: Some(runtime),
+            rail_runs: BTreeMap::new(),
             classic_known_buildings: Default::default(),
             commands: crate::match_commands::MatchCommands::new(4096),
             grid: SpatialGrid::new(&world.game.units, 16.0),
@@ -629,7 +631,7 @@ impl Match {
                 (*at, home, distance)
             })
             .collect();
-        guarded.sort_by(|a, b| b.2.total_cmp(&a.2));
+        crate::sort::sort_by(&mut guarded, |a, b| b.2 - a.2);
         let count = guarded.len();
         for (index, (at, home, _)) in guarded.into_iter().enumerate() {
             if index as f64 >= count as f64 * 0.4 {
