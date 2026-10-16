@@ -1,5 +1,7 @@
 //! Native engineering behavior checks under Axel's approved intent rule.
 //! Initial poses and damage inputs are authored scene inputs, never captured outputs.
+#[path = "map_runtime_batch3_tests.rs"]
+mod map_runtime_batch3;
 use crate::{
     catalog::Catalog,
     economy::{Faction, Mode},

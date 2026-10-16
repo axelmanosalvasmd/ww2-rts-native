@@ -334,8 +334,8 @@ pub struct Game {
     pub cell_hp: Vec<f32>,
     /// The way a dug trench faces, radians, NaN for map-drawn trenches (`g.trenchFront`, 32-bit floats).
     pub trench_front: Option<Vec<f32>>,
-    /// Hit point multiplier per cell (`g.tough`; missing means 1).
-    pub tough: Option<Vec<f64>>,
+    /// Hit point multiplier per cell (`g.tough`, 32-bit floats; missing means 1).
+    pub tough: Option<Vec<f32>>,
     /// How wet the ground is, 0 to 1, when the living ground runs (`g.wx?.wet`).
     pub wet: Option<f64>,
     /// The end-of-match reveal: everyone sees everything (`g.reveal`).
