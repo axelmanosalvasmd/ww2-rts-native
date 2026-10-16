@@ -32,6 +32,11 @@ pub struct RecipientRouting {
     wrecks: Vec<Wreck>,
 }
 impl RecipientRouting {
+    pub(crate) fn independent_delivery(&self) -> Self {
+        let mut result = self.clone();
+        let _ = result.memory.take_changes();
+        result
+    }
     pub fn knowledge(&self) -> &RouteKnowledge {
         &self.routes
     }

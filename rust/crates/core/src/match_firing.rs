@@ -981,6 +981,26 @@ impl Match {
         start_fraction: f64,
         end_fraction: f64,
     ) -> Result<Option<FlightContact>, String> {
+        self.flight_contact_filtered(p, a, b, Some((start_fraction, end_fraction)), |_| true)
+    }
+    pub(crate) fn recipient_flight_contact(
+        &self,
+        p: &LiveFlight,
+        a: projectiles::Point3,
+        b: projectiles::Point3,
+        visible: impl Fn(UnitId) -> bool,
+    ) -> Result<Option<FlightContact>, String> {
+        self.flight_contact_filtered(p, a, b, None, visible)
+    }
+    fn flight_contact_filtered(
+        &self,
+        p: &LiveFlight,
+        a: projectiles::Point3,
+        b: projectiles::Point3,
+        fractions: Option<(f64, f64)>,
+        visible: impl Fn(UnitId) -> bool,
+    ) -> Result<Option<FlightContact>, String> {
+        let (start_fraction, end_fraction) = fractions.unwrap_or((1.0, 1.0));
         let g = &self.world.game;
         let level_height = n(self.firing_config()?, "levelHeight", 2.5);
         let mut best: Option<FlightContact> = None;
@@ -1034,6 +1054,7 @@ impl Match {
                 && t.air.is_none()
                 && !t.riding
                 && t.id != p.shooter
+                && visible(t.id)
                 && (p.blast_source.is_some() || !g.allied(p.owner, t.owner))
         });
         candidates.sort_unstable();
@@ -1043,11 +1064,8 @@ impl Match {
             if def.building && t.cells.as_ref().is_some_and(|c| !c.is_empty()) {
                 continue;
             }
-            let old = self
-                .firing
-                .prior
-                .get(&id)
-                .copied()
+            let old = fractions
+                .and_then(|_| self.firing.prior.get(&id).copied())
                 .unwrap_or_else(|| t.pose());
             let before = projectiles::BodyPosition {
                 x: old.x + (t.x - old.x) * start_fraction,
