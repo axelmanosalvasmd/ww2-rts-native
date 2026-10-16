@@ -44,7 +44,7 @@ fn original_shared_pattern_order_front_and_segment_prices() {
         }
         compared += 1;
     }
-    assert_eq!(compared, 168);
+    assert_eq!(compared, 192);
     for pattern in ["line", "zigzag", "double", "arc", "ring"] {
         assert_eq!(trench_patterns.get(pattern), Some(&8), "{pattern}");
     }
