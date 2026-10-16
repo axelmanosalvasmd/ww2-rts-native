@@ -29,3 +29,29 @@ mod rows;
 
 #[path = "vision/supplemental.rs"]
 mod supplemental;
+
+#[test]
+fn cmb39_existing_tower_actor_sees_twelve_then_sixty_when_complete() {
+    let fixture: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/vision-rows.json")).unwrap();
+    let case = fixture["rangeCases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|case| case["name"] == "tower-unfinished")
+        .unwrap();
+    let rules = ww2_core::rules::Rules::compiled().unwrap();
+    let mut loaded = load_game(&case["game"], &rules).unwrap();
+    let id = case["unit"].as_u64().unwrap() as u32;
+    assert_eq!(rules.kinds[loaded.game.units[&id].kind].name, "tower");
+    // Use the recorded actor on clear ground, independent of weather/height.
+    loaded.game.weather = None;
+    for (built, reach) in [(0.99, 12.0_f64), (1.0, 60.0)] {
+        loaded.game.units.get_mut(&id).unwrap().built = Some(built);
+        assert_eq!(
+            ww2_core::vision::vision_of(&loaded.game, &rules, &loaded.game.units[&id]).to_bits(),
+            reach.to_bits(),
+            "tower built={built}"
+        );
+    }
+}

@@ -12,6 +12,9 @@ fn bits(n: f64) -> Value {
     json!(format!("{:016x}", n.to_bits()))
 }
 fn make(c: &Value) -> Match {
+    make_with_faction(c, Faction::Usa)
+}
+fn make_with_faction(c: &Value, faction: Faction) -> Match {
     let map = AuthoritativeMap::from_json(&serde_json::to_vec(&c["map"]).unwrap()).unwrap();
     Match::new(
         &map,
@@ -22,7 +25,7 @@ fn make(c: &Value) -> Match {
                 PlayerConfig {
                     name: "A".into(),
                     team: 0,
-                    faction: Faction::Usa,
+                    faction,
                 },
                 PlayerConfig {
                     name: "B".into(),
@@ -104,6 +107,12 @@ fn reaction_snapshot(m: &Match) -> Value {
 fn connected_tick_phases_match_actual_reference_steps() {
     let fixture: Value = serde_json::from_str(include_str!("fixtures/match-tick.json")).unwrap();
     for c in fixture["cases"].as_array().unwrap() {
+        replay_connected_tick_cases(std::slice::from_ref(c), |_, _| {});
+    }
+}
+
+fn replay_connected_tick_cases(cases: &[Value], mut after_tick: impl FnMut(i64, &[Value])) {
+    for c in cases {
         let mut m = make(c);
         let input = &c["input"];
         for unit in m.world.game.units.values_mut() {
@@ -280,6 +289,7 @@ fn connected_tick_phases_match_actual_reference_steps() {
                     retired.last_hit
                 ]));
             }
+            after_tick(report.tick, &deaths);
             assert!(!report.unavailable.is_empty());
             assert_eq!(
                 report
@@ -480,6 +490,76 @@ fn connected_tick_phases_match_actual_reference_steps() {
         assert!(expected.next().is_none());
     }
 }
+// The full final Source trace specifies the prefix due on every native tick.
+// Neither this comparison nor its controls can initialize or mutate Match.
+fn death_trace_matches_tick(actual: &[Value], expected: &[Value], tick: i64) -> bool {
+    actual.iter().eq(expected
+        .iter()
+        .filter(|death| death[0].as_i64().unwrap() <= tick))
+}
+
+#[test]
+fn cmb69_seeded_retirement_rejects_wrong_tick_identity_and_missing_or_extra_deaths() {
+    let fixture: Value = serde_json::from_str(include_str!("fixtures/match-tick.json")).unwrap();
+    let cases = fixture["cases"].as_array().unwrap();
+    let selected: Vec<_> = cases
+        .iter()
+        .filter(|case| case["retirement"] == true && case["ticks"] == 800)
+        .collect();
+    assert_eq!(selected.len(), 1, "one authentic long retirement scene");
+    let case = selected[0];
+    assert!(case["input"].get("hp").is_none(), "no health priming");
+    assert_eq!(case["input"]["seed"], 0x1234_5678);
+    let checkpoints = case["checkpoints"].as_array().unwrap();
+    assert_eq!(checkpoints.len(), 15);
+    let expected = checkpoints.last().unwrap()["deaths"].as_array().unwrap();
+    assert_eq!(expected.as_slice(), &[json!([483, 2, 1, "rifle", 0])]);
+
+    let mut early = expected.clone();
+    early[0][0] = json!(482);
+    let mut late = expected.clone();
+    late[0][0] = json!(484);
+    let mut wrong_id = expected.clone();
+    wrong_id[0][1] = json!(1);
+    let mut wrong_owner = expected.clone();
+    wrong_owner[0][2] = json!(0);
+    let mut wrong_kind = expected.clone();
+    wrong_kind[0][3] = json!("mg");
+    let mut wrong_hitter = expected.clone();
+    wrong_hitter[0][4] = json!(1);
+    let mut duplicate = expected.clone();
+    duplicate.push(expected[0].clone());
+    let controls = [
+        ("early death", early, 482),
+        ("late death", late, 483),
+        ("wrong unit ID", wrong_id, 483),
+        ("wrong owner", wrong_owner, 483),
+        ("wrong kind", wrong_kind, 483),
+        ("wrong last hitter", wrong_hitter, 483),
+        ("missing death", Vec::new(), 483),
+        ("duplicate death", duplicate, 483),
+    ];
+    let mut first_rejection = vec![None; controls.len()];
+    let mut ticks = 0;
+    replay_connected_tick_cases(std::slice::from_ref(case), |tick, deaths| {
+        ticks += 1;
+        assert_eq!(tick, ticks, "every canonical tick is observed");
+        assert!(
+            death_trace_matches_tick(deaths, expected, tick),
+            "authentic death trace at tick {tick}"
+        );
+        for (index, (_, changed, _)) in controls.iter().enumerate() {
+            if !death_trace_matches_tick(deaths, changed, tick) {
+                first_rejection[index].get_or_insert(tick);
+            }
+        }
+    });
+    assert_eq!(ticks, 800);
+    for ((name, _, tick), rejected) in controls.iter().zip(first_rejection) {
+        assert_eq!(rejected, Some(*tick), "decisive control: {name}");
+    }
+}
+
 #[test]
 fn rejected_clock_does_not_consume_a_tick() {
     let fixture: Value = serde_json::from_str(include_str!("fixtures/match-tick.json")).unwrap();
@@ -939,4 +1019,83 @@ fn late_terrain_change_does_not_recompute_the_earlier_supply_beat() {
         );
     }
     assert!(m.start.points[0].cut);
+}
+
+#[test]
+fn cmb41_four_actual_conscript_recruits_add_three_population() {
+    use std::collections::BTreeSet;
+    use ww2_core::economy_state::{Context, ModeContext, Unit};
+    let fixture: Value = serde_json::from_str(include_str!("fixtures/match-tick.json")).unwrap();
+    let mut m = make_with_faction(&fixture["cases"][0], Faction::Ussr);
+    let original = m.world.game.units.keys().copied().collect::<BTreeSet<_>>();
+    assert!(m.world.game.strikes.is_empty());
+    m.start.economy.players[0].mp = 1000.0;
+    let population = |m: &Match| {
+        let queues = m
+            .world
+            .game
+            .units
+            .values()
+            .map(|unit| {
+                m.production
+                    .building(unit.id)
+                    .map_or_else(Vec::new, |building| building.queue().collect::<Vec<_>>())
+            })
+            .collect::<Vec<_>>();
+        let units = m
+            .world
+            .game
+            .units
+            .values()
+            .zip(&queues)
+            .map(|(unit, queue)| Unit {
+                id: u64::from(unit.id),
+                owner: Some(unit.owner),
+                kind: &m.rules.kinds[unit.kind].name,
+                hp: unit.hp,
+                built: unit.built.unwrap_or(1.0),
+                queue,
+            })
+            .collect::<Vec<_>>();
+        m.start
+            .economy
+            .population(
+                &Context {
+                    mode: ModeContext {
+                        kind: m.options.mode,
+                        ..Default::default()
+                    },
+                    army: m.options.army,
+                    units: &units,
+                    drops: &[],
+                    points: &[],
+                    nodes: &[],
+                    world: None,
+                },
+                0,
+            )
+            .unwrap()
+    };
+    let before = population(&m);
+    let wallet = m.start.economy.players[0].mp;
+    let price = ww2_core::economy::price_of(Mode::Conquest, "conscript").unwrap();
+    let mut bought = BTreeSet::new();
+    for count in 1..=4 {
+        let born = m.recorded_buy(0, "conscript", None).unwrap();
+        assert!(bought.insert(born.unit));
+        assert!(!original.contains(&born.unit));
+        let actor = &m.world.game.units[&born.unit];
+        assert_eq!(m.rules.kinds[actor.kind].name, "conscript");
+        assert_eq!(actor.owner, 0);
+        assert!(m.recruit_metadata.contains_key(&born.unit));
+        assert_eq!(population(&m) - before, f64::from(count) * 0.75);
+    }
+    assert_eq!(bought.len(), 4);
+    assert_eq!(population(&m) - before, 3.0);
+    assert_eq!(m.start.economy.players[0].mp, wallet - 4.0 * price.mp);
+    assert!(
+        original
+            .iter()
+            .all(|id| m.world.game.units.contains_key(id))
+    );
 }

@@ -1,5 +1,192 @@
 # Three Crossroads Native: design decisions
 
+## Six restored combat checks after S3 qualification (2026-10-15)
+
+Promote only CMB39/40/41/64/65/69 Rust/Status cells after actual selected-check
+qualification. Producing `39b004f2e180b334a27a51c9b0ce47db1ff27126` passes renewed
+fmt, five unique selected simtests (5 passed, 0 failed, 224 skipped) and strict
+locked core/simtest all-target ci-test Clippy. The status/documentation child
+retains its exact Rust tree `deadbd9f81413f8bc03aa9cd847f715051b8a5ad`.
+The five are corrected ordinary-command MG/flak/fighter AA, real four-Conscript
+population, the 800-tick death trace with eight decisive controls, the extracted
+original connected replay, and paired clear-weather tower 12/60 vision.
+
+Carry the existing second-Tiger max check and unchanged complete components
+from actual main 7a7348cb run 38776054627, with eight named instances passing on
+each of three platforms. CMB64's focused native PASS stays attributed to daaa4743;
+the core subtree is unchanged and that test was excluded from this new grant.
+The old zero-ammo fighter refusal remains a recorded failure. Its replacement
+uses a different complete captured real-aircraft initialization and ordinary
+Patrol/Attack admission, with no ammo injection or guard relaxation. Root
+accepted this bounded new native consumer; its concatenated sequence is not a
+new matched Source capture. No Source, CMB42 or whole-match qualification is
+inferred. Existing full component checks count under PARITY without a new gate.
+
+The [terminal report](docs/testing/audit-combat-1821-s3-result.md) records exact
+commands, resource limits, raw logs, preserved failures and producing heads.
+The [whole-check brief](docs/testing/audit-combat-1821-review-brief.md) maps every
+selected predicate and all eight death controls. Preserve all Acceptance cells,
+other table rows and held CMB38/42/62/63/66/67/68. Opening the first row PR still
+requires Root's combat publication lease handover after CMB_IMPL; independent
+actual-head review, hosted checks, Hermes runtime acknowledgment and merge
+authority remain separate. This status child runs no executable job.
+
+## CMB-65 S3 mechanical format child (2026-10-15)
+
+The exact 3ca67777 S3 format check requests two expression wraps in the new
+Patrol/Attack test commands. Apply only those mechanical changes and freeze a
+child before the renewed format check and five selected native instances.
+Preserve all inputs, assertions, captured fixtures and runtime code. The format
+diagnostic remains in `/tmp/audit-combat-3ca-S3-3fa592e8/fmt-3ca.log` and supplies
+no native result or parity eligibility by itself.
+
+## CMB-65 ready-fighter source correction (2026-10-15)
+
+The separate private child starts at ccad825a and preserves daaa4743's real
+zero-ammo mission-refusal failure and its logs. Select the complete unchanged
+held-fighter-attack-air-target-loss initialization for the new fighter
+transition. Its real captured Base fighter has fuel 50/ammo 60 and its original
+first Attack is admitted. Require complete initial snapshot equality. Use
+ordinary Move to admit Patrol, then one existing aircraft step to establish an
+actually airborne, in-range held actor. Retain six held calls with unchanged
+HP/XP/no events, dispatch ordinary Attack, require committed Attack/target/Out
+and unchanged ammo, then retain all six positive damage/XP/AA-event calls.
+No ammo, HP, type, pose, visibility, mission or RNG setter is added. The original
+mg/flak inputs and complete 42-trace corpus remain exact; no guard or existing
+positive assertion is weakened. Direct mission admission is now checked through
+its ordinary command path and actual committed mission state.
+
+Ordinary rearm is available in the unchanged provider and its captured
+fighter-rearm-denial/fuel-home-rearm cases. It is not executed here or used as a
+synthetic refill. The [source/caller gap declaration](docs/testing/cmb65-mission-eligible-source.md)
+separates the full authentic initialization and old captured components from the
+new concatenated transition, which has no matched new Source trace or native
+PASS. A bounded new-only recorder and Root grant would be required if review
+requires that capture. CMB-39/69/connected/41 remain source-preserved and unrun;
+old CMB-64 PASS stays at daaa4743. The sniper source branch stays separate.
+All actual parity cells remain unchanged. This child executes no job and needs
+Root's exact successor review and grant before any future execution.
+
+## Restored combat S2 native stop at daaa4743 (2026-10-15)
+
+At producing `daaa4743bc257235378b561b639641f69f07271b`, renewed fmt passes
+and the exact core CMB-64 test passes (1 passed, 138 skipped). The subsequent
+five-name simtest invocation runs CMB-65 first, then stops with 0 passed,
+1 failed, 224 skipped and four selected instances unrun, exit 100. Its failure
+is the asserted true result of send_aircraft_mission at test line 692. Read-only
+inspection finds the exact mismatch: the reused original fighter-continuous-aa
+input has station-state aircraft ammo 0, whereas the unchanged new-mission
+admission rejects ammo <= 0. Continuous AA itself is independent of that sortie
+ammo. No runtime defect or guard change follows from this test-input conflict.
+No repair, refill, input mutation or rerun is performed.
+
+The CMB-39, CMB-69, extracted connected-tick and CMB-41 instances did not run.
+The conditional strict core/simtest ci-test all-target Clippy did not run.
+Two unique native instances executed in total, one pass and one failure.
+The initial e80d formatting diagnostic remains preserved, and its authorized
+mechanical application was frozen before this producing head. Every job
+confirmed actual S2 CPUs 4-7, 6 GiB, swap 0, quota 400%, jobs 4/threads 1,
+current guard/target and 56-57 GiB free above the 20 GiB floor. Cargo/nextest
+exited and S2 flock was released; Root was notified before the report/dep-info.
+The [terminal result](docs/testing/audit-combat-1821-s2-result.md) points to exact raw logs,
+producing-head binding and the held witness. All parity cells and fixtures
+remain unchanged. The separate eb4e97b3 sniper child stays unrun. This docs child
+executes no new check and carries no first-five completion or publication claim.
+
+## Restored combat S2 formatting child (2026-10-15)
+
+Root grants exact e80d qualification on S2, CPUs 4-7, 6 GiB memory, zero swap,
+400% quota, jobs 4 and threads 1. The initial cargo fmt check exits 1 with four
+mechanical differences in the new bounty, AA, death-prefix and Conscript code.
+The authorized formatter application exits 0. Preserve the initial log at
+`/tmp/audit-combat-e80-S2-3fa592e8/fmt-e80.log`; no native behavior check has run.
+This child changes only formatting in the three affected Rust test files plus
+direct CHANGELOG/DESIGN notes. Inputs, assertions and fixture/runtime behavior
+stay exact. Freeze before the renewed fmt check and exactly six granted native
+instances. The separate eb4e sniper worktree remains unrun and excluded.
+
+## CMB-41 genuine recruitment witness (2026-10-15, source only)
+
+Continue the restored batch after the first-five source freeze. The new
+`match_tick::cmb41_four_actual_conscript_recruits_add_three_population` uses
+the existing arena and canonical Match constructor with an explicit Soviet
+seat, retains every starting actor, funds the wallet as the original named
+check does, and calls recorded_buy four times. It reads actual paid queue and
+field descriptors into the existing EconomyState population component after
+every birth, requiring increments .75, 1.5, 2.25 and 3, four distinct native
+birth IDs, recruitment metadata and exact payment. No synthetic actors, type
+mutation, health write, expected-state import or runtime change is introduced.
+The original Source test changes four placed rifles to Conscripts; real paid
+Conscript births exercise the same named population check through the native
+caller. This test has no execution proof and CMB-41 stays held. It is additional
+to the first-five status proposal, not a silent expansion of that patch or a
+previous slot request. Root must explicitly grant this sixth affected instance
+at its new frozen head before it runs.
+
+## Restored combat first-five candidate (2026-10-15, source only)
+
+The first proposed batch is CMB-39/40/64/65/69. CMB-39 supplements the existing
+complete catalog and original tower range fixtures with a paired native
+12/60 check on the recorded tower actor with weather disabled. CMB-40 already
+has the exact named second-Tiger refusal in the actual production fixture and
+native replay. CMB-64 adds an explicit bounty assertion over the existing
+recorded enemy/friendly retirement scene; the connected 800-tick fixture
+separately supplies a real projectile casualty and complete wallet comparison.
+CMB-65 supplements the existing 42-trace AA fixture with ordinary Hold Fire
+commands and a fighter's existing explicit-air-target mission caller: six
+held calls must preserve HP/XP/events, followed by six permitted AA calls
+with damage, XP and an actual AA event. Actors come from the maintained
+scene factory; there are no new synthetic actors or health writes.
+
+Main push run `38776054627` was opened directly and its raw log read locally.
+It produced successful executions at `7a7348cbac35924b5876531e318140d13b7a42c1`,
+not this child: the existing catalog, production, combat, aviation, firing and
+connected-tick tests each pass on all three hosted platforms. Those named
+bodies, providers and inputs are retained, apart from the documented extraction
+of the connected replay. Current `379ba4e` has the same Rust tree as that
+producing head. The [row assessment](docs/testing/audit-combat-1821-eligibility.md)
+keeps each complete selected check separate from broader runtime claims.
+
+Four new tests remain unexecuted. Source-only evidence is not compiled proof.
+The private status-cell patch is a review proposal and has not been applied.
+Root must grant and qualify the five named affected instances, obtain independent
+actual-head review, and compose the combat publication lease before applying
+any proposed status cells. CMB-41/42/62/63/66/67/68 and CMB-38 remain held for
+the exact missing checks, rather than being promoted to reach a quota.
+
+## AUDIT_COMBAT restored batch and seeded death controls (2026-10-15)
+
+The private branch starts directly at frozen main `379ba4e06c794708623c005ab6052bebd03d8809`.
+It owns only CMB-38/39/40/41/42/62/63/64/65/66/67/68/69. The ledger and
+roster remain Root-owned. CMB_IMPL retains the next combat publication lease.
+Current issue #5 through Hermes 173 (`6199107614`) and the lifecycle result
+`6199190039` is read locally. This acknowledges receipt, not consent to the
+pending general defaults proposal. The reference stays `e4e579a`; approved
+ABI 2 and contract status are unchanged. No public acknowledgment is posted.
+
+CMB-69 already has a real seeded component runner: the retained case at index
+7 of `match-tick.json` advances 800 canonical ticks, with Combat seed 701 and
+environment seed 305419896. Its 15 authentic Source checkpoints carry a
+cumulative death trace, with unit 2 retiring at tick 483. The scene uses initial
+positions and ownership inputs, with no health prime, mid-run health write,
+random reset or expected-state import into Match.
+
+Extract the existing replay loop without changing its assertions or input
+handling. A read-only callback receives the canonical tick and accumulated
+retirement records. The new focused test uses that same complete replay once
+and compares the due prefix of the final Source death trace on every tick.
+Eight altered oracle-only traces must first fail at tick 482 or 483: early,
+late, wrong ID, owner, type, hitter, missing and duplicate death. All original
+snapshot comparisons remain active. No runtime, provider, guard, scene,
+projection, ABI, protocol or terrain policy changes. This is a component
+check under PARITY's existing rules; it does not depend on proposed whole-match
+defaults or assert completion of every death family.
+
+Source-only checkpoint: zero Cargo, Node, rustc, native, fmt, lint, discovery,
+release or CI execution. The new test is authored, not passed. The exact gate
+plan is [the restored combat batch](docs/testing/audit-combat-1821-gates.md).
+All parity cells remain unchanged until whole-check evidence is reviewed.
+
 ## Held World movement test registration (2026-10-15)
 
 Published PR #268 at `9c7b07963471e8f58bb2978e90b239a65561ea3f` registered two held World companions for default CI: `original_public_world_300_plus_40_plus_40_distance` and `physical_world_march_calm_boundary_200_and_201`. The retained Ubuntu, macOS and Windows failures all reach `mov_world_distance.rs:141` before the first tick, where full-runner admission refuses with `World automatic salvo tick actuator is not connected`. The World provider and refusal guard are identical at historical `a5a1d52b`, main `f7c51b1a` and published `9c7b0796`; the incoming LOG registration does not change this admission.

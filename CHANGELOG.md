@@ -4,6 +4,22 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Mark CMB-39/40/41/64/65/69 ported for their complete selected checks. Producing 39b004f2 passes the five granted simtests, renewed fmt and strict locked core/simtest all-target ci-test Clippy. Carry CMB-64's single PASS at daaa4743 and unchanged complete three-platform main components at 7a7348cb with their original attribution. Preserve the prior zero-ammo CMB-65 failure, all Acceptance cells and seven held owned rows; no runtime, fixture or Source change.
+
+- Apply the two mechanical command-expression wraps from CMB-65's granted S3 format check. Preserve every test input, assertion, fixture and runtime byte; freeze the child before the five selected native checks.
+
+- Prepare a source-only CMB-65 correction using the complete existing ready-fighter capture, ordinary Patrol/Attack command admission and one actual aircraft step before the six held AA calls. Preserve all positive damage/XP/event checks and the zero-ammo failure history. No ammo, HP, type, pose, guard, fixture or status edit; the composed sequence has no new Source capture or native result.
+
+- Record restored combat S2's first native failure at daaa4743: CMB-64 passes, then CMB-65's new explicit fighter mission is refused because its reused continuous-AA fixture starts with zero aircraft ammo. Stop without repair or retry; CMB-39/CMB-69/connected tick/CMB-41 and conditional strict Clippy remain unrun. Renewed fmt passes, all parity cells stay unchanged and the initial fmt diagnostic is retained.
+
+- Apply the four formatting-only changes requested by the granted e80d S2 format check. Preserve all test inputs, assertions, fixtures and runtime behavior. Keep the initial formatting diagnostic; the six exact native checks remain pending on the frozen child.
+
+- Add a source-only CMB-41 witness that buys four real Soviet Conscripts through the existing recorded purchase caller, retains the full native starting roster, and checks actual field/queue population after each paid birth. The original four-squads-count-three check is authored but unrun; no status is changed.
+
+- Prepare the first five restored combat checks: add focused native tower 12/60 vision, enemy/friendly bounty, and MG/flak/fighter Hold Fire witnesses using existing fixture actors and callers. Recover exact main hosted component passes and record every held batch gap. Execution, whole-check review and the private five-row status proposal remain pending; all actual parity cells stay unchanged.
+
+- Add an 800-tick CMB-69 death-trace witness over the existing authentic retirement scene, with eight controls for wrong timing, identity, attribution, missing deaths and duplicates. Reuse the complete connected-tick replay and preserve all original assertions and fixtures. Native execution and parity promotion remain pending.
+
 - Mark MOV-05/06/07/10/12/13 ported from their complete literal road/mud, half-road, timed-slope, together-march, obstructed-corner and border-ray checks. Actual `8d7d892b` passes all six behavior tests plus both real registration guards (8 passed, 0 failed, 363 skipped), final fmt and strict locked core/simtest all-target Clippy. Preserve every Acceptance cell, all other rows, all prior failures and the MOV-04 fuel gap.
 
 - Format only the two new MOV corner and border-ray consumers after retaining their initial fmt-check diagnostics. Preserve all assertions, literals, original inputs and authentic fixtures. The eight selected native checks remain pending.
