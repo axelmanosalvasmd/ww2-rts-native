@@ -194,6 +194,8 @@ pub struct UnitControl {
     pub supply_hold: bool,
     pub supply_escape: bool,
     pub enter: Option<usize>,
+    /// Physical entry used for supply handoff while inside a house.
+    pub garrison_entry: Option<Point>,
     pub fire_at: Option<usize>,
     pub nade: Option<Point>,
     /// Recruitment marks a rally walk so queued orders do not interrupt it.
@@ -261,6 +263,7 @@ impl UnitControl {
             supply_hold: false,
             supply_escape: false,
             enter: None,
+            garrison_entry: None,
             fire_at: None,
             nade: None,
             rally_drift: false,
