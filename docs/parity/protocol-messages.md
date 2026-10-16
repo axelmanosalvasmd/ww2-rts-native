@@ -190,7 +190,7 @@ Built by `snapshotFor(g, slot, shots, cells, cache)` (shared/sim.js:6011-6090), 
 | `fog` | Run string of cells that flipped since the receiver's last fog (5.7); absent when unchanged, for non-World spectators and AI. | seats, World spectators, operatives |
 | `smokes`, `fires`, `falling` | Visible smoke `[x, z, r, id]`, burning cell indexes, collapsing sections. | all (filtered) |
 | `strikes` | `[kind, x, z, dir, seconds, owner]`; World: allied or seen only; elsewhere public. | all |
-| `flights`, `shots` | Projectiles and shot events filtered per receiver (shared/sim.js:5985-6009, 6079-6088). Shot keys include `k`, `f`, `fo`, `t`, `to`, `x`, `y`, `z`, `hit`, `kill`, `pub`, `m`, `local`, `text` (CMB owns the list). | all |
+| `flights`, `shots` | Recipient projectile rows and chronological events, with the exact shapes and field rules below (shared/sim.js:5962-6009, 6079-6089). | all (filtered) |
 | `scenario` | `{version: 1, objectives}` filtered by recipient policy (shared/scenarios.js:171-174). | all (spectators: public objectives only) |
 | `ghosts` | Remembered enemy buildings not seen now `[id, type, owner, x, z, built]` (base modes). | seats, operatives |
 | `foundMines` | Cell indexes of enemy mines the team has found. | all |
@@ -206,6 +206,51 @@ Built by `snapshotFor(g, slot, shots, cells, cache)` (shared/sim.js:6011-6090), 
 | `operative` | Status block (5.8). | operatives |
 
 Spectator removals: `movement, queues, productionJobs, plans, orders, air, mp, inc, mun, fuel, fuelInc, upkeep, sup, rally, home, works, covers, logistics` (server.js:251). Operative removals: `movement, queues, productionJobs, plans, orders, air, rally, works, covers, sup` (server.js:326).
+
+### Projectile and aviation event shapes
+
+These shapes are identical to prototype `e4e579a`. Coordinates are simulation
+metres, directions are radians and times are simulation seconds. The server
+passes the accumulated chronological shot batch to `snapshotFor` before resetting
+it (`server.js:246`; `server/room-tick.js:25-34`).
+
+A live `flights` entry has `flight` (projectile ID), `kind` (unit type), optional
+`effect`, `seq` (contact sequence), `x`, `y`, `z` (current position), `v` (current
+`[vx, vy, vz]`), `gravity`, `time`, `launched`, `expires` and `until`. It appears
+only after launch and while its current ground cell is visible to the recipient's
+team, or during reveal. `f` and `fo` appear together only when the recipient sees
+the shooter. No target fields appear. `until` is bounded by expiry, the next
+0.15 seconds, the first hidden ground cell and the first visible static contact.
+Hidden unit bodies do not shorten it (`shared/sim.js:5962-5995`).
+
+Local projectile `shots` use the same ground-cell visibility rule. Hidden `f`
+removes both `f` and `fo`; hidden `t` removes both `t` and `to`. A launch event
+has `k: "flight"`, `flight`, `kind`, optional `effect`, `seq: 0`, `f`, `fo`,
+`x`, `y`, `z`, `v`, `gravity`, `time`, `expires`, `local: true` and a fog-bounded
+`until`. Unlike live rows, its extrapolation has no weapon contact facts
+(`shared/sim.js:4136-4140,5997-6008`).
+
+| Event | Exact producer fields before recipient redaction | Prototype evidence |
+| --- | --- | --- |
+| Contact | `k: "contact", kind, flight, seq, contactId, time, x, y, z, f, fo`, optional `t, to`, `hit, kill, terminal, explosive`, optional `effect, blast`, `normal: [x,y,z], direction: [x,y,z], impulse, material, local: true` | shared/sim.js:4292-4295 |
+| Expiry | `k: "expiry", flight, seq, time, x, y, z, local: true` | shared/sim.js:4340 |
+| Salvo | `k: "salvo", f, fo, x, z, n, r, physical: true, local: true` | shared/sim.js:4153 |
+| Throw | `k: "throw", f, fo, x, z, physical: true, local: true` | shared/sim.js:2104,5427 |
+| Arrival | `k` equal to the support kind (`recon`, `strafe`, `bombing`, `dive`, `para`), `x, z, dir, fo, pub: true` | shared/sim.js:5249 |
+| Bomb | `k: "bomb", x, z, pub: true` | shared/sim.js:5253,5281 |
+| Chutes | `k: "chutes", x, z, pub: true` | shared/sim.js:5262 |
+| Flak | `k: "flak", f, fo, x, z, pub: true` | shared/sim.js:4704 |
+| Shot down | `k: "shotdown", x, z, dir, kind` (support kind), `by` (`fighters` or `flak`), `pub: true` | shared/sim.js:4709 |
+| On-map anti-air | `k: "aa", f, fo, t, to, x, z` | shared/sim.js:2250 |
+| On-map plane down | `k: "planedown", t, to, x, z, dir, kill: true` | shared/sim.js:2251 |
+
+Ordinary events are delivered if their position is seen, a participant is allied
+or seen, reveal is active, or `pub` is true outside World. Hidden participant
+IDs are removed, while their owner fields remain. In particular an arrival's
+`fo` remains even without an `f`. These are distinct from local projectile
+redaction (`shared/sim.js:6079-6089`). Incoming `strikes` remain the six-field
+rows above, public outside World (`shared/sim.js:5935,6052`). World room admission
+remains deferred.
 
 ### 5.2 Unit row
 
@@ -368,7 +413,6 @@ When no seat, spectator or operative is connected for more than 60 s, the room a
 
 - The `ws` library's exact behavior for a wrong upgrade path, an oversized frame (close 1009), an offered subprotocol, a binary frame, and its default deflate parameters (ws 8.22.0).
 - The full refusal reason chains on shared/sim.js:3640 (`dig`) and 3695 (`build`), which are long single-line expressions only partly read here; placement reasons come from `placementCheck` (ENG and BASE).
-- The complete key list of `shots` and `flights` entries (CMB owns them).
 - The close status a browser sees after `ws.close()` with no code (1005 expected, not checked).
 
 ### Recipient ground-list checkpoint

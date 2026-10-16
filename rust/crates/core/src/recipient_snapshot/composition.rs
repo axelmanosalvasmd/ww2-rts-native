@@ -105,9 +105,7 @@ pub(super) fn complete(
     projection.fields.insert("t".into(), json!("s"));
     // Admission inspected each actual canonical actor/list owner. Their
     // absent output is a represented source result for this bounded frame.
-    for name in ["flights", "shots"] {
-        projection.fields.insert(name.into(), json!([]));
-    }
+    projection.fields.insert("shots".into(), json!([]));
     projection.fields.entry("air").or_insert_with(|| json!([]));
     projection.fields.insert(
         "wrecks".into(),
@@ -179,15 +177,12 @@ pub(super) fn admit_actors(state: &Match, outside_events: &[Effect]) -> Result<(
     };
     if !outside_events.is_empty()
         || !state.firing.events.is_empty()
-        || !state.firing.flights.is_empty()
-        || !state.firing.salvos.is_empty()
-        || !state.firing.grenades.is_empty()
         || !state.support.events.is_empty()
     {
         return Err(refused(SnapshotCapability::ShotsAndFlights));
     }
-    // Aircraft state has an owner adapter. Aviation shot encodings still need
-    // a contract, so undrained event payloads retain their admission guard.
+    // The caller must drain aviation events into the chronological tick batch
+    // before delivery, just as it drains firing and support events above.
     if !state.aviation.events.is_empty() {
         return Err(refused(SnapshotCapability::Air));
     }

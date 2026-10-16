@@ -1,0 +1,3 @@
+- Deliver live projectile trajectories and aviation, support and throw events with the prototype's per-field recipient rules. Limit extrapolation at fog boundaries and visible contacts.
+- Allow aircraft fire, aircraft purchases and plane-backed support in ordinary recipient rooms now that their snapshots can carry the complete lifecycle. Replace the tests that pinned the temporary refusals with event, privacy and full-match delivery checks.
+- Add intent coverage for Tutorial recruitment and aircraft orders and firing intervals. World room admission remains deferred; AI aircraft planning and broader AI command coverage remain unfinished.
