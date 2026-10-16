@@ -97,6 +97,8 @@ mod match_tick_events;
 mod mode14_spawn_layout;
 #[path = "../mode_predicates.rs"]
 mod mode_predicates;
+#[path = "../mode_runtime_b2.rs"]
+mod mode_runtime_b2;
 #[path = "../mode_startup_checks.rs"]
 mod mode_startup_checks;
 #[path = "../mov_border_rays.rs"]
