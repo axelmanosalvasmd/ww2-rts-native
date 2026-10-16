@@ -1,5 +1,5 @@
 //! Ordinary ground carrier commands and physical boarding using canonical Match owners.
-//! Boat/rail, garrison exit and wrecked-carrier ejection remain explicit boundaries.
+//! Boat/rail and garrison exits remain explicit boundaries.
 
 use crate::{
     catalog::Catalog,
@@ -26,13 +26,13 @@ pub enum BoardingOutcome {
         at: Point,
     },
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum RidingOutcome {
     OnFoot,
     /// Source early-unit-loop continuation: skip ordinary timers, movement and fire.
     Riding,
-    /// A missing/dead carrier needs the unimplemented thrown exit, not ordinary unload.
-    UnsupportedEjection,
+    /// A wrecked or missing carrier throws out its passenger before the ground turn.
+    Ejected(crate::environment::Hurt),
 }
 fn view(m: &Match) -> TerrainView<'_> {
     let g = &m.world.game;
@@ -381,8 +381,45 @@ impl Match {
             Ok(BoardingOutcome::Idle)
         }
     }
-    /// Source early riding branch. Caller skips the remaining unit turn on Riding;
-    /// dead-carrier ejection must be handled by the future drop/effect actuator.
+    /// Prepare the source thrown exit without changing relations, health or the grid.
+    pub(crate) fn prepare_carrier_ejection(&self, id: UnitId) -> Result<(Point, f64), String> {
+        let u = &self.world.game.units[&id];
+        let kind = &self.rules.kinds[u.kind];
+        if self.carrier_boundary(id) || !kind.infantry {
+            return Err("unsupported thrown rider".into());
+        }
+        let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
+        let cfg = catalog.table("CFG").map_err(|e| e.to_string())?;
+        let definition = catalog.unit(&kind.name).map_err(|e| e.to_string())?;
+        let number = |value: Option<&crate::catalog::Value>| {
+            value
+                .and_then(|v| v.number())
+                .filter(|n| n.is_finite())
+                .ok_or("invalid thrown rider rule")
+        };
+        let shore = number(cfg.get("shoreReach"))?;
+        let evict = number(cfg.get("aid").and_then(|v| v.get("evict")))?;
+        let strength = number(definition.get("models"))? * number(definition.get("hpPer"))?;
+        let cell = SpawnPlacer::new()
+            .nearest_free(view(self), u.at(), kind.block(), None)
+            .map_err(|e| format!("thrown carrier exit: {e:?}"))?;
+        let at = Point {
+            x: (cell % self.world.game.w) as f64 * CELL + CELL * 0.5,
+            z: (cell / self.world.game.w) as f64 * CELL + CELL * 0.5,
+        };
+        let hp = if math::hypot(u.x - at.x, u.z - at.z) > shore {
+            0.0
+        } else {
+            u.hp - strength * evict
+        };
+        if shore < 0.0 || evict < 0.0 || !strength.is_finite() || !hp.is_finite() {
+            return Err("invalid thrown rider health".into());
+        }
+        Ok((at, hp))
+    }
+
+    /// Caller skips the remaining unit turn on Riding and publishes Ejected's hurt
+    /// before continuing the passenger's ordinary ground turn.
     pub fn apply_unit_riding(&mut self, id: UnitId, dt: f64) -> Result<RidingOutcome, String> {
         self.validate_carrier_world()?;
         if self.world.game.units.contains_key(&id) {
@@ -423,13 +460,43 @@ impl Match {
             }
             return Ok(RidingOutcome::OnFoot);
         };
-        let Some(c) = self.world.game.units.get(&carrier) else {
-            return Ok(RidingOutcome::UnsupportedEjection);
-        };
-        self.validate_carrier_unit(carrier)?;
-        if c.hp <= 0. {
-            return Ok(RidingOutcome::UnsupportedEjection);
+        if self.world.game.units.contains_key(&carrier) {
+            self.validate_carrier_unit(carrier)?;
+            if self.carrier_boundary(carrier) {
+                return Err("unsupported riding carrier".into());
+            }
+            if !self.combat.get(carrier).unwrap().cargo.contains(&id) {
+                return Err("inconsistent rider relation".into());
+            }
         }
+        if self
+            .world
+            .game
+            .units
+            .get(&carrier)
+            .is_none_or(|c| c.hp <= 0.0)
+        {
+            let (at, hp) = self.prepare_carrier_ejection(id)?;
+            if let Some(meta) = self.combat.get_mut(carrier) {
+                meta.cargo.retain(|other| *other != id);
+            }
+            self.combat.get_mut(id).unwrap().carrier = None;
+            let unit = self.world.game.units.get_mut(&id).unwrap();
+            unit.riding = false;
+            unit.x = at.x;
+            unit.z = at.z;
+            unit.hp = hp;
+            self.grid.update(id, unit);
+            return Ok(RidingOutcome::Ejected(crate::environment::Hurt {
+                unit: id,
+                owner: unit.owner,
+                at,
+                killed: hp <= 0.0,
+                from: None,
+                local: false,
+            }));
+        }
+        let c = &self.world.game.units[&carrier];
         if self.carrier_boundary(id) || self.carrier_boundary(carrier) {
             return Err("unsupported riding actor/carrier".into());
         }

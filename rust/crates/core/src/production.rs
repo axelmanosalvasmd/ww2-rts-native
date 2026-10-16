@@ -559,8 +559,9 @@ impl ProductionState {
         ))
     }
     /// Prepare instant skirmish recruitment without changing wallets or queues.
-    /// Default represents the absent Conquest mode object. Winner, away, out and
-    /// rate admission stay with Match; construction modes use training queues.
+    /// Default represents the absent Conquest mode object. Construction modes use
+    /// training queues. Horde names its scripted seat for shared allied facilities.
+    /// Winner, away, out and rate admission stay with Match.
     pub fn prepare_recruit<'a, 'facts>(
         &'a self,
         c: &'a Context<'facts>,
@@ -572,12 +573,17 @@ impl ProductionState {
     ) -> Result<PreparedRecruit<'a, 'facts>, Error> {
         self.validate(c, wallets)?;
         self.slot(slot)?;
+        let horde = c.mode.kind == Mode::Horde
+            && c.mode
+                .income_excluded_slot
+                .is_some_and(|slot| slot.checked_add(1) == Some(self.players.len()));
         if !matches!(
             c.mode.kind,
             Mode::Default | Mode::Conquest | Mode::Assault | Mode::Annihilation
-        ) {
+        ) && !horde
+        {
             return Err(Error::InvalidInput(
-                "recruitment requires a represented skirmish mode",
+                "recruitment requires a represented skirmish mode or initialized Horde",
             ));
         }
         let cat = Catalog::compiled()?;

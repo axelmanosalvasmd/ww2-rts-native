@@ -1,0 +1,2 @@
+- Match JavaScript whitespace trimming for lobby names and titles, including BOM trimming and preserved U+0085 characters. Add checks for hello validation, public invite URLs, AI difficulty controls and trusted R1 restarts.
+- Leave cancelled-connection presence for a later server batch: a retained connection can still earn income before disconnect cleanup marks its seat away.

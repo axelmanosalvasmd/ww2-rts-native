@@ -1,4 +1,4 @@
-//! Canonical finish and timeline for represented Conquest, Assault, elimination and World phases.
+//! Shared finish and timeline services. A mode using these services still owns its runner admission.
 use crate::{
     economy::Mode,
     game::{CELL, LOCAL_DEFENDER_OWNER, ModeKind, Point},
@@ -77,8 +77,10 @@ impl Match {
             | (Mode::Assault, Some(ModeKind::Assault))
             | (Mode::Annihilation, Some(ModeKind::Annihilation))
             | (Mode::Classic, Some(ModeKind::Classic))
+            | (Mode::Horde, Some(ModeKind::Horde))
+            | (Mode::Tutorial, Some(ModeKind::Tutorial))
             | (Mode::World, Some(ModeKind::World)) => Ok(()),
-            _ => Err("finish/story supports represented Conquest, Assault and World only".into()),
+            _ => Err("finish/story mode tags disagree".into()),
         }
     }
     pub(crate) fn validate_match_finish_state(&self) -> Result<(), String> {
@@ -291,7 +293,7 @@ impl Match {
                 }
                 if hp > 0.0
                     && self.rules.kinds[kind].structure
-                    && (matches!(self.options.mode, Mode::World | Mode::Classic)
+                    && (self.options.mode.is_construction()
                         || self.rules.kinds[kind].name == "bunker")
                     && let Some(owner) = players.get(owner)
                 {

@@ -846,3 +846,175 @@ fn work_snapshot(m: &Match) -> Value {
     }).collect();
     json!({"players":m.start.economy.players.iter().enumerate().map(|(slot,p)|json!({"slot":slot,"mp":bits(p.mp)})).collect::<Vec<_>>(),"dig":dig})
 }
+
+fn log07_match() -> Match {
+    let mut m = initial(&json!({
+        "map": {
+            "name": "powered movement", "w": 32, "h": 24,
+            "rows": vec!["................................"; 24],
+            "spawns": [{"x": 0, "y": 0}, {"x": 31, "y": 23}],
+            "points": [{"id": "p", "x": 12, "y": 12}]
+        },
+        "initial": [
+            {"kind": "tank", "x": 25, "z": 23},
+            {"kind": "tank", "x": 53, "z": 39}
+        ]
+    }));
+    m.options.logistics = true;
+    m.initialize_logistics().unwrap();
+    m
+}
+
+fn log07_move(m: &mut Match) {
+    let command = Command::Move {
+        orders: vec![MoveOrder {
+            unit: 1,
+            at: Point { x: 55.0, z: 23.0 },
+        }],
+        control_ids: None,
+        attack_move: false,
+        queue: false,
+        together: false,
+        face: None,
+    };
+    assert_eq!(m.execute_command(0, &command, false).unwrap(), None);
+    assert!(!m.world.game.units[&1].path.is_empty());
+}
+
+fn log07_step(m: &mut Match, suppression_speed: f64) -> crate::movement::Moved {
+    m.world.game.tick += 1;
+    m.begin_path_tick(4096, 20).unwrap();
+    m.move_unit_with_command_routes(1, suppression_speed)
+        .unwrap()
+        .unwrap()
+}
+
+fn log07_close(actual: f64, expected: f64) {
+    assert!((actual - expected).abs() < 1e-10, "{actual} != {expected}");
+}
+
+#[test]
+fn log07_parked_and_riding_movement_preserve_fuel() {
+    let mut m = log07_match();
+    let before = m.world.game.units[&1].at();
+    let reserves = m.logistics.get(1).unwrap().clone();
+    log07_step(&mut m, 1.0);
+    assert_eq!(m.world.game.units[&1].at(), before);
+    assert_eq!(m.logistics.get(1), Some(&reserves));
+
+    log07_move(&mut m);
+    // Authored rider facts also protect direct wrapper calls; the normal tick skips riders.
+    m.world.game.units.get_mut(&1).unwrap().riding = true;
+    m.combat.get_mut(1).unwrap().carrier = Some(2);
+    m.combat.get_mut(2).unwrap().cargo.push(1);
+    log07_step(&mut m, 1.0);
+    let unit = &m.world.game.units[&1];
+    assert!(crate::math::hypot(unit.x - before.x, unit.z - before.z) > 0.0);
+    assert_eq!(m.logistics.get(1), Some(&reserves));
+}
+
+#[test]
+fn log07_acceleration_charges_actual_distance_without_reticking_reserves() {
+    let mut m = log07_match();
+    log07_move(&mut m);
+    m.advance_unit_reserves(1).unwrap();
+    let before = m.world.game.units[&1].at();
+    let reserves = m.logistics.get(1).unwrap().clone();
+    assert_eq!(m.world.game.units[&1].move_speed, 0.0);
+    let moved = log07_step(&mut m, 1.0);
+    let unit = &m.world.game.units[&1];
+    let distance = crate::math::hypot(unit.x - before.x, unit.z - before.z);
+    let driving = distance / moved.speed;
+    assert!(driving > 0.0 && driving < m.rules.movement.tick);
+    let after = m.logistics.get(1).unwrap();
+    log07_close(after.fuel.unwrap(), reserves.fuel.unwrap() - driving);
+    assert_eq!(after.emergency, reserves.emergency);
+    assert_eq!(after.provisions, reserves.provisions);
+    assert_eq!(after.warning, reserves.warning);
+    assert!(!after.forced && !after.stranded);
+}
+
+#[test]
+fn log07_ordinary_depletion_limits_speed_and_debits_emergency_overrun() {
+    let mut baseline = log07_match();
+    log07_move(&mut baseline);
+    let full_speed = log07_step(&mut baseline, 1.0).speed;
+    for fraction in [0.5, 1e-5] {
+        let mut m = log07_match();
+        log07_move(&mut m);
+        let dt = m.rules.movement.tick;
+        let ordinary = dt * fraction;
+        let emergency = dt * 2.0;
+        let r = m.logistics.get_mut(1).unwrap();
+        r.fuel = Some(ordinary);
+        r.emergency = Some(emergency);
+        assert!(!r.forced);
+        // Existing momentum exercises the dt cap; tiny powered speed exercises the .001 divisor floor.
+        m.world.game.units.get_mut(&1).unwrap().move_speed = if fraction == 0.5 {
+            full_speed
+        } else {
+            full_speed * fraction
+        };
+        let before = m.world.game.units[&1].at();
+        let moved = log07_step(&mut m, 1.0);
+        log07_close(moved.speed, full_speed * fraction);
+        let unit = &m.world.game.units[&1];
+        let distance = crate::math::hypot(unit.x - before.x, unit.z - before.z);
+        assert!(distance > 0.0);
+        let driving = crate::math::min(dt, distance / crate::math::max(moved.speed, 0.001));
+        assert!(driving > ordinary);
+        if fraction == 0.5 {
+            assert!(distance / moved.speed > dt);
+            assert_eq!(driving, dt);
+        } else {
+            assert!(moved.speed < 0.001 && driving < dt);
+        }
+        let after = m.logistics.get(1).unwrap();
+        assert_eq!(after.fuel, Some(0.0));
+        log07_close(after.emergency.unwrap(), emergency - (driving - ordinary));
+        assert!(after.forced && !after.stranded);
+    }
+}
+
+#[test]
+fn log07_forced_escape_scales_retreat_speed_and_empty_fuel_strands() {
+    let mut baseline = log07_match();
+    baseline.logistics.get_mut(1).unwrap().forced = true;
+    log07_move(&mut baseline);
+    assert!(baseline.world.game.units[&1].retreating);
+    let retreat_speed = log07_step(&mut baseline, 0.0).speed;
+    assert!(retreat_speed > 0.0);
+
+    let mut m = log07_match();
+    let dt = m.rules.movement.tick;
+    let r = m.logistics.get_mut(1).unwrap();
+    r.fuel = Some(0.0);
+    r.emergency = Some(dt / 2.0);
+    r.forced = true;
+    log07_move(&mut m);
+    assert!(m.world.game.units[&1].retreating);
+    assert!(m.commands.units[&1].supply_escape);
+    m.world.game.units.get_mut(&1).unwrap().move_speed = retreat_speed / 2.0;
+    let before = m.world.game.units[&1].at();
+    let moved = log07_step(&mut m, 0.0);
+    log07_close(moved.speed, retreat_speed / 2.0);
+    let unit = &m.world.game.units[&1];
+    assert!(crate::math::hypot(unit.x - before.x, unit.z - before.z) > 0.0);
+    let r = m.logistics.get(1).unwrap();
+    assert_eq!((r.fuel, r.emergency), (Some(0.0), Some(0.0)));
+    assert!(r.forced && r.stranded);
+
+    let mut empty = log07_match();
+    let r = empty.logistics.get_mut(1).unwrap();
+    r.fuel = Some(0.0);
+    r.emergency = Some(0.0);
+    log07_move(&mut empty);
+    let before = empty.world.game.units[&1].at();
+    for _ in 0..2 {
+        assert_eq!(log07_step(&mut empty, 1.0).speed, 0.0);
+        assert_eq!(empty.world.game.units[&1].at(), before);
+        let r = empty.logistics.get(1).unwrap();
+        assert_eq!((r.fuel, r.emergency), (Some(0.0), Some(0.0)));
+        assert!(r.forced && r.stranded);
+    }
+}

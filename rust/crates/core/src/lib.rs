@@ -36,6 +36,8 @@ pub mod deployment;
 pub mod economy;
 pub mod economy_state;
 pub mod elimination_modes;
+#[cfg(test)]
+mod engineering_runtime_assertion_tests;
 pub mod environment;
 pub mod environment_debris;
 pub mod field_works;
@@ -48,6 +50,7 @@ pub mod human_commander_inputs;
 pub mod human_commander_policy;
 pub mod human_commander_state;
 pub mod human_commander_timing;
+pub mod match_horde;
 
 #[cfg(test)]
 use crate as core_api;
@@ -59,6 +62,7 @@ pub mod legacy_scenario_runtime;
 pub mod match_companion_effects;
 mod match_companion_tick;
 pub mod match_companions;
+pub mod scenario_validation;
 
 pub(crate) mod existing_observers;
 pub mod logistics;
@@ -132,6 +136,8 @@ pub mod vision;
 pub mod weather;
 pub mod weather_runtime;
 pub mod world;
+mod world_bridge;
+mod world_fill;
 pub mod world_generation;
 
 pub mod world_map;

@@ -2466,3 +2466,7 @@ mod audit_native;
 #[cfg(test)]
 #[path = "map_feature_tests.rs"]
 mod map_feature_tests;
+
+#[cfg(test)]
+#[path = "map_intent_batch2_tests.rs"]
+mod map_intent_batch2;

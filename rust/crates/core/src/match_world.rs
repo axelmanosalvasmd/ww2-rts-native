@@ -302,6 +302,7 @@ impl Match {
             firing: crate::match_firing::FiringState::default(),
             assault: None,
             elimination: None,
+            horde: None,
             recipients: Vec::new(),
             routing_fog: crate::fog::Fog::default(),
             tick_state: crate::match_tick::TickState::default(),
