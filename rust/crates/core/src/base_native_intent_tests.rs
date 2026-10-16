@@ -3,7 +3,7 @@
 mod runtime2;
 use super::*;
 use crate::{
-    economy::{self, Faction, TechState, Technology},
+    economy::{self, Faction, Mode, TechState, Technology},
     economy_state::{ArmySize, EconomyState, ModeContext, PlayerEconomy},
     map::AuthoritativeMap,
     match_commands::Command,
