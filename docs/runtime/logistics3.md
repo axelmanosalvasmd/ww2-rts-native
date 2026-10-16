@@ -18,4 +18,10 @@ No Tutorial/Horde scenario engine admission is added. Their logistics result is 
 
 ## Validation
 
-Pending on the final integrated head. Use the shared Cargo slot protocol, 6 GiB memory, no swap, four jobs and the matching target directory. Focus on logistics, option/hosting tests, authored scenarios, snapshots, save/load and trusted room/binary tests. Formatting and strict workspace all-target Clippy are required before publication.
+At producing head `393ca954910b54ff270788ee21a2bb6ef4260590`, Rust tree `e3d78cdadc75ab5727786a7e6c035caea425b964`, all 244 selected tests passed (1,129 skipped) on the Vostro. The selection includes all 11 tests in the trusted-room binary, both new scenario lifecycle tests, all ordinary option combinations and loaded-false restart cases. S2 used `/tmp/ww2-native-target-S2-0e8d6d9b`, 6 GiB memory, no swap, four build jobs and four test workers. Source roots were touched before compilation so the shared target rebuilt from this worktree. The worktree was clean and its head/Rust tree were unchanged throughout execution. The subsequent receipt update changes only this document and its changelog fragment, preserving that tested Rust tree.
+
+```bash
+cargo nextest run --locked --cargo-profile ci-test --no-fail-fast -j4 -p ww2-core -p ww2-server -E 'test(logistics) | test(log13) | test(log01) | test(log20) | test(mode_options_tests) | test(mode_hosting_tests) | test(scenario) | test(elimination_modes::) | test(recipient_snapshot::) | test(recipient_lists::) | test(save_state::) | test(save_load_tests::) | test(trusted_room_tests::) | test(native_startup) | test(base30) | test(base45) | test(base49) | test(base56) | test(match_tick_events) | test(snapshot_lists) | test(snapshot_delta) | test(classic_save_load) | binary(trusted_room_process)'
+```
+
+The first integration run exposed two additional constructor scenario refusals and two assertions that incorrectly expected scheduled snapshot fields inside Start. Those were repaired before the producing head above. The final run passes without retries. No full workspace test suite, Source recorder or Unreal execution ran. Independent source review accepted the producing head. Formatting and strict workspace all-target Clippy remain required before publication; their final-head receipts are recorded in the PR body.
