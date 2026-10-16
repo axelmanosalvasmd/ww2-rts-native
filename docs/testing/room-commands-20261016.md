@@ -110,3 +110,14 @@ the actuator stops nine metres short of its target, so the authored water was
 not a planning barrier. The refusal witness now uses an empty truck without a
 collection source, proving an unassignable job rather than inferring route
 failure from terrain. The actual transfer/hold/resume/finish witness is unchanged.
+
+Acknowledged issue #5 comment 6225924617
+(`julio-merge-without-ack-20261017`): the owner records a new orchestrator merge
+process, retaining exact-head checks, stack order, source review and merge
+integrity review. This stream still follows its explicit stop-after-PR brief;
+it does not merge or claim a Hermes ack.
+
+Recomputed `git merge-tree --write-tree` for merges d123277b, 8d394557,
+c2d4798a and d95c5013. Comparing each automatic tree with its committed merge
+finds exactly the conflict paths listed above plus this additive merge record.
+No additional hand-edited source path was found.

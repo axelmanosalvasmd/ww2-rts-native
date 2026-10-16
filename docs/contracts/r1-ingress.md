@@ -12,8 +12,8 @@ The owner decisions are `julio-owner-decisions-recorded-20261016`
 `julio-owner-merge-now-20261016` (6217727398) confirms the grant and says Axel's
 later written line does not gate implementation. Axel also confirmed these
 decisions on #5 in `axel-owner-confirm-a-to-p-20261016`. This follows the handoff
-and preserves `axel-interface-response-004`. Hermes' exact-head content review
-remains required; no ack is claimed here.
+and preserves `axel-interface-response-004`. No Hermes ack is claimed here. The stream stops after PR creation; the
+orchestrator owns later CI, review and merge decisions.
 
 ## Host controls and resync
 
