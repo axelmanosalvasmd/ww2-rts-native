@@ -1,0 +1,1 @@
+- Add native intent tests for MODE-24/32/72/73/76: radio and depot services, Assault map validation, seeded World homes, local defenders and World victory decisions. Keep Tutorial runtime rows and incomplete mode/client work for later batches.
