@@ -854,7 +854,7 @@ impl Match {
         Ok(())
     }
 
-    /// Run the source's late Conquest point-supply, capture and income phases.
+    /// Run the late ordinary or explicit Horde point-supply, capture and income phases.
     /// `unit_order` is the tick's captured list, so newly spawned units wait until the next tick.
     /// This phase does not advance the clock, apply combat or decide a winner.
     pub fn apply_point_economy(
@@ -889,7 +889,17 @@ impl Match {
         capture_income: bool,
     ) -> Result<Vec<crate::objectives::Captured>, String> {
         use crate::{economy_state as economy, objectives};
-        self.validate_conquest_finish_state()?;
+        let mode = if self.options.mode == Mode::Horde {
+            self.validate_horde_economy()?;
+            economy::ModeContext {
+                kind: Mode::Horde,
+                defender_team: Some(0),
+                income_excluded_slot: self.horde.as_ref().map(|h| h.slot),
+            }
+        } else {
+            self.validate_conquest_finish_state()?;
+            economy::ModeContext::default()
+        };
         let winner_decided = winner_decided || self.finish.is_some();
         let dt = self.rules.movement.tick;
         let game = &self.world.game;
@@ -985,7 +995,7 @@ impl Match {
             wallets
                 .advance_income(
                     &economy::Context {
-                        mode: economy::ModeContext::default(),
+                        mode,
                         army: self.options.army,
                         units: &income_units,
                         drops: &[],

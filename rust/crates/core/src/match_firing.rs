@@ -89,6 +89,17 @@ pub enum LaunchEvent {
         at: Point,
     },
     SmallArms(SmallArmsEvent),
+    /// Public, ephemeral Horde effects. These add no retained projectile state.
+    Breath {
+        shooter: UnitId,
+        target: UnitId,
+        owner: usize,
+        target_owner: usize,
+        at: Point,
+    },
+    BreathShell {
+        at: Point,
+    },
     Environment(crate::environment::Effect),
     Contact(ContactEvent),
     Expiry {
@@ -203,6 +214,16 @@ impl LaunchEvent {
                 }
                 value
             }
+            Self::Breath {
+                shooter,
+                target,
+                owner,
+                target_owner,
+                at,
+            } => {
+                json!({"f":shooter,"t":target,"fo":crate::game::source_owner_json(*owner),"to":crate::game::source_owner_json(*target_owner),"x":at.x,"z":at.z,"hit":true,"k":"kaiju","pub":true})
+            }
+            Self::BreathShell { at } => json!({"k":"shell","x":at.x,"z":at.z,"pub":true}),
             Self::Environment(e) => e.to_json(),
             Self::Expiry {
                 id,
@@ -343,6 +364,9 @@ impl Match {
             ) | (
                 crate::economy::Mode::World,
                 Some(crate::game::ModeKind::World)
+            ) | (
+                crate::economy::Mode::Horde,
+                Some(crate::game::ModeKind::Horde)
             )
         ) {
             return Err("weapon execution requires ordinary Conquest mode".into());
@@ -376,7 +400,7 @@ impl Match {
             .values()
             .any(|u| u.air.is_some() || self.rules.kinds.get(u.kind).is_some_and(|kind| kind.air))
         {
-            self.validate_aviation()
+            self.validate_aviation_observation()
                 .map_err(|error| error.to_string())?;
             if self.world.game.units.values().any(|u| {
                 u.air.is_some() && (u.x.abs() > 1_073_741_824.0 || u.z.abs() > 1_073_741_824.0)
@@ -1071,6 +1095,114 @@ impl Match {
         }
         Ok(best)
     }
+    fn fire_breath(&mut self, id: UnitId, target: UnitId) -> Result<(), String> {
+        self.supported_firing_mode()?;
+        if self.options.mode != crate::economy::Mode::Horde {
+            return Err("beam firing requires canonical Horde mode".into());
+        }
+        self.validate_firing_units()?;
+        let g = &self.world.game;
+        let u = g.units.get(&id).ok_or("missing breath shooter")?;
+        let t = g.units.get(&target).ok_or("missing breath target")?;
+        if self.rules.kinds[u.kind].name != "kaiju" {
+            return Err("unsupported beam weapon".into());
+        }
+        let w = self.weapon(u)?.ok_or("missing breath weapon")?;
+        let (at, owner, target_owner) = (u.at(), u.owner, t.owner);
+        let length = dist(at, t.at());
+        let d = if length == 0.0 { 1.0 } else { length };
+        let direction = Point {
+            x: (t.x - at.x) / d,
+            z: (t.z - at.z) / d,
+        };
+        let range = n(w, "range", 0.0);
+        let width = n(w, "beam", 0.0);
+        let interval = n(w, "interval", 0.0);
+        let scar = n(
+            self.firing_config()?
+                .get("scar")
+                .ok_or("missing scar rules")?,
+            "tank",
+            0.0,
+        );
+        let profile = ExplosionSource::weapon(u.kind, &self.rules).map_err(|e| e.to_string())?;
+        let unit_order = g.units.keys().copied().collect::<Vec<_>>();
+        let mut targets = Vec::new();
+        let skip_buildings = BTreeSet::new();
+        for v in g.units.values() {
+            if v.hp <= 0.0 || v.air.is_some() || v.riding || g.allied(owner, v.owner) {
+                continue;
+            }
+            let dx = v.x - at.x;
+            let dz = v.z - at.z;
+            let along = dx * direction.x + dz * direction.z;
+            if along > 0.0
+                && along <= range
+                && (dz * direction.x - dx * direction.z).abs()
+                    <= width + n(self.definition(v)?, "radius", 1.5)
+            {
+                targets.push(v.id);
+            }
+        }
+        let (mut damage, firing) = self.firing_damage_view(&unit_order);
+        for victim in targets {
+            let hurt = damage
+                .hurt(victim, profile, 1.0, owner as i32, firing)
+                .map_err(|e| e.to_string())?;
+            firing
+                .events
+                .push(LaunchEvent::Environment(crate::environment::Effect::Hurt(
+                    hurt,
+                )));
+        }
+        let mut memory = crate::environment::DamageMemory::default();
+        let mut hit = crate::environment::DamageContext::plain(&skip_buildings);
+        hit.owner = Some(owner as i32);
+        hit.actor_order = Some(&unit_order);
+        hit.memory = Some(&mut memory);
+        let mut sample = 4.0;
+        while sample <= range {
+            damage
+                .terrain_blast_emitting(
+                    crate::environment::Blast {
+                        at: Point {
+                            x: at.x + direction.x * sample,
+                            z: at.z + direction.z * sample,
+                        },
+                        radius: width,
+                        damage: profile.terrain.unwrap_or(0.0),
+                        scar,
+                    },
+                    &mut hit,
+                    &mut |effect| firing.events.push(LaunchEvent::Environment(effect)),
+                )
+                .map_err(|e| e.to_string())?;
+            sample += CELL;
+        }
+        firing.events.push(LaunchEvent::Breath {
+            shooter: id,
+            target,
+            owner,
+            target_owner,
+            at: Point {
+                x: at.x + direction.x * range,
+                z: at.z + direction.z * range,
+            },
+        });
+        let mut sample = 8.0;
+        while sample <= range {
+            firing.events.push(LaunchEvent::BreathShell {
+                at: Point {
+                    x: at.x + direction.x * sample,
+                    z: at.z + direction.z * sample,
+                },
+            });
+            sample += 8.0;
+        }
+        self.firing.initialize(id).cooldown = interval;
+        self.world.game.units.get_mut(&id).unwrap().shot_at = Some(self.world.game.tick as f64);
+        Ok(())
+    }
     fn fire_weapon(&mut self, id: UnitId, target: UnitId, moving: bool) -> Result<(), String> {
         let g = &self.world.game;
         let u = &g.units[&id];
@@ -1086,6 +1218,9 @@ impl Match {
             self.launch_weapon_salvo(id, at, None)?;
             self.firing.initialize(id).cooldown = interval * supply_rate;
             return Ok(());
+        }
+        if flag(w, "beam") {
+            return self.fire_breath(id, target);
         }
         let per_model = flag(w, "perModel");
         let requested = if per_model {
@@ -1459,8 +1594,8 @@ impl Match {
             self.commands.units.get_mut(&id).unwrap().aim = u.rot;
             return Ok(());
         };
-        if flag(w, "beam") {
-            return Err("beam firing is unsupported".into());
+        if flag(w, "beam") && self.options.mode != crate::economy::Mode::Horde {
+            return Err("beam firing requires canonical Horde mode".into());
         }
         let hull = !kind.infantry && !kind.structure && !moving;
         if hull {
@@ -2478,3 +2613,7 @@ mod audit_native;
 #[cfg(test)]
 #[path = "map_feature_tests.rs"]
 mod map_feature_tests;
+
+#[cfg(test)]
+#[path = "match_kaiju_tests.rs"]
+mod match_kaiju_tests;

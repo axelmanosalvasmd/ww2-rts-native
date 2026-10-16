@@ -141,6 +141,11 @@ impl Match {
     pub(crate) fn validate_aviation(&self) -> Result<(), AviationError> {
         self.validate_aviation_context(false)
     }
+    /// Ground combat and retirement may observe the planes spawned by an
+    /// explicit Horde wave. This does not admit aircraft actuation or full ticks.
+    pub(crate) fn validate_aviation_observation(&self) -> Result<(), AviationError> {
+        self.validate_aviation_context(true)
+    }
     fn validate_aviation_context(&self, horde_spawn: bool) -> Result<(), AviationError> {
         let g = &self.world.game;
         if !(matches!(self.options.mode, Mode::Default | Mode::Conquest) && g.mode.is_none()

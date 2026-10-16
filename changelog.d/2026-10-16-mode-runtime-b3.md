@@ -1,0 +1,2 @@
+- Add core Horde profile projection during breaks, Kaiju breath combat and public effects, and Horde income, bounty and bunker-defeat result handling. Full Horde ticking and hosting remain guarded.
+- Record construction and waiting-production refunds in match spending counters, with checks for recovery charges, refused operations and frozen counters after a match ends.

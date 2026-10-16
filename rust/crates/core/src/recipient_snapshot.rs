@@ -78,6 +78,25 @@ pub struct RecipientProjection {
     pub missing: Vec<SnapshotCapability>,
 }
 
+/// The public Horde mode component, separate from complete recipient admission.
+/// No seat data or hidden purchase state enters this row. The complete Horde
+/// snapshot and host remain guarded by their existing mode checks.
+pub fn horde_mode_row(state: &Match) -> Result<Value, SnapshotError> {
+    let mode = state.horde_projection().map_err(|_| SnapshotError::Rules)?;
+    let horde = state.horde.as_ref().ok_or(SnapshotError::Rules)?;
+    let mut row = json!({
+        "kind": "horde", "defenderTeam": 0, "attackerTeam": 1,
+        "timeLeft": mode.time_left, "suddenDeath": false,
+        "profile": mode.profile.as_str(), "wave": mode.wave,
+        "left": mode.left, "active": mode.active, "boss": mode.boss,
+        "slot": horde.slot
+    });
+    if let Some(profile) = mode.next_profile {
+        row["nextProfile"] = json!(profile.as_str());
+    }
+    Ok(row)
+}
+
 /// Capture immutable rows for one send pass after canonical state changes.
 /// The Rust borrow prevents state mutation until every recipient is projected.
 pub struct SnapshotCache<'a> {

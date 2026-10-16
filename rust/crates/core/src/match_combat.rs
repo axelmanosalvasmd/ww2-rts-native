@@ -243,7 +243,11 @@ impl DamageWorld<'_> {
         CombatContext {
             tick: self.world.game.tick as f64,
             mode: self.mode,
-            horde_defenders: 0,
+            horde_defenders: if self.mode == Mode::Horde {
+                self.world.game.players.len().saturating_sub(1) as u32
+            } else {
+                0
+            },
             allied: self.alliance(owner, target),
             tech_enabled: self.tech_enabled,
             attacker_tech: usize::try_from(owner)
@@ -948,6 +952,7 @@ impl DamageWorld<'_> {
         };
         let damage = base
             * shrug
+            * combat::bunker_mul(target.kind, context.mode, context.horde_defenders)?
             * fall
             * if combat::retreat_protected(target.retreat)? {
                 number(cfg, "retreatDamage")?
@@ -1366,7 +1371,7 @@ impl crate::match_runtime::Match {
             || !self.aviation.planes.is_empty()
             || !self.aviation.anti_air.is_empty()
         {
-            self.validate_aviation()
+            self.validate_aviation_observation()
                 .map_err(|_| CombatError::InvalidInput("aircraft retirement registry"))?;
         }
         let mut wallets = self
@@ -1388,7 +1393,9 @@ impl crate::match_runtime::Match {
                 .last_hit
                 .and_then(|o| usize::try_from(o).ok())
                 .filter(|o| {
-                    !self.world.game.allied(*o, u.owner) && !self.start.economy.players[*o].out
+                    !self.world.game.allied(*o, u.owner)
+                        && !self.start.economy.players[*o].out
+                        && self.horde.as_ref().is_none_or(|h| h.slot != *o)
                 });
             if let Some(k) = killer {
                 wallets[k] += number(definition(u.kind, &self.rules)?, "cost")? * bounty;
@@ -1528,7 +1535,10 @@ impl crate::match_runtime::Match {
             self.building_rallies.remove(&u.id);
             // Source buildingCells retains historical ruin ownership/position after retirement.
 
-            if let Some(killer) = enemy.filter(|k| !self.start.economy.players[*k].out) {
+            if let Some(killer) = enemy.filter(|k| {
+                !self.start.economy.players[*k].out
+                    && self.horde.as_ref().is_none_or(|h| h.slot != *k)
+            }) {
                 self.start.economy.players[killer].mp += number(def, "cost")? * bounty;
             }
             progress.completed += 1;
