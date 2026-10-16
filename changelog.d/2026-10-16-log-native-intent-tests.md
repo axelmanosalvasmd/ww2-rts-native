@@ -1,0 +1,1 @@
+- Add 28 native logistics feature tests and mappings for all 48 assigned LOG rows, covering reserve shortages, stock ownership, convoy scheduling and control, ground supply and upkeep. Keep World supply, full-tick integration and client gaps open pending implementation; native execution and prototype review are pending.

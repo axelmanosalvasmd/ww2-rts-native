@@ -1,5 +1,24 @@
 # Three Crossroads Native: design decisions
 
+## LOG native intent test window (2026-10-16)
+
+The separate logistics contribution maps all 48 assigned remaining LOG rows
+under Axel's approved native-intent rule. Twenty-eight new native tests use
+existing reserve, convoy, inventory and ground-network APIs with explicit
+component inputs. They exercise exhaustion timing, powered fuel consumption,
+support payment, source/store lifecycle, territory grace and reconnection,
+grouped jobs, route-plan budgeting, safe reuse, manual hold/resume, donor
+permissions, fleet replacement and recipient privacy. Existing exact reserve,
+route, network and convoy fixtures remain unchanged and are included in the
+proposed focused run.
+
+The tests do not install a World supply graph or connect guarded full-tick
+logistics phases. The row map keeps those gaps, incomplete consumer histories
+and Unreal-only LOG-49 through LOG-55 explicit. No runtime, reference, fixture
+or contract changes are made. The window is unrun pending Root's grant and
+review; no previous green result is transferred and no row is promoted.
+
+
 ## BASE native intent test window (2026-10-16)
 
 Apply Axel's approved rules 1 to 5 from issue #5 comment 6206861267. The

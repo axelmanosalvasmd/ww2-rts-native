@@ -49,6 +49,8 @@ mod human_commander_timing;
 mod legacy_scenario;
 #[path = "../logistics.rs"]
 mod logistics;
+#[path = "../logistics_features.rs"]
+mod logistics_features;
 #[path = "../match_combat.rs"]
 mod match_combat;
 #[path = "../match_routing.rs"]
