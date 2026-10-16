@@ -93,10 +93,9 @@ impl Hub {
             .filter(|t| t.code == code)
             .map_or_else(
                 || {
-                    code.bytes()
-                        .fold(now ^ self.next_epoch.wrapping_add(1), |v, c| {
-                            v.wrapping_mul(1099511628211) ^ u64::from(c)
-                        })
+                    code.bytes().fold(self.next_epoch.wrapping_add(1), |v, c| {
+                        v.wrapping_mul(1099511628211) ^ u64::from(c)
+                    })
                 },
                 |t| t.seed.wrapping_add(self.next_epoch),
             );

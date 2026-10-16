@@ -423,8 +423,31 @@ fn mode94_horde_editor_restart_refusal_is_atomic_and_success_uses_fresh_seeds() 
         native.runtime.state().options.map_key.as_deref(),
         Some("private-horde")
     );
+    // Clock XOR used to let these two ordinary host timestamps collide.
+    hub.configure_trusted_room(None);
+    hub.start_horde("ABC", a.id, true, 8).unwrap();
+    let untrusted_seed = hub.rooms["ABC"]
+        .native
+        .as_ref()
+        .unwrap()
+        .runtime
+        .state()
+        .options
+        .seed;
+    hub.start_horde("ABC", a.id, true, 15).unwrap();
+    assert_ne!(
+        hub.rooms["ABC"]
+            .native
+            .as_ref()
+            .unwrap()
+            .runtime
+            .state()
+            .options
+            .seed,
+        untrusted_seed
+    );
     for callback in 0..8 {
-        hub.poll_native(callback * 50, callback * 50_000_000);
+        hub.poll_native(callback * 50 + 50, callback * 50_000_000 + 50_000_000);
         outputs(&mut hub, &mut ra, callback * 50);
         outputs(&mut hub, &mut rb, callback * 50);
         assert_eq!(mode(&mut hub).len(), 3);

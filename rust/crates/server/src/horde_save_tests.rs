@@ -56,8 +56,8 @@ fn setup(
     hub.configure_saves(dir.0.join("saves"));
     hub.configure_records(crate::HordeRecords::new(dir.0.join("records.json")));
     let raw = json!({"name":"Saved Horde arena", "w":60,"h":60,"rows":vec![".".repeat(60);60],
-        "spawns":[{"x":30,"y":5},{"x":10,"y":54},{"x":50,"y":54}],
-        "defend":[0],"points":[{"x":30,"y":30}]});
+        "spawns":[{"x":30,"y":30},{"x":10,"y":54},{"x":50,"y":54}],
+        "defend":[0],"points":[{"x":30,"y":15}]});
     std::fs::write(
         dir.0.join("bastogne.json"),
         serde_json::to_vec(&raw).unwrap(),
@@ -115,6 +115,15 @@ fn hosted_horde_save_restores_wave_inputs_and_brain_then_resumes_to_full_ending_
         .unwrap()
         .runtime;
     let state = runtime.state_mut();
+    // The centered compound must provide real static AA for the saved aircraft.
+    assert!(
+        state
+            .world
+            .game
+            .units
+            .values()
+            .any(|unit| state.rules.kinds[unit.kind].name == "flakpos")
+    );
     let bunker = state.horde.as_ref().unwrap().bunker;
     let target = state.world.game.units[&bunker].at();
     state.world.game.units.get_mut(&bunker).unwrap().hp = 1.0;
@@ -174,6 +183,54 @@ fn hosted_horde_save_restores_wave_inputs_and_brain_then_resumes_to_full_ending_
             // Injury lets ordinary AA down this saved plane before the boss fires.
             unit.hp = 20.0;
         }
+    }
+    let aa_position = state
+        .world
+        .game
+        .units
+        .values()
+        .find(|unit| state.rules.kinds[unit.kind].name == "flakpos")
+        .unwrap()
+        .at();
+    let aircraft = state
+        .world
+        .game
+        .units
+        .values()
+        .filter(|unit| unit.owner == horde_slot && unit.air.is_some())
+        .map(|unit| unit.id)
+        .collect::<Vec<_>>();
+    // Capture the returning sortie inside the compound's AA range. The ordinary
+    // spawn base is off-map and would not reach these guns before bunker defeat.
+    for id in aircraft {
+        let unit = state.world.game.units.get_mut(&id).unwrap();
+        unit.x = aa_position.x + 4.0;
+        unit.z = aa_position.z + 4.0;
+        assert!(
+            state
+                .send_aircraft_mission(
+                    horde_slot,
+                    id,
+                    ww2_core::match_aviation::PlaneMission {
+                        kind: ww2_core::match_aviation::MissionKind::Patrol,
+                        target: None,
+                        at: aa_position,
+                    }
+                )
+                .unwrap()
+        );
+    }
+    state.grid.rebuild(&state.world.game.units);
+    state.update_horde_vision().unwrap();
+    for unit in state
+        .world
+        .game
+        .units
+        .values()
+        .filter(|unit| unit.owner == horde_slot && unit.air.is_some())
+    {
+        assert!(state.world.game.players[0].sees(unit.id));
+        assert!(state.world.game.players[1].sees(unit.id));
     }
     runtime.think(true).unwrap();
     snapshot_every_seat(runtime);
@@ -262,6 +319,7 @@ fn hosted_horde_save_restores_wave_inputs_and_brain_then_resumes_to_full_ending_
     let mut saw_queued_input = false;
     let mut saw_finish = false;
     let mut saw_aircraft_aa = [false; 2];
+    let mut aviation_rows = Vec::new();
     let mut saw_aircraft_down = [false; 2];
     let mut snapshots = [0; 2];
     for callback in 5..405_u64 {
@@ -274,6 +332,11 @@ fn hosted_horde_save_restores_wave_inputs_and_brain_then_resumes_to_full_ending_
                     snapshots[slot] += 1;
                     if !saw_finish && message["winner"].is_null() {
                         for shot in message["shots"].as_array().into_iter().flatten() {
+                            if aviation_rows.len() < 16
+                                && matches!(shot["k"].as_str(), Some("aa" | "planedown"))
+                            {
+                                aviation_rows.push((slot, message["tick"].clone(), shot.clone()));
+                            }
                             if shot["k"] == "aa"
                                 && shot["to"] == 2
                                 && shot["t"]
@@ -352,7 +415,7 @@ fn hosted_horde_save_restores_wave_inputs_and_brain_then_resumes_to_full_ending_
         )
     });
     let diagnostic = format!(
-        "brain={saw_brain_observation}, queued={saw_queued_input}, aa={saw_aircraft_aa:?}, planedown={saw_aircraft_down:?}, finish={saw_finish}, frames={snapshots:?}, status={final_status:?}, remaining={remaining:?}"
+        "brain={saw_brain_observation}, queued={saw_queued_input}, aa={saw_aircraft_aa:?}, planedown={saw_aircraft_down:?}, finish={saw_finish}, frames={snapshots:?}, aviation={aviation_rows:?}, status={final_status:?}, remaining={remaining:?}"
     );
     assert!(
         saw_brain_observation,
