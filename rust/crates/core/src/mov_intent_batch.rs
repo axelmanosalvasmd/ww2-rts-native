@@ -526,7 +526,7 @@ fn mov_52_priority_tiers_age_cap_ties_and_traffic_durations() {
 
 #[test]
 fn mov_63_bridge_and_ford_peers_keep_forward_progress() {
-    for crossing in [b'=', b'F', b'.'] {
+    for crossing in *b"=F." {
         let mut m = scene();
         m.world.set_cell(30 * 80 + 30, crossing).unwrap();
         let a = add(&mut m, "rifle", 0, p(60.5, 60.5));
