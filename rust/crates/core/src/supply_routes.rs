@@ -8,9 +8,13 @@ use crate::{
     supply_convoys::{Route, RouteFailure},
 };
 use std::collections::BTreeMap;
+
 #[cfg(test)]
 #[path = "interface_handoff_keys_tests.rs"]
 mod interface_handoff_keys_tests;
+
+#[cfg(test)]
+mod intent_tests;
 #[derive(Clone, Copy, Debug)]
 pub struct RouteRequest {
     pub owner: usize,

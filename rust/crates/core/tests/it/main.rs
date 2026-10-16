@@ -79,6 +79,9 @@ mod mov_aircraft_immunity;
 mod mov_hull_clearance;
 #[path = "../mov_wreck_journey.rs"]
 mod mov_wreck_journey;
+
+#[path = "../mov_settling.rs"]
+mod mov_settling;
 #[path = "../objectives.rs"]
 mod objectives;
 #[path = "../observed_memory.rs"]

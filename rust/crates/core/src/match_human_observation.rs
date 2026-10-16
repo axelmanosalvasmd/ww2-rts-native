@@ -325,11 +325,7 @@ impl Match {
             let mut amove = None;
             if row.owner == owner && !self.rules.kinds[u.kind].structure {
                 let c = &self.commands.units[&u.id];
-                if u.build {
-                    return Err(
-                        "human observation requires canonical construction target identity".into(),
-                    );
-                }
+                crate::match_construction::validate_build_activity(u, c)?;
                 let project = if u.entrench {
                     Some(
                         self.field_works
@@ -347,7 +343,8 @@ impl Match {
                     && g.units.contains_key(&c.attack_id)
                     && g.players[owner].sees(c.attack_id);
                 let project_plan = project.is_some_and(|p| !p.jobs.is_empty() || p.active != 0);
-                if !(ride
+                if !(u.build
+                    || ride
                     || u.retreating
                     || attack
                     || c.fire_at.is_some()
@@ -384,6 +381,13 @@ impl Match {
                 entrench: row.entrench,
                 garrison: row.garrison,
             });
+        }
+        if let Some(context) = &mut input.runtime {
+            for unit in &units {
+                if let Some(facts) = context.units.get_mut(&unit.motion.id) {
+                    facts.amove = unit.motion.amove;
+                }
+            }
         }
         let visible: Vec<_> = input
             .units
@@ -532,6 +536,11 @@ fn apply_view_rows(
         // ai-view retains the received N character while decoding its delivered surface mask.
         input.chars[row.cell] = row.ch;
         input.flags[row.cell] = flag as u16;
+        if let Some(runtime) = &mut input.runtime
+            && let Some(height) = &mut runtime.height
+        {
+            height[row.cell] = row.height;
+        }
     }
     Ok(())
 }

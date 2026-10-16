@@ -29,6 +29,10 @@ pub mod client_view;
 pub mod combat;
 pub mod command_destinations;
 pub mod commander_ai;
+mod commander_forward_hq;
+pub mod commander_mind;
+mod commander_shopping;
+pub mod commander_tactics;
 pub mod companion_ray;
 pub mod companions;
 pub mod conquest_end;
@@ -153,6 +157,7 @@ pub mod match_world_tick;
 pub mod match_world_memory;
 pub mod world_memory;
 pub mod world_recipient_metadata;
+pub mod world_territories;
 
 pub mod staged_observer;
 

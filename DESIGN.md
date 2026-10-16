@@ -4835,6 +4835,10 @@ and Unreal acceptance are not completed by these selected component rows.
 
 PR #274 strict Clippy rejected a nested conditional in the stillness-reset assertion. Combine the existing option match and movement threshold with a let chain. The condition, assertions and authored inputs stay the same.
 
+## Native server diagnostics (2026-10-16)
+
+NET-97 uses the existing host tick meter and an opt-in bounded writer. `WW2_DIAG=1` appends room JSONL records under the process working directory's `logs/`; `WW2_TICKLOG=1` prints phase percentiles every thirty seconds. Library hosts choose a diagnostic directory through `Config`. A 64-record channel keeps file writes outside the room lock; full queues and file errors discard diagnostic records without affecting the match. Native scheduler delay measures excess over the ten-millisecond maintenance poll, providing the equivalent of the prototype's event-loop delay. Timestamps are Unix milliseconds. A separate optional socket gauge measures queued UTF-8 payload bytes for all output classes and preserves the existing UTF-16 snapshot admission threshold. Browser metrics stay host-private. None of these measurements enters the deterministic rules state or recipient snapshots.
+
 ## Horde wave phase and scenario type validation (2026-10-16)
 
 `Match::step_horde` is an explicit late phase after ordinary capture, income

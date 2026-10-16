@@ -7,7 +7,7 @@ fn replaced_connection_cannot_reserve_input_and_denials_stay_with_the_person() {
     let client = |id| {
         let (tx, rx) = mpsc::channel(64);
         let (cancel, _) = watch::channel(false);
-        (Connection { id, tx, cancel }, rx)
+        (Connection::new(id, tx, cancel), rx)
     };
     let (old, mut old_rx) = client(1);
     let (peer, mut peer_rx) = client(2);

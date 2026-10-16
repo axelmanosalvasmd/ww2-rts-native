@@ -1,4 +1,4 @@
-//! Bounded quiet strategic policy on the ordinary human commander's actual attention schedule.
+//! Seat tactics and the original quiet component on the human commander's attention schedule.
 //! This publishes private state and delayed attempts; the host owns queue admission and receipts.
 
 use crate::{
@@ -19,6 +19,7 @@ pub struct HumanPolicy {
     owner: u32,
     source: SourceState,
     random: MatchRandom,
+    tactics: crate::commander_tactics::State,
 }
 
 impl HumanPolicy {
@@ -27,6 +28,7 @@ impl HumanPolicy {
             owner,
             source: SourceState::default(),
             random: MatchRandom::new(recorded_match_seed),
+            tactics: crate::commander_tactics::State::default(),
         }
     }
 
@@ -40,6 +42,48 @@ impl HumanPolicy {
             return Err(Error::Planner(
                 "human policy seat does not match its delivered packet".into(),
             ));
+        }
+        if observation.input().runtime.is_some() {
+            let sightings = screen
+                .sightings
+                .iter()
+                .map(|s| {
+                    let v = &s.payload;
+                    Ok(crate::commander_mind::Sighting {
+                        id: s.id,
+                        kind: v["type"]
+                            .as_str()
+                            .ok_or_else(|| Error::Planner("invalid sighting kind".into()))?
+                            .into(),
+                        owner: v["owner"]
+                            .as_u64()
+                            .ok_or_else(|| Error::Planner("invalid sighting owner".into()))?
+                            as usize,
+                        at: crate::game::Point {
+                            x: v["x"]
+                                .as_f64()
+                                .ok_or_else(|| Error::Planner("invalid sighting x".into()))?,
+                            z: v["z"]
+                                .as_f64()
+                                .ok_or_else(|| Error::Planner("invalid sighting z".into()))?,
+                        },
+                        time: v["t"]
+                            .as_f64()
+                            .ok_or_else(|| Error::Planner("invalid sighting time".into()))?,
+                        worth: v["val"]
+                            .as_f64()
+                            .ok_or_else(|| Error::Planner("invalid sighting worth".into()))?,
+                    })
+                })
+                .collect::<Result<Vec<_>, Error>>()?;
+            return crate::commander_tactics::plan(
+                &observation,
+                &sightings,
+                &mut self.tactics,
+                level,
+                &mut self.random,
+            )
+            .map_err(Error::Planner);
         }
         let planned =
             commander_ai::plan(&observation, &mut self.source, level, &mut self.random)

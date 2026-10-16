@@ -7,12 +7,10 @@ use axum::{
 #[path = "map-data.rs"]
 mod data;
 
-/// The committed mapForClient projection, independent of private authoring data.
+/// Sanitize the immutable authoring map before any public delivery.
 pub(crate) fn public_map(name: &str) -> Option<serde_json::Value> {
-    data::MAPS
-        .iter()
-        .find(|(key, _)| *key == name)
-        .map(|(_, text)| serde_json::from_str(text).expect("validated public map asset"))
+    let map = crate::authoritative_maps::load(name).ok()?;
+    ww2_core::map::map_for_client(map.source()).ok()
 }
 
 /// Read-only map delivery. No request can select an authoring file or raw projection.
@@ -58,12 +56,14 @@ fn response(path: &str, method: &Method, editor_header: bool) -> Response<Body> 
         // Editor requests cannot select the private native match catalogue.
         return text(StatusCode::FORBIDDEN, "wrong password");
     }
-    match data::MAPS.iter().find(|(key, _)| *key == name) {
-        Some((_, json)) => Response::builder()
+    match public_map(name) {
+        Some(map) => Response::builder()
             .status(StatusCode::OK)
             .header(header::CONTENT_TYPE, "application/json")
             .header(header::CACHE_CONTROL, "no-store")
-            .body(Body::from(*json))
+            .body(Body::from(
+                serde_json::to_vec(&map).expect("public map JSON"),
+            ))
             .unwrap(),
         None => text(StatusCode::NOT_FOUND, "no such map"),
     }
@@ -105,6 +105,13 @@ fn normalized_path(path: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn map24_catalogue_public_projection_matches_every_committed_public_asset() {
+        for (key, text) in data::MAPS {
+            let expected: serde_json::Value = serde_json::from_str(text).unwrap();
+            assert_eq!(public_map(key).unwrap(), expected, "{key}");
+        }
+    }
     #[test]
     fn raw_names_and_methods_cannot_reach_authoring_data() {
         for name in ["default", "default.json"] {

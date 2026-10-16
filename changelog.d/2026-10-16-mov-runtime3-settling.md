@@ -1,0 +1,1 @@
+- Preserve every World move destination when any click in the command is unseen, so hidden terrain cannot alter formation or cover selection. Add settling controls and an ordinary R1 movement journey that keeps both seats snapshotting.

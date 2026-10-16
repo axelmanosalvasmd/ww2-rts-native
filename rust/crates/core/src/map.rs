@@ -562,6 +562,69 @@ impl AuthoritativeMap {
     }
 }
 
+/// The prototype's public authored-map projection. Private scripts and mine materials
+/// are removed from a copy; the authoritative document is never changed.
+pub fn map_for_client(source: &Value) -> Result<Value> {
+    let mut result = source.clone();
+    let object = result
+        .as_object_mut()
+        .ok_or_else(|| invalid("document", "expected a map object"))?;
+    object.remove("triggers");
+    object.remove("scenario");
+    let map = AuthoritativeMap::from_value(result.clone())?;
+    let w = map.w;
+    let strings = |cells: &[u8]| -> Value {
+        serde_json::json!(
+            cells
+                .chunks(w)
+                .map(|row| String::from_utf8(row.to_vec()).expect("validated ASCII terrain"))
+                .collect::<Vec<_>>()
+        )
+    };
+    if source.get("layers").is_none() {
+        result["worldVersion"] = serde_json::json!(2);
+        result["layers"] = serde_json::json!({"ground":strings(&map.layers.ground),"objects":strings(&map.layers.objects)});
+    }
+    let hidden_rows = source
+        .get("layers")
+        .map_or(&source["rows"], |layers| &layers["objects"]);
+    let hidden: Vec<_> = hidden_rows
+        .as_array()
+        .expect("validated rows")
+        .iter()
+        .flat_map(|row| row.as_str().expect("validated row").bytes())
+        .map(|ch| ch == b'N')
+        .collect();
+    let public: Vec<_> = map
+        .chars
+        .iter()
+        .enumerate()
+        .map(|(cell, &ch)| {
+            if ch != b'N' {
+                ch
+            } else if map.layers.objects[cell] != b'.' {
+                map.layers.objects[cell]
+            } else {
+                map.layers.ground[cell]
+            }
+        })
+        .collect();
+    result["rows"] = strings(&public);
+    result["layers"]["objects"] = strings(&map.layers.objects);
+    result["layers"]["mines"] = serde_json::json!(vec![".".repeat(w); map.h]);
+    for key in ["materials", "objectMaterials"] {
+        if let Some(list) = result["layers"].get_mut(key).and_then(Value::as_array_mut) {
+            list.retain(|entry| {
+                !hidden[entry["c"].as_f64().expect("validated material cell") as usize]
+            });
+        }
+    }
+    if result["layers"].get("mineMaterials").is_some() {
+        result["layers"]["mineMaterials"] = serde_json::json!([]);
+    }
+    Ok(result)
+}
+
 fn material_list(source: &Value, key: &str, n: usize) -> Result<BTreeMap<usize, String>> {
     let mut result = BTreeMap::new();
     if let Some(v) = source.get(key) {
