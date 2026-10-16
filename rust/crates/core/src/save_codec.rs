@@ -164,10 +164,11 @@ pub(crate) fn normalize_pointer_fields(
         let Some(a) = node.as_array_mut() else { return };
         if a.len() == 2 && a[0] == "some" {
             normalize_number(&mut a[1], bindings);
-        } else if a.len() == 2 && a[0] == "u" {
-            if let Some(old) = a[1].as_u64().and_then(|n| usize::try_from(n).ok()) {
-                a[1] = Value::from(bindings.get(&old).copied().unwrap_or(0) as u64);
-            }
+        } else if a.len() == 2
+            && a[0] == "u"
+            && let Some(old) = a[1].as_u64().and_then(|n| usize::try_from(n).ok())
+        {
+            a[1] = Value::from(bindings.get(&old).copied().unwrap_or(0) as u64);
         }
     }
     fn visit(node: &mut Value, bindings: &std::collections::BTreeMap<usize, usize>) {

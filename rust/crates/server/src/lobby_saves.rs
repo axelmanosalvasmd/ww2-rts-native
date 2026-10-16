@@ -59,15 +59,13 @@ impl Hub {
         };
         if result.is_err()
             && let Some(room) = self.rooms.get_mut(code)
-        {
-            if let Some(person) = room
+            && let Some(person) = room
                 .players
                 .iter_mut()
                 .chain(&mut room.spectators)
                 .find(|p| p.connection.as_ref().is_some_and(|c| c.id == connection_id))
-            {
-                person.deny(command, "save", now);
-            }
+        {
+            person.deny(command, "save", now);
         }
         true
     }
