@@ -295,11 +295,8 @@ impl crate::match_runtime::Match {
         {
             return Err("tick execution requires represented ordinary or World mode".into());
         }
-        if self.options.logistics != self.convoys.is_some() {
-            return Err("logistics option and convoy state disagree".into());
-        }
-        if self.options.logistics {
-            self.validate_withdrawal_supply()?;
+        if self.options.logistics || self.convoys.is_some() {
+            return Err("reserve and convoy tick phases are not connected".into());
         }
         self.preflight_legacy_scenario()?;
         self.tick_state.paths.validate()?;
@@ -837,9 +834,12 @@ impl crate::match_runtime::Match {
                 ]
             } else {
                 vec![
+                    TickPhase::UnitReserves,
                     TickPhase::Production,
                     TickPhase::Rail,
                     TickPhase::GroundEffects,
+                    TickPhase::SupplyNetwork,
+                    TickPhase::Convoys,
                 ]
             },
         })

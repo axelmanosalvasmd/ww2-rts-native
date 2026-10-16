@@ -6,7 +6,7 @@ use crate::{
     match_commands::{Command, Denial, MoveOrder, Stance},
     match_runtime::{Match, MatchOptions, PlayerConfig},
     match_tick::TickPhase,
-    recipient_snapshot::{DeliveryState, SnapshotCapability},
+    recipient_snapshot::{DeliveryState, SnapshotCapability, SnapshotError},
     weather::WeatherChoice,
 };
 use serde_json::json;
@@ -78,40 +78,72 @@ fn force(m: &mut Match, id: u32, at: Point) {
     r.warning = Some(0.);
     r.forced = true;
 }
-fn snapshot(m: &mut Match, d: &mut DeliveryState) {
-    let tick = m.world.game.tick;
-    let frame = d.capture(m, &[true, true], &[false, false]).unwrap();
-    for owner in 0..2 {
-        let projection = frame.recipient(owner).unwrap();
-        assert_eq!(projection.fields["tick"], tick);
-        assert!(
-            projection.fields["units"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .any(|r| r[2] == owner)
-        );
-        // The existing internal projection explicitly retains its missing logistics payload.
-        assert!(projection.missing.contains(&SnapshotCapability::Logistics));
+// Exercise the reserve and withdrawal adapters without entering the full tick runner.
+fn withdrawal_turn(m: &mut Match, id: u32) {
+    m.begin_path_tick(4096, 20).unwrap();
+    m.advance_unit_reserves(id).unwrap();
+    m.advance_supply_withdrawal(id).unwrap();
+}
+fn assert_closed(m: &mut Match) {
+    assert!(
+        m.validate_tick_state()
+            .unwrap_err()
+            .contains("reserve and convoy tick phases")
+    );
+    let mut delivery = DeliveryState::new(m).unwrap();
+    let before = delivery.clone();
+    assert!(matches!(
+        delivery.capture_with_lists(m, &[true, true], &[false, false], &[]),
+        Err(SnapshotError::Unsupported {
+            capability: SnapshotCapability::Logistics,
+            ..
+        })
+    ));
+    assert_eq!(delivery, before);
+    assert!(m.tick_state.fault().is_none());
+}
+#[test]
+fn logistics_runtime_full_tick_and_complete_snapshot_guards_stay_closed() {
+    for (enabled, convoys) in [(true, true), (true, false), (false, true)] {
+        let (mut m, id) = scene(true);
+        m.options.logistics = enabled;
+        if !convoys {
+            m.convoys = None;
+        }
+        let tick = m.world.game.tick;
+        let reserves = m.logistics.get(id).unwrap().clone();
+        let control = m.commands.units[&id].clone();
+        let error = m.advance_tick().unwrap_err();
+        assert!(error.reason.contains("reserve and convoy tick phases"));
+        assert!(error.events.is_empty());
+        assert_eq!(m.world.game.tick, tick);
+        assert_eq!(m.logistics.get(id).unwrap(), &reserves);
+        assert_eq!(m.commands.units[&id], control);
+        assert_closed(&mut m);
     }
 }
 #[test]
-fn logistics_runtime_ordinary_matches_tick_and_project_with_logistics_off_and_on() {
-    for enabled in [false, true] {
-        let (mut m, id) = scene(enabled);
-        let mut d = DeliveryState::new(&m).unwrap();
-        snapshot(&mut m, &mut d);
-        for _ in 0..45 {
-            let report = m.advance_tick().unwrap();
-            assert_eq!(report.phases.contains(&TickPhase::UnitReserves), enabled);
-            assert_eq!(report.phases.contains(&TickPhase::Convoys), enabled);
-            snapshot(&mut m, &mut d);
+fn logistics_runtime_ordinary_logistics_off_ticks_and_complete_snapshots_still_work() {
+    let (mut m, _) = scene(false);
+    let mut delivery = DeliveryState::new(&m).unwrap();
+    for _ in 0..45 {
+        let report = m.advance_tick().unwrap();
+        assert!(!report.phases.contains(&TickPhase::UnitReserves));
+        assert!(!report.phases.contains(&TickPhase::Convoys));
+        for phase in [
+            TickPhase::UnitReserves,
+            TickPhase::SupplyNetwork,
+            TickPhase::Convoys,
+        ] {
+            assert!(report.unavailable.contains(&phase));
+        }
+        let frame = delivery
+            .capture_with_lists(&mut m, &[true, true], &[false, false], &[])
+            .unwrap();
+        for owner in 0..2 {
+            frame.recipient(owner).unwrap();
         }
         assert!(m.tick_state.fault().is_none());
-        if enabled {
-            assert!(m.logistics.get(id).unwrap().provisions > 0.);
-            assert_eq!(m.supply_net.width, 80);
-        }
     }
 }
 #[test]
@@ -129,7 +161,7 @@ fn logistics_runtime_log12_withdrawal_cancels_orders_and_routes_without_teleport
         ids: vec![i64::from(id)],
     });
     m.world.game.units.get_mut(&id).unwrap().board = carrier;
-    m.advance_tick().unwrap();
+    withdrawal_turn(&mut m, id);
     let c = &m.commands.units[&id];
     assert!(c.supply_started && c.orders.is_empty());
     assert!(c.nade.is_none() && c.fire_at.is_none() && c.enter.is_none());
@@ -154,12 +186,7 @@ fn logistics_runtime_log12_withdrawal_cancels_orders_and_routes_without_teleport
         .unwrap()
         .at;
     assert!((crate::math::hypot(goal.x - home.x, goal.z - home.z) - 10.).abs() < 1e-9);
-    let mut d = DeliveryState::new(&m).unwrap();
-    snapshot(&mut m, &mut d);
-    for _ in 0..20 {
-        m.advance_tick().unwrap();
-        snapshot(&mut m, &mut d);
-    }
+    assert_closed(&mut m);
 }
 #[test]
 fn logistics_runtime_log12_stranded_retries_and_nearby_handoff_needs_no_path() {
@@ -206,7 +233,7 @@ fn logistics_runtime_log12_stranded_retries_and_nearby_handoff_needs_no_path() {
 fn logistics_runtime_log13_player_hold_escape_stances_and_recovery() {
     let (mut m, id) = scene(true);
     force(&mut m, id, Point { x: 65., z: 45. });
-    m.advance_tick().unwrap();
+    withdrawal_turn(&mut m, id);
     let ids = vec![i64::from(id)];
     for stance in [Stance::HoldFire, Stance::HoldPosition, Stance::AutoRetreat] {
         assert_eq!(
@@ -234,7 +261,7 @@ fn logistics_runtime_log13_player_hold_escape_stances_and_recovery() {
         None
     );
     assert!(m.commands.units[&id].supply_hold);
-    m.advance_tick().unwrap();
+    withdrawal_turn(&mut m, id);
     assert!(m.logistics.get(id).unwrap().stranded);
     assert!(m.world.game.units[&id].path.is_empty());
     let go = |attack_move| Command::Move {
@@ -255,9 +282,8 @@ fn logistics_runtime_log13_player_hold_escape_stances_and_recovery() {
         m.execute_command(0, &go(true), false).unwrap(),
         Some(Denial::Blocked)
     );
-    let mut d = DeliveryState::new(&m).unwrap();
-    m.advance_tick().unwrap();
-    snapshot(&mut m, &mut d);
+    withdrawal_turn(&mut m, id);
+    assert_closed(&mut m);
     m.execute_command(0, &Command::Stop { ids: ids.clone() }, false)
         .unwrap();
     m.execute_command(0, &Command::Retreat { ids }, false)
@@ -266,7 +292,7 @@ fn logistics_runtime_log13_player_hold_escape_stances_and_recovery() {
     let r = m.logistics.get_mut(id).unwrap();
     r.provisions = 120.;
     r.ammo = r.ammo_max;
-    m.advance_tick().unwrap();
+    withdrawal_turn(&mut m, id);
     assert!(!m.logistics.get(id).unwrap().forced);
     let c = &m.commands.units[&id];
     assert!(!c.supply_started && !c.supply_hold && !c.supply_escape);
@@ -347,15 +373,14 @@ fn logistics_runtime_log12_withdrawal_cancels_canonical_build_and_shared_project
             None
         );
         force(&mut m, id, at);
-        m.advance_tick().unwrap();
+        withdrawal_turn(&mut m, id);
         let u = &m.world.game.units[&id];
         assert!(!u.build && !u.entrench && !u.dig);
         assert!(m.commands.units[&id].build_target.is_none());
         assert!(m.field_works.membership(id).is_none() && !m.field_works.is_active(id));
-        let mut d = DeliveryState::new(&m).unwrap();
-        snapshot(&mut m, &mut d);
-        m.advance_tick().unwrap();
-        snapshot(&mut m, &mut d);
+        assert_closed(&mut m);
+        withdrawal_turn(&mut m, id);
+        assert_closed(&mut m);
     }
 }
 #[test]
@@ -367,22 +392,21 @@ fn logistics_runtime_log12_empty_fuel_and_emergency_strands_without_removal() {
     let r = m.logistics.get_mut(id).unwrap();
     r.fuel = Some(0.);
     r.emergency = Some(0.);
-    m.advance_tick().unwrap();
+    withdrawal_turn(&mut m, id);
     let u = &m.world.game.units[&id];
     assert_eq!(u.at(), at);
     assert!(u.path.is_empty() && !u.retreating && u.hp > 0.);
     assert!(m.logistics.get(id).unwrap().stranded);
-    let mut d = DeliveryState::new(&m).unwrap();
-    snapshot(&mut m, &mut d);
-    m.advance_tick().unwrap();
-    snapshot(&mut m, &mut d);
+    assert_closed(&mut m);
+    withdrawal_turn(&mut m, id);
+    assert_closed(&mut m);
 }
 #[test]
 fn logistics_runtime_log13_stranded_defense_cannot_chase_or_interrupt_escape() {
     let (mut m, id) = scene(true);
     force(&mut m, id, Point { x: 65., z: 45. });
     m.commands.units.get_mut(&id).unwrap().supply_hold = true;
-    m.advance_tick().unwrap();
+    withdrawal_turn(&mut m, id);
     let enemy = m
         .world
         .game
@@ -421,7 +445,7 @@ fn logistics_runtime_log13_stranded_defense_cannot_chase_or_interrupt_escape() {
     assert_eq!(m.commands.units[&id].attack_id, before);
 }
 #[test]
-fn logistics_runtime_log12_forced_garrison_exits_before_ordinary_retreat_guard() {
+fn logistics_runtime_log12_forced_garrison_exits_through_withdrawal_adapter() {
     let (mut m, id) = scene(true);
     let at = Point { x: 65., z: 45. };
     let cell = 22 * 80 + 32;
@@ -432,26 +456,24 @@ fn logistics_runtime_log12_forced_garrison_exits_before_ordinary_retreat_guard()
     u.garrison = Some(cell);
     u.hp = 1.;
     m.commands.units.get_mut(&id).unwrap().auto_retreat = true;
-    m.advance_tick().unwrap();
+    withdrawal_turn(&mut m, id);
     assert!(m.world.game.units[&id].garrison.is_none());
     assert!(m.world.game.units[&id].hp > 0.);
-    let mut d = DeliveryState::new(&m).unwrap();
-    snapshot(&mut m, &mut d);
-    m.advance_tick().unwrap();
-    snapshot(&mut m, &mut d);
+    assert_closed(&mut m);
+    withdrawal_turn(&mut m, id);
+    assert_closed(&mut m);
 }
 #[test]
-fn logistics_runtime_late_convoy_birth_keeps_next_ticks_and_projections_valid() {
+fn logistics_runtime_convoy_adapter_keeps_full_ticks_and_snapshots_closed() {
     let (mut m, id) = scene(true);
     force(&mut m, id, Point { x: 65., z: 45. });
     m.logistics.get_mut(id).unwrap().cut_for = Some(10.0);
     m.commands.units.get_mut(&id).unwrap().supply_hold = true;
-    // Start a fresh scheduling cycle with an already cut-off troop. The real
-    // convoy phase discovers sources and publishes the truck through its owner.
+    // The convoy adapter discovers sources and publishes the truck through its owner.
     m.convoys = crate::supply_convoys::ConvoyState::setup(true);
     m.supply_net.teams.clear();
     let first = m.next_unit_id;
-    m.advance_tick().unwrap();
+    m.step_supply_convoys(false).unwrap();
     assert!(m.next_unit_id > first);
     assert!(
         m.world
@@ -460,11 +482,10 @@ fn logistics_runtime_late_convoy_birth_keeps_next_ticks_and_projections_valid() 
             .values()
             .any(|u| u.id >= first && m.rules.kinds[u.kind].name == "truck")
     );
-    let mut d = DeliveryState::new(&m).unwrap();
-    snapshot(&mut m, &mut d);
+    assert_closed(&mut m);
     for _ in 0..3 {
-        m.advance_tick().unwrap();
-        snapshot(&mut m, &mut d);
+        m.step_supply_convoys(false).unwrap();
+        assert_closed(&mut m);
     }
     assert!(m.tick_state.fault().is_none());
 }
