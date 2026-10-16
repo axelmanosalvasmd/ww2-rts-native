@@ -172,6 +172,9 @@ mod world_start;
 #[path = "../world_tick.rs"]
 mod world_tick;
 
+#[path = "../mode91_refunds.rs"]
+mod mode91_refunds;
+
 /// Fails when a `tests/*.rs` file is not compiled into this binary. Cargo's
 /// `autotests = false` would otherwise skip it without a word. The check reads
 /// this file's own `#[path = "../<name>.rs"] mod <name>;` declarations, so a

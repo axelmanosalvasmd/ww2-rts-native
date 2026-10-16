@@ -1174,6 +1174,161 @@ fn invalid_world_recovery_actor_rejects_before_health_wallet_or_metadata() {
     assert_eq!(m.recovery, metadata);
 }
 
+fn mode91_case(fixture: &Value, name: &str) -> (Match, Vec<u32>) {
+    make(
+        fixture["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|case| case["name"] == name)
+            .unwrap(),
+    )
+}
+
+#[test]
+fn mode91_recovery_counts_actual_home_depot_hospital_and_carrier_charges_until_finish() {
+    let fixture: Value =
+        serde_json::from_str(include_str!("../../tests/fixtures/match-recovery.json")).unwrap();
+    for path in ["infantry", "vehicle", "depot", "hospital", "carrier"] {
+        for decided in [false, true] {
+            let case = match path {
+                "hospital" | "carrier" => "field-hospital-and-halted-halftrack-aid",
+                "vehicle" => "vehicle-rate-wallet-provisions-and-insufficient-wallet",
+                _ => "infantry-timer-modelheal-wallet-and-reset",
+            };
+            let (mut m, order) = mode91_case(&fixture, case);
+            m.options.logistics = false;
+            m.convoys = None;
+            let patient = if path == "hospital" { 1 } else { 2 };
+            // Isolate one paying patient while retaining each actual recovery provider.
+            for (&id, unit) in &mut m.world.game.units {
+                if id != patient {
+                    let d = Catalog::compiled()
+                        .unwrap()
+                        .unit(&m.rules.kinds[unit.kind].name)
+                        .unwrap();
+                    unit.hp = d.get("models").unwrap().number().unwrap()
+                        * d.get("hpPer").unwrap().number().unwrap();
+                }
+            }
+            if path == "hospital" {
+                m.world.aid.insert(217, 2);
+            }
+            if path == "depot" {
+                m.world.game.units.get_mut(&1).unwrap().x = 58.0;
+                m.world.game.units.get_mut(&1).unwrap().z = 38.0;
+                m.start.points[0].kind = Some("depot".into());
+                m.start.points[0].owner = Some(2);
+                m.start.points[0].at = m.world.game.units[&patient].at();
+                m.start.points[0].cut = false;
+            }
+            m.start.economy.players[0].mp = 500.0;
+            m.recovery.get_mut(patient).unwrap().reinforcement = 10.0;
+            let hp = m.world.game.units[&patient].hp;
+            let before = m.story.clone();
+            if decided {
+                let finish = m
+                    .prepare_match_finish(0, crate::match_end::EndReason::Headquarters, None)
+                    .unwrap();
+                m.publish_match_finish(finish);
+            }
+            let frame = m.prepare_recovery(&order).unwrap();
+            m.reinforce(&frame, 0.05).unwrap();
+            let charge = 500.0 - m.start.economy.players[0].mp;
+            assert!(charge > 0.0, "{path} decided={decided}");
+            assert!(m.world.game.units[&patient].hp > hp, "{path}");
+            let expected = if decided { 0.0 } else { charge };
+            assert!((m.story[0].mp_spent - expected).abs() < 1e-10, "{path}");
+            let mut expected_story = before;
+            expected_story[0].mp_spent = m.story[0].mp_spent;
+            assert_eq!(m.story, expected_story, "{path} changed unrelated counters");
+        }
+    }
+}
+
+#[test]
+fn mode91_declined_recovery_charges_leave_wallet_and_all_counters_unchanged() {
+    let fixture: Value =
+        serde_json::from_str(include_str!("../../tests/fixtures/match-recovery.json")).unwrap();
+    for vehicle in [false, true] {
+        for gate in [
+            "wallet",
+            "provisions",
+            "operative",
+            "healthy",
+            "dead",
+            "remote",
+            "time",
+        ] {
+            let case = if vehicle {
+                "vehicle-rate-wallet-provisions-and-insufficient-wallet"
+            } else {
+                "infantry-provision-failure-accumulates-timer"
+            };
+            let (mut m, order) = mode91_case(&fixture, case);
+            m.start.economy.players[0].mp = 500.0;
+            m.recovery.get_mut(2).unwrap().reinforcement = 10.0;
+            if gate != "provisions" {
+                m.options.logistics = false;
+                m.convoys = None;
+            } else {
+                m.logistics.get_mut(2).unwrap().provisions = 0.0;
+            }
+            let mut dt = 0.05;
+            match gate {
+                "wallet" => m.start.economy.players[0].mp = 0.0,
+                "operative" => m.commands.units.get_mut(&2).unwrap().operative = true,
+                "healthy" => {
+                    let unit = &m.world.game.units[&2];
+                    let d = Catalog::compiled()
+                        .unwrap()
+                        .unit(&m.rules.kinds[unit.kind].name)
+                        .unwrap();
+                    m.world.game.units.get_mut(&2).unwrap().hp =
+                        d.get("models").unwrap().number().unwrap()
+                            * d.get("hpPer").unwrap().number().unwrap();
+                }
+                "dead" => m.world.game.units.get_mut(&2).unwrap().hp = 0.0,
+                "remote" => {
+                    m.world.game.units.get_mut(&2).unwrap().x = 58.0;
+                    m.world.game.units.get_mut(&2).unwrap().z = 38.0;
+                }
+                "time" => {
+                    m.recovery.get_mut(2).unwrap().reinforcement = 0.0;
+                    dt = 0.0;
+                }
+                "provisions" => {}
+                _ => unreachable!(),
+            }
+            let hp = m.world.game.units[&2].hp;
+            let wallet = m.start.economy.players[0].mp;
+            let story = m.story.clone();
+            let frame = m.prepare_recovery(&order).unwrap();
+            m.reinforce(&frame, dt).unwrap();
+            assert_eq!(
+                m.world.game.units[&2].hp, hp,
+                "vehicle={vehicle} gate={gate}"
+            );
+            assert_eq!(m.start.economy.players[0].mp, wallet, "{gate}");
+            assert_eq!(m.story, story, "{gate}");
+        }
+    }
+}
+
+#[test]
+fn mode91_free_medic_healing_does_not_count_as_manpower_spending() {
+    let fixture: Value =
+        serde_json::from_str(include_str!("../../tests/fixtures/match-recovery.json")).unwrap();
+    let (mut m, order) = mode91_case(&fixture, "medic-grid-bucket-tie-and-wound-history");
+    let hp = m.world.game.units[&2].hp + m.world.game.units[&3].hp;
+    let wallet = m.start.economy.clone();
+    let story = m.story.clone();
+    m.heal_wounded(&order, 0.5).unwrap();
+    assert!(m.world.game.units[&2].hp + m.world.game.units[&3].hp > hp);
+    assert_eq!(m.start.economy, wallet);
+    assert_eq!(m.story, story);
+}
+
 #[test]
 fn mode91_recovery_spending_tracks_actual_charges_and_freezes_after_finish() {
     let fixture: Value =

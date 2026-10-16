@@ -2,8 +2,8 @@ use super::*;
 use crate::weather::WeatherChoice;
 use serde_json::json;
 
-fn scene(defenders: usize, army: ArmySize) -> Match {
-    let map = AuthoritativeMap::from_json(
+fn map() -> AuthoritativeMap {
+    AuthoritativeMap::from_json(
         &serde_json::to_vec(&json!({
             "name":"Horde intent", "w":60,"h":60,"rows":vec![".".repeat(60);60],
             "spawns":[{"x":30,"y":5},{"x":10,"y":54},{"x":50,"y":54}],
@@ -11,9 +11,11 @@ fn scene(defenders: usize, army: ArmySize) -> Match {
         }))
         .unwrap(),
     )
-    .unwrap();
+    .unwrap()
+}
+fn scene(defenders: usize, army: ArmySize) -> Match {
     Match::new_horde(
-        &map,
+        &map(),
         MatchOptions {
             seed: 701,
             mode: Mode::Horde,
@@ -842,5 +844,314 @@ fn mode42_gates_follow_sixteen_metres_of_medium_route_including_multiple_legs() 
     assert!(
         math::hypot(h.gates[0].x - medium_gate.x, h.gates[0].z - medium_gate.z) < 1e-8,
         "the authored gate follows the medium route, rather than the infantry shortcut"
+    );
+}
+
+#[test]
+fn mode45_public_projection_hides_prepared_profiles_during_active_waves() {
+    let mut m = scene(2, ArmySize::Standard);
+    let announced = m.horde_projection().unwrap().next_profile.unwrap();
+    assert_eq!(
+        crate::recipient_snapshot::horde_mode_row(&m).unwrap()["nextProfile"],
+        announced.as_str()
+    );
+    m.step_horde(44.01).unwrap();
+    assert_eq!(m.horde_projection().unwrap().time_left, 1.0);
+    assert_eq!(m.horde_projection().unwrap().next_profile, Some(announced));
+    m.world.game.tick = 1;
+    m.step_horde(1.0).unwrap();
+    for _ in 0..3 {
+        let public = m.horde_projection().unwrap();
+        assert!(public.active);
+        assert_eq!(public.profile, announced);
+        assert_eq!(public.next_profile, None);
+        assert!(
+            crate::recipient_snapshot::horde_mode_row(&m)
+                .unwrap()
+                .get("nextProfile")
+                .is_none()
+        );
+        m.step_horde(0.05).unwrap();
+    }
+    for id in living_ground(&m) {
+        m.world.game.units.get_mut(&id).unwrap().hp = 0.0;
+    }
+    let h = m.horde.as_mut().unwrap();
+    h.reserve.clear();
+    h.budget = 0.0;
+    m.step_horde(0.05).unwrap();
+    let public = m.horde_projection().unwrap();
+    assert!(!public.active);
+    assert_eq!(public.wave, 1);
+    assert_eq!(
+        crate::recipient_snapshot::horde_mode_row(&m).unwrap()["nextProfile"],
+        public.next_profile.unwrap().as_str()
+    );
+    assert_eq!(public.time_left, 45.0);
+    assert_eq!(
+        public.next_profile,
+        Some(m.horde.as_ref().unwrap().next_profile)
+    );
+}
+
+#[test]
+fn mode54_horde_income_and_bounties_exclude_the_internal_enemy() {
+    let mut m = scene(2, ArmySize::Standard);
+    let h = m.horde.as_ref().unwrap();
+    let (slot, gate, bunker) = (h.slot, h.gates[0], h.bunker);
+    let at = m.world.game.units[&bunker].at();
+    m.start.economy.players[slot].mp = 123.0;
+    m.start.points[0].owner = Some(slot);
+    m.start.points[0].mp = 999.0;
+    let ids = m.world.game.units.keys().copied().collect::<Vec<_>>();
+    let defender_before = m.start.economy.players[0].mp;
+    for _ in 0..4 {
+        m.world.game.tick += 1;
+        m.apply_point_capture_income(&ids).unwrap();
+        assert_eq!(m.start.economy.players[slot].mp, 123.0);
+        assert_eq!(m.start.economy.players[slot].inc, 0.0);
+    }
+    assert!(m.start.economy.players[0].mp > defender_before);
+    let victim = m
+        .world
+        .game
+        .units
+        .values()
+        .find(|u| u.owner == 0 && m.rules.kinds[u.kind].name == "rifle")
+        .unwrap()
+        .id;
+    m.world.game.units.get_mut(&victim).unwrap().hp = 0.0;
+    m.combat.get_mut(victim).unwrap().last_hit = Some(slot as i32);
+    m.retire_dead(&[victim]).unwrap();
+    assert_eq!(
+        m.start.economy.players[slot].mp, 123.0,
+        "no bounty to Horde"
+    );
+    for (killer, out, reward) in [(0, false, 300.0), (0, true, 0.0), (slot, false, 0.0)] {
+        m.start.economy.players[killer].out = out;
+        let id = m
+            .spawn_horde_ground(slot, "kaiju", gate, at, 0, 0.0)
+            .unwrap();
+        assert_eq!(m.world.game.units[&id].hp, 6000.0);
+        m.world.game.units.get_mut(&id).unwrap().hp = 0.0;
+        m.combat.get_mut(id).unwrap().last_hit = Some(killer as i32);
+        let before = m.start.economy.players[killer].mp;
+        m.retire_dead(&[id]).unwrap();
+        assert_eq!(m.start.economy.players[killer].mp - before, reward);
+        m.start.economy.players[killer].out = false;
+    }
+}
+
+#[test]
+fn mode54_bunker_death_finishes_once_at_the_fallen_bunker_with_wave_and_defeats() {
+    for missing in [false, true] {
+        let mut m = scene(3, ArmySize::Standard);
+        assert!(m.horde_result().unwrap().is_none());
+        m.horde.as_mut().unwrap().wave = 7;
+        m.world.game.tick = 321;
+        let bunker = m.horde.as_ref().unwrap().bunker;
+        let at = m.world.game.units[&bunker].at();
+        m.world.game.units.get_mut(&bunker).unwrap().hp = 0.0;
+        if missing {
+            let retired = m.retire_dead(&[bunker]).unwrap();
+            assert_eq!(retired.retired.len(), 1);
+            m.record_death(
+                crate::match_story::DeathRecord {
+                    owner: Some(0),
+                    kind: "bunker",
+                    at,
+                },
+                None,
+            )
+            .unwrap();
+        } else {
+            m.fallen.bunker = Some(at);
+        }
+        m.step_horde(0.05).unwrap();
+        let result = m.horde_result().unwrap().unwrap();
+        assert_eq!(result.wave, 7);
+        assert_eq!(result.defender_outcomes, vec!["defeat"; 3]);
+        assert_eq!(result.report.winner, 1);
+        assert_eq!(
+            result.report.reason,
+            crate::match_end::EndReason::Structures
+        );
+        assert_eq!(result.report.at, at);
+        assert_eq!(result.report.end_tick, 321);
+        assert_eq!(result.report.mode, "horde");
+        let timeline = m.timeline.clone();
+        let story = m.story.clone();
+        for _ in 0..4 {
+            m.world.game.tick += 1;
+            m.step_horde(0.05).unwrap();
+            m.sample_match_tick().unwrap();
+            m.record_spending(0, 10.0).unwrap();
+            assert_eq!(m.horde_result().unwrap().unwrap(), result);
+        }
+        assert_eq!(m.timeline, timeline);
+        assert_eq!(m.story, story);
+        assert!(
+            m.validate_tick_state().is_err(),
+            "full Horde tick stays guarded"
+        );
+        assert!(matches!(
+            crate::recipient_snapshot::SnapshotCache::new(&m),
+            Err(crate::recipient_snapshot::SnapshotError::UnsupportedMode)
+        ));
+    }
+}
+
+#[test]
+fn mode_b3_ordinary_match_ticks_snapshots_and_finish_remain_supported() {
+    let mut options = scene(1, ArmySize::Standard).options;
+    options.mode = Mode::Conquest;
+    options.tech = false;
+    options.players[1].team = 1;
+    let mut m = Match::new(&map(), options).unwrap();
+    for _ in 0..4 {
+        m.advance_tick().unwrap();
+        crate::recipient_snapshot::SnapshotCache::new(&m)
+            .unwrap()
+            .recipient(0)
+            .unwrap();
+        assert!(m.horde.is_none());
+        assert!(m.tick_state.fault().is_none());
+    }
+    m.start.economy.players[0].vp = m.start.win_vp;
+    m.advance_tick().unwrap();
+    assert!(m.finish.is_some());
+    for _ in 0..4 {
+        m.advance_tick().unwrap();
+        crate::recipient_snapshot::SnapshotCache::new(&m)
+            .unwrap()
+            .recipient(0)
+            .unwrap();
+        assert!(m.tick_state.fault().is_none());
+    }
+}
+
+#[test]
+fn mode52_boss_waves_publish_gate_announcements_and_living_health_totals() {
+    for wave in [9, 10, 20, 30] {
+        let mut m = scene(2, ArmySize::Standard);
+        force_wave(&mut m, wave);
+        m.world.game.tick = 1;
+        let events = m.step_horde(0.05).unwrap();
+        let expected = if wave.is_multiple_of(10) {
+            wave / 10
+        } else {
+            0
+        };
+        assert_eq!(events.len(), expected as usize);
+        let h = m.horde.as_ref().unwrap();
+        let (slot, gates, target) = (h.slot, h.gates.clone(), m.world.game.units[&h.bunker].at());
+        let bosses = m
+            .world
+            .game
+            .units
+            .values()
+            .filter(|u| u.owner == slot && m.rules.kinds[u.kind].name == "kaiju")
+            .map(|u| u.id)
+            .collect::<Vec<_>>();
+        assert_eq!(bosses.len(), expected as usize);
+        for (index, (id, event)) in bosses.iter().zip(&events).enumerate() {
+            let gate = gates[index % gates.len()];
+            assert_eq!(*event, HordeEvent::BossSurfaced { at: gate });
+            assert_eq!(
+                event.shot_json(),
+                json!({"k":"say", "text":"THE KAIJU HAS SURFACED", "x":gate.x,"z":gate.z,"pub":true})
+            );
+            let unit = &m.world.game.units[id];
+            assert_eq!(unit.hp, 6000.0);
+            assert_eq!(unit.amove, Some(target));
+            assert!(!unit.path.is_empty());
+            assert!(!m.commands.units[id].auto_retreat);
+        }
+        let total = f64::from(expected) * 6000.0;
+        let bar = (expected > 0).then_some([total, total]);
+        assert_eq!(m.horde_projection().unwrap().boss, bar);
+        assert_eq!(
+            crate::recipient_snapshot::horde_mode_row(&m).unwrap()["boss"],
+            json!(bar)
+        );
+        if let Some(&id) = bosses.first() {
+            m.world.game.units.get_mut(&id).unwrap().hp = 1234.1;
+            for id in bosses.iter().skip(1) {
+                m.world.game.units.get_mut(id).unwrap().hp = 0.0;
+            }
+            m.step_horde(0.05).unwrap();
+            assert_eq!(m.horde_projection().unwrap().boss, Some([1235.0, 6000.0]));
+        }
+    }
+}
+
+#[test]
+fn mode52_real_boss_wave_allows_breath_and_retirement_beside_guarded_aircraft() {
+    let mut m = scene(2, ArmySize::Standard);
+    force_wave(&mut m, 10);
+    m.world.game.tick = 1;
+    m.step_horde(0.05).unwrap();
+    assert!(!m.aviation.planes.is_empty());
+    let slot = m.horde.as_ref().unwrap().slot;
+    let boss = m
+        .world
+        .game
+        .units
+        .values()
+        .find(|u| m.rules.kinds[u.kind].name == "kaiju")
+        .unwrap()
+        .id;
+    let target = m
+        .world
+        .game
+        .units
+        .values()
+        .find(|u| u.owner == 0 && m.rules.kinds[u.kind].name == "rifle")
+        .unwrap()
+        .id;
+    {
+        let unit = m.world.game.units.get_mut(&boss).unwrap();
+        unit.x = 61.0;
+        unit.z = 61.0;
+        unit.rot = 0.0;
+    }
+    {
+        let unit = m.world.game.units.get_mut(&target).unwrap();
+        unit.x = 71.0;
+        unit.z = 61.0;
+        unit.garrison = None;
+    }
+    m.grid.rebuild(&m.world.game.units);
+    m.world.game.players[slot].visible = vec![target];
+    m.commands.units.get_mut(&boss).unwrap().attack_id = target;
+    m.firing.get_mut(boss).unwrap().target_id = target;
+    let hp = m.world.game.units[&target].hp;
+    m.apply_unit_firing(boss, false, 0.05).unwrap();
+    assert!(m.world.game.units[&target].hp < hp);
+    assert!(
+        m.firing
+            .events
+            .iter()
+            .any(|event| matches!(event, crate::match_firing::LaunchEvent::Breath { .. }))
+    );
+    m.firing.take_events();
+    m.world.game.units.get_mut(&boss).unwrap().hp = 0.0;
+    m.combat.get_mut(boss).unwrap().last_hit = Some(0);
+    let wallet = m.start.economy.players[0].mp;
+    assert_eq!(m.retire_dead(&[boss]).unwrap().retired.len(), 1);
+    assert_eq!(m.start.economy.players[0].mp - wallet, 300.0);
+    for _ in 0..3 {
+        m.world.game.tick += 1;
+        m.step_horde(0.05).unwrap();
+        assert!(crate::recipient_snapshot::horde_mode_row(&m).is_ok());
+    }
+    assert!(m.horde_projection().unwrap().boss.is_none());
+    assert!(
+        m.validate_aviation().is_err(),
+        "aircraft actuation stays guarded"
+    );
+    assert!(
+        m.validate_tick_state().is_err(),
+        "full Horde tick stays guarded"
     );
 }
