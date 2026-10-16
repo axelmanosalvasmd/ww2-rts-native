@@ -121,6 +121,103 @@ fn arena(specs: &[(&str, usize, Point)]) -> Match {
     m
 }
 
+#[test]
+fn supported_support_lifecycles_deliver_every_r1_seat_through_match_finish() {
+    use ww2_core::recipient_snapshot::SUPPORTED_SUPPORT_KINDS;
+    for kind in SUPPORTED_SUPPORT_KINDS {
+        let mut state = crate::lobby::native_tests::native_match();
+        for control in state.commands.units.values_mut() {
+            control.hold_fire = true;
+            control.auto_cast = false;
+            control.auto_retreat = false;
+        }
+        state.start.economy.players[0].mp = 10000.;
+        state.start.players[0]
+            .support
+            .insert(kind.name().into(), 0.);
+        let at = Point { x: 100., z: 100. };
+        state
+            .enqueue_command(
+                OrderKey {
+                    tick: 1,
+                    issuer: 0,
+                    sequence: 1,
+                },
+                Command::Support {
+                    kind: kind.name().into(),
+                    at,
+                    direction: Some(0.),
+                },
+            )
+            .unwrap();
+        let mut runtime = RoomRuntime::new(state, 0).unwrap();
+        let selected = (0..2)
+            .map(|slot| SelectedSeat {
+                slot,
+                full: false,
+                omit: false,
+            })
+            .collect::<Vec<_>>();
+        let mut observed = false;
+        let mut retired = false;
+        for _ in 0..2400 {
+            runtime.advance_tick(&[false; 2]).unwrap();
+            let frames = runtime
+                .collect_frame(&selected, FrameKind::Scheduled)
+                .unwrap();
+            assert_eq!(frames.len(), 2);
+            assert_eq!(frames[0].message["strikes"], frames[1].message["strikes"]);
+            assert!(
+                frames[0].message["strikes"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .all(|row| row[0] == kind.name() && row[5] == 0)
+            );
+            assert!(frames.iter().all(|frame| frame.message["t"] == "s"));
+            observed |= !runtime.state().world.game.strikes.is_empty();
+            if observed
+                && runtime.state().world.game.strikes.is_empty()
+                && runtime.state().support.covers.is_empty()
+                && runtime.state().world.game.smokes.is_empty()
+            {
+                retired = true;
+                break;
+            }
+        }
+        assert!(observed && retired, "{} did not finish", kind.name());
+        // End through the actual VP phase after the support lifetime, retaining
+        // ordinary tick and delivery admission through the decided match.
+        runtime.state_mut().start.economy.players[0].vp = 10000.;
+        for _ in 0..10 {
+            runtime.advance_tick(&[false; 2]).unwrap();
+            let frames = runtime
+                .collect_frame(&selected, FrameKind::Scheduled)
+                .unwrap();
+            if runtime.state().finish.is_some() {
+                assert!(frames.iter().all(|frame| frame.message["winner"] == 0));
+            }
+        }
+        assert!(runtime.state().finish.is_some());
+        assert!(runtime.fault().is_none());
+        assert!(runtime.tick_failure().is_none());
+    }
+}
+
+#[test]
+fn plane_support_state_cannot_attach_to_an_r1_room_before_its_event_contract() {
+    for name in ["recon", "strafe", "bombing", "dive", "para"] {
+        let mut state = crate::lobby::native_tests::native_match();
+        state.start.economy.players[0].mp = 10000.;
+        state.start.players[0].support.insert(name.into(), 0.);
+        let at = state.start.players[0].spawn;
+        assert_eq!(state.admit_support(0, name, at, Some(0.)).unwrap(), None);
+        assert!(
+            matches!(RoomRuntime::new(state, 0), Err(error) if error == "snapshot admission: Unsupported { unit: 0, capability: TeamEffects }")
+        );
+    }
+}
+
 fn protected(runtime: &RoomRuntime) -> Vec<String> {
     let m = runtime.state();
     vec![
