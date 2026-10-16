@@ -1,0 +1,2 @@
+- Strengthen combat tests with closer-target hysteresis boundaries, grenade and demolition impacts on units and structures, friendly blast damage, automatic vision refresh through match ticks, and rejection of ground attack orders on visible aircraft.
+- Add aircraft Hold Fire, anti-air and support-interception guard tests. CMB-84 remains incomplete because automatic aircraft ground fire, explicit ground attack and fighter hunting are unavailable in the native aircraft actuator.
