@@ -82,6 +82,37 @@ pub struct HordeState {
 pub enum HordeEvent {
     BossSurfaced { at: Point },
 }
+impl HordeEvent {
+    /// Existing public effect shape for a caller-owned phase batch. This does
+    /// not admit Horde rooms or add a transport message.
+    pub fn shot_json(&self) -> serde_json::Value {
+        match self {
+            Self::BossSurfaced { at } => serde_json::json!({
+                "k": "say", "text": "THE KAIJU HAS SURFACED",
+                "x": at.x, "z": at.z, "pub": true
+            }),
+        }
+    }
+}
+/// Public mode facts only. Purchase seeds, reserves and prepared active-wave
+/// profiles remain owned by the simulation. Full recipient admission is separate.
+#[derive(Clone, Debug, PartialEq)]
+pub struct HordeProjection {
+    pub wave: u32,
+    pub active: bool,
+    pub time_left: f64,
+    pub profile: HordeProfile,
+    pub next_profile: Option<HordeProfile>,
+    pub left: f64,
+    pub boss: Option<[f64; 2]>,
+}
+/// Core result facts, before persistence, lobby records or server delivery.
+#[derive(Clone, Debug, PartialEq)]
+pub struct HordeResult {
+    pub wave: u32,
+    pub defender_outcomes: Vec<&'static str>,
+    pub report: crate::match_story::MatchResult,
+}
 fn cfg() -> Result<&'static Value, String> {
     Catalog::compiled()
         .map_err(|e| e.to_string())?
@@ -302,6 +333,43 @@ impl Match {
             }
         }
         Ok(())
+    }
+    pub(crate) fn validate_horde_economy(&self) -> Result<(), String> {
+        self.validate_horde_phase(0.0)?;
+        self.validate_match_finish_state()
+    }
+    pub fn horde_projection(&self) -> Result<HordeProjection, String> {
+        self.validate_horde_phase(0.0)?;
+        let m = self.horde.as_ref().expect("validated Horde state");
+        if m.boss.is_some_and(|bar| {
+            !bar.iter().all(|value| value.is_finite()) || bar[0] < 0.0 || bar[1] <= 0.0
+        }) {
+            return Err("invalid Horde boss projection".into());
+        }
+        Ok(HordeProjection {
+            wave: m.wave,
+            active: m.active,
+            time_left: m.time_left.max(0.0).ceil(),
+            profile: m.profile,
+            next_profile: (!m.active).then_some(m.next_profile),
+            left: m.left,
+            boss: m.boss,
+        })
+    }
+    pub fn horde_result(&self) -> Result<Option<HordeResult>, String> {
+        self.validate_horde_phase(0.0)?;
+        let Some(report) = self.match_result()? else {
+            return Ok(None);
+        };
+        if report.winner != 1 || report.reason != crate::match_end::EndReason::Structures {
+            return Err("Horde result requires bunker defeat".into());
+        }
+        let m = self.horde.as_ref().expect("validated Horde state");
+        Ok(Some(HordeResult {
+            wave: m.wave,
+            defender_outcomes: vec!["defeat"; m.defenders],
+            report,
+        }))
     }
     /// Explicit constructor for the Horde-owned wave phase. Generic `Match::new`
     /// and ordinary `advance_tick` retain their existing admission guards.
