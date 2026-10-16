@@ -215,6 +215,20 @@ impl Match {
         queue: bool,
         winner: bool,
     ) -> Result<Option<Denial>, String> {
+        let order = match order {
+            ProjectOrder::New {
+                pattern,
+                material: ProjectMaterial::Fill,
+                from,
+                to,
+            } => ProjectOrder::New {
+                pattern,
+                material: ProjectMaterial::Fort(FortKind::Fill),
+                from,
+                to,
+            },
+            order => order,
+        };
         let Some(player) = self.start.economy.players.get(owner) else {
             return Ok(Some(Denial::Blocked));
         };
@@ -270,7 +284,7 @@ impl Match {
             return Ok(Some(Denial::Unsupported));
         }
         if let ProjectOrder::New {
-            material: ProjectMaterial::Fill | ProjectMaterial::Wall,
+            material: ProjectMaterial::Wall,
             ..
         } = order
         {

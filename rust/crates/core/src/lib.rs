@@ -43,6 +43,8 @@ pub mod conquest_end;
 pub mod deployment;
 pub mod economy;
 pub mod economy_state;
+#[cfg(test)]
+mod engineering_runtime_assertion_tests;
 pub mod environment;
 pub mod environment_debris;
 pub mod field_works;
@@ -141,6 +143,8 @@ pub mod vision;
 pub mod weather;
 pub mod weather_runtime;
 pub mod world;
+mod world_bridge;
+mod world_fill;
 pub mod world_generation;
 
 pub mod world_map;

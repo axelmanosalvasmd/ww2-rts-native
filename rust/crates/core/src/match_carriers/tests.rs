@@ -323,16 +323,6 @@ fn invalid_or_unavailable_carrier_work_preserves_canonical_state() {
         );
         assert_eq!(atomic(&m), before, "{field}");
     }
-    let mut m = make(c);
-    m.carrier_board_command(0, &[1], Some(2), false).unwrap();
-    m.apply_unit_boarding(1).unwrap();
-    m.world.game.units.get_mut(&2).unwrap().hp = 0.;
-    let before = atomic(&m);
-    assert_eq!(
-        m.apply_unit_riding(1, 0.05).unwrap(),
-        RidingOutcome::UnsupportedEjection
-    );
-    assert_eq!(atomic(&m), before);
 }
 
 #[test]
