@@ -21,6 +21,13 @@ pub struct WorldCapture {
     pub owner: usize,
 }
 
+/// Prepared ownership changes, committed only after capture and elimination guards pass.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct WorldFortTransfer {
+    pub id: u32,
+    pub owner: usize,
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum ProductionLock {
     Guard,
@@ -46,7 +53,7 @@ fn truthy(value: &Value) -> bool {
 
 impl Match {
     /// Source income precedes region capture. Prepare every consequence before publishing.
-    /// Unsupported fort transfer and army elimination leave the whole phase intact. Eligible
+    /// Unsupported army elimination leaves the whole phase intact. Eligible
     /// source finish is prepared after those preflights, then published on canonical state.
     pub fn apply_world_capture_income(
         &mut self,
@@ -59,7 +66,7 @@ impl Match {
     }
     /// Run the bounded phase with actual administrative removals and building wrecks.
     /// The complete current order is distinct from the captured tick upkeep list.
-    /// Unsupported fort, logistics and rider consequences leave every owner unchanged.
+    /// Unsupported logistics and rider consequences leave every owner unchanged.
     pub fn apply_world_capture_income_and_elimination(
         &mut self,
         tick_order: &[u32],
@@ -124,6 +131,7 @@ impl Match {
         }
         let mut regions = runtime.regions.clone();
         let mut captured = Vec::new();
+        let mut transfers = Vec::new();
         for (index, (r, definition)) in regions.iter_mut().zip(&geography.regions).enumerate() {
             if !r.progress.is_finite()
                 || !(0.0..=1.0).contains(&r.progress)
@@ -189,9 +197,7 @@ impl Match {
                         if !game.allied(fort.owner, owner)
                             && self.world_region_index(fort.at())? == Some(index)
                         {
-                            return Err(
-                                "unsupported World capture: fort ownership and gate state".into()
-                            );
+                            transfers.push(WorldFortTransfer { id: fort.id, owner });
                         }
                     }
                     captured.push(WorldCapture {
@@ -209,7 +215,15 @@ impl Match {
                 .filter(|(_, r)| r.team == wallet.team)
                 .collect();
             if own.is_empty() {
-                if live_order.is_none() && game.units.values().any(|u| u.owner == slot) {
+                if live_order.is_none()
+                    && game.units.values().any(|u| {
+                        transfers
+                            .iter()
+                            .find(|t| t.id == u.id)
+                            .map_or(u.owner, |t| t.owner)
+                            == slot
+                    })
+                {
                     return Err(
                         "unsupported World phase: army elimination and terrain wrecking".into(),
                     );
@@ -234,8 +248,15 @@ impl Match {
                 spawns[slot] = best.expect("owned region").0;
             }
         }
-        let draft = live_order
-            .map(|order| self.prepare_world_elimination(order, &regions))
+        let transfer_order;
+        let staged_order = if !transfers.is_empty() && live_order.is_none() {
+            transfer_order = game.units.keys().copied().collect::<Vec<_>>();
+            Some(transfer_order.as_slice())
+        } else {
+            live_order
+        };
+        let draft = staged_order
+            .map(|order| self.prepare_world_elimination(order, &regions, &transfers))
             .transpose()?
             .flatten();
         let finish = if let Some(draft) = &draft {
@@ -253,7 +274,9 @@ impl Match {
                 })
                 .collect::<Vec<_>>();
             let removed = draft.removed.iter().map(|u| u.id).collect::<Vec<_>>();
-            self.prepare_world_finish_after_removal(&wallets, &regions, &facts, &removed)?
+            self.prepare_world_finish_after_region_changes(
+                &wallets, &regions, &facts, &removed, &transfers,
+            )?
         } else {
             self.prepare_world_finish(&wallets, &regions)?
         };
@@ -320,6 +343,19 @@ impl Match {
                 player.spawn = at;
             }
             story.commit();
+        }
+        // Transfer only footprint rows that still identify the captured building.
+        // No gate timer exists in this core slice; gate ticking stays refused.
+        for transfer in transfers {
+            if let Some(unit) = self.world.game.units.get(&transfer.id) {
+                for &cell in unit.cells.as_deref().unwrap_or(&[]) {
+                    if let Some(row) = self.building_cells.get_mut(&(cell as usize))
+                        && row.unit == transfer.id
+                    {
+                        row.owner = transfer.owner;
+                    }
+                }
+            }
         }
         if let Some(finish) = finish {
             self.publish_match_finish(finish);

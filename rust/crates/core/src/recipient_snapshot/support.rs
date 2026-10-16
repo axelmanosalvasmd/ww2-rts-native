@@ -1,11 +1,28 @@
 use super::*;
 
-/// Support actors represented by the current recipient snapshot adapter.
+/// Kinds whose complete tick and event lifecycle can be delivered by a room.
+/// Plane-backed strikes have representable state, but their arrival and payload
+/// events still require an agreed encoding before ingress can admit them.
 pub const SUPPORTED_SUPPORT_KINDS: &[crate::match_support::SupportKind] = &[
     crate::match_support::SupportKind::Artillery,
     crate::match_support::SupportKind::Smoke,
     crate::match_support::SupportKind::Cover,
 ];
+
+pub(super) fn admit_lifecycle(state: &Match) -> Result<(), SnapshotError> {
+    if state.world.game.strikes.iter().any(|strike| {
+        strike
+            .runtime
+            .as_ref()
+            .is_none_or(|timing| !SUPPORTED_SUPPORT_KINDS.contains(&timing.kind))
+    }) {
+        return Err(SnapshotError::Unsupported {
+            unit: 0,
+            capability: SnapshotCapability::TeamEffects,
+        });
+    }
+    Ok(())
+}
 
 pub(super) fn capture(state: &Match) -> Result<Vec<Map<String, Value>>, SnapshotError> {
     let g = &state.world.game;
@@ -17,8 +34,8 @@ pub(super) fn capture(state: &Match) -> Result<Vec<Map<String, Value>>, Snapshot
             unit: 0,
             capability: SnapshotCapability::TeamEffects,
         })?;
-        if strike.kind != crate::game::StrikeKind::Other
-            || !SUPPORTED_SUPPORT_KINDS.contains(&timing.kind)
+        if (strike.kind == crate::game::StrikeKind::Recon)
+            != (timing.kind == crate::match_support::SupportKind::Recon)
         {
             return Err(SnapshotError::Unsupported {
                 unit: 0,
@@ -219,8 +236,9 @@ mod tests {
         assert_eq!(delivery, before);
         state.world.game.strikes[0].runtime.as_mut().unwrap().kind =
             crate::match_support::SupportKind::Recon;
+        assert!(SnapshotCache::new(&state).is_ok());
         assert!(matches!(
-            delivery.capture(&mut state, &[false; 3], &[false; 3]),
+            state.preflight_ordinary_snapshot(),
             Err(SnapshotError::Unsupported {
                 capability: SnapshotCapability::TeamEffects,
                 ..
@@ -229,3 +247,7 @@ mod tests {
         assert_eq!(delivery, before);
     }
 }
+
+#[cfg(test)]
+#[path = "support_state_tests.rs"]
+mod state_tests;

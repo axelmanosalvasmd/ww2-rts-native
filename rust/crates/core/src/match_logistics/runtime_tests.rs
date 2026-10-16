@@ -10,13 +10,21 @@ use crate::{
 };
 use serde_json::json;
 
-fn arena(enabled: bool) -> Match {
+pub(super) fn arena(enabled: bool) -> Match {
+    arena_with_barrier(enabled, false)
+}
+pub(super) fn arena_with_barrier(enabled: bool, barrier: bool) -> Match {
+    let mut row = ".".repeat(80);
+    if barrier {
+        row.replace_range(40..42, "WW");
+    }
+    let point_x = if barrier { 36 } else { 40 };
     let map = AuthoritativeMap::from_json(
         &serde_json::to_vec(&json!({
             "name": "logistics runtime arena", "w": 80, "h": 80,
-            "rows": vec![".".repeat(80); 80],
+            "rows": vec![row; 80],
             "spawns": [{"x":12,"y":40},{"x":68,"y":40}],
-            "points": [{"x":40,"y":8,"vp":0,"mp":0}], "defend":[0]
+            "points": [{"x":point_x,"y":8,"vp":0,"mp":0}], "defend":[0]
         }))
         .unwrap(),
     )
@@ -52,7 +60,7 @@ fn arena(enabled: bool) -> Match {
     )
     .unwrap()
 }
-fn troop(m: &Match) -> u32 {
+pub(super) fn troop(m: &Match) -> u32 {
     m.world
         .game
         .units
@@ -61,7 +69,7 @@ fn troop(m: &Match) -> u32 {
         .unwrap()
         .id
 }
-fn place(m: &mut Match, id: u32, at: Point) {
+pub(super) fn place(m: &mut Match, id: u32, at: Point) {
     let u = m.world.game.units.get_mut(&id).unwrap();
     u.x = at.x;
     u.z = at.z;
@@ -564,6 +572,59 @@ fn intent_log32_busy_demand_own_source_and_obstructed_ring() {
         2,
         "one busy truck plus one open job needs two trucks"
     );
+}
+
+#[test]
+fn intent_log32_inactive_allied_source_blocks_retirement_until_activated() {
+    let mut m = arena(true);
+    let at = Point { x: 81., z: 81. };
+    source(&mut m, at);
+    let id = add_truck(&mut m, 0, at);
+    m.world.game.players[1].team = 0;
+    m.start.economy.players[1].team = 0;
+    {
+        let state = m.convoys.as_mut().unwrap();
+        state.stores[0].id = StoreId::Source(1);
+        state.stores[0].owner = 1;
+        state.trucks.get_mut(&id).unwrap().origin = StoreId::Source(1);
+    }
+
+    for active in [false, true] {
+        // Only source activation changes between the two fleet passes.
+        m.convoys.as_mut().unwrap().stores[0].active = active;
+        let state = m.convoys.as_ref().unwrap();
+        assert_eq!(state.stores.len(), 1);
+        let store = &state.stores[0];
+        assert_eq!(store.id, StoreId::Source(1));
+        assert_eq!(store.owner, 1);
+        assert!(store.source);
+        assert_eq!(store.at, at);
+        assert_eq!(m.world.game.players[store.owner].team, 0);
+        assert!(!m.start.economy.players[0].out && !m.start.economy.players[0].away);
+        assert!(state.jobs.is_empty());
+        assert_eq!(state.trucks.len(), 1);
+        let truck = &state.trucks[&id];
+        assert_eq!(truck.state, supply_convoys::TruckState::Idle);
+        assert_eq!(truck.cargo, Stock::default());
+        assert!(!truck.manual && !truck.hold);
+        let unit = &m.world.game.units[&id];
+        assert_eq!(unit.owner, 0);
+        assert_eq!(m.rules.kinds[unit.kind].name, "truck");
+        assert!(unit.hp > 0.);
+        assert!(unit.path.is_empty() && unit.world_goal.is_none());
+        assert!(m.commands.units[&id].orders.is_empty());
+        assert!(math::hypot(unit.x - at.x, unit.z - at.z) <= 15.);
+        assert!(handoff(&mut m, id, at, None, 15.));
+
+        m.step_supply_convoys_with_dt(false, 0.).unwrap();
+        assert_eq!(
+            m.convoys.as_ref().unwrap().trucks.contains_key(&id),
+            !active,
+            "retirement requires the allied source to be active"
+        );
+        assert_eq!(m.world.game.units.contains_key(&id), !active);
+        assert_eq!(m.commands.units.contains_key(&id), !active);
+    }
 }
 
 #[test]

@@ -146,6 +146,13 @@ impl Mind {
         None
     }
 
+    pub(crate) fn losses_near(&self, at: Point, now: f64, age: f64, radius: f64) -> usize {
+        self.losses
+            .values()
+            .filter(|(p, t)| now - *t < age && distance(*p, at) < radius)
+            .count()
+    }
+
     pub fn point_failures(&self) -> Vec<u8> {
         self.failures.clone()
     }

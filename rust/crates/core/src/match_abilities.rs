@@ -2,7 +2,7 @@
 use crate::grid::UnitId;
 use std::collections::BTreeMap;
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct AbilityUnit {
     /// Source `cd`, allowed to expire below zero.
     pub cooldown: f64,
@@ -13,7 +13,7 @@ pub struct AbilityUnit {
     pub aimed_walked: bool,
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct AbilityState {
     units: BTreeMap<UnitId, AbilityUnit>,
 }
@@ -156,9 +156,13 @@ impl Match {
             self.options.mode,
             crate::economy::Mode::Default
                 | crate::economy::Mode::Conquest
+                | crate::economy::Mode::Assault
+                | crate::economy::Mode::Annihilation
+                | crate::economy::Mode::Classic
+                | crate::economy::Mode::Tutorial
                 | crate::economy::Mode::World
         ) {
-            return Err("abilities currently require represented Conquest or World state".into());
+            return Err("abilities require a represented ordinary or World state".into());
         }
         self.validate_actor_mode()?;
         if self.world.game.tick < 0
@@ -220,7 +224,7 @@ impl Match {
             }
             self.ability_kind(id)?;
             self.ability_munitions_cost(id)?;
-            if self.options.mode == crate::economy::Mode::World {
+            if self.options.mode.is_construction() {
                 self.ability_munitions_available(unit.owner)?;
             }
         }
@@ -295,9 +299,9 @@ impl Match {
                             || self.world.game.flags_at(e.x, e.z) & (COVER | TRENCH) != 0)
                         && self.ability_clear(id, e.at(), n(ab, "radius", 0.) + 1.)
                 });
-                foes.sort_by(|a, b| {
-                    dist(u.at(), self.world.game.units[a].at())
-                        .total_cmp(&dist(u.at(), self.world.game.units[b].at()))
+                crate::sort::sort_by(&mut foes, |a, b| {
+                    dist(u.at(), self.world.game.units[&a].at())
+                        - dist(u.at(), self.world.game.units[&b].at())
                 });
                 foes.first()
                     .map(|e| AutocastTarget::At(self.world.game.units[e].at()))
@@ -577,7 +581,7 @@ impl Match {
             if self.abilities.get(id).unwrap().cooldown > 0.
                 || u.retreating
                 || kind.ammo() && !self.logistics.can_fire(id, count)
-                || self.options.mode == crate::economy::Mode::World
+                || self.options.mode.is_construction()
                     && self.ability_munitions_available(u.owner)?
                         < self.ability_munitions_cost(id)?
             {
@@ -727,7 +731,7 @@ impl Match {
                 continue;
             }
             let cost = self.ability_munitions_cost(id)?;
-            if self.options.mode == crate::economy::Mode::World
+            if self.options.mode.is_construction()
                 && self.ability_munitions_available(u.owner)? < cost
             {
                 reason = Denial::Munitions;
@@ -742,10 +746,11 @@ impl Match {
                     if u.garrison.is_some() {
                         let at = exits[&id];
                         let unit = self.world.game.units.get_mut(&id).unwrap();
-                        unit.x = at.x;
-                        unit.z = at.z;
-                        unit.garrison = None;
-                        self.grid.update(id, unit);
+                        crate::unit_placement::place_unit(&mut self.grid, unit, |unit| {
+                            unit.x = at.x;
+                            unit.z = at.z;
+                            unit.garrison = None;
+                        });
                     }
                     self.cancel_field_work(id)?;
                     let u = self.world.game.units.get_mut(&id).unwrap();

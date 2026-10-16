@@ -291,7 +291,7 @@ fn malformed_finished_world_and_zero_actor_identity_reject_before_publication() 
     assert_eq!(protected(&m), before);
 }
 #[test]
-fn late_fort_refusal_preserves_decided_phase_and_the_original_terminal_owners() {
+fn late_fort_transfer_preserves_decided_result_story_and_capture_timestamps() {
     let f = fixture();
     let case = &f["cases"][0];
     let mut m = load(&f, case);
@@ -310,11 +310,45 @@ fn late_fort_refusal_preserves_decided_phase_and_the_original_terminal_owners() 
         true,
     );
     let order = m.world.game.units.keys().copied().collect::<Vec<_>>();
-    let before = protected(&m);
-    assert!(
-        m.apply_world_regions(&order, 0.05)
-            .unwrap_err()
-            .contains("fort")
+    let history = terminal(&m);
+    let result = m.match_result().unwrap().unwrap();
+    let capture_ticks = m
+        .world_runtime
+        .as_ref()
+        .unwrap()
+        .regions
+        .iter()
+        .map(|r| r.cap_tick)
+        .collect::<Vec<_>>();
+    let mut fort = m.world.game.units[&999].clone();
+    let region = m.world_region_index(fort.at()).unwrap().unwrap();
+    let effects = m.apply_world_regions(&order, 0.05).unwrap();
+    let capture = effects
+        .captures
+        .iter()
+        .find(|capture| capture.region_index == region)
+        .unwrap();
+    assert_ne!(capture.owner, fort.owner);
+    fort.owner = capture.owner;
+    let mut actual = m.world.game.units[&999].clone();
+    assert_eq!(actual.pace.to_bits(), fort.pace.to_bits());
+    actual.pace = 0.0;
+    fort.pace = 0.0;
+    assert_eq!(actual, fort);
+    assert_eq!(
+        m.world_runtime.as_ref().unwrap().regions[region].team,
+        m.world.game.players[capture.owner].team
     );
-    assert_eq!(protected(&m), before);
+    assert_eq!(terminal(&m), history);
+    assert_eq!(m.match_result().unwrap().unwrap(), result);
+    assert_eq!(
+        m.world_runtime
+            .as_ref()
+            .unwrap()
+            .regions
+            .iter()
+            .map(|r| r.cap_tick)
+            .collect::<Vec<_>>(),
+        capture_ticks
+    );
 }

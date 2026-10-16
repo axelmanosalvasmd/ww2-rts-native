@@ -10,13 +10,24 @@ use crate::{
     random::{MatchRandom, StreamId},
 };
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Level {
     Easy,
+    #[default]
     Normal,
     Hard,
 }
 impl Level {
+    /// Lobby choices are exact names. A missing choice is handled by the seat default.
+    pub fn from_key(key: &str) -> Option<Self> {
+        match key {
+            "easy" => Some(Self::Easy),
+            "normal" => Some(Self::Normal),
+            "hard" => Some(Self::Hard),
+            _ => None,
+        }
+    }
+
     pub fn every(self) -> i64 {
         match self {
             Self::Easy => 120,
@@ -233,11 +244,39 @@ impl Observation {
                 context.munitions,
                 context.fuel,
                 context.sight,
+                context.caution,
                 context.build_reserve,
                 context.fort_reserve,
             ]
             .iter()
             .all(|v| v.is_finite())
+                || context
+                    .hidden_spawns
+                    .iter()
+                    .any(|i| *i >= input.players.len())
+                || context.site_nodes.iter().any(|p| !within(*p))
+                || context.caution <= 0.0
+                || context.known_buildings.iter().any(|b| {
+                    b.id == 0
+                        || b.owner >= input.players.len()
+                        || !within(b.at)
+                        || !catalog
+                            .unit(&b.kind)
+                            .is_ok_and(|d| d.get("building").and_then(Value::boolean) == Some(true))
+                })
+                || context
+                    .known_buildings
+                    .windows(2)
+                    .any(|w| w[0].id >= w[1].id)
+                || context
+                    .owned_nodes
+                    .iter()
+                    .any(|i| *i >= context.nodes.len())
+                || context
+                    .nodes
+                    .iter()
+                    .chain(&context.known_depots)
+                    .any(|p| !finite_point(*p))
                 || context.height.as_ref().is_some_and(|h| h.len() != cells)
                 || context
                     .smokes

@@ -7,7 +7,9 @@ use std::collections::BTreeMap;
 
 pub const ORDER_QUEUE_VERSION: u32 = 1;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
 pub struct OrderKey {
     pub tick: u64,
     pub issuer: u32,
@@ -45,7 +47,7 @@ pub struct OrderSnapshot<T> {
     pub pending: Vec<StampedOrder<T>>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct OrderQueue<T> {
     next_tick: Option<u64>,
     capacity: usize,

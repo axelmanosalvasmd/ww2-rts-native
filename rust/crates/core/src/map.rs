@@ -1,9 +1,10 @@
-//! Authoritative ordinary and generated World map data supplied by a trusted caller.
+//! Authoritative ordinary and generated World maps, plus pure received-map presentation helpers.
 //!
-//! This is not a client-map importer or a match constructor. Client projections erase mines,
-//! triggers and scenarios irreversibly. Callers must supply the original authoritative document;
+//! `AuthoritativeMap` is not a client-map importer or a match constructor. Client projections erase
+//! mines, triggers and scenarios irreversibly. Its callers must supply the authoritative document;
 //! the format has no provenance marker that could distinguish a stripped projection.
-//! Authored scenarios remain unsupported. Unknown authoring properties stay in `source()` for later systems.
+//! Authored scenarios are validated here; their execution remains guarded at match admission.
+//! Unknown authoring properties stay in `source()` for later systems.
 use std::{collections::BTreeMap, fmt};
 
 use serde_json::Value;
@@ -209,22 +210,13 @@ impl AuthoritativeMap {
             .map(|v| {
                 rows(v, w, h, b"01234ab", "heights").map(|r| {
                     r.into_iter()
-                        .map(|c| match c {
-                            b'a' => -1,
-                            b'b' => -2,
-                            _ => (c - b'0') as i8,
-                        })
+                        .map(|c| level_of(c).expect("validated height character"))
                         .collect()
                 })
             })
             .transpose()?;
-        let layers = normalize_layers(&source, w, h, &chars)?;
+        let layers = normalize_layers(&source, w, h, &chars, true)?;
         let structures = crate::structures::parse(source.get("structures"), w, h, &layers)?;
-        if source.get("scenario").is_some() {
-            return Err(MapError::Unsupported {
-                feature: "scenario",
-            });
-        }
         let is_world = source.get("world").is_some();
         let minimum_spawns = if is_world { 1 } else { 2 };
         let pos = |v: &Value, field: &str| -> Result<(usize, usize)> {
@@ -371,6 +363,8 @@ impl AuthoritativeMap {
             }
         }
         let catalog = Catalog::compiled().map_err(|e| MapError::Catalog(e.to_string()))?;
+        crate::scenario_validation::validate_scenario(&source, catalog)
+            .map_err(|e| invalid("scenario", &e.0))?;
         let houses = catalog
             .table("CFG")
             .map_err(|e| MapError::Catalog(e.to_string()))?
@@ -566,6 +560,69 @@ impl AuthoritativeMap {
     }
 }
 
+/// The prototype's public authored-map projection. Private scripts and mine materials
+/// are removed from a copy; the authoritative document is never changed.
+pub fn map_for_client(source: &Value) -> Result<Value> {
+    let mut result = source.clone();
+    let object = result
+        .as_object_mut()
+        .ok_or_else(|| invalid("document", "expected a map object"))?;
+    object.remove("triggers");
+    object.remove("scenario");
+    let map = AuthoritativeMap::from_value(result.clone())?;
+    let w = map.w;
+    let strings = |cells: &[u8]| -> Value {
+        serde_json::json!(
+            cells
+                .chunks(w)
+                .map(|row| String::from_utf8(row.to_vec()).expect("validated ASCII terrain"))
+                .collect::<Vec<_>>()
+        )
+    };
+    if source.get("layers").is_none() {
+        result["worldVersion"] = serde_json::json!(2);
+        result["layers"] = serde_json::json!({"ground":strings(&map.layers.ground),"objects":strings(&map.layers.objects)});
+    }
+    let hidden_rows = source
+        .get("layers")
+        .map_or(&source["rows"], |layers| &layers["objects"]);
+    let hidden: Vec<_> = hidden_rows
+        .as_array()
+        .expect("validated rows")
+        .iter()
+        .flat_map(|row| row.as_str().expect("validated row").bytes())
+        .map(|ch| ch == b'N')
+        .collect();
+    let public: Vec<_> = map
+        .chars
+        .iter()
+        .enumerate()
+        .map(|(cell, &ch)| {
+            if ch != b'N' {
+                ch
+            } else if map.layers.objects[cell] != b'.' {
+                map.layers.objects[cell]
+            } else {
+                map.layers.ground[cell]
+            }
+        })
+        .collect();
+    result["rows"] = strings(&public);
+    result["layers"]["objects"] = strings(&map.layers.objects);
+    result["layers"]["mines"] = serde_json::json!(vec![".".repeat(w); map.h]);
+    for key in ["materials", "objectMaterials"] {
+        if let Some(list) = result["layers"].get_mut(key).and_then(Value::as_array_mut) {
+            list.retain(|entry| {
+                !hidden[entry["c"].as_f64().expect("validated material cell") as usize]
+            });
+        }
+    }
+    if result["layers"].get("mineMaterials").is_some() {
+        result["layers"]["mineMaterials"] = serde_json::json!([]);
+    }
+    Ok(result)
+}
+
 fn material_list(source: &Value, key: &str, n: usize) -> Result<BTreeMap<usize, String>> {
     let mut result = BTreeMap::new();
     if let Some(v) = source.get(key) {
@@ -586,33 +643,39 @@ fn material_list(source: &Value, key: &str, n: usize) -> Result<BTreeMap<usize, 
     }
     Ok(result)
 }
-fn normalize_layers(source: &Value, w: usize, h: usize, chars: &[u8]) -> Result<Layers> {
+fn normalize_layers(
+    source: &Value,
+    w: usize,
+    h: usize,
+    chars: &[u8],
+    authoritative: bool,
+) -> Result<Layers> {
     let (ground, authored, mines, legacy, explicit_base, explicit_object, explicit_mine) =
         if let Some(layer) = source.get("layers") {
             if source["worldVersion"].as_f64() != Some(2.0) {
                 return Err(invalid("worldVersion", "layers require version 2"));
             }
             let ground = rows(&layer["ground"], w, h, BASE, "layers.ground")?;
-            let authored = rows(&layer["objects"], w, h, OBJECT, "layers.objects")?;
+            let allowed = if authoritative {
+                OBJECT
+            } else {
+                b".BH#TXY=RNAQKO"
+            };
+            let authored = rows(&layer["objects"], w, h, allowed, "layers.objects")?;
             let mines = layer
                 .get("mines")
                 .map(|v| rows(v, w, h, b".N", "layers.mines"))
                 .transpose()?
                 .unwrap_or(vec![b'.'; w * h]);
-            for c in 0..chars.len() {
+            // Received runtime layers may differ from the initial rows after known terrain changes.
+            for c in (0..chars.len()).filter(|_| authoritative) {
                 let object = if authored[c] == b'N' {
                     b'.'
                 } else {
                     authored[c]
                 };
                 let mine = authored[c] == b'N' || mines[c] == b'N';
-                let composed = if mine {
-                    b'N'
-                } else if object != b'.' {
-                    object
-                } else {
-                    ground[c]
-                };
+                let composed = compose_world_cell(ground[c], object, mine);
                 if composed != chars[c] {
                     return Err(invalid("layers", "rows must match composed layers"));
                 }
@@ -759,7 +822,7 @@ pub struct TerrainState {
     pub height: Option<Vec<i8>>,
     pub house: Vec<u8>,
     pub cell_hp: Vec<f32>,
-    pub tough: Option<Vec<f64>>,
+    pub tough: Option<Vec<f32>>,
     pub wear: Vec<f32>,
     pub surface_wear: Vec<f32>,
     pub trench_front: Option<Vec<f32>>,
@@ -813,14 +876,22 @@ fn neighbors(c: usize, w: usize, n: usize) -> impl Iterator<Item = usize> {
     .flatten()
 }
 fn component(chars: &[u8], w: usize, start: usize, seen: &mut [bool]) -> Vec<usize> {
+    component_where(|cell| chars[cell] == chars[start], w, start, seen)
+}
+fn component_where(
+    matches: impl Fn(usize) -> bool,
+    width: usize,
+    start: usize,
+    seen: &mut [bool],
+) -> Vec<usize> {
     let mut queue = vec![start];
     seen[start] = true;
     let mut i = 0;
     while i < queue.len() {
         let c = queue[i];
         i += 1;
-        for next in neighbors(c, w, chars.len()) {
-            if !seen[next] && chars[next] == chars[start] {
+        for next in neighbors(c, width, seen.len()) {
+            if !seen[next] && matches(next) {
                 seen[next] = true;
                 queue.push(next);
             }
@@ -852,10 +923,6 @@ impl AuthoritativeMap {
                 .and_then(crate::catalog::Value::number)
                 .ok_or_else(|| MapError::Catalog(format!("missing {key}")))
         };
-        let houses = cfg
-            .get("houses")
-            .and_then(crate::catalog::Value::array)
-            .ok_or_else(|| MapError::Catalog("missing houses".into()))?;
         let physical: Vec<_> = self
             .layers
             .ground
@@ -865,39 +932,9 @@ impl AuthoritativeMap {
             .collect();
         let n = physical.len();
         let mut house = vec![0; n];
-        let mut seen = vec![false; n];
-        let named: BTreeMap<_, _> = self
-            .buildings
-            .iter()
-            .filter_map(|b| {
-                houses
-                    .iter()
-                    .position(|h| {
-                        h.get("name").and_then(crate::catalog::Value::string) == Some(&b.kind)
-                    })
-                    .map(|kind| (b.y * self.w + b.x, kind))
-            })
-            .collect();
-        for c in 0..n {
-            if physical[c] != b'B' || seen[c] {
-                continue;
-            }
-            let block = component(&physical, self.w, c, &mut seen);
-            let mut kind = houses
-                .iter()
-                .rposition(|h| {
-                    h.get("min")
-                        .and_then(crate::catalog::Value::number)
-                        .is_some_and(|min| block.len() as f64 >= min)
-                })
-                .ok_or_else(|| MapError::Catalog("no default house kind".into()))?;
-            for c in &block {
-                if let Some(k) = named.get(c) {
-                    kind = *k;
-                }
-            }
-            for c in block {
-                house[c] = kind as u8;
+        for block in house_kinds_where(|c| physical[c] == b'B', n, self.w, &self.buildings, None)? {
+            for c in block.cells {
+                house[c] = block.kind;
             }
         }
         let mut tough = None;
@@ -905,7 +942,7 @@ impl AuthoritativeMap {
             let values = tough.get_or_insert_with(|| vec![1.0; n]);
             let mut seen = vec![false; n];
             for c in component(&self.chars, self.w, b.y * self.w + b.x, &mut seen) {
-                values[c] = cfg_num("stoneBridge")?;
+                values[c] = cfg_num("stoneBridge")? as f32;
             }
         }
         let mut terrain = TerrainState {
@@ -948,7 +985,7 @@ impl AuthoritativeMap {
                 rules.movement.house_hp[usize::from(terrain.house[c])]
             } else {
                 rules.movement.terrain_hp(*ch).unwrap_or(0.0)
-                    * terrain.tough.as_ref().map_or(1.0, |t| t[c])
+                    * terrain.tough.as_ref().map_or(1.0, |t| f64::from(t[c]))
             }) as f32;
         }
         if self.trench_facing {
@@ -1005,4 +1042,170 @@ impl AuthoritativeMap {
         }
         Ok(terrain)
     }
+}
+
+/// Decode a valid authored height character. Presentation heights use levels -2 through 4.
+pub fn level_of(ch: u8) -> Option<i8> {
+    match ch {
+        b'0'..=b'4' => Some((ch - b'0') as i8),
+        b'a' => Some(-1),
+        b'b' => Some(-2),
+        _ => None,
+    }
+}
+
+/// Encode a valid authored height level.
+pub fn level_char(level: i8) -> Option<u8> {
+    match level {
+        -2 => Some(b'b'),
+        -1 => Some(b'a'),
+        0..=4 => Some(b'0' + level as u8),
+        _ => None,
+    }
+}
+
+/// Compose only the layers supplied by the caller. A mine marker takes precedence.
+pub fn compose_world_cell(ground: u8, object: u8, mine: bool) -> u8 {
+    if mine {
+        b'N'
+    } else if object != b'.' && object != 0 {
+        object
+    } else {
+        ground
+    }
+}
+
+/// Normalize a received map without requiring authoritative spawns, objectives or scenarios.
+/// This reads only the supplied document and accepts discovered runtime object characters.
+pub fn world_layers(source: &Value) -> Result<Layers> {
+    let w = integer(&source["w"], 1, 1024, "w")?;
+    let h = integer(&source["h"], 1, 1024, "h")?;
+    let chars = rows(&source["rows"], w, h, b".BH#+TWF=RXYDMNOQAK", "rows")?;
+    normalize_layers(source, w, h, &chars, false)
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct HouseBlock {
+    /// Cells in the source breadth-first traversal order.
+    pub cells: Vec<usize>,
+    pub kind: u8,
+}
+
+/// Connected known houses, visited in seed order or ascending cell order when seeds are absent.
+/// Named overrides are resolved in breadth-first order, preserving the last named cell.
+pub fn house_kinds_where(
+    is_house: impl Fn(usize) -> bool,
+    cells: usize,
+    width: usize,
+    buildings: &[Building],
+    seeds: Option<&[usize]>,
+) -> Result<Vec<HouseBlock>> {
+    if width == 0 || !cells.is_multiple_of(width) {
+        return Err(invalid("houses", "invalid rectangular cell count"));
+    }
+    if seeds.is_some_and(|seeds| seeds.iter().any(|&c| c >= cells)) {
+        return Err(invalid("houses", "seed outside map"));
+    }
+    let catalog = Catalog::compiled().map_err(|e| MapError::Catalog(e.to_string()))?;
+    let houses = catalog
+        .table("CFG")
+        .map_err(|e| MapError::Catalog(e.to_string()))?
+        .get("houses")
+        .and_then(crate::catalog::Value::array)
+        .ok_or_else(|| MapError::Catalog("missing houses".into()))?;
+    let named: BTreeMap<_, _> = buildings
+        .iter()
+        .filter_map(|building| {
+            if building.x >= width || building.y >= cells / width {
+                return None;
+            }
+            houses
+                .iter()
+                .position(|house| {
+                    house.get("name").and_then(crate::catalog::Value::string)
+                        == Some(building.kind.as_str())
+                })
+                .map(|kind| (building.y * width + building.x, kind))
+        })
+        .collect();
+    let mut seen = vec![false; cells];
+    let mut out = Vec::new();
+    let starts: Box<dyn Iterator<Item = usize> + '_> = match seeds {
+        Some(seeds) => Box::new(seeds.iter().copied()),
+        None => Box::new(0..cells),
+    };
+    for start in starts {
+        if seen[start] || !is_house(start) {
+            continue;
+        }
+        let queue = component_where(&is_house, width, start, &mut seen);
+        let mut kind = houses
+            .iter()
+            .rposition(|house| {
+                house
+                    .get("min")
+                    .and_then(crate::catalog::Value::number)
+                    .is_some_and(|minimum| queue.len() as f64 >= minimum)
+            })
+            .ok_or_else(|| MapError::Catalog("no default house kind".into()))?;
+        for c in &queue {
+            if let Some(named_kind) = named.get(c) {
+                kind = *named_kind;
+            }
+        }
+        out.push(HouseBlock {
+            cells: queue,
+            kind: kind as u8,
+        });
+    }
+    Ok(out)
+}
+
+/// Border segments in source run/side order, in cell coordinates.
+pub fn territory_edges(runs: &[[i64; 3]]) -> Vec<[i64; 4]> {
+    let mut rows: BTreeMap<i64, Vec<(i64, i64)>> = BTreeMap::new();
+    let mut edges = Vec::new();
+    for &[y, a, b] in runs {
+        rows.entry(y).or_default().push((a, b));
+    }
+    for &[y, a, b] in runs {
+        edges.extend([[a, y, a, y + 1], [b, y, b, y + 1]]);
+        for side in [-1, 1] {
+            let mut x = a;
+            let line = if side < 0 { y } else { y + 1 };
+            for &(lo, hi) in rows.get(&(y + side)).into_iter().flatten() {
+                if hi <= x || lo >= b {
+                    continue;
+                }
+                if lo > x {
+                    edges.push([x, line, lo.min(b), line]);
+                }
+                x = x.max(hi);
+                if x >= b {
+                    break;
+                }
+            }
+            if x < b {
+                edges.push([x, line, b, line]);
+            }
+        }
+    }
+    edges
+}
+
+/// Test only known runs when present, including an empty known set. Legacy bounds are in metres.
+pub fn inside_known_region(
+    runs: Option<&[[usize; 3]]>,
+    bounds: Option<[f64; 4]>,
+    at: Point,
+    cell: f64,
+) -> bool {
+    if let Some(runs) = runs {
+        let x = (at.x / cell).floor();
+        let y = (at.z / cell).floor();
+        return runs
+            .iter()
+            .any(|r| y == r[0] as f64 && x >= r[1] as f64 && x < r[2] as f64);
+    }
+    bounds.is_some_and(|[x0, z0, x1, z1]| at.x >= x0 && at.z >= z0 && at.x < x1 && at.z < z1)
 }

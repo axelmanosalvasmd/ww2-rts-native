@@ -8,6 +8,9 @@ use crate::{
     supply_convoys::{Route, RouteFailure},
 };
 use std::collections::BTreeMap;
+
+#[cfg(test)]
+mod intent_tests;
 #[derive(Clone, Copy, Debug)]
 pub struct RouteRequest {
     pub owner: usize,
@@ -23,12 +26,12 @@ pub struct Handoff {
     pub store: Point,
     pub radius: f64,
 }
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Threat {
     pub at: Point,
     pub range: f64,
 }
-#[derive(Default)]
+#[derive(Default, serde::Serialize, serde::Deserialize)]
 struct OwnerRoutes {
     key: Option<(u64, u64)>,
     threats: Vec<Threat>,
@@ -46,7 +49,7 @@ struct OwnerRoutes {
 }
 /// Scratch belongs to one Match and its stable recipient/world identities.
 /// Construct fresh scratch when replacing a Match or its equal-version terrain.
-#[derive(Default)]
+#[derive(Default, serde::Serialize, serde::Deserialize)]
 pub struct SupplyRouting {
     owners: BTreeMap<usize, OwnerRoutes>,
     handoff_paths: Pathfinding,

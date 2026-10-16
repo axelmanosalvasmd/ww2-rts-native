@@ -1,6 +1,5 @@
 //! Conquest recipient routing. Discovery queries current units, not fog masks.
 use crate::{
-    economy::Mode,
     existing_observers::{ExistingObservers, ObserverOverlay},
     game::{CELL, Game, Point, Unit, Wreck},
     grid::SpatialGrid,
@@ -18,7 +17,7 @@ use std::collections::BTreeMap;
 
 /// One owner's remembered rows and routing projection. Refresh through Match;
 /// consumers borrow this state separately from mutable units or path scratch.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct RecipientRouting {
     memory: ObservedMemory,
     routes: RouteKnowledge,
@@ -33,6 +32,14 @@ pub struct RecipientRouting {
     wrecks: Vec<Wreck>,
 }
 impl RecipientRouting {
+    fn save_storage_pointers(&self) -> [usize; 2] {
+        self.routes.storage_pointers()
+    }
+
+    fn relocate_save_storage(&mut self, bindings: &BTreeMap<usize, usize>) {
+        self.memory.relocate_save_storage(bindings);
+    }
+
     pub fn knowledge(&self) -> &RouteKnowledge {
         &self.routes
     }
@@ -70,7 +77,47 @@ impl RecipientRouting {
         self.memory.full_rows()
     }
 }
-#[derive(Clone, Copy, Debug)]
+
+impl Match {
+    /// Storage identities in a stable order. The save envelope records these
+    /// as small IDs and uses the same order to bind newly allocated arrays.
+    pub(crate) fn save_storage_pointers(&self) -> Vec<usize> {
+        let mut pointers = vec![
+            self.world.game.flags.as_ptr() as usize,
+            self.world.initial().chars.as_ptr() as usize,
+        ];
+        if let Some(heights) = &self.world.game.height {
+            pointers.push(heights.as_ptr() as usize);
+        }
+        for recipient in &self.recipients {
+            pointers.extend(recipient.save_storage_pointers());
+        }
+        pointers.extend(self.commands.paths.storage_pointers());
+        pointers
+    }
+
+    /// Replace saved storage IDs in routing guards with the new allocations.
+    pub(crate) fn relocate_save_storage(&mut self, old: &[usize]) -> Result<(), String> {
+        let new = self.save_storage_pointers();
+        if old.len() != new.len() {
+            return Err("saved routing storage count mismatch".into());
+        }
+        let mut bindings = BTreeMap::new();
+        for (&from, &to) in old.iter().zip(&new) {
+            if let Some(previous) = bindings.insert(from, to)
+                && previous != to
+            {
+                return Err("ambiguous saved routing storage identity".into());
+            }
+        }
+        self.commands.paths.relocate_save_storage(&bindings);
+        for recipient in &mut self.recipients {
+            recipient.relocate_save_storage(&bindings);
+        }
+        Ok(())
+    }
+}
+#[derive(Clone, Copy, Debug, serde::Serialize, serde::Deserialize)]
 struct BoundUnit {
     id: u32,
     kind: usize,
@@ -601,8 +648,8 @@ fn validate_context<'a>(
     }) {
         return Err("routing needs valid unique wreck identities and positions".into());
     }
-    if !matches!(context.options.mode, Mode::Default | Mode::Conquest) || g.mode.is_some() {
-        return Err("owned routing currently supports ordinary Conquest".into());
+    if !crate::match_actor::ordinary_ground_mode(g, context.options.mode) {
+        return Err("owned routing requires a matching ordinary mode".into());
     }
     if g.players.len() != context.start.players.len()
         || g.players.len() != context.options.players.len()
@@ -1061,9 +1108,7 @@ impl PreparedOrdinaryLists {
         source: OrdinaryListPublication<'e>,
         targets: &'a mut [RecipientRouting],
     ) -> Result<OrdinaryListsCommit<'a, 'e>, String> {
-        if !matches!(source.options.mode, Mode::Default | Mode::Conquest)
-            || source.world.game.mode.is_some()
-        {
+        if !crate::match_actor::ordinary_ground_mode(&source.world.game, source.options.mode) {
             return Err("ordinary list publication mode changed".into());
         }
         self.source.validate_source(source.world)?;
@@ -1099,9 +1144,7 @@ pub fn prepare_ordinary_recipient_lists(
     state: &Match,
     owners: &[usize],
 ) -> Result<PreparedOrdinaryLists, String> {
-    if !matches!(state.options.mode, Mode::Default | Mode::Conquest)
-        || state.world.game.mode.is_some()
-    {
+    if !crate::match_actor::ordinary_ground_mode(&state.world.game, state.options.mode) {
         return Err("ordinary list batch requires ordinary Conquest".into());
     }
     let mut unique = std::collections::BTreeSet::new();

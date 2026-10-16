@@ -51,6 +51,27 @@ pub fn sort_by<T: Copy>(v: &mut [T], compare: impl FnMut(T, T) -> f64) {
     sort.merge_force_collapse();
 }
 
+/// Applies the same numeric comparator to owned values without requiring them to be `Copy`.
+/// Sort indices first, then move each value to its destination with swaps.
+pub(crate) fn sort_by_ref<T>(v: &mut [T], mut compare: impl FnMut(&T, &T) -> f64) {
+    if v.len() < 2 {
+        return;
+    }
+    let mut order: Vec<_> = (0..v.len()).collect();
+    sort_by(&mut order, |a, b| compare(&v[a], &v[b]));
+    let mut destinations = vec![0; v.len()];
+    for (destination, original) in order.into_iter().enumerate() {
+        destinations[original] = destination;
+    }
+    for i in 0..v.len() {
+        while destinations[i] != i {
+            let j = destinations[i];
+            v.swap(i, j);
+            destinations.swap(i, j);
+        }
+    }
+}
+
 /// `ComputeMinRunLength`: n itself below 64, otherwise between 32 and 64.
 fn min_run_length(mut n: isize) -> isize {
     let mut r = 0;
@@ -672,3 +693,6 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+mod if25_tests;
