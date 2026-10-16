@@ -180,8 +180,7 @@ fn base54_world_fort_ranks_are_confined_to_source_shares() {
             .iter()
             .map(|p| p.spawn)
             .min_by(|a, b| {
-                math::hypot(a.x - at.x, a.z - at.z)
-                    .total_cmp(&math::hypot(b.x - at.x, b.z - at.z))
+                math::hypot(a.x - at.x, a.z - at.z).total_cmp(&math::hypot(b.x - at.x, b.z - at.z))
             })
             .unwrap();
         let face = math::atan2(home.z - at.z, home.x - at.x);
@@ -497,7 +496,11 @@ fn base54_elimination_refusal_keeps_transfer_atomic() {
     for (id, before) in units {
         let after = &m.world.game.units[&id];
         assert_eq!(format!("{after:?}"), format!("{before:?}"), "unit {id}");
-        assert_eq!(after.pace.to_bits(), before.pace.to_bits(), "unit {id} pace");
+        assert_eq!(
+            after.pace.to_bits(),
+            before.pace.to_bits(),
+            "unit {id} pace"
+        );
     }
     assert_eq!(m.world_runtime.as_ref().unwrap().regions, regions);
     assert_eq!(m.start.economy, wallets);

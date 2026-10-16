@@ -425,7 +425,7 @@ impl Match {
 
     /// The source teamSees point predicate at current positions. This is not a
     /// fog-mask query or a remembered-wreck/smoke policy.
-    pub fn recipient_sees(&mut self, owner: usize, at: Point) -> Result<bool, String> {
+    pub fn recipient_sees(&self, owner: usize, at: Point) -> Result<bool, String> {
         self.validate_recipient(owner)?;
         if !at.x.is_finite() || !at.z.is_finite() {
             return Err("invalid visibility point".into());

@@ -189,10 +189,9 @@ impl Match {
                     }) {
                         if !game.allied(fort.owner, owner)
                             && self.world_region_index(fort.at())? == Some(index)
+                            && transfers.insert(fort.id, owner).is_some()
                         {
-                            if transfers.insert(fort.id, owner).is_some() {
-                                return Err("duplicate World fort transfer".into());
-                            }
+                            return Err("duplicate World fort transfer".into());
                         }
                     }
                     captured.push(WorldCapture {

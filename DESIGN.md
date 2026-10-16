@@ -4855,3 +4855,7 @@ It does not admit or execute general authored scenarios.
 ## Transactional World fort capture (2026-10-16)
 
 Stage a region's fort-owner changes before computing army elimination. An enemy fort captured on the same step that its former owner loses their last region belongs to the captor and survives the administrative removal. Prepare finish facts from those exact staged owners, then publish the unit, grid, matching footprint and currently visible remembered owner changes together. Preserve HP, physical sections, missing footprint entries and replacement buildings. Gate physics, World snapshots and hosted World admission remain guarded.
+
+## Borrowed building placement (2026-10-16)
+
+Ordinary Build admission uses one read-only building-placement query. It borrows terrain, actors, visibility and optional node, territory and rail-yard facts, so previews can use the same rule without adding match state. Equal-distance nodes retain their input index, matching the prototype's stable sort. The query returns the selected footprint and snapped centre even when a later rule refuses it. Visibility precedes territory, rail, node overlap, coast and physical occupancy. World facts are exercised as components; they do not admit World construction, hosted rooms or recipient delivery. Fortifications retain their separate existing query.

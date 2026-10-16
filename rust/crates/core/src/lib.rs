@@ -24,6 +24,7 @@ mod aligned_replay;
 mod native_order_intent_tests;
 
 pub mod assault_runtime;
+pub mod building_placement;
 pub mod catalog;
 pub mod client_view;
 pub mod combat;
