@@ -2033,3 +2033,7 @@ mod native_ingress_tests;
 #[cfg(test)]
 #[path = "trusted_room_lobby_tests.rs"]
 mod trusted_room_tests;
+
+#[cfg(test)]
+#[path = "mode_native_batch.rs"]
+mod mode_native_batch;

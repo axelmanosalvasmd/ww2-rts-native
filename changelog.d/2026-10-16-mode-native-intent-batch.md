@@ -1,0 +1,1 @@
+- Add native MODE checks for lobby setting authority and match locking, Tutorial roster and setup, income, the live orchard/recruit/tank lessons, Assault timer finalization, and map field validation. List the first 50 owned row mappings and incomplete branches without promoting untested rows. Preserve the original Tutorial Trench failure and existing exact fixtures.

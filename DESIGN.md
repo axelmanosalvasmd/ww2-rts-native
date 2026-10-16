@@ -1,5 +1,23 @@
 # Three Crossroads Native: design decisions
 
+## Native mode intent tests (2026-10-16, execution pending)
+
+Axel approved the five native-intent qualification rules in issue #5 comment
+6206861267 without added conditions. The first MODE window contains 50 of
+83 assigned remaining rows. Native tests exercise the real Hub dispatcher,
+Tutorial constructors and live ground ticks, and the explicit late Assault
+victory phase. They install no captured states and change no shipping rules.
+The Tutorial journey uses movement, combat, capture and paid AT recruitment.
+It ends on Trench entry; it makes no clearance or final victory claim.
+
+Horde, Classic and Annihilation still have no admitted native constructors.
+Their rows remain incomplete. Tutorial tick7081 Trench failure on 8a5af066
+remains unchanged, including the full original test and its diagnostics.
+Partial tests cannot promote all-mode or server-start rows. The literal
+first-window mapping and reasons are in docs/parity/modes.md. New tests have
+not run; Root grants the focused batch, and prototype review remains pending.
+
+
 ## Tutorial passive firing and ability operands (2026-10-15, source only)
 
 The actual `1a8d99e9ef9e5dca8fdc30ff190675b3f98e5b85` failure remains

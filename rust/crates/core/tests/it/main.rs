@@ -53,6 +53,8 @@ mod match_combat;
 mod match_routing;
 #[path = "../math.rs"]
 mod math;
+#[path = "../mode_native_batch.rs"]
+mod mode_native_batch;
 #[path = "../objectives.rs"]
 mod objectives;
 #[path = "../observed_memory.rs"]

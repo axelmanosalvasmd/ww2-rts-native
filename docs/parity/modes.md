@@ -259,3 +259,62 @@ The component does not schedule phases, disable supply by mode, apply capture st
 6. **Doc fixes:** confirm the code values (World 60%, Classic pop 24, Shipyard counts) and correct DESIGN.md and CONTEXT.md in ww2-rts.
 7. **Legacy `triggers`:** keep the field in the native map format, or convert the five maps to `scenario` blocks when the pin moves?
 8. **Horde records file** (MODE-55): keep the horde-records.json shape and key, or let NET choose the persistence format?
+
+## Native behavior batch, first 50 owned rows (2026-10-16)
+
+[Axel approved rules 1 to 5](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6206861267) without added conditions. Behavior rows use native intent tests and prototype review. Existing exact component fixtures and historical failures remain intact. This window proposes no status promotion before actual execution and review. No runtime behavior changes.
+
+Tests below live in `rust/crates/core/tests/mode_native_batch.rs` and `rust/crates/server/src/mode_native_batch.rs`; existing validator tests remain in `rust/crates/core/tests/authoritative_maps.rs`. Every named function is literal. Partial coverage does not complete its row.
+
+| Row | Native test | Qualification or remaining reason |
+|---|---|---|
+| MODE-01 | `lobby::mode_native_batch::mode01_04_06_09_41_lobby_mode_capacity_army_and_ai_controls` | partial: constructor coverage lacks three modes |
+| MODE-02 | none | incomplete: generic constructor rejects unsupported modes; silent fallback absent |
+| MODE-03 | `lobby::mode_native_batch::mode03_host_settings_and_guest_rejection_cover_each_control`; `lobby::mode_native_batch::mode03_attached_match_locks_every_setting` | candidate; native execution and prototype review pending |
+| MODE-04 | `lobby::mode_native_batch::mode01_04_06_09_41_lobby_mode_capacity_army_and_ai_controls` | partial: public start and Assault readiness unavailable |
+| MODE-06 | `lobby::mode_native_batch::mode01_04_06_09_41_lobby_mode_capacity_army_and_ai_controls` | partial: all-mode army scaling unavailable |
+| MODE-07 | none | incomplete: fresh server weather seed and full all-mode integration incomplete |
+| MODE-09 | `lobby::mode_native_batch::mode01_04_06_09_41_lobby_mode_capacity_army_and_ai_controls` | partial: human handover unavailable |
+| MODE-10 | none | incomplete: sandbox spawn command unavailable |
+| MODE-11 | none | incomplete: all-mode startup feature switches unavailable |
+| MODE-16 | `mode_native_batch::mode16_17_tutorial_roster_uses_shared_home_and_first_unused_enemy_faction` | partial: Tutorial only; Horde constructor absent |
+| MODE-17 | `mode_native_batch::mode16_17_tutorial_roster_uses_shared_home_and_first_unused_enemy_faction` | partial: Tutorial only; Horde constructor absent |
+| MODE-21 | none | incomplete: native purpose streams deliberately replace Source global draw order; all-mode/server coverage incomplete |
+| MODE-22 | none | incomplete: Horde, Classic and Annihilation constructors absent |
+| MODE-24 | none | incomplete: radio/depot combined native behavior check not yet implemented |
+| MODE-29 | none | incomplete: ordinary Assault command/fog/veterancy consumers remain guarded |
+| MODE-30 | none | incomplete: all-mode damage scaling check lacks Horde/Annihilation runtime |
+| MODE-31 | `mode_native_batch::mode31_assault_timer_phase_finishes_once_and_freezes_clock` | partial: late timer phase only; ordinary Assault tick remains guarded |
+| MODE-32 | `mode_native_batch::mode32_assault_authoring_rejects_each_invalid_field`; `authoritative_maps::assault_authoring_errors_match_original_validator_messages` | candidate; retains existing exact validator oracle; native execution and prototype review pending |
+| MODE-33 | none | incomplete: Annihilation constructor absent |
+| MODE-34 | none | incomplete: Annihilation elimination consumer absent |
+| MODE-35 | none | incomplete: Annihilation victory consumer absent |
+| MODE-36 | none | incomplete: all-mode out-player command/income/bounty consumers incomplete |
+| MODE-37 | none | incomplete: Classic constructor absent |
+| MODE-38 | none | incomplete: Classic Sudden Death consumer absent |
+| MODE-39 | none | incomplete: Classic elimination consumer absent |
+| MODE-40 | none | incomplete: Classic victory consumer absent |
+| MODE-41 | `lobby::mode_native_batch::mode01_04_06_09_41_lobby_mode_capacity_army_and_ai_controls` | partial: fresh map reload on start/restart unavailable |
+| MODE-42 | none | incomplete: Horde constructor absent |
+| MODE-43 | none | incomplete: Horde wave runner absent |
+| MODE-44 | none | incomplete: nextwave unavailable |
+| MODE-45 | none | incomplete: Horde profile runner absent |
+| MODE-46 | none | incomplete: Horde unlock runner absent |
+| MODE-47 | none | incomplete: Horde purchase/reserve runner absent |
+| MODE-48 | none | incomplete: Horde entry runner absent |
+| MODE-49 | none | incomplete: Horde wave ending runner absent |
+| MODE-50 | none | incomplete: Horde wave MP runner absent |
+| MODE-51 | none | incomplete: Horde plane runner absent |
+| MODE-52 | none | incomplete: Horde Kaiju runner absent |
+| MODE-53 | none | incomplete: Horde reveal runner absent |
+| MODE-54 | none | incomplete: Horde ending runner absent |
+| MODE-55 | none | incomplete: Horde record persistence and lobby integration absent |
+| MODE-56 | none | incomplete: Horde server brain scheduling absent |
+| MODE-57 | none | incomplete: Tutorial public autostart remains guarded |
+| MODE-58 | `mode_native_batch::mode58_tutorial_starts_without_bases_and_recruits_at_home` | candidate; native execution and prototype review pending |
+| MODE-59 | `mode_native_batch::mode59_tutorial_tick_pays_attacker_base_income_without_vp` | candidate; native execution and prototype review pending |
+| MODE-60 | none | incomplete: retained tick7081 Trench failure blocks full nine-step progression |
+| MODE-62 | `mode_native_batch::mode62_64_65_live_orchard_recruit_tank_progression` | candidate; native execution and prototype review pending |
+| MODE-64 | `mode_native_batch::mode62_64_65_live_orchard_recruit_tank_progression` | candidate; native execution and prototype review pending |
+| MODE-65 | `mode_native_batch::mode62_64_65_live_orchard_recruit_tank_progression` | candidate; native execution and prototype review pending |
+| MODE-66 | `mode_native_batch::mode62_64_65_live_orchard_recruit_tank_progression` | partial: trench entry only; retained tick7081 clearance failure blocks completion |
