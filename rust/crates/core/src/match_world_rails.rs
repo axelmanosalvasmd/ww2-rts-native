@@ -174,17 +174,14 @@ impl WorldRails {
         }
         let mut best: BTreeMap<usize, (usize, Option<(usize, usize)>)> = BTreeMap::new();
         best.insert(source, (0, None));
-        let mut visited = BTreeSet::new();
-        while let Some((cost, at)) = best
-            .iter()
-            .filter(|(region, _)| !visited.contains(*region))
-            .map(|(&region, &(distance, _))| (distance, region))
-            .min()
-        {
+        let mut todo = vec![source];
+        while !todo.is_empty() {
+            crate::sort::sort_by(&mut todo, |a, b| best[&b].0 as f64 - best[&a].0 as f64);
+            let at = todo.pop()?;
+            let cost = best[&at].0;
             if at == target {
                 break;
             }
-            visited.insert(at);
             for (index, line) in self.lines.iter().enumerate() {
                 let next = if line.a == at {
                     line.b
@@ -210,6 +207,7 @@ impl WorldRails {
                     continue;
                 }
                 best.insert(next, (distance, Some((at, index))));
+                todo.push(next);
             }
         }
         best.get(&target)?;
@@ -736,7 +734,7 @@ impl Match {
                     .is_some_and(|r| r.team == team)
             })
             .collect();
-        let origin = own.iter().copied().min_by(|(ai, a), (bi, b)| {
+        let origin = crate::sort::first_by(own.iter().copied(), |(_, a), (_, b)| {
             let distance = |s: &WorldStation| {
                 eligible
                     .iter()
@@ -746,7 +744,7 @@ impl Match {
                     })
                     .fold(f64::INFINITY, f64::min)
             };
-            distance(a).total_cmp(&distance(b)).then(ai.cmp(bi))
+            distance(a) - distance(b)
         });
         let Some((origin_index, origin)) = origin else {
             return Ok(Some(Denial::Needs));
@@ -757,15 +755,12 @@ impl Match {
         }) {
             return Ok(Some(Denial::Needs));
         }
-        let destination = own
-            .iter()
-            .copied()
-            .filter(|(i, _)| *i != origin_index)
-            .min_by(|(ai, a), (bi, b)| {
-                math::hypot(a.x - at.x, a.z - at.z)
-                    .total_cmp(&math::hypot(b.x - at.x, b.z - at.z))
-                    .then(ai.cmp(bi))
-            });
+        let destination = crate::sort::first_by(
+            own.iter().copied().filter(|(i, _)| *i != origin_index),
+            |(_, a), (_, b)| {
+                math::hypot(a.x - at.x, a.z - at.z) - math::hypot(b.x - at.x, b.z - at.z)
+            },
+        );
         let Some((destination_index, destination)) = destination else {
             return Ok(Some(Denial::Needs));
         };
@@ -791,12 +786,11 @@ impl Match {
             let u = &game.units[id];
             math::hypot(u.x - origin.x, u.z - origin.z) <= RAIL_REACH
         });
-        eligible.sort_by(|a, b| {
-            let ua = &game.units[a];
-            let ub = &game.units[b];
+        crate::sort::sort_by(&mut eligible, |a, b| {
+            let ua = &game.units[&a];
+            let ub = &game.units[&b];
             math::hypot(ua.x - origin.x, ua.z - origin.z)
-                .total_cmp(&math::hypot(ub.x - origin.x, ub.z - origin.z))
-                .then(a.cmp(b))
+                - math::hypot(ub.x - origin.x, ub.z - origin.z)
         });
         eligible.truncate(RAIL_CARS);
         let mut garrison_exits = BTreeMap::new();
@@ -1093,6 +1087,42 @@ mod intent_tests {
         weather::WeatherChoice,
     };
     use serde_json::json;
+
+    #[test]
+    fn if25_rail_route_equal_cost_pops_last_stable_todo_entry() {
+        let mut rails = WorldRails {
+            stations: [0, 3]
+                .map(|region| WorldStation {
+                    region,
+                    cell: region,
+                    x: region as f64 * CELL + 1.0,
+                    z: 1.0,
+                    next: BTreeMap::new(),
+                })
+                .to_vec(),
+            lines: [(0, 1), (0, 2), (1, 3), (2, 3)]
+                .map(|(a, b)| WorldRailLine {
+                    a,
+                    b,
+                    cells: vec![a, b],
+                    regions: vec![a, b],
+                    bridges: vec![],
+                })
+                .to_vec(),
+            ..WorldRails::default()
+        };
+        let route = |rails: &WorldRails| {
+            rails
+                .route(7, 0, 1, &[7; 4], &[b'.'; 4], 4)
+                .unwrap()
+                .into_iter()
+                .map(|p| p.cell)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(route(&rails), vec![0, 2, 3]);
+        rails.lines.swap(0, 1);
+        assert_eq!(route(&rails), vec![0, 1, 3]);
+    }
 
     #[test]
     fn mov81_open_route_chooses_shortest_owned_lines_and_rejects_cut_bridge() {

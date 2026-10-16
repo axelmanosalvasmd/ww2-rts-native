@@ -72,6 +72,26 @@ pub(crate) fn sort_by_ref<T>(v: &mut [T], mut compare: impl FnMut(&T, &T) -> f64
     }
 }
 
+/// Selects the first entry after the prototype's stable numeric sort.
+/// Unlike a minimum scan, this also preserves V8's comparison order around NaN.
+pub(crate) fn first_by<T: Copy>(
+    values: impl IntoIterator<Item = T>,
+    compare: impl FnMut(T, T) -> f64,
+) -> Option<T> {
+    let mut values: Vec<_> = values.into_iter().collect();
+    sort_by(&mut values, compare);
+    values.first().copied()
+}
+
+/// JavaScript's `first || second` for numeric comparator results.
+pub(crate) fn then(first: f64, second: f64) -> f64 {
+    if first == 0.0 || first.is_nan() {
+        second
+    } else {
+        first
+    }
+}
+
 /// `ComputeMinRunLength`: n itself below 64, otherwise between 32 and 64.
 fn min_run_length(mut n: isize) -> isize {
     let mut r = 0;
