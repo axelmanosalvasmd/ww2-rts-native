@@ -61,12 +61,19 @@ impl Rig {
         Self::with_trusted(None).await
     }
     async fn with_trusted(trusted: Option<TrustedRoomConfig>) -> Self {
+        Self::with_editor(trusted, None).await
+    }
+    async fn with_editor(
+        trusted: Option<TrustedRoomConfig>,
+        map_editor: Option<MapEditor>,
+    ) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let address = listener.local_addr().unwrap();
         let (stop, stopped) = watch::channel(false);
         let (workers, supervisors) = start_workers(
             Config {
                 max_rooms: 1,
+                map_editor: map_editor.clone(),
                 ..Config::default()
             },
             trusted,
@@ -77,6 +84,7 @@ impl Rig {
             worker.sender().await.unwrap();
         }
         let front = Front {
+            map_editor,
             workers,
             stop: stopped.clone(),
         };
@@ -407,5 +415,34 @@ async fn intent_net96_trusted_front_preserves_private_code_bound_ingress_on_ever
     })
     .await
     .unwrap();
+    rig.shutdown().await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn net12_front_persists_maps_and_both_workers_refresh_horde_catalogue() {
+    let dir = crate::map_editor_tests::Dir::new();
+    let editor = MapEditor::open(dir.0.clone(), "editor-password").unwrap();
+    let rig = Rig::with_editor(None, Some(editor.clone())).await;
+    let address = rig.address;
+    tokio::task::spawn_blocking(move || {
+        let mut a=Client::open(address,"room0","a",None); a.until("lobby");
+        let mut b=Client::open(address,"room1","b",None); b.until("lobby");
+        for client in [&mut a,&mut b] { client.send(json!({"t":"mode","v":"horde"})); assert!(!client.until("lobby")["hordeMaps"].as_array().unwrap().contains(&json!("saved"))); }
+        let body=crate::map_editor_tests::raw_map().to_string();
+        let mut socket=TcpStream::connect(address).unwrap();socket.set_read_timeout(Some(Duration::from_secs(10))).unwrap();
+        write!(socket,"POST /maps/saved HTTP/1.0\r\nHost: {address}\r\nX-Edit-Password: editor-password\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",body.len()).unwrap();
+        let mut response=String::new();socket.read_to_string(&mut response).unwrap();
+        assert!(response.starts_with("HTTP/1.0 200"),"{response}");assert!(response.ends_with("{\"ok\":true}"));
+        for client in [&mut a,&mut b] {
+            client.send(json!({"t":"map","name":"saved"}));let lobby=client.until("lobby");
+            assert_eq!(lobby["mapName"],"saved");assert!(lobby["hordeMaps"].as_array().unwrap().contains(&json!("saved")));
+            client.send(json!({"t":"mode","v":"conquest"}));assert_eq!(client.until("lobby")["spawns"],2);
+        }
+        let (headers,public)=http(address,"/maps/saved",false);assert!(headers.starts_with("HTTP/1.0 200"));assert!(public.get("triggers").is_none());
+        // Replacing a Horde map invalidates the defender list in every worker too.
+        let mut raw=crate::map_editor_tests::raw_map(); raw.as_object_mut().unwrap().remove("defend");
+        editor.save("saved",raw.to_string().as_bytes()).unwrap();
+        for client in [&mut a,&mut b] {client.send(json!({"t":"mode","v":"horde"}));assert!(!client.until("lobby")["hordeMaps"].as_array().unwrap().contains(&json!("saved")));}
+    }).await.unwrap();
     rig.shutdown().await;
 }

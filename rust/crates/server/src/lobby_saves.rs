@@ -253,6 +253,7 @@ impl Hub {
         let staged = Room {
             code: room.code.clone(),
             saves: room.saves.clone(),
+            records: room.records.clone(),
             listed: room.listed,
             title: room.title.clone(),
             players,

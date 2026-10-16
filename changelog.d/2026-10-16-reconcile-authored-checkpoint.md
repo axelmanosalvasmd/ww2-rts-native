@@ -1,0 +1,1 @@
+- Gave objective missions the same complete v2 checkpoint schema as the scenario engine, preserving trigger records, objective scopes, condition facts and capture history without a second save-version bump.
