@@ -368,7 +368,7 @@ fn observe(m: &Match) -> Value {
         "nextProductionJob"=>n(m.production.next_job_id() as f64),"covers"=>array_or_raw(&m.support.covers),
         "convoys"=>raw(&m.convoys),"scenario"=>raw(&m.scenario),"world"=>raw(&m.world_runtime.as_ref().map(|_|"present")),
         "trenchFront"=>option(g.trench_front.as_ref(),|v|f32s(v)),
-        "tough"=>option(g.tough.as_ref(),|v|typed("RustVecF64",v.iter().copied())),
+        "tough"=>option(g.tough.as_ref(),|v|f32s(v)),
         "shoal"=>option(w.shoal.as_ref(),|v|typed("Uint8Array",v.iter().map(|v|f64::from(*v)))),
         "logisticsEnabled"=>json!(m.options.logistics),"supply"=>json!(m.options.supply),"sandbox"=>json!(m.options.sandbox),
         "tech"=>json!(m.options.tech),"army"=>army,

@@ -101,6 +101,20 @@ fn eng07_paid_bridge_builds_five_cells_from_the_builders_bank() {
 }
 
 #[test]
+fn eng07_bridge_on_dry_ground_is_refused_without_payment_or_work() {
+    let mut m = river_match();
+    let before = m.world.game.chars.clone();
+    assert_eq!(
+        command(&mut m, "bridge", Point { x: 11., z: 21. }, Some(0.)),
+        Some(Denial::Blocked)
+    );
+    assert_eq!(m.start.economy.players[0].mp, 500.);
+    assert!(m.field_works.jobs().is_empty());
+    assert!(!m.world.game.units[&1].dig);
+    assert_eq!(m.world.game.chars, before);
+}
+
+#[test]
 fn eng08_fill_is_paid_once_and_rechecks_each_changed_cell() {
     let fixture: Value =
         serde_json::from_str(include_str!("../tests/fixtures/match-engineering.json")).unwrap();
@@ -142,7 +156,7 @@ fn eng08_fill_is_paid_once_and_rechecks_each_changed_cell() {
 
 #[test]
 fn eng16_bridge_preview_masks_sight_and_reorders_a_reversed_span_from_the_bank() {
-    let m = river_match();
+    let mut m = river_match();
     let at = Point { x: 25., z: 21. };
     assert_eq!(
         crate::field_works::placement(&m.world, FortKind::Bridge, at, 0., Some(0), |_| false),
@@ -159,20 +173,40 @@ fn eng16_bridge_preview_masks_sight_and_reorders_a_reversed_span_from_the_bank()
         |_| true,
     )
     .unwrap();
-    assert!(m.world.bridge_supported_at(reverse[0].cell));
-    let mut prior = BTreeSet::new();
-    for c in reverse {
-        assert!(
-            m.world.bridge_supported_at(c.cell)
-                || m.world
-                    .neighbors(c.cell)
-                    .into_iter()
-                    .flatten()
-                    .any(|n| prior.contains(&n))
-        );
-        prior.insert(c.cell);
-    }
-    assert_eq!(prior.len(), 5);
+    // Prototype fortCells emits right to left at PI. supportedBridgePlan keeps
+    // that order when the right bank supports the first cell (sim.js:2538-2551).
+    assert_eq!(
+        reverse.iter().map(|c| (c.cell, c.ch)).collect::<Vec<_>>(),
+        vec![
+            (414, b'='),
+            (413, b'='),
+            (412, b'='),
+            (411, b'='),
+            (410, b'=')
+        ]
+    );
+    // Removing only the right bank makes the same directed plan wait for the
+    // leftmost cell, then accept one more cell on each pass through pending.
+    m.world.set_cell(415, b'W').unwrap();
+    let reverse = crate::field_works::placement(
+        &m.world,
+        FortKind::Bridge,
+        at,
+        std::f64::consts::PI,
+        Some(0),
+        |_| true,
+    )
+    .unwrap();
+    assert_eq!(
+        reverse.iter().map(|c| (c.cell, c.ch)).collect::<Vec<_>>(),
+        vec![
+            (410, b'='),
+            (411, b'='),
+            (412, b'='),
+            (413, b'='),
+            (414, b'=')
+        ]
+    );
     assert_eq!(
         crate::field_works::placement(
             &m.world,

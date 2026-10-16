@@ -170,6 +170,10 @@ impl StartPlan {
         #[cfg(test)] replay: Option<crate::aligned_replay::Replay>,
     ) -> Result<Self, String> {
         let world_mode = matches!(&profile, StartupProfile::World(_));
+        // Validation permits saving authored missions. Their executor is not admitted yet.
+        if map.source().get("scenario").is_some() {
+            return Err("native startup does not yet execute authored scenarios".into());
+        }
         let horde_mode = matches!(&profile, StartupProfile::Horde);
         let defender_team = match &profile {
             StartupProfile::Assault { defender_team } => Some(*defender_team),
@@ -346,12 +350,7 @@ impl StartPlan {
                 })
             })
             .collect::<Result<Vec<_>, String>>()?;
-        let army_key = match options.army {
-            ArmySize::Standard => "standard",
-            ArmySize::Large => "large",
-            ArmySize::Massive => "massive",
-            ArmySize::Endless => "endless",
-        };
+        let army_key = options.army.key();
         let income_scale = number(field(field(cfg, "armies")?, army_key)?, "income")?;
         let initial_mp = number(
             if world_mode {
