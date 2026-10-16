@@ -11,6 +11,9 @@ use crate::{
 };
 use std::collections::{BTreeMap, BTreeSet};
 
+#[cfg(test)]
+mod combat_guard_tests;
+
 pub struct WorldRouting<'a> {
     knowledge: &'a RouteKnowledge,
     live: &'a WorldLive,
