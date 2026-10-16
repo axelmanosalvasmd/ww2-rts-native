@@ -9,3 +9,5 @@ Ground army centre excludes aircraft and falls back to the seat's spawn. A ready
 Existing JSON WebSocket v0 shapes remain identical to `shared/sim.js:6016-6062`: `air` is `[id,state,ceil(fuel),ammo,ceil(timer)]`, queues carry progress, rally and unit names, and `productionJobs` retain original paid charges and active/waiting status. These lists belong to the receiving owner. Aircraft appear at their selected producer regardless of rally (`shared/sim.js:1071-1079`). Classic head jobs train only at finished living buildings outside Sudden Death (`shared/sim.js:1065-1070,5352`); fighter/attacker/bomber train for 30/35/45 seconds (`shared/sim.js:381`).
 
 This batch adds no World or Horde room admission. Complete mixed rows retain their other stream and deferred World dependencies.
+
+Trusted Classic room attachment now supplies the existing public `nodes` rows to the global list-version cache. The bytes match the recipient projection: `[round(x*10)/10,round(z*10)/10,rate,fuel?1:0]` (`shared/sim.js:6019`). Classic mode and canonical elimination state must match; other held modes still refuse. Public lobby startup is unchanged.

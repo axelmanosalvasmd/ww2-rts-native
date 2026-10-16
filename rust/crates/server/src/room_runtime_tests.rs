@@ -1023,6 +1023,18 @@ fn base21_hosted_classic_aircraft_train_fifo_at_exact_times_and_pause_without_lo
         .collect_frame(&selected, FrameKind::Current)
         .unwrap();
     let owner = &initial_frames.iter().find(|f| f.slot == 0).unwrap().message;
+    let raw_nodes = runtime
+        .state()
+        .ordinary_snapshot_raw_lists()
+        .unwrap()
+        .nodes
+        .unwrap();
+    assert_eq!(owner["nodes"], raw_nodes);
+    assert!(raw_nodes.as_array().is_some_and(|nodes| !nodes.is_empty()));
+    for frame in &initial_frames {
+        assert_eq!(frame.message["nodes"], raw_nodes);
+        assert_eq!(frame.list_versions.nodes, 1);
+    }
     let jobs = owner["productionJobs"]
         .as_array()
         .unwrap()
@@ -1095,6 +1107,10 @@ fn base21_hosted_classic_aircraft_train_fifo_at_exact_times_and_pause_without_lo
                 .collect_frame(&selected, FrameKind::Current)
                 .unwrap();
             assert_eq!(frames.len(), 2);
+            for frame in &frames {
+                assert_eq!(frame.message["nodes"], raw_nodes);
+                assert_eq!(frame.list_versions.nodes, 1);
+            }
             let state = runtime.state();
             let elapsed = (state.world.game.tick - start_tick) as f64 * 0.05;
             let owner = &frames.iter().find(|f| f.slot == 0).unwrap().message;
@@ -1156,6 +1172,22 @@ fn base21_hosted_classic_aircraft_train_fifo_at_exact_times_and_pause_without_lo
             .jobs()
             .is_empty()
     );
+    // Shared list versions must also publish a real public node change exactly once.
+    let state = runtime.state_mut();
+    let classic = state.elimination.as_mut().unwrap();
+    classic.nodes[0].rate += 0.25;
+    let rate = classic.nodes[0].rate;
+    let mut changed_nodes = raw_nodes.clone();
+    changed_nodes[0][2] = json!(rate);
+    for _ in 0..2 {
+        let frames = runtime
+            .collect_frame(&selected, FrameKind::Current)
+            .unwrap();
+        for frame in frames {
+            assert_eq!(frame.message["nodes"], changed_nodes);
+            assert_eq!(frame.list_versions.nodes, 2);
+        }
+    }
     // Sudden Death freezes a real paid job, including its existing progress.
     assert_eq!(
         runtime
