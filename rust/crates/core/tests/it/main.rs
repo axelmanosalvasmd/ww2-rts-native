@@ -5,10 +5,10 @@
 //! Windows. A new test file needs a `#[path]` module below;
 //! `every_test_file_is_compiled` fails until it has one.
 
-#[path = "../base_audit_features.rs"]
-mod base_audit_features;
 #[path = "../authoritative_maps.rs"]
 mod authoritative_maps;
+#[path = "../base_audit_features.rs"]
+mod base_audit_features;
 #[path = "../client_view.rs"]
 mod client_view;
 #[path = "../combat.rs"]

@@ -1,6 +1,6 @@
 //! Economy and purchase behaviors exercised through the existing native components.
 use ww2_core::{
-    economy::{self, Faction, Mode, TechState},
+    economy::{Faction, Mode, TechState},
     economy_state::{
         self as es, ArmySize, EconomyState, ModeContext, PlayerEconomy, Region, RegionKind,
         WorldContext,
