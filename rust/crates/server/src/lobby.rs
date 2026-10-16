@@ -437,10 +437,7 @@ impl Room {
                     .map_or_else(|| name.clone(), |p| p.name.clone())
             })
             .collect();
-        let mut report = result_message(
-            result,
-            names,
-        )?;
+        let mut report = result_message(result, names)?;
         let state = native.runtime.state();
         if let Some(horde) = &state.horde {
             let run = crate::horde_records::Run {
@@ -2600,8 +2597,8 @@ pub(crate) use async_start::StartRequest;
 #[path = "async_start_tests.rs"]
 mod async_start_tests;
 
+#[path = "horde_host.rs"]
+mod horde_host;
 #[cfg(test)]
 #[path = "results2_tests.rs"]
 mod results2_tests;
-#[path = "horde_host.rs"]
-mod horde_host;

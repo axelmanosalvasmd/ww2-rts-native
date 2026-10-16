@@ -117,9 +117,11 @@ impl<'a> SnapshotCache<'a> {
     pub fn new(state: &'a Match) -> Result<Self, SnapshotError> {
         let horde = state.options.mode == Mode::Horde
             && state.world.game.mode == Some(crate::game::ModeKind::Horde);
-        if !(horde || matches!(state.options.mode,
-            Mode::Default | Mode::Conquest | Mode::Assault | Mode::Annihilation | Mode::Classic)
-            && crate::match_actor::ordinary_ground_mode(&state.world.game, state.options.mode))
+        if !(horde
+            || matches!(
+                state.options.mode,
+                Mode::Default | Mode::Conquest | Mode::Assault | Mode::Annihilation | Mode::Classic
+            ) && crate::match_actor::ordinary_ground_mode(&state.world.game, state.options.mode))
             || state.world.geography().is_some()
             || (state.options.mode != Mode::Assault && state.assault.is_some())
             || state.world_runtime.is_some()
@@ -137,7 +139,8 @@ impl<'a> SnapshotCache<'a> {
                 .map_err(|_| SnapshotError::Rules)?;
         }
         if horde {
-            state.validate_horde_economy()
+            state
+                .validate_horde_economy()
                 .map_err(|_| SnapshotError::Rules)?;
         }
         let g = &state.world.game;
@@ -487,7 +490,7 @@ fn near_cover(state: &Match, u: &Unit) -> Result<bool, SnapshotError> {
 /// JSON omits fields that are undefined in the prototype's modeRow.
 fn ordinary_mode_row(state: &Match) -> Result<Option<Value>, SnapshotError> {
     Ok(match state.options.mode {
-        Mode::Default | Mode::Conquest => None,
+        Mode::Default | Mode::Conquest | Mode::Horde => None,
         Mode::Assault => {
             let mode = state.assault.ok_or(SnapshotError::Rules)?;
             finite(&[mode.time_left])?;

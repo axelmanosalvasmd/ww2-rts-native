@@ -1,0 +1,21 @@
+# HOSTED-RESULTS row mapping
+
+The branch starts at #385, stacks on #384, merges save/editor/records #376 and hosted Horde #413 (which stacks on #399/#357), and includes fixed main after #373. Source is pinned to prototype e4e579a. No parity status table is edited.
+
+Full-row claims in this combined tree are MODE-55, MODE-94 and NET-94. MODE-90/96 have their assigned hosted Horde remainder covered, but their Tutorial paths remain on #387 and are not counted as complete rows here. NET-78 remains partial pending human AI idle integration. MODE-09 remains held for ROOM-AI. No row is dropped and no difference is proposed.
+
+Each row's literal test mapping:
+
+- MODE-55: `mode55_mode90_net94_hosted_completion_records_and_sandbox_exclusion`; `net94_isolated_game_workers_publish_to_one_record_owner_and_keep_better_run`; inherited `mode55_records_exact_shape_keys_order_and_durable_reload`.
+- MODE-90: `mode55_mode90_net94_hosted_completion_records_and_sandbox_exclusion`, plus inherited `mode90_complete_ordinary_results_publish_story_timeline_and_each_seat_outcome` and `mode90_host_end_publishes_only_ended_and_clears_pause_after_live_snapshots`.
+- MODE-94: `mode94_horde_editor_restart_refusal_is_atomic_and_success_uses_fresh_seeds`, inherited `mode41_horde_maps_select_preserve_ignore_and_reread_start_restart_atomically`, and ordinary `mode94_restart_keeps_settings_uses_fresh_seeds_and_runs_recipient_frames`.
+- MODE-96: `mode96_horde_exact_break_active_boss_and_later_break_rows`, `mode55_mode90_net94_hosted_completion_records_and_sandbox_exclusion`, inherited `mode96_ordinary_modes_deliver_exact_rows_through_victory_and_full_hold` and `horde_mode_wire_fields_and_private_purchase_omissions_match_prototype`. Scope is admitted ordinary modes and Horde; Tutorial delivery remains with its runtime stream, World is deferred by decision C.
+- NET-94: `net94_isolated_game_workers_publish_to_one_record_owner_and_keep_better_run`; `mode55_mode90_net94_hosted_completion_records_and_sandbox_exclusion`.
+- NET-78, non-AI portion: the same hosted completion test checks all 120 callbacks, exactly 60 alternating steps/frames, refusal of valid stop input, final frame before result lobby, defender outcomes and unchanged scripted Horde brain. Ordinary ending/result tests remain complementary evidence. Human AI idle behavior remains with ROOM-AI.
+- MODE-09: no new non-AI behavior in this row. Difficulty and Normal handover remain ROOM-AI-owned and are unclaimed here until that stream is integrated.
+
+Save continuation is additional requested scope: `hosted_horde_save_restores_wave_inputs_and_brain_then_resumes_to_full_ending_hold`, `hosted_horde_save_restores_sandbox_flag_and_resumes_every_seat`, and `hosted_horde_save_keeps_human_and_atomic_load_capability_guards`. They use real save/load socket dispatch, preserve the canonical wave/RNG/recorded input, restore host pause, reconstruct the scripted brain from recipient facts, and continue through all-seat snapshots. The natural boss fight reaches the full ending hold after load. The sandbox test preserves its flag; completed sandbox runs separately prove no record publication.
+
+Worker ownership coverage uses real hosted room completion in two isolated game threads with the front-configured record owner handle. It protects equal late runs, current best lookup, persisted reload and key isolation. This is source-level use of the game-worker architecture, not an external two-shard WebSocket test.
+
+The merge conflict and hand-edited path ledger is in `changelog.d/2026-10-16-hosted-results.md`. Historical passing receipts from prerequisite PRs do not qualify this combined tree. Final-head commands and their actual results are recorded in the PR body.

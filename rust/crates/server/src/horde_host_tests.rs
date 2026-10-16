@@ -303,6 +303,7 @@ fn mode44_host_nextwave_ignores_guest_pause_and_active_wave_then_ticks_and_recon
 fn mode56_hosted_horde_runs_boss_combat_to_result_and_complete_hold_with_all_seat_frames() {
     let (mut hub, _a, mut ra, _, mut rb) = lobby();
     let dir = MapDir::new();
+    hub.configure_records(crate::HordeRecords::new(dir.0.join("records.json")));
     dir.write(&arena());
     hub.configure_authored_maps(Some(dir.0.clone()));
     let map = hub.horde_map("bastogne").unwrap();
@@ -425,3 +426,6 @@ fn mode56_hosted_horde_runs_boss_combat_to_result_and_complete_hold_with_all_sea
                 && v.get("vp").is_none())
     );
 }
+
+#[path = "hosted_results_tests.rs"]
+mod hosted_results;

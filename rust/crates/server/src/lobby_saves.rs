@@ -1,5 +1,17 @@
-//! Save admission and transactional restoration for ordinary human rooms.
+//! Save admission and transactional restoration for ordinary and Horde human rooms.
 use super::*;
+
+fn saved_mode_supported(mode: &str, state: &Match, seats: usize) -> bool {
+    match mode {
+        "conquest" => matches!(state.options.mode, Mode::Default | Mode::Conquest),
+        "horde" => {
+            state.options.mode == Mode::Horde
+                && (1..=5).contains(&seats)
+                && state.horde.as_ref().is_some_and(|h| h.slot == seats)
+        }
+        _ => false,
+    }
+}
 
 impl Hub {
     pub(super) fn save_command(
@@ -79,9 +91,9 @@ impl Hub {
             return Err("faulted match".into());
         }
         let state = native.runtime.state();
-        if !matches!(state.options.mode, Mode::Default | Mode::Conquest)
+        if !saved_mode_supported(&room.mode, state, room.players.len())
             || state.options.logistics
-            || state.options.sandbox
+            || (state.options.sandbox && state.options.mode != Mode::Horde)
             || state.world_runtime.is_some()
             || room.players.iter().any(|p| p.ai)
             || !room.spectators.is_empty()
@@ -125,16 +137,17 @@ impl Hub {
         }
         let saved = room.saves.read(code, id)?;
         // Closed room capabilities remain closed even when a file is valid JSON.
-        if saved["settings"]["mode"] != "conquest"
-            || !saved["guard"].is_null()
+        if !matches!(
+            saved["settings"]["mode"].as_str(),
+            Some("conquest" | "horde")
+        ) || !saved["guard"].is_null()
             || !saved["ai"].is_null()
         {
             return Err("save needs an unavailable room capability".into());
         }
         let state = Match::from_save_json(saved["g"]["state"].clone())?;
-        if !matches!(state.options.mode, Mode::Default | Mode::Conquest)
-            || state.options.logistics
-            || state.options.sandbox
+        if state.options.logistics
+            || (state.options.sandbox && state.options.mode != Mode::Horde)
             || state.world_runtime.is_some()
         {
             return Err("save needs an unavailable room capability".into());
@@ -143,6 +156,13 @@ impl Hub {
             .as_array()
             .filter(|s| !s.is_empty() && s.len() <= MAX_PLAYERS)
             .ok_or("invalid saved roster")?;
+        if !saved_mode_supported(
+            saved["settings"]["mode"].as_str().unwrap(),
+            &state,
+            seats.len(),
+        ) {
+            return Err("saved mode disagrees with the match".into());
+        }
         let present = room
             .players
             .iter()
@@ -272,6 +292,9 @@ impl Hub {
             starting: None,
             result: None,
         };
+        // prepare_native_room rebuilds the internal Horde brain from the loaded
+        // recipient view. The canonical wave, RNG and recorded inputs stay saved.
+        // Prototype saves.js:20-21 also permits omitted AI memories to start afresh.
         let mut prepared =
             self.prepare_native_room(&staged, state, now, false, Some(&saved["map"]))?;
         prepared
@@ -298,3 +321,7 @@ impl Hub {
         Ok(self.publish_native(code, prepared))
     }
 }
+
+#[cfg(test)]
+#[path = "horde_save_tests.rs"]
+mod horde_tests;

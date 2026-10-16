@@ -20,7 +20,8 @@ impl StartRequest {
         if let Some(raw) = &self.edited_map {
             let map = ww2_core::map::AuthoritativeMap::from_json(
                 &serde_json::to_vec(raw).map_err(|error| error.to_string())?,
-            ).map_err(|error| error.to_string())?;
+            )
+            .map_err(|error| error.to_string())?;
             Match::new(&map, self.options.clone())
         } else {
             crate::authoritative_maps::create_match(&self.map, self.options.clone())
@@ -100,7 +101,10 @@ impl Hub {
         Ok(StartRequest {
             token: Arc::new(()),
             map: room.map.clone(),
-            edited_map: self.map_editor.as_ref().and_then(|editor| editor.raw(&room.map)),
+            edited_map: self
+                .map_editor
+                .as_ref()
+                .and_then(|editor| editor.raw(&room.map)),
             restart,
             options: MatchOptions {
                 // Failed preparations leave next_epoch unchanged, so only a

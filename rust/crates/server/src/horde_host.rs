@@ -10,7 +10,16 @@ impl Hub {
     }
 
     fn horde_map(&self, key: &str) -> Result<AuthoritativeMap, String> {
-        // Catalogue membership bounds the path. Files are private host input, never HTTP data.
+        if let Some(editor) = &self.map_editor {
+            let raw = editor
+                .raw(key)
+                .ok_or("Horde map absent from editor catalogue")?;
+            return AuthoritativeMap::from_json(
+                &serde_json::to_vec(&raw).map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string());
+        }
+        // Catalogue membership bounds the private authored-file path.
         crate::authoritative_maps::load(key).map_err(|e| e.to_string())?;
         if let Some(dir) = &self.authored_maps_dir {
             let bytes = std::fs::read(dir.join(format!("{key}.json")))
@@ -89,8 +98,11 @@ impl Hub {
                             v.wrapping_mul(1099511628211) ^ u64::from(c)
                         })
                 },
-                |t| t.seed,
+                |t| t.seed.wrapping_add(self.next_epoch),
             );
+        let weather_seed = ww2_core::random::MatchRandom::new(seed)
+            .below(ww2_core::random::StreamId::Weather, 1 << 31)
+            .map_err(|e| format!("Horde weather seed: {e:?}"))? as u32;
         let state = Match::new_horde(
             &map,
             MatchOptions {
@@ -100,7 +112,7 @@ impl Hub {
                 shuffle: true,
                 army,
                 weather: WeatherChoice::from_reference(Some(&room.weather)),
-                weather_seed: None,
+                weather_seed: Some(weather_seed),
                 living_weather: true,
                 map_key: Some(room.map.clone()),
                 tech: true,

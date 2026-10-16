@@ -39,7 +39,7 @@ The root has these seven required keys. The six content owners correspond to `se
 | `map` | Full raw authored map, including private layers and triggers. It is never replaced with `mapForClient`. The prototype uses `null` in World (`server.js:426`); native World restoration is refused. |
 | `seats` | Saved roster in simulation slot order, with the keys below (`server.js:425`). |
 | `settings` | Exactly the nine setting keys below (`server.js:419,426`). |
-| `ai` | Planner memories, separately owned from `g` (`shared/ai.js:159-165`). Currently `null`; non-null memories and AI seats are refused until hosted planner restoration exists. Commander state is not added to this envelope. |
+| `ai` | Planner memories, separately owned from `g` (`shared/ai.js:159-165`). Currently `null`; non-null memories and human AI seats are refused until hosted planner restoration exists. The internal Horde director restarts from its loaded recipient view, matching the prototype fallback when memories are omitted (`server/saves.js:20-21`; `server.js:401-404`). Commander state is not added to this envelope. |
 
 Each saved seat has `name`, `token`, `ai`, `level`, `team`, `faction`. `name` removes a trailing ` (AI)`; `ai` is boolean; `level` is the difficulty string, or `null` for a human without an AI level; `team` and `faction` are the original numeric values (`server.js:425`). A valid UTF-16 token is saved as a JSON string. A token ending in an unpaired surrogate uses `{utf16: [code units]}` so the native server's existing truncated token identity survives JSON without replacement characters. This is a private format representation, not a socket field.
 
@@ -47,7 +47,7 @@ The setting keys and values are:
 
 | Key | Value |
 | --- | --- |
-| `mode` | Room mode, currently admitted as `conquest`. |
+| `mode` | Room mode, currently admitted as `conquest` or `horde`. |
 | `worldSize` | World-size setting string. |
 | `mapName` | Authored map key. |
 | `mapSpawns` | Raw authored spawn objects, preserving `x`, `y` and optional `assault`. |
@@ -57,7 +57,7 @@ The setting keys and values are:
 | `logistics` | Match logistics switch. |
 | `tech` | Match technology switch. |
 
-The list is identical to `server.js:419`. In particular, `sandbox` is not a setting key. Native sandbox and logistics room restoration remain refused by this batch's existing room capability boundary.
+The list is identical to `server.js:419`. In particular, `sandbox` is not a setting key. Sandbox Horde restoration preserves the checkpoint flag; ordinary sandbox and logistics restoration remain refused.
 
 ## Game checkpoint encoding
 
@@ -105,7 +105,7 @@ The `state` struct field keys are listed below. These are native component bound
 
 Version remains 1. The hotfix completes serialization of the existing `Match.elimination` field and documents its nested keys; it adds no envelope or socket keys. Main `57ebeb8e`, which combined elimination modes and versioned saves, could not compile and therefore could not write a v1 checkpoint. A checkpoint from another build that omits `elimination` still deserializes that optional owner as `None`, so otherwise compatible non-elimination v1 saves remain loadable. Missing state is not reconstructed for Annihilation or Classic: their validators reject it. A present elimination record must contain its required typed fields; incomplete records are refused.
 
-Annihilation and Classic remain excluded by ordinary recipient snapshot admission, including the room save/load path. Their full Match checkpoint codec is tested independently, including Classic sudden death, resource nodes and next-tick continuation. Serializing their owners does not open room admission.
+Annihilation and Classic are admitted for recipient snapshots but remain excluded by room save/load admission. Their full Match checkpoint codec is tested independently, including Classic sudden death, resource nodes and next-tick continuation. Serializing their owners does not open room admission.
 
 ## Admission and delivery
 
@@ -128,3 +128,9 @@ NET-12 (editor writes), MODE-55 (Horde records), NET-90 (World autosave), the fu
 The elimination serialization repair and editor/record persistence retain version 1. An absent `elimination` means no elimination owner, matching an ordinary prototype game without that mode state. Present elimination values remain lossless, and elimination modes reject missing authoritative state. Editor maps and Horde records add no match checkpoint keys.
 
 Authored missions require one version increment, to version 2. The prototype restores the saved game directly (`server/saves.js:23-26`, `server.js:434-451`); it does not restart mission execution on load. Defaulting a running mission's executions, objectives, historical captures or pending arrivals would change that game. Version 1 binaries can ignore unknown struct fields, so version 2 also prevents them from silently discarding an authored owner. Both scenario PRs must use the same complete authored checkpoint schema, including contextual trigger records, objective scopes, condition facts, current target owners and deferred arrivals. The objective-only executor writes that schema before the engine extends behavior. Non-authored saves remain version 1; readers accept versions 1 and 2, and version 1 carrying authored state is refused. There is no version 3 in this stack.
+
+## Hosted Horde continuation
+
+Horde rooms with one through five human defenders use the same envelope, commands and transactional load. The internal Horde seat is part of `g`, not `seats`. Canonical wave state, RNG streams, queued commands, pending effects and ending-hold counter survive. `settings.mode` must agree with the checkpoint and the internal Horde slot must follow the saved defenders. The original raw map is sufficient even if the host later removes its authored map file. Sandbox Horde saves preserve `g`'s sandbox flag, as `server.js:420-432,466` does; result record suppression remains independent (`:753`).
+
+Preparation seeds a new internal director from the loaded recipient packet before publishing any starts. This follows the prototype's permitted missing-memory fallback (`server/saves.js:20-21`) and fresh Horde observation (`server.js:401-404`). It does not claim preservation of the private director's previous planner queue. Human AI seats and their planner restoration remain separate work. Loaded Horde stays in the same indefinite host pause, resumes only for the host and continues through ordinary every-seat snapshots and the complete ending hold.
