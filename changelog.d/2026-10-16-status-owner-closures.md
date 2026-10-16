@@ -1,0 +1,2 @@
+- Close 1 Rust-side Unreal-only parity row as accepted under owner decision B and drop 1 running-World row for milestone R1 under decision C. The 10 decision-A rows already differ and stay unchanged.
+- Mark 5 merged PR #368 save/status rows ported with verified test-function citations. Leave 188 unresolved table entries (187 distinct IDs) open; the existing duplicate BASE-18 entry remains unchanged.
