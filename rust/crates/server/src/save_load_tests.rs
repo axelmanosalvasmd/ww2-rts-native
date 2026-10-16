@@ -622,7 +622,7 @@ fn net80_loaded_save_stays_host_paused_until_host_resume_and_refuses_versions_at
                 < rows.iter().position(|m| m["t"] == "start").unwrap()
         );
         assert_eq!(
-            rows.last().unwrap(),
+            &rows[rows.iter().position(|m| m["t"] == "start").unwrap() - 1],
             &json!({"t":"pause","paused":true,"by":"host","reason":"host","left":0})
         );
     }

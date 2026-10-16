@@ -1,5 +1,6 @@
 //! Prototype retained flight rows. Internal grenade and salvo tickets have no wire row.
 use super::*;
+#[cfg(test)]
 use crate::{
     game::Point,
     grid::SpatialGrid,
@@ -16,17 +17,6 @@ pub(super) fn validate(state: &Match) -> Result<(), SnapshotError> {
         state
             .validate_firing_tick_state()
             .map_err(|_| SnapshotError::Rules)?;
-        if state
-            .firing
-            .flights
-            .values()
-            .any(|p| state.rules.kinds[p.source_kind].air)
-        {
-            return Err(SnapshotError::Unsupported {
-                unit: 0,
-                capability: SnapshotCapability::Air,
-            });
-        }
     }
     if !state.firing.grenades.is_empty() {
         state
@@ -50,6 +40,7 @@ pub(super) fn validate(state: &Match) -> Result<(), SnapshotError> {
 
 /// Static extrapolation uses current bodies and only recipients' seen units,
 /// matching flightContact with a fresh prior map and fractions (1, 1).
+#[cfg(test)]
 fn contact_fraction(
     state: &Match,
     slot: usize,
@@ -162,6 +153,7 @@ fn contact_fraction(
     Ok(best)
 }
 
+#[cfg(test)]
 pub(super) fn for_seat(state: &Match, slot: usize) -> Result<Value, SnapshotError> {
     let g = &state.world.game;
     let team = g

@@ -121,20 +121,26 @@ fn net66_presence_and_ping_survive_scheduled_paused_catchup_and_reconnect_delive
     }
     assert!(hub.native_status("ABC").unwrap().fault.is_none());
 
-    // AI metadata uses the same production projection, without enabling room AI.
+    // AI metadata uses the same production projection in a hosted room.
     let mut lobby = Hub::new(32, String::new());
-    let (client, _rx) = peer(10);
+    let (client, mut rx) = peer(10);
     join(&mut lobby, &client, "human", 0);
     lobby.message("ABC", &client, &mut true, json!({"t":"addAi"}), 1);
     let ai = &mut lobby.rooms.get_mut("ABC").unwrap().players[1];
     ai.rtt = Some(123.0);
     assert!(ai.online());
     assert_eq!(ai.ping(), Some(-1.0));
-    assert!(
-        lobby
-            .attach_native("ABC", native_tests::native_match(), 2)
-            .is_err()
-    );
+    lobby
+        .attach_native("ABC", native_tests::native_match(), 2)
+        .unwrap();
+    drain(&mut lobby, &mut rx, 2);
+    lobby.poll_native(2, 0);
+    lobby.poll_native(52, 50_000_000);
+    let delivered = drain(&mut lobby, &mut rx, 52);
+    let frame = snapshots(&delivered).next().unwrap();
+    assert_eq!(frame["online"], json!([true, true]));
+    assert_eq!(frame["ping"][1].as_f64(), Some(-1.0));
+    assert!(lobby.native_status("ABC").unwrap().fault.is_none());
 }
 
 #[test]

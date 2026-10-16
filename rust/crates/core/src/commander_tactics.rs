@@ -37,6 +37,13 @@ pub struct KnownBuilding {
     pub at: Point,
 }
 #[derive(Clone, Debug, PartialEq)]
+pub struct NodeObservation {
+    pub at: Point,
+    pub rate: f64,
+    pub fuel: bool,
+    pub visible: bool,
+}
+#[derive(Clone, Debug, PartialEq)]
 pub struct Context {
     pub mode: Mode,
     pub naval: bool,
@@ -56,12 +63,13 @@ pub struct Context {
     pub sight: f64,
     pub support: BTreeMap<String, f64>,
     /// Resource positions and enemy depot memories already delivered to this seat.
-    pub nodes: Vec<Point>,
+    pub nodes: Vec<NodeObservation>,
     pub known_depots: Vec<Point>,
     /// Indices of delivered nodes on owned World ground. Other modes use every node.
     pub owned_nodes: BTreeSet<usize>,
     pub build_reserve: f64,
     pub fort_reserve: f64,
+    pub claimed_nodes: BTreeSet<usize>,
 }
 impl Default for Context {
     fn default() -> Self {
@@ -88,6 +96,7 @@ impl Default for Context {
             owned_nodes: BTreeSet::new(),
             build_reserve: 0.0,
             fort_reserve: 0.0,
+            claimed_nodes: BTreeSet::new(),
         }
     }
 }
@@ -166,24 +175,28 @@ impl Skill {
         s
     }
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum SituationKind {
     Defense,
     Wait,
     Push,
 }
-#[derive(Clone, Debug, PartialEq)]
+// The custom decoder returns compiled names instead of borrowing the save buffer.
+type SavedCounter = &'static str;
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Situation {
     pub kind: SituationKind,
     pub until: f64,
     pub point: Option<usize>,
     pub threat: Option<u32>,
     pub at: Option<Point>,
-    pub counter: Option<&'static str>,
+    #[serde(with = "saved_counter")]
+    pub counter: Option<SavedCounter>,
     pub safe: Option<usize>,
     pub failed_at: u8,
 }
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct State {
     pub mind: Mind,
     pub raid: Option<crate::commander_classic_rules::Raid>,
@@ -195,9 +208,10 @@ pub struct State {
     pub decision: Option<Decision>,
     pub called: Option<f64>,
     pub cleared_sightings: BTreeMap<u32, f64>,
+    pub node: BTreeMap<u32, usize>,
     pub(crate) fort_steps: BTreeMap<u32, u8>,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Decision {
     pub situation: SituationKind,
     pub buy: String,
@@ -532,20 +546,22 @@ fn plan_inner(
     let mut budget = input.manpower - reserved;
     let mut newly_busy = BTreeSet::new();
     let adaptive = context.mode.is_construction() && skill.adaptive;
-    let rush = adaptive
-        && now < 240.0
-        && strategic_recent.iter().any(|e| {
-            now - e.time < 5.0
-                && input.units.iter().any(|u| {
-                    u.owner == input.slot
-                        && boolean(definition(u), "building")
-                        && dist(u.at, e.at) < 35.0
-                })
-        });
-    let construction = crate::commander_construction::plan(
+    let rush_at = crate::commander_classic_rules::rush_at(observation, strategic_recent, skill)?;
+    let rush = rush_at.is_some();
+    // Engineers escaping a nearby rush remain available to defense, not construction.
+    let construction_units: Vec<_> = available_units
+        .iter()
+        .copied()
+        .filter(|u| !rush_at.is_some_and(|at| u.kind == "engineer" && dist(u.at, at) < 25.0))
+        .collect();
+    let construction = crate::commander_construction::plan_with_classic(
         observation,
-        &available_units,
+        &construction_units,
         budget,
+        strategic_recent,
+        &mut state.node,
+        level,
+        random,
         (adaptive || skill.memory) && strategic_recent.iter().any(|s| armor(&s.kind)),
         &sight_game,
         sees,
@@ -1314,3 +1330,27 @@ mod regression_tests;
 #[cfg(test)]
 #[path = "if25_tactics_tests.rs"]
 mod if25_tests;
+
+// Checkpoints restore only the fixed rule names used by the planner.
+mod saved_counter {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    pub fn serialize<S: Serializer>(
+        value: &Option<&'static str>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        if value.is_some_and(|v| !matches!(v, "at" | "mg")) {
+            return Err(serde::ser::Error::custom("unknown planner counter"));
+        }
+        value.serialize(serializer)
+    }
+    pub fn deserialize<'de, D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Option<&'static str>, D::Error> {
+        match Option::<String>::deserialize(deserializer)?.as_deref() {
+            None => Ok(None),
+            Some("at") => Ok(Some("at")),
+            Some("mg") => Ok(Some("mg")),
+            _ => Err(serde::de::Error::custom("unknown planner counter")),
+        }
+    }
+}

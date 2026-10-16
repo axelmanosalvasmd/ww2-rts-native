@@ -35,6 +35,9 @@ pub(crate) struct StartEnvelope {
     match_id: u64,
 }
 impl NativeStartup {
+    pub(crate) fn public_map(&self) -> &Value {
+        &self.map
+    }
     pub(crate) fn prepare(state: &Match, settings: StartupSettings<'_>) -> Result<Self, String> {
         let authored = crate::authoritative_maps::load(settings.map).map_err(|e| e.to_string())?;
         Self::prepare_authored(state, settings, authored)

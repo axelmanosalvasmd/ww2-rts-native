@@ -17,7 +17,7 @@ pub struct HumanUnit {
     pub garrison: bool,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct HumanSighting {
     pub id: u32,
     pub payload: Value,

@@ -72,11 +72,12 @@ impl Hub {
         }
         if room.players.len() != 2
             || !room.spectators.is_empty()
-            || room.players.iter().any(|p| p.ai || p.token.is_empty())
+            || room.players.iter().any(|p| !p.ai && p.token.is_empty())
             || room.players[0].team == room.players[1].team
-            || room.players[0].token == room.players[1].token
+            || (!room.players[0].ai && !room.players[1].ai
+                && room.players[0].token == room.players[1].token)
         {
-            return Err("R1 requires exactly two human commander tokens on opposing teams".into());
+            return Err("R1 requires exactly two commander seats on opposing teams".into());
         }
         if !matches!(
             room.weather.as_str(),

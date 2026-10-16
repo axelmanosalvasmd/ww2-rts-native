@@ -251,6 +251,14 @@ impl Observation {
             .iter()
             .all(|v| v.is_finite())
                 || context
+                    .nodes
+                    .iter()
+                    .any(|n| !within(n.at) || !n.rate.is_finite() || n.rate < 0.0)
+                || context
+                    .claimed_nodes
+                    .iter()
+                    .any(|i| *i >= context.nodes.len())
+                || context
                     .hidden_spawns
                     .iter()
                     .any(|i| *i >= input.players.len())
@@ -272,11 +280,7 @@ impl Observation {
                     .owned_nodes
                     .iter()
                     .any(|i| *i >= context.nodes.len())
-                || context
-                    .nodes
-                    .iter()
-                    .chain(&context.known_depots)
-                    .any(|p| !finite_point(*p))
+                || context.known_depots.iter().any(|p| !finite_point(*p))
                 || context.height.as_ref().is_some_and(|h| h.len() != cells)
                 || context
                     .smokes
@@ -358,12 +362,12 @@ impl Observation {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Aim {
     pub i: usize,
     pub until: f64,
 }
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SourceState {
     pub aim: Option<Aim>,
     pub point_failures: Vec<u8>,

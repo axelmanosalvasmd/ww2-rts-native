@@ -234,7 +234,7 @@ fn aircraft_sorties_survive_ordinary_ticks_snapshots_rearm_and_match_finish() {
 }
 
 #[test]
-fn invalid_aircraft_metadata_and_uncontracted_events_preserve_delivery_state() {
+fn invalid_aircraft_metadata_and_undrained_events_preserve_delivery_state() {
     let mut state = scene();
     let id = state.spawn_aircraft(0, "fighter").unwrap();
     let mut delivery = DeliveryState::new(&state).unwrap();
@@ -286,12 +286,23 @@ fn invalid_aircraft_metadata_and_uncontracted_events_preserve_delivery_state() {
             direction: 0.,
         },
     ] {
-        let frame = delivery.capture_selected_with_tick_events(
-            &mut state, &selected(), &[TickEvent::Aviation(event.clone())]
-        ).unwrap().unwrap();
-        assert!(frame.recipient(0).unwrap().into_json()["shots"].as_array().is_some_and(|rows| !rows.is_empty()));
-        drop(frame);
-        // The caller must still drain producer buffers before collecting a frame.
+        // Detached producer output now has the prototype's aa/planedown encoding.
+        let expected = match &event {
+            AviationEvent::AntiAir { .. } => json!([
+                {"k":"aa","f":id,"t":id,"fo":0,"to":0,"x":10.,"z":10.}
+            ]),
+            AviationEvent::PlaneDown { .. } => json!([
+                {"k":"planedown","t":id,"to":0,"x":10.,"z":10.,"dir":0,"kill":true}
+            ]),
+        };
+        let snapshots = capture(
+            &mut state,
+            &mut delivery,
+            &[TickEvent::Aviation(event.clone())],
+        );
+        assert_eq!(snapshots[0]["shots"], expected);
+        assert_eq!(snapshots[1]["shots"], expected);
+        let before = delivery.clone();
         state.aviation.events.push(event);
         assert!(matches!(
             state.preflight_ordinary_snapshot(),
@@ -300,6 +311,7 @@ fn invalid_aircraft_metadata_and_uncontracted_events_preserve_delivery_state() {
                 ..
             })
         ));
+        assert_eq!(delivery, before);
         state.aviation.events.clear();
     }
 }

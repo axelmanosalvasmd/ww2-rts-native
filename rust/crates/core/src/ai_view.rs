@@ -6,9 +6,10 @@ use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 
 mod horde;
+pub use commander::CommanderViewMemory;
 
 /// Metadata already available to the human client from match start.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct PublicMap {
     pub width: usize,
     pub height: usize,
@@ -43,9 +44,10 @@ pub struct SeatView {
 }
 
 /// Private to one seat and match. Recreate it for a new match or seat handover.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SeatMemory {
     slot: usize,
+    #[serde(skip)]
     binding: Option<(u64, usize)>,
     map: PublicMap,
     tick: Option<i64>,
@@ -128,6 +130,20 @@ fn mapped(rows: &[Value], names: &[&str]) -> Result<Vec<Value>> {
 }
 
 impl SeatMemory {
+    pub fn planner_memory_json(&self) -> Result<Value> {
+        crate::save_codec::to_value(self)
+    }
+
+    pub fn restore_planner_memory(&mut self, value: &Value) -> Result<()> {
+        let mut restored: Self = crate::save_codec::from_value(value.clone())?;
+        if restored.slot != self.slot || restored.map != self.map {
+            return Err("saved recipient memory belongs to another seat or map".into());
+        }
+        restored.binding = self.binding;
+        *self = restored;
+        Ok(())
+    }
+
     pub fn new(slot: usize, map: PublicMap) -> Result<Self> {
         if map.width == 0
             || map.height == 0

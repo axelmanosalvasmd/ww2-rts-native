@@ -222,7 +222,7 @@ fn hosted_horde_save_restores_wave_inputs_and_brain_then_resumes_to_full_ending_
             .iter()
             .position(|v| v["t"] == "pause" && v["paused"] == true)
             .unwrap();
-        assert!(lobby < start && start < pause);
+        assert!(lobby < pause && pause < start);
         assert_eq!(received[start]["you"], slot);
         assert_eq!(received[start]["names"], json!(["host", "guest", "Horde"]));
         assert_eq!(
@@ -284,9 +284,24 @@ fn hosted_horde_save_restores_wave_inputs_and_brain_then_resumes_to_full_ending_
                             }
                             if shot["k"] == "planedown"
                                 && shot["to"] == 2
-                                && shot["t"].as_u64().is_some_and(|id| saved_aircraft.contains(&id))
+                                && shot.get("t").is_none_or(|target| {
+                                    target.as_u64().is_some_and(|id| saved_aircraft.contains(&id))
+                                })
                             {
                                 assert!(saw_aircraft_aa[slot], "plane down preceded delivered AA");
+                                let mut keys = shot
+                                    .as_object()
+                                    .unwrap()
+                                    .keys()
+                                    .map(String::as_str)
+                                    .collect::<Vec<_>>();
+                                keys.sort_unstable();
+                                let expected: &[&str] = if shot.get("t").is_some() {
+                                    &["dir", "k", "kill", "t", "to", "x", "z"]
+                                } else {
+                                    &["dir", "k", "kill", "to", "x", "z"]
+                                };
+                                assert_eq!(keys, expected);
                                 assert!(shot["x"].as_f64().is_some_and(|x| x.is_finite()));
                                 assert!(shot["z"].as_f64().is_some_and(|z| z.is_finite()));
                                 assert!(shot["dir"].as_f64().is_some_and(|dir| dir.is_finite()));
