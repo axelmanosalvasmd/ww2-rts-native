@@ -14,3 +14,9 @@ regions retain the base side:
 - `seat_lifecycle_tests.rs`, host pause/resume regression: retain the complete test.
 
 All other merge changes are automatic. No guards or test registrations were removed.
+
+Merged PR #369 at `161bbe3880f0ac06187c64bfe3ff2dab0856841c`, including its
+#349 flight ancestry. One conflict region in `commander_ingress.rs` joins
+the complete garrisoned movement and production-cancel tests from #296/#366
+with #369's complete FireAt/compound refusal test. All three are retained.
+Other merge changes are automatic, including `room_runtime.rs`.

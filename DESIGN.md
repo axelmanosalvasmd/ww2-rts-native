@@ -1,3 +1,16 @@
+## Commander medic and house-shelling chores (2026-10-16)
+
+The detached tactics planner now moves a stationary medic toward the ground army mean when it is more than `CFG.aid.seek * 0.8` away. Ground army members contribute in unit ID order. Shell-capable units without a target or an active FireAt choose the first noticed enemy garrison strictly within 60 metres, also in unit ID order. Both decisions emit existing core commands and add no Match state.
+
+Pinned `shared/ai.js:593,673-681` puts these chores before the general busy check. A medic keeps its existing path, and a sheller keeps its active target or FireAt, but house shelling can replace a movement path. The tests retain that source precedence rather than interpreting AI-38's abbreviated busy wording as a new rule. Ordinary fighters still keep paths, attacks, aimed abilities, digging, entry, FireAt and targets. This is an internal planning change over delivered facts; command admission and recipient ownership remain with their existing owners.
+
+CMB-150 remains incomplete without World recovery, sandbox spawn and convoy command integration. CMB-146 still needs rail dispatch and its tick adapter. LOG-05 and LOG-08 remain incomplete without the other firing-family and full logistics-match evidence. Full logistics ticks and complete logistics snapshots stay guarded. This batch starts from PR #337's FireAt branch and must merge after it.
+
+## FireAt runtime and recipient lifetime (2026-10-16)
+
+Internal FireAt uses the existing unit-control cell, queued command owner and deterministic projectile state. Waiting orders normalize to one unit and a cell-center point, projected as existing owner order kind 5. Active plans use the same kind. Direct guns approach intact terrain, accept a first wall only when it belongs to the target structure, and stop after the target cell is destroyed. Salvos keep firing on open ground until replaced. Both use the existing ammunition and shortage owners.
+
+The complete recipient adapter previously rejected all persistent projectiles. Ground flights now use the existing prototype flight row, current fog visibility, hidden shooter removal and a visual horizon clipped by fog and visible contacts. This changes no row shape, contract or public command whitelist. Public `fireat` and compound `orders` remain blocked. World tactical FireAt and replacing a pending aimed ability remain closed at admission. Main's aircraft area owner remains unchanged, including its refusal of mixed selections containing an eligible ground sheller. AI house-shelling and medic chores remain separate work.
 ## Owner parity decisions A, B and C (2026-10-16)
 
 The [recorded owner decisions](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6217590741) approve the differences below, the Rust-only acceptance of the listed client rows, and World deferral for milestone R1. Julio recorded both owners' decisions after Axel's voice approval; Axel's written confirmation on #5 is requested in that comment. This section records the decisions for STATUS-ABC.
