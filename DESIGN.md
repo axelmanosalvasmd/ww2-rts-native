@@ -4297,3 +4297,28 @@ producing38317a14 and in the original native log. No test is repaired,
 weakened or retried. This excludes failed diagnostics from a normal passing
 subset while the first40 new passing tests and second-window tests stay
 enabled. The separate nine-test second selection is unchanged.
+
+
+## Combat test-PR scope child (2026-10-16)
+
+Apply the authoritative overseer03:35 split and Root's direct scope
+instruction. Restore only this task's combat parity delta to exact pre-task
+parent `b2eefab2293b4ad50ef4f63868319cd0d12a9992`. Before restoration,
+all160 Acceptance cells, every unowned row and CMB88 were verified exact.
+The full66-row literal test/prototype map, first46PASS/3FAIL result and
+second-window gaps already live in the normal docs/testing file, so no
+mapping/result content is discarded. The test-PR aggregate changes no
+parity file or status cell. No proven-row ledger or public action occurs.
+
+The tested first-batch Rust remains attributed only to38317a14. Current
+Rust still contains the independently registered, unrun second-window five
+tests and three scope-only ignored first failures. Their complete bodies,
+inputs and assertions stay unchanged. This documentation scope child runs
+no formatter, Cargo, native, Source or CI job and changes no Rust bytes.
+Root owns the next exact-head nine-test grant and fresh prototype review.
+
+Integrate only the task delta from b2eefab2 to this child: new combat tests,
+their cfg(test) registrations and normal DESIGN/CHANGELOG/testing notes.
+Do not import the inherited unpublished branch, old recorders, captures,
+shipping providers or historical parity proposal. Separate merged-proof
+status PRs replace the former one-open-PR-per-parity-file serialization.

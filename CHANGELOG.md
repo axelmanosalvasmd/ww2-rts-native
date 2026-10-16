@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Prepare the combat test-PR scope under the separate proof/status flow: restore this task's parity-file delta to its exact pre-task parent and keep every row mapping, result and gap in normal testing documentation. Preserve failed diagnostic bodies and all producing-head attribution; run no new executable job.
+
 - Exclude the three failed first-window combat rows from normal test runs with explicit ignored diagnostics. Preserve their assertions, inputs and `38317a14` failures exactly; do not repair or rerun them. Other combat tests and the pending second window remain enabled.
 
 - Run the first native combat batch once: 49 selected, 46 passed and 3 failed at `38317a14`; retain the failed CMB-94/126/137 bodies and drop those rows from candidates. Add five native tests for the second 16-row window, keeping all missing/client/delegated clauses pending and every Acceptance cell exact. No semantic retry or new Source capture.
