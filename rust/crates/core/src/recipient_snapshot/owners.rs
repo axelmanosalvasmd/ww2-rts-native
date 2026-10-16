@@ -10,10 +10,16 @@ pub(super) fn capture(state: &Match) -> Result<Vec<Map<String, Value>>, Snapshot
     }
     for (slot, owner) in owners.iter_mut().enumerate() {
         owner.insert("movement".into(), super::movement_for(state, slot)?);
+        if !state.aviation.planes.is_empty() {
+            owner.insert("air".into(), json!([]));
+        }
     }
     let catalog = Catalog::compiled().map_err(|_| SnapshotError::Rules)?;
     for u in state.world.game.units.values() {
         let own = &mut owners[u.owner];
+        if let Some(air) = u.air {
+            push(own, "air", aircraft::row(state, u.id, air)?);
+        }
         if let Some(building) = state.production.building(u.id) {
             let mut row = vec![json!(u.id)];
             let progress = if let Some(head) = building.jobs().first() {
@@ -192,6 +198,9 @@ fn center(state: &Match, cell: usize) -> Result<Point, SnapshotError> {
 }
 fn plan(state: &Match, u: &Unit) -> Result<(u8, Point), SnapshotError> {
     let g = &state.world.game;
+    if u.air.is_some() {
+        return Ok(aircraft::plan(state, u));
+    }
     let c = &state.commands.units[&u.id];
     if let Some(ride) = g.units.get(&u.board) {
         return Ok((9, ride.at()));
