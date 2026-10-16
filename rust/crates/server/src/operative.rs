@@ -4,6 +4,7 @@ use ww2_core::recipient_snapshot::OperativeDelivery;
 
 pub(super) struct Operative {
     pub(super) person: Person,
+    key: String,
     pub(super) commander: Option<usize>,
     pub(super) input_at: u64,
     pub(super) stream: Option<OperativeDelivery>,
@@ -11,7 +12,7 @@ pub(super) struct Operative {
 }
 impl Operative {
     fn key(&self) -> String {
-        String::from_utf16_lossy(&self.person.token)
+        self.key.clone()
     }
 }
 impl Room {
@@ -85,7 +86,14 @@ impl Room {
                 );
                 return true;
             }
+            // Truncation may retain an unmatched UTF-16 surrogate. Distinct
+            // person tokens must keep distinct core records after UTF-8 conversion.
+            let mut key = String::from_utf16_lossy(token);
+            while self.operatives.iter().any(|operative| operative.key == key) {
+                key.push('\0');
+            }
             self.operatives.push(Operative {
+                key,
                 person: Person {
                     token: token.to_vec(),
                     name: name.into(),

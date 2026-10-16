@@ -326,14 +326,14 @@ fn operative_grenade_flight_and_launch_rows_match_literal_shapes_and_fog_rules()
         snapshot["flights"],
         json!([{
             "flight":flight,"kind":"rifle","effect":"boom","seq":0,"x":50.,"y":2.,"z":50.,
-            "v":[4.,3.,0.],"gravity":2.,"time":0.,"launched":0.,"expires":1.,"until":0.15,"f":id,"fo":0,
+            "v":[4.,3.,0],"gravity":2.,"time":0,"launched":0,"expires":1.,"until":0.15,"f":id,"fo":0,
         }])
     );
     assert_eq!(
         snapshot["shots"],
         json!([{
             "k":"flight","flight":flight,"kind":"rifle","effect":"boom","seq":0,
-            "x":50.,"y":2.,"z":50.,"v":[4.,3.,0.],"gravity":2.,"time":0.,"expires":1.,
+            "x":50.,"y":2.,"z":50.,"v":[4.,3.,0],"gravity":2.,"time":0,"expires":1.,
             "local":true,"until":0.15,"f":id,"fo":0,
         }])
     );
@@ -362,7 +362,7 @@ fn operative_grenade_flight_and_launch_rows_match_literal_shapes_and_fog_rules()
         cache.recipient(2).unwrap().fields["flights"],
         json!([{
             "flight":flight,"kind":"rifle","effect":"boom","seq":0,"x":at.x,"y":8.,"z":at.z,
-            "v":[4.,3.,0.],"gravity":2.,"time":0.,"launched":0.,"expires":1.,"until":0.15,
+            "v":[4.,3.,0],"gravity":2.,"time":0,"launched":0,"expires":1.,"until":0.15,
         }])
     );
 }
@@ -429,6 +429,22 @@ fn operative_delivery_keeps_commander_pending_memory_and_fog_independent_on_succ
 #[test]
 fn operative_death_respawn_and_full_match_finish_keep_every_recipient_live() {
     let (mut state, first) = scene();
+    // Grenades collide with allied bodies too. Use an open firing lane so the
+    // deliberate death happens while this soldier's grenade is still airborne.
+    let firing_lane = Point { x: 60., z: 40. };
+    assert!(
+        state
+            .world
+            .game
+            .units
+            .values()
+            .filter(|u| u.id != first)
+            .all(|u| { crate::math::hypot(u.x - firing_lane.x, u.z - firing_lane.z) > 30. })
+    );
+    let unit = state.world.game.units.get_mut(&first).unwrap();
+    unit.x = firing_lane.x;
+    unit.z = firing_lane.z;
+    state.grid.update(first, unit);
     state.start.points[0].owner = Some(0);
     state.start.points[0].progress = 1.;
     state.start.points[0].vp = 1.;
@@ -461,6 +477,13 @@ fn operative_death_respawn_and_full_match_finish_keep_every_recipient_live() {
             ));
         }
         if state.world.game.tick == 3 {
+            assert!(
+                state
+                    .firing
+                    .flights
+                    .values()
+                    .any(|flight| flight.shooter == first)
+            );
             state.world.game.units.get_mut(&first).unwrap().hp = 0.;
         }
         let report = state.advance_tick().unwrap();

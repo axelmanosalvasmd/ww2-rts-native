@@ -834,3 +834,53 @@ fn operative_trusted_room_admission_preserves_refusal_and_live_token_takeover() 
     command(&mut hub, &current, json!({"t":"restart"}), 2);
     assert!(messages(&mut current_receiver).is_empty());
 }
+
+#[test]
+fn operative_truncated_utf16_tokens_keep_distinct_soldiers_and_input() {
+    let (mut hub, _, mut commanders) = room();
+    hub.attach_native("ABC", native_tests::native_match(), 0)
+        .unwrap();
+    drain_commanders(&mut hub, &mut commanders, 0);
+    let prefix = "x".repeat(39);
+    let tokens = [format!("{prefix}😀"), format!("{prefix}�")];
+    let (first, mut first_receiver) = client(3);
+    let (second, mut second_receiver) = client(4);
+    for (owner, (connection, token)) in [(&first, &tokens[0]), (&second, &tokens[1])]
+        .into_iter()
+        .enumerate()
+    {
+        assert!(hello(
+            &mut hub,
+            connection,
+            json!({
+                "t":"hello", "token":token, "name":"Friend", "role":"operative", "commander":owner
+            }),
+            0
+        ));
+    }
+    let first_start = messages(&mut first_receiver)
+        .into_iter()
+        .find(|m| m["t"] == "start")
+        .unwrap();
+    let second_start = messages(&mut second_receiver)
+        .into_iter()
+        .find(|m| m["t"] == "start")
+        .unwrap();
+    assert_ne!(
+        first_start["operative"]["id"],
+        second_start["operative"]["id"]
+    );
+    assert_eq!(state(&hub).companions.records.len(), 2);
+    command(&mut hub, &first, fps(0), 20);
+    command(&mut hub, &second, fps(7), 20);
+    for (owner, seq) in [(0, 0), (1, 7)] {
+        let record = state(&hub)
+            .companions
+            .records
+            .values()
+            .find(|op| op.owner == owner)
+            .unwrap();
+        assert_eq!(record.last_seq, seq);
+        assert_eq!(state(&hub).world.game.units[&record.unit_id].owner, owner);
+    }
+}

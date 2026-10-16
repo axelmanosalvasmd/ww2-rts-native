@@ -2,3 +2,4 @@
 - Send prototype-shaped operative starts, private recipient snapshots and status, including paused and ending frames, independent terrain and fog memory, and resync. Retain the prototype's hit-position disclosure and cached nonowner flag mask.
 - Replace the obsolete test assertion that every operative join must fail. Keep World admission, save/load and Unreal integration outside this change.
 - Preserve the existing prepared-runtime publication call while carrying its server-clock timestamp into operative starts, and record the latest owner confirmation in the operative contract note.
+- Keep distinct operative identities when the prototype token limit truncates a UTF-16 surrogate pair.
