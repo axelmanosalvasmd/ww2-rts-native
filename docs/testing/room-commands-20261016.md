@@ -76,8 +76,8 @@ No issue messages are posted under this stream's no-issue-write instruction.
 
 Source-only review accepted the bounded command implementation and found the
 initial missing naval FireAt branch. The branch now receives a dedicated ship
-lifecycle witness; execution is required before counting it. Hermes' exact-head
-runtime ack remains pending, and no client adoption is claimed.
+lifecycle witness; final execution is required before counting it. No Hermes
+ack or client adoption is claimed.
 
 Validation uses a real shared slot with matching target directory, Rust 1.99.0,
 6 GiB memory, zero swap and -j4. Nextest selects all server library tests because room admission changed, plus
@@ -135,3 +135,23 @@ Merged fetched main `09340ac993ac594d1702229912fd00dac7073b00`. Seven conflict r
 - `trusted_room_lobby_tests.rs`: retain both logistics witnesses and the complete incoming named-army lifecycle witness.
 
 All other refreshed-main changes are automatic.
+
+The aborted #393 conflict paths were `match_commands.rs`, `match_firing.rs`,
+`recipient_snapshot.rs`, `recipient_snapshot/composition.rs`,
+`recipient_snapshot/shots.rs`, `server/src/commander_ingress.rs`,
+`server/src/lobby.rs` and `server/src/main.rs`. Its remaining integration needs
+one canonical live-flight projection: reconcile #393's `shots::live_flights` and
+`recipient_flight_contact` with #369's `flights::project` and
+`visible_flight_contact`, keeping sandbox spawn, breath validation and all
+corresponding tests. Reintroducing sandbox-only flight admission would regress
+#369's ordinary rooms. No aborted resolution was committed.
+
+For merge 836cc15e, `git merge-tree --write-tree` finds exactly the seven listed
+conflict paths plus the additive merge record and its changelog fragment. The
+independent source review accepted that exact merge. Formatter-only changes
+and the final executed head are reported separately.
+
+The final FireAt fixtures initialize ordinary logistics after their authored gun
+setup. Ground, bomber and destroyer commands therefore exercise the composed
+R1 logistics and flight owners together, rather than qualifying only a
+logistics-disabled room. Final execution must cover that stronger fixture.

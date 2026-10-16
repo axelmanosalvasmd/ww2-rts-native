@@ -572,7 +572,10 @@ mod tests {
             json!({"t":"cancel", "id":hq}),
             json!({"t":"rally", "id":hq, "x":30, "z":30}),
             json!({"t":"rally", "x":30, "z":30}),
-        ].into_iter().enumerate() {
+        ]
+        .into_iter()
+        .enumerate()
+        {
             assert_eq!(ingress.enqueue(&mut state, 0, &raw), Ok(()));
             assert_eq!(state.commands.pending_commands(), index + 1);
             assert_eq!(

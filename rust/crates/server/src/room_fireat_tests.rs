@@ -78,6 +78,9 @@ fn scene(kind: &str) -> (RoomRuntime, u32, CommanderIngress) {
     u.still = Some(30.);
     u.hold_pos = true;
     state.grid.update(id, u);
+    // The composed R1 room enables ordinary logistics, including for these guns.
+    state.options.logistics = true;
+    state.initialize_logistics().unwrap();
     (
         RoomRuntime::new(state, 0).unwrap(),
         id,
