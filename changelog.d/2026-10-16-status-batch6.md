@@ -1,0 +1,1 @@
+- Marked 20 rows ported across six parity files, citing native intent tests merged in #311 (NET-97), #316 (BASE-05, 09, 23, 44), #317 (MOV-46), #320 (MAP-34, 58, 24, 104, 60), #327 (ENG-11, 15, 24), #330 (LOG-33, 35, 36, 37, 38) and #333 (LOG-32), each reviewed against the prototype under Axel's 2026-10-16 evidence standard; runtime PRs merged after Hermes' exact-head ack.
