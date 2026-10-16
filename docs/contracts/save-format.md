@@ -1,8 +1,8 @@
-# Native match save format, version 2 (loads version 1)
+# Native match save format, version 1
 
 This implements owner group I as recorded in [issue #5, comment 6217590741](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6217590741). The compatibility source is `reference/ww2-rts` at `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`. Hermes' exact-head implementation acknowledgement remains a merge requirement. This document does not mark another draft contract agreed.
 
-The envelope carries the prototype's game, local defender, raw map, seats, settings and planner-memory content. JSON with a version field replaces Node's V8 binary serialization. Existing Node `.save` files are not imported. Version 2 binds this native state schema and its compiled rules; incompatible schema or rules changes require a format-version increment. Version 1 remains readable. Its pre-merge checkpoint can omit `elimination`, which defaults to null; a v1 checkpoint that contains that field retains it. The v2 writer adds that authoritative native owner after the #301/#368 integration exposed its missing serialization. No other envelope, setting, seat or summary key changes. Files and credentials remain server-private. The deterministic core encodes and decodes in-memory state and performs no file I/O.
+The envelope carries the prototype's game, local defender, raw map, seats, settings and planner-memory content. JSON with a version field replaces Node's V8 binary serialization. Existing Node `.save` files are not imported. Version 1 binds this native state schema and its compiled rules; incompatible schema or rules changes require a format-version increment. Files and credentials remain server-private. The deterministic core encodes and decodes in-memory state and performs no file I/O.
 
 ## Files and summaries
 
@@ -33,7 +33,7 @@ The root has these seven required keys. The six content owners correspond to `se
 
 | Key | Value and source |
 | --- | --- |
-| `version` | Integer `2` for new room saves. Readers also accept `1`; every other value is refused before native state restoration. |
+| `version` | Integer `1`. Any other value is refused before native state restoration. |
 | `g` | Lossless native `Match` checkpoint, described below. It owns every implemented authoritative ordinary-match component. The prototype stores the whole `g` at `server/saves.js:18`. |
 | `guard` | Separate local-defender player, corresponding to the non-enumerable `g.players[-1]` at `server/saves.js:15-26`. Currently `null`; a non-null guard is refused by room admission while World is closed. |
 | `map` | Full raw authored map, including private layers and triggers. It is never replaced with `mapForClient`. The prototype uses `null` in World (`server.js:426`); native World restoration is refused. |
@@ -77,7 +77,7 @@ The list is identical to `server.js:419`. In particular, `sandbox` is not a sett
 
 Each node is `[tag, payload]`, except `["unit"]` and `["none"]`. A unit enum variant is a tagged string containing its variant name. Other enum variants are single-entry tagged maps from their variant name to the tagged newtype, sequence or field-map payload.
 
-All fields in `Match` and its nested mutable owners participate in the checkpoint. The elimination owner uses the same tagged codec, including exact float bits in its timer and resource nodes. Only a missing v1 elimination field defaults to null. This includes `world`, `start` (economy, points, weather and RNG streams), `options`, commands and pending orders, production, rallies, field work, combat, firing, abilities, recovery, environment, logistics, supply, unit allocation, story, fallen locations, finish state and timeline. Recipient routing knowledge, fog, remembered buildings, path requests, retries and route caches also survive. Immutable compiled rules are reconstructed from the binary. World runtime and geography are excluded behind an explicit save/load refusal.
+All fields in `Match` and its nested mutable owners participate in the checkpoint. This includes `world`, `start` (economy, points, weather and RNG streams), `options`, commands and pending orders, production, rallies, field work, combat, firing, abilities, recovery, environment, logistics, supply, unit allocation, story, fallen locations, finish state and timeline. Recipient routing knowledge, fog, remembered buildings, path requests, retries and route caches also survive. Immutable compiled rules are reconstructed from the binary. World runtime and geography are excluded behind an explicit save/load refusal.
 
 Native cache identities that refer to vector allocations must be rebound to restored storage. They are not dereferenced from saved addresses. This is an internal native persistence choice under IF-27, recorded in `design.d/2026-10-16-save-load.md`: the prototype loses WeakMap path/cache state (`shared/sim.js:2865,3035`), while native checkpoints retain state required for deterministic continuation. It does not claim JavaScript tick equality or import compatibility.
 
@@ -96,7 +96,6 @@ The `state` struct field keys are listed below. These are native component bound
 | `building_cells`, `production`, `building_rallies`, `player_rallies`, `recruit_metadata`, `produced_placer` | Building identity, production jobs, rally points, completed recruit metadata and placement state. |
 | `capture_ticks`, `tick_state`, `ordinary_snapshot_only` | Capture clocks, tick phase state and the existing delivery capability restriction. |
 | `story`, `fallen`, `finish`, `timeline`, `next_unit_id` | Match statistics, fall locations, terminal decision, result samples and the canonical actor allocator. |
-| `elimination` | Teams, bunkers, time left, sudden death and resource nodes. Added to new v2 checkpoints; absent in pre-merge v1 checkpoints. |
 | `assault`, `horde`, `tutorial`, `scenario`, `companions`, `rail_runs` | Existing mode and operative owners. Inactive records are retained; their presence does not grant room admission. |
 | `elimination` | Optional Annihilation/Classic owner: `teams`, `bunkers`, `time_left`, `sudden_death`, `nodes`. Each resource node retains `cell`, `at` (`x`, `z`), `depot`, `rate`, `fuel`. |
 | `rules` | Omitted and reconstructed from compiled rules. Saving modified rules is refused. |
@@ -122,6 +121,10 @@ A successful load clears the previous result and opens an indefinite host pause 
 
 Intent tests cover the save portions of NET-28 and NET-80, plus NET-89, NET-91 and NET-93. They also compare a running saved match's continuation with uninterrupted native execution, using held fire, movement and queued AutoRetreat stance changes, collecting both seats' complete recipient snapshots on every tick through a VP victory and subsequent ending ticks. Unsupported-version refusal must preserve the lobby and epoch.
 
-NET-12 (editor writes), MODE-55 (Horde records), NET-90 (World autosave), the full NET-71 callback ordering, full NET-92 seat/AI/spectator restoration and AI-63 planner memory are not claimed by ordinary match persistence in its original batch.
+NET-12 (editor writes), MODE-55 (Horde records), NET-90 (World autosave), the full NET-71 callback ordering, full NET-92 seat/AI/spectator restoration and AI-63 planner memory are not claimed by ordinary match persistence.
 
-Editor map persistence and the MODE-55 record component are documented in [editor-record-persistence.md](editor-record-persistence.md). This follow-up does not claim full NET-71, NET-92, AI-63 or IF-27.
+## Reconciled save stack (#373, #376, #383, #386)
+
+The elimination serialization repair and editor/record persistence retain version 1. An absent `elimination` means no elimination owner, matching an ordinary prototype game without that mode state. Present elimination values remain lossless, and elimination modes reject missing authoritative state. Editor maps and Horde records add no match checkpoint keys.
+
+Authored missions require one version increment, to version 2. The prototype restores the saved game directly (`server/saves.js:23-26`, `server.js:434-451`); it does not restart mission execution on load. Defaulting a running mission's executions, objectives, historical captures or pending arrivals would change that game. Version 1 binaries can ignore unknown struct fields, so version 2 also prevents them from silently discarding an authored owner. Both scenario PRs must use the same complete authored checkpoint schema, including contextual trigger records, objective scopes, condition facts, current target owners and deferred arrivals. The objective-only executor writes that schema before the engine extends behavior. Non-authored saves remain version 1; readers accept versions 1 and 2, and version 1 carrying authored state is refused. There is no version 3 in this stack.

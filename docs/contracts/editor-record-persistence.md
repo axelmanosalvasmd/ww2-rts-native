@@ -1,6 +1,6 @@
 # Editor maps and Horde records
 
-Owner decisions I and K were recorded in #5 comment 6217590741 and confirmed by Axel in comment 6218552386. Compatibility source: prototype `e4e579a`. Hermes' exact-head runtime acknowledgement remains required. This extends server persistence without changing the C interface or headers. Match saves now write v2 and continue to load v1, as documented in [save-format.md](save-format.md).
+Owner decisions I and K were recorded in #5 comment 6217590741 and confirmed by Axel in comment 6218552386. Compatibility source: prototype `e4e579a`. Hermes' exact-head runtime acknowledgement remains required. This extends server persistence without changing the C interface or headers. Match saves retain v1 with optional elimination state, as documented in [save-format.md](save-format.md).
 
 ## Editor HTTP
 

@@ -367,7 +367,7 @@ mod tests {
         assert!(Match::from_save_json(Value::Null).is_err());
     }
     #[test]
-    fn native_checkpoint_v1_missing_elimination_defaults_and_v2_keeps_float_bits() {
+    fn native_checkpoint_missing_elimination_defaults_and_present_owner_keeps_float_bits() {
         let state = ordinary();
         let mut legacy = state.save_json().unwrap();
         legacy[1]

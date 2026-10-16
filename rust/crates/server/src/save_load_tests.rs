@@ -402,7 +402,7 @@ fn net12_saved_editor_map_restores_exact_state_and_every_seat_through_victory() 
     assert_eq!(runtime.state().commands.pending_tick(60).count(), 1);
     let id = hub.save_room("ABC", host.id).unwrap();
     let saved = hub.saves.read("ABC", &id).unwrap();
-    assert_eq!(saved["version"], 2);
+    assert_eq!(saved["version"], 1);
     assert_eq!(saved["map"], raw);
     assert_eq!(
         saved
@@ -426,22 +426,6 @@ fn net12_saved_editor_map_restores_exact_state_and_every_seat_through_victory() 
         .as_array_mut()
         .unwrap()
         .retain(|entry| entry[0] != json!(["string", "elimination"]));
-    let mut incomplete_v2 = legacy.clone();
-    incomplete_v2["version"] = json!(2);
-    let invalid_id = hub
-        .saves
-        .write(
-            "ABC",
-            "manual",
-            &incomplete_v2,
-            json!({"mode":"conquest","minutes":0,"names":["host","guest"]}),
-            1_800_000_000_001,
-        )
-        .unwrap();
-    assert_eq!(
-        hub.saves.read("ABC", &invalid_id).unwrap_err(),
-        "incomplete v2 checkpoint"
-    );
     let legacy_id = hub
         .saves
         .write(
@@ -473,7 +457,7 @@ fn net12_saved_editor_map_restores_exact_state_and_every_seat_through_victory() 
         .take()
         .unwrap()
         .runtime;
-    // Load v2 through the same room transaction as v1.
+    // Load the complete v1 checkpoint through the same transaction as the legacy body.
     hub.load_room("ABC", host.id, &id, 5000).unwrap();
     messages(&mut hub, &mut host_rx);
     messages(&mut hub, &mut guest_rx);
