@@ -45,8 +45,7 @@ fn scene() -> Match {
         },
     )
     .unwrap();
-    // Exercise the state-only slice. Automatic weapon actuators and aviation
-    // shot encodings remain outside its admitted runtime/contract scope.
+    // Keep automatic weapon actuators idle while testing aircraft state rows.
     for control in state.commands.units.values_mut() {
         control.hold_fire = true;
         control.auto_cast = false;
@@ -287,19 +286,12 @@ fn invalid_aircraft_metadata_and_uncontracted_events_preserve_delivery_state() {
             direction: 0.,
         },
     ] {
-        let before = delivery.clone();
-        assert!(matches!(
-            delivery.capture_selected_with_tick_events(
-                &mut state,
-                &selected(),
-                &[TickEvent::Aviation(event.clone())]
-            ),
-            Err(SnapshotError::Unsupported {
-                capability: SnapshotCapability::Air,
-                ..
-            })
-        ));
-        assert_eq!(delivery, before);
+        let frame = delivery.capture_selected_with_tick_events(
+            &mut state, &selected(), &[TickEvent::Aviation(event.clone())]
+        ).unwrap().unwrap();
+        assert!(frame.recipient(0).unwrap().into_json()["shots"].as_array().is_some_and(|rows| !rows.is_empty()));
+        drop(frame);
+        // The caller must still drain producer buffers before collecting a frame.
         state.aviation.events.push(event);
         assert!(matches!(
             state.preflight_ordinary_snapshot(),

@@ -166,10 +166,14 @@ fn hosted_horde_save_restores_wave_inputs_and_brain_then_resumes_to_full_ending_
         .world
         .game
         .units
-        .values()
+        .values_mut()
         .filter(|unit| unit.owner == horde_slot)
     {
         state.firing.initialize(unit.id).cooldown = 2.0;
+        if unit.air.is_some() {
+            // Injury lets ordinary AA down this saved plane before the boss fires.
+            unit.hp = 20.0;
+        }
     }
     runtime.think(true).unwrap();
     snapshot_every_seat(runtime);
@@ -177,6 +181,16 @@ fn hosted_horde_save_restores_wave_inputs_and_brain_then_resumes_to_full_ending_
     let saved_wave = runtime.state().horde.clone();
     assert!(saved_wave.as_ref().unwrap().active);
     assert_eq!(saved_wave.as_ref().unwrap().wave, 10);
+    let saved_aircraft = runtime
+        .state()
+        .world
+        .game
+        .units
+        .values()
+        .filter(|unit| unit.owner == horde_slot && unit.air.is_some())
+        .map(|unit| u64::from(unit.id))
+        .collect::<Vec<_>>();
+    assert!(!saved_aircraft.is_empty());
     let saved_random = runtime.state().start.random.snapshot();
     let saved_tick = runtime.state().world.game.tick;
     command(&mut hub, &host, json!({"t":"save"}), 1);
@@ -247,6 +261,8 @@ fn hosted_horde_save_restores_wave_inputs_and_brain_then_resumes_to_full_ending_
     let mut saw_brain_observation = false;
     let mut saw_queued_input = false;
     let mut saw_finish = false;
+    let mut saw_aircraft_aa = [false; 2];
+    let mut saw_aircraft_down = [false; 2];
     let mut snapshots = [0; 2];
     for callback in 5..405_u64 {
         hub.poll_native(callback * 50, callback * 50_000_000);
@@ -256,6 +272,29 @@ fn hosted_horde_save_restores_wave_inputs_and_brain_then_resumes_to_full_ending_
             for message in messages(&mut hub, rx) {
                 if message["t"] == "s" {
                     snapshots[slot] += 1;
+                    if !saw_finish && message["winner"].is_null() {
+                        for shot in message["shots"].as_array().into_iter().flatten() {
+                            if shot["k"] == "aa"
+                                && shot["to"] == 2
+                                && shot["t"].as_u64().is_some_and(|id| saved_aircraft.contains(&id))
+                            {
+                                assert!(shot["x"].as_f64().is_some_and(|x| x.is_finite()));
+                                assert!(shot["z"].as_f64().is_some_and(|z| z.is_finite()));
+                                saw_aircraft_aa[slot] = true;
+                            }
+                            if shot["k"] == "planedown"
+                                && shot["to"] == 2
+                                && shot["t"].as_u64().is_some_and(|id| saved_aircraft.contains(&id))
+                            {
+                                assert!(saw_aircraft_aa[slot], "plane down preceded delivered AA");
+                                assert!(shot["x"].as_f64().is_some_and(|x| x.is_finite()));
+                                assert!(shot["z"].as_f64().is_some_and(|z| z.is_finite()));
+                                assert!(shot["dir"].as_f64().is_some_and(|dir| dir.is_finite()));
+                                assert_eq!(shot["kill"], true);
+                                saw_aircraft_down[slot] = true;
+                            }
+                        }
+                    }
                     saw_finish |= message["winner"] == 1;
                 }
             }
@@ -294,7 +333,7 @@ fn hosted_horde_save_restores_wave_inputs_and_brain_then_resumes_to_full_ending_
         )
     });
     let diagnostic = format!(
-        "brain={saw_brain_observation}, queued={saw_queued_input}, finish={saw_finish}, frames={snapshots:?}, status={final_status:?}, remaining={remaining:?}"
+        "brain={saw_brain_observation}, queued={saw_queued_input}, aa={saw_aircraft_aa:?}, planedown={saw_aircraft_down:?}, finish={saw_finish}, frames={snapshots:?}, status={final_status:?}, remaining={remaining:?}"
     );
     assert!(
         saw_brain_observation,
@@ -305,6 +344,14 @@ fn hosted_horde_save_restores_wave_inputs_and_brain_then_resumes_to_full_ending_
         "queued HoldFire was not applied: {diagnostic}"
     );
     assert!(saw_finish, "no delivered Horde victory: {diagnostic}");
+    assert!(
+        saw_aircraft_aa.iter().all(|seen| *seen),
+        "every human must receive AA against a saved aircraft before victory: {diagnostic}"
+    );
+    assert!(
+        saw_aircraft_down.iter().all(|seen| *seen),
+        "every human must receive a saved aircraft's natural plane down before victory: {diagnostic}"
+    );
     assert!(snapshots.iter().all(|count| *count >= 60));
     assert!(hub.rooms["ABC"].native.is_none());
     assert_eq!(

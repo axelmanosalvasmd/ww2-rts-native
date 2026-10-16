@@ -264,6 +264,7 @@ fn absent_and_unready_connections_are_distinct_and_expiry_precedes_callbacks() {
     h.poll_native(50, 50_000_000);
     let native = &h.rooms["ABC"].native.as_ref().unwrap().runtime;
     assert_eq!(native.state().world.game.tick, 2);
+    // Closed transports are away, matching prototype connected(readyState === 1).
     assert!(
         native
             .state()
@@ -271,7 +272,7 @@ fn absent_and_unready_connections_are_distinct_and_expiry_precedes_callbacks() {
             .economy
             .players
             .iter()
-            .all(|player| !player.away)
+            .all(|player| player.away)
     );
     assert_eq!(h.accounts[&1].delivery, before);
     assert!(!h.accounts[&1].full_terrain);
