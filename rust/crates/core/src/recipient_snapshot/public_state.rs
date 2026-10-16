@@ -68,6 +68,9 @@ pub(super) fn capture(state: &Match) -> Result<Vec<Map<String, Value>>, Snapshot
     let mut result = Vec::with_capacity(g.players.len());
     for slot in 0..g.players.len() {
         let mut fields = Map::new();
+        if state.options.mode == Mode::Horde {
+            fields.insert("mode".into(), horde_mode_row(state)?);
+        }
         // Reuse Source's six-field ghost rows. Never consult a hidden live building here.
         if matches!(state.options.mode, Mode::Classic | Mode::World) {
             let rows = state

@@ -62,6 +62,7 @@ impl NativeStartup {
         let mode_matches = matches!(
             (settings.mode, state.options.mode, state.world.game.mode),
             ("conquest", Mode::Default | Mode::Conquest, None)
+                | ("horde", Mode::Horde, Some(ww2_core::game::ModeKind::Horde))
                 | (
                     "assault",
                     Mode::Assault,
@@ -116,6 +117,7 @@ impl NativeStartup {
             return Err("native startup authoring map binding changed".into());
         }
         let plan = match state.options.mode {
+            Mode::Horde => StartPlan::prepare_horde(authored, &state.options, &state.rules)?,
             Mode::Assault => StartPlan::prepare_assault(
                 authored,
                 &state.options,

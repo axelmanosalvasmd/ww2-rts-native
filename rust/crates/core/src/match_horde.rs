@@ -1,5 +1,4 @@
-//! Deterministic Horde setup and explicit late wave phase. Public tick admission
-//! remains guarded until the other Horde mode owners are connected.
+//! Deterministic Horde setup and the late wave phase used by the core tick runner.
 use crate::{
     catalog::{Catalog, Value},
     economy::{Faction, Mode},
@@ -78,7 +77,7 @@ pub struct HordeState {
 }
 /// The caller detaches these public world effects at the same boundary as other
 /// phase events. They do not define snapshot or wire fields.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum HordeEvent {
     BossSurfaced { at: Point },
 }
@@ -314,40 +313,48 @@ impl Match {
         Ok(true)
     }
 
-    /// Explicit core vision phase. This does not admit Horde to ordinary ticking or delivery.
+    /// Refresh the core vision component, including active-wave Horde markers.
+    /// The core tick runner invokes this on its ordinary vision cadence.
     pub fn refresh_horde_visibility(&mut self) -> Result<(), String> {
         self.validate_horde_phase(0.0)?;
-        let horde = self.horde.as_ref().unwrap();
+        let h = self.horde.as_ref().ok_or("missing Horde state")?;
         let defender_team = self.world.game.players[0].team;
-        let few = horde.budget == 0.0 && horde.left <= number(cfg()?, "reveal")?;
+        let threshold = number(cfg()?, "reveal")?;
+        let few = h.budget == 0.0 && h.left <= threshold;
         let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
-        let mut revealed = Vec::new();
-        if horde.active {
-            for unit in self.world.game.units.values() {
-                if unit.owner == horde.slot
-                    && unit.air.is_none()
-                    && (few
-                        || catalog
-                            .unit(&self.rules.kinds[unit.kind].name)
-                            .map_err(|e| e.to_string())?
-                            .get("boss")
-                            .and_then(Value::boolean)
-                            .unwrap_or(false))
-                {
-                    revealed.push(unit.id);
-                }
+        let mut marked = Vec::new();
+        for u in self.world.game.units.values() {
+            let kind = self
+                .rules
+                .kinds
+                .get(u.kind)
+                .ok_or("invalid Horde vision unit kind")?;
+            let boss = catalog
+                .unit(&kind.name)
+                .map_err(|e| e.to_string())?
+                .get("boss")
+                .and_then(Value::boolean)
+                .unwrap_or(false);
+            if h.active && u.owner == h.slot && u.air.is_none() && (few || boss) {
+                marked.push(u.id);
             }
         }
         crate::vision::update_vision(&mut self.world.game, &self.rules, &self.grid);
         for player in &mut self.world.game.players {
             if player.team == defender_team {
-                player.visible.extend_from_slice(&revealed);
+                player.visible.extend_from_slice(&marked);
                 player.visible.sort_unstable();
                 player.visible.dedup();
             }
         }
         Ok(())
     }
+
+    /// Refresh the same guarded Horde vision phase used by combat visibility.
+    pub fn update_horde_vision(&mut self) -> Result<(), String> {
+        self.refresh_horde_visibility()
+    }
+
     pub(crate) fn validate_horde_economy(&self) -> Result<(), String> {
         self.validate_horde_phase(0.0)?;
         self.validate_match_finish_state()
@@ -385,8 +392,8 @@ impl Match {
             report,
         }))
     }
-    /// Explicit constructor for the Horde-owned wave phase. Generic `Match::new`
-    /// and ordinary `advance_tick` retain their existing admission guards.
+    /// Explicit Horde constructor. Generic `Match::new` keeps its ordinary setup;
+    /// the shared tick runner admits this canonical Horde state.
     pub fn new_horde(map: &AuthoritativeMap, mut options: MatchOptions) -> Result<Self, String> {
         if options.mode != Mode::Horde || !(1..=5).contains(&options.players.len()) {
             return Err("Horde needs Horde mode and one through five defenders".into());
@@ -478,6 +485,7 @@ impl Match {
         state.prepare_profile(1.0)?;
         result.horde = Some(state);
         result.complete_skirmish_start()?;
+        result.initialize_recipient_routing()?;
         Ok(result)
     }
     fn horde_income(&self) -> Result<f64, String> {
@@ -801,3 +809,11 @@ impl Match {
 #[cfg(test)]
 #[path = "match_horde_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "match_horde_lifecycle_tests.rs"]
+mod lifecycle_tests;
+
+#[cfg(test)]
+#[path = "match_horde_runner_tests.rs"]
+mod runner_tests;

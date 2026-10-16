@@ -304,7 +304,12 @@ pub struct OrdinaryRawLists {
 impl crate::match_runtime::Match {
     pub fn ordinary_snapshot_raw_lists(&self) -> Result<OrdinaryRawLists, String> {
         let game = &self.world.game;
-        if !crate::match_actor::ordinary_ground_mode(game, self.options.mode)
+        let horde =
+            self.options.mode == crate::economy::Mode::Horde && game.mode == Some(ModeKind::Horde);
+        if horde {
+            self.validate_actor_mode()?;
+            self.validate_horde_economy()?;
+        } else if !crate::match_actor::ordinary_ground_mode(game, self.options.mode)
             || self.options.mode == crate::economy::Mode::Tutorial
         {
             return Err("global ordinary lists require represented ordinary mode".into());
