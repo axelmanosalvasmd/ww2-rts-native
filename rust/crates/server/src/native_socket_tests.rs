@@ -76,7 +76,7 @@ impl Client {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn real_socket_maintenance_uses_trusted_runtime_and_public_start_stays_denied() {
+async fn real_socket_maintenance_uses_native_runtime_and_ignores_start_while_playing() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
     let (stop, stopped) = oneshot::channel();

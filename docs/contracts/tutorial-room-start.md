@@ -49,3 +49,11 @@ Owner groups E/O cover the projectile state needed when Tutorial and Assault uni
 Each row uses the canonical current position and velocity, launch/expiry times, sequence and unit type. `effect` is omitted when absent. A future launch is omitted. The ground-cell fog mask gates each row even for its owner; `reveal` overrides that mask. `f` and `fo` appear only when the shooter is visible. No target identity is sent. `until` limits extrapolation to 150 ms, expiry, the first hidden cell, and a visible static contact using current poses. Projection does not advance projectiles or damage actors.
 
 Private salvo schedules and grenade tickets do not add wire arrays. Their physical flights and emitted events already represent them (`shared/sim.js:4141-4152,6079-6080`). Snapshot admission validates those owners and retains the guard for undrained producer event buffers. The component test checks the exact flight object, hidden-shooter redaction, unseen and future flight exclusion, and static contact clipping. The room lifecycle test retains active artillery while collecting every recipient snapshot.
+
+Ordinary grenade throws also use the existing prototype shot shape from `shared/sim.js:5427` (shared with operative throws at `:2104`):
+
+```json
+{"f":1,"fo":0,"x":35,"z":35,"k":"throw","physical":true,"local":true}
+```
+
+The existing local-event rule applies: the ground cell must be visible, and `f`/`fo` are removed together when the shooter is hidden (`shared/sim.js:5998-6003`). This admits the ordinary Tutorial ability event without opening operative room admission.

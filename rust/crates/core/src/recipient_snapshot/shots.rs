@@ -279,11 +279,17 @@ fn raw_event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
                     owner(state, *seat)?;
                     numbers(&[at.x, at.z, *spread])?;
                 }
-                // SmallArms is an operative payload. Throw is shared by ordinary
-                // abilities and operatives, with no retained source provenance.
-                // Horde breath effects also remain outside ordinary recipient admission.
-                LaunchEvent::Throw { .. }
-                | LaunchEvent::SmallArms(_)
+                LaunchEvent::Throw {
+                    shooter,
+                    owner: seat,
+                    at,
+                } => {
+                    identity(u64::from(*shooter))?;
+                    owner(state, *seat)?;
+                    numbers(&[at.x, at.z])?;
+                }
+                // Operative small arms and Horde breath retain their admission guards.
+                LaunchEvent::SmallArms(_)
                 | LaunchEvent::Breath { .. }
                 | LaunchEvent::BreathShell { .. } => return Err(refused()),
                 LaunchEvent::Contact(value) => {
@@ -533,6 +539,44 @@ fn project_shots(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ordinary_throw_uses_prototype_shape_and_local_visibility() {
+        let fixture: Value =
+            serde_json::from_str(include_str!("../../tests/fixtures/recipient-snapshot.json"))
+                .unwrap();
+        let mut state = super::super::tests::initialize(&fixture["cases"][0]);
+        let shot = LaunchEvent::Throw {
+            shooter: 1,
+            owner: 0,
+            at: Point { x: 35., z: 35. },
+        };
+        let selected = (0..3)
+            .map(|slot| SelectedSeat {
+                slot,
+                full: false,
+                omit: false,
+            })
+            .collect::<Vec<_>>();
+        state.world.game.reveal = true;
+        let rows = project_shots(&state, &selected, &[ShotRef::Firing(&shot)]).unwrap();
+        assert!(rows.iter().all(|(_, row)| *row
+            == json!([{"f":1,"fo":0,"x":35.,"z":35.,"k":"throw","physical":true,"local":true}])));
+        state.world.game.reveal = false;
+        state.world.game.players[2].visible.clear();
+        let rows = project_shots(&state, &selected, &[ShotRef::Firing(&shot)]).unwrap();
+        assert_eq!(
+            rows[2].1,
+            json!([{"x":35.,"z":35.,"k":"throw","physical":true,"local":true}])
+        );
+        let hidden = LaunchEvent::Throw {
+            shooter: 1,
+            owner: 0,
+            at: Point { x: -10., z: -10. },
+        };
+        let rows = project_shots(&state, &selected, &[ShotRef::Firing(&hidden)]).unwrap();
+        assert!(rows.iter().all(|(_, row)| *row == json!([])));
+    }
 
     #[test]
     fn live_flight_shape_visibility_and_extrapolation_match_prototype() {
@@ -790,11 +834,6 @@ mod tests {
                 owner: 0,
                 at: Point { x: 13.0, z: 13.0 },
                 direction: 0.0,
-            }),
-            TickEvent::Firing(LaunchEvent::Throw {
-                shooter: 1,
-                owner: 0,
-                at: Point { x: 13.0, z: 13.0 },
             }),
             TickEvent::Environment(metadata.clone()),
         ] {

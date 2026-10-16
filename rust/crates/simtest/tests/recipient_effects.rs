@@ -567,11 +567,9 @@ fn original_ordinary_batches_match_selected_shot_rows_and_numeric_bits() {
                             1
                         );
                     }
-                    // Source snapshotFor warms teamFog at each selected query,
-                    // including the launch frame that native complete admission
-                    // refuses. The public base-field query supplies this input
-                    // history from canonical facts, before the refusal baseline.
-                    // Its disposable receipt is not complete-frame delivery.
+                    // Source snapshotFor warms teamFog at each selected query.
+                    // The disposable base-field receipt supplies this input
+                    // history from canonical facts before complete delivery.
                     if !selected.is_empty() {
                         let mut query = DeliveryState::new(&state).unwrap();
                         assert!(
@@ -594,15 +592,8 @@ fn original_ordinary_batches_match_selected_shot_rows_and_numeric_bits() {
                         .any(|v| v == "live-flights")
                     {
                         flights += 1;
-                        assert!(matches!(
-                            result,
-                            Err(SnapshotError::Unsupported {
-                                capability: SnapshotCapability::ShotsAndFlights,
-                                ..
-                            })
-                        ));
-                        assert_eq!(guard(&state, &delivery), state_before);
-                    } else if selected.is_empty() {
+                    }
+                    if selected.is_empty() {
                         assert!(result.unwrap().is_none());
                         assert_eq!(guard(&state, &delivery), state_before);
                         assert_eq!(batch.len(), 2);
@@ -624,6 +615,21 @@ fn original_ordinary_batches_match_selected_shot_rows_and_numeric_bits() {
                                 &row["fields"]["shots"],
                                 &format!("{name}:{} seat{} shots", frame["tick"], row["slot"]),
                             );
+                            if frame["refusals"]
+                                .as_array()
+                                .unwrap()
+                                .iter()
+                                .any(|v| v == "live-flights")
+                            {
+                                common::exact(
+                                    &actual["flights"],
+                                    &row["fields"]["flights"],
+                                    &format!(
+                                        "{name}:{} seat{} flights",
+                                        frame["tick"], row["slot"]
+                                    ),
+                                );
+                            }
                             recipients += 1;
                             shots += row["fields"]["shots"].as_array().unwrap().len();
                         }
@@ -651,7 +657,7 @@ fn original_ordinary_batches_match_selected_shot_rows_and_numeric_bits() {
         (
             traces, frames, recipients, shots, supplied, empty, air_frames, flights, falling
         ),
-        (7, 158, 790, 90, 24, 1, 1, 1, 4)
+        (7, 159, 795, 94, 25, 1, 1, 1, 4)
     );
 }
 
@@ -677,14 +683,6 @@ fn caller_batch_refusals_do_not_publish_a_valid_original_prefix() {
     for (row, capability) in [
         (
             TickEvent::Environment(Effect::LastHit { unit: 1, owner: 0 }),
-            SnapshotCapability::ShotsAndFlights,
-        ),
-        (
-            TickEvent::Firing(LaunchEvent::Throw {
-                shooter: 1,
-                owner: 0,
-                at: point(&source["units"][0]),
-            }),
             SnapshotCapability::ShotsAndFlights,
         ),
         (
