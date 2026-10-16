@@ -270,7 +270,6 @@ fn ordinary_binary_refuses_unsupported_settings_before_any_start_publication() {
         json!({"t":"mode","v":"assault"}),
         json!({"t":"mode","v":"annihilation"}),
         json!({"t":"mode","v":"classic"}),
-        json!({"t":"mode","v":"horde"}),
         json!({"t":"mode","v":"tutorial"}),
         json!({"t":"sandbox","v":true}),
         json!({"t":"team","slot":1,"v":0}),
@@ -488,4 +487,30 @@ fn mode06_binary_named_armies_start_and_deliver_to_both_sockets() {
         assert_eq!(server.receipts()[0]["options"]["army"], key);
         assert!(!server.log().contains("NATIVE_FAULT"));
     }
+}
+
+#[test]
+fn room_ai_horde_binary_starts_selected_level_and_internal_horde_views() {
+    let server = BinaryServer::start(true, SEED);
+    let mut host = Client::join(server.address, "a");
+    host.send(json!({"t":"addAi"}));
+    host.until(|m| m["t"] == "lobby" && m["players"].as_array().is_some_and(|p| p.len() == 2));
+    host.send(json!({"t":"level","slot":1,"v":"hard"}));
+    host.until(|m| m["t"] == "lobby" && m["players"][1]["level"] == "hard");
+    host.send(json!({"t":"mode","v":"horde"}));
+    host.until(|m| m["t"] == "lobby" && m["mode"] == "horde");
+    host.send(json!({"t":"start"}));
+    let start = host.until(|m| m["t"] == "start");
+    assert_eq!(start["names"], json!(["a", "AI 1", "Horde"]));
+    assert_eq!(start["teams"], json!([0, 0, 1]));
+    assert_eq!(start["spawns"].as_array().unwrap().len(), 3);
+    for _ in 0..4 {
+        let snapshot = host.until(|m| m["t"] == "s");
+        assert_eq!(snapshot["mode"]["kind"], "horde");
+        assert_eq!(snapshot["mode"]["slot"], 2);
+        assert_eq!(snapshot["online"], json!([true, true]));
+        assert_eq!(snapshot["ping"][1].as_f64(), Some(-1.0));
+    }
+    host.barrier();
+    assert!(!server.log().contains("NATIVE_FAULT"));
 }
