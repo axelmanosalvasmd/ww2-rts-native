@@ -1594,13 +1594,8 @@ impl Match {
             .units
             .get(&id)
             .ok_or("missing canonical unit control")?;
-        if kind.air
-            || kind.rail
-            || control.operative
-            || control.fire_at.is_some()
-            || control.nade.is_some()
-        {
-            return Err("air, rail, operative and ability/terrain firing are unsupported".into());
+        if kind.air || kind.rail || control.operative || control.nade.is_some() {
+            return Err("air, rail, operative and aimed ability firing are unsupported".into());
         }
         if u.riding {
             return Ok(());
@@ -1660,6 +1655,9 @@ impl Match {
             self.firing.initialize(id).target_id = 0;
             self.commands.units.get_mut(&id).unwrap().aim = rot;
             return Ok(());
+        }
+        if self.commands.units[&id].fire_at.is_some() {
+            return self.fire_at_weapon(id);
         }
         let current = self.firing.get(id).copied().unwrap_or_default();
         if hold_fire && attack == 0 {
@@ -2675,6 +2673,9 @@ mod map_feature_tests;
 #[path = "map_intent_batch2_tests.rs"]
 mod map_intent_batch2;
 
+mod fire_at;
+#[cfg(test)]
+mod fire_at_tests;
 #[cfg(test)]
 #[path = "match_kaiju_tests.rs"]
 mod match_kaiju_tests;
