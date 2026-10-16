@@ -671,11 +671,11 @@ mod tests {
             snapshot["flights"],
             json!([
                 {"flight":operative_flight,"kind":"rifle","effect":"boom","seq":0,
-                 "x":60.,"y":10.,"z":60.,"v":[20.,0.,0.],"gravity":0.,
-                 "time":1.,"launched":0.,"expires":3.,"until":1.15,"f":operative,"fo":0},
+                 "x":60.,"y":10.,"z":60.,"v":[20.,0,0],"gravity":0,
+                 "time":1.,"launched":0,"expires":3.,"until":1.15,"f":operative,"fo":0},
                 {"flight":ordinary_flight,"kind":"rifle","effect":"boom","seq":0,
-                 "x":60.,"y":10.,"z":70.,"v":[20.,0.,0.],"gravity":0.,
-                 "time":1.,"launched":0.,"expires":1.05,"until":1.05,"f":ordinary,"fo":1}
+                 "x":60.,"y":10.,"z":70.,"v":[20.,0,0],"gravity":0,
+                 "time":1.,"launched":0,"expires":1.05,"until":1.05,"f":ordinary,"fo":1}
             ])
         );
         assert_eq!(
