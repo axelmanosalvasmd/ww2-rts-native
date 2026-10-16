@@ -1,0 +1,1 @@
+- Marked 28 rows ported across four parity files, citing native intent tests merged in #289 (CMB-145), #300 (17 AI rows), #305 (LOG-07, 09, 34, 40, 42) and #308 (BASE-17, 39, 45, 49, 50), each reviewed against the prototype under Axel's 2026-10-16 evidence standard and merged after Hermes' exact-head runtime ack.

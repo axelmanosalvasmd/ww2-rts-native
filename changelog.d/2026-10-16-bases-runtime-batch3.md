@@ -1,0 +1,3 @@
+- Share point-supply scheduling and kill-bounty rules between match phases and focused rule checks, including disabled supply modes and the Horde AI bounty exclusion.
+- Support the existing personal and building rally command in admitted native matches, with recruitment, tick and recipient-snapshot checks after rally changes.
+- Check every training duration, head-only progression and unfinished or Sudden Death pauses. Aircraft placement and the Classic deadline caller remain unproved by these component checks.

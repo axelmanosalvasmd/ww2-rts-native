@@ -1,0 +1,2 @@
+- Complete ordinary ground-carrier scuttling: passengers leave dead or missing carriers, take eviction damage or drown beyond shore reach, and publish the existing hurt effect before their ground turn continues. Scuttled units and buildings retain friendly attribution, leave wrecks or rubble, and give no refund or enemy bounty.
+- Add a CMB-145 full-tick behavior test for surviving, fatal, stranded and already-retired carrier exits. Replace the old ejection-rejection assertions with supported-exit coverage and retain rejection of invalid noninfantry riders.

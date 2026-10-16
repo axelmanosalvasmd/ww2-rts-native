@@ -423,6 +423,6 @@ fn preparation_and_invalid_steps_preserve_canonical_state() {
         Err(Error::World(_))
     ));
     assert_eq!(before, snapshot(&w, &runtime, &[wallet]));
-    assert_eq!(FortKind::parse("bridge"), Err(Error::UnsupportedKind));
-    assert_eq!(FortKind::parse("wall"), Err(Error::UnsupportedKind));
+    assert_eq!(FortKind::parse("bridge"), Ok(FortKind::Bridge));
+    assert_eq!(FortKind::parse("wall"), Ok(FortKind::Wall));
 }

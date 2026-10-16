@@ -65,6 +65,41 @@ pub(super) fn capture(state: &Match) -> Result<Vec<Map<String, Value>>, Snapshot
     let mut result = Vec::with_capacity(g.players.len());
     for slot in 0..g.players.len() {
         let mut fields = Map::new();
+        // Reuse Source's six-field ghost rows. Never consult a hidden live building here.
+        if matches!(state.options.mode, Mode::Classic | Mode::World)
+            && let Some((_, rows)) = state
+                .classic_known_buildings
+                .iter()
+                .find(|(team, _)| *team == g.players[slot].team)
+        {
+            let ghosts = rows
+                .iter()
+                .filter(|row| !seen_by(state, slot, row.id))
+                .map(|row| {
+                    let kind = state
+                        .rules
+                        .kinds
+                        .get(row.kind)
+                        .ok_or(SnapshotError::Rules)?;
+                    if row.id == 0 || row.owner >= g.players.len() || !kind.building {
+                        return Err(SnapshotError::Rules);
+                    }
+                    finite(&[row.at.x, row.at.z])?;
+                    if let Some(built) = row.built {
+                        finite(&[built])?;
+                    }
+                    Ok(json!([
+                        row.id,
+                        kind.name,
+                        row.owner,
+                        r(row.at.x),
+                        r(row.at.z),
+                        row.built.map(r)
+                    ]))
+                })
+                .collect::<Result<Vec<_>, SnapshotError>>()?;
+            fields.insert("ghosts".into(), json!(ghosts));
+        }
         if state.scenario.is_some() {
             // The admitted migrated engine has no authored objectives.
             fields.insert("scenario".into(), json!({"version":1,"objectives":[]}));

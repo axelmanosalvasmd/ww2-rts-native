@@ -17,7 +17,7 @@ Every change must be recorded in the same commit as the change, as a new file in
 
 ## The JavaScript game is the prototype
 
-- `reference/ww2-rts` is the prototype: it was built to try the game's ideas out, and nothing in it is fixed. Build every feature in `PARITY.md` with the same intent, and take the better architecture, algorithm or rule wherever Rust allows one. Record each such choice in `DESIGN.md`.
+- `reference/ww2-rts` is the prototype: it was built to try the game's ideas out, and nothing in it is fixed. Build every feature in `PARITY.md` with the same intent, and take the better architecture, algorithm or rule wherever Rust allows one. Record each such choice in a `design.d/` fragment.
 - Before marking a `PARITY.md` row done, or changing something players would notice, read "How parity is judged" in `PARITY.md`: it says what is compared exactly, what by outcome, and which changes need both owners.
 - Never edit `reference/ww2-rts` here. Moving the pin is its own commit, with the port of the changed rules and the affected `PARITY.md` rows updated.
 - Keep the core deterministic, so a match replays from its seed and orders on every platform:
@@ -49,5 +49,5 @@ Every change must be recorded in the same commit as the change, as a new file in
 ## Other rules
 
 - Never use em dashes, in code comments, docs, commit messages or chat. Use a period, comma, colon or parentheses.
-- `DESIGN.md` holds the decisions and the measurements. Keep it in sync.
+- `DESIGN.md` holds the decisions and the measurements. Put new decisions in a `design.d/` fragment in the same commit (see `design.d/README.md`); `scripts/collect-design.sh` folds them into `DESIGN.md`. Editing existing `DESIGN.md` text stays allowed.
 - More than one agent session may work in this folder. Stage specific files (not whole folders) and check `git status` for changes that aren't yours before committing.

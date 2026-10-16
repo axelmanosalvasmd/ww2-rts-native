@@ -12,6 +12,8 @@ use crate::{
 mod match_engineering;
 #[path = "match_projects.rs"]
 mod match_projects;
+#[path = "match_queued_dig.rs"]
+mod match_queued_dig;
 #[path = "field_project_tick.rs"]
 mod project_tick;
 #[path = "field_work_snapshot.rs"]
@@ -28,7 +30,9 @@ pub use projects::{
     ProjectRequest, Segment, SegmentPreparation, entrench_plan, line_fort, segment_cost,
 };
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
 pub enum FortKind {
     Trench,
     Sandbags,
@@ -38,6 +42,10 @@ pub enum FortKind {
     Mines,
     Demine,
     Aid,
+    Bridge,
+    Fill,
+    Wall,
+    Gate,
 }
 impl FortKind {
     pub fn as_str(self) -> &'static str {
@@ -50,6 +58,10 @@ impl FortKind {
             Self::Mines => "mines",
             Self::Demine => "demine",
             Self::Aid => "aid",
+            Self::Bridge => "bridge",
+            Self::Fill => "fill",
+            Self::Wall => "wall",
+            Self::Gate => "gate",
         }
     }
     pub fn parse(name: &str) -> Result<Self, Error> {
@@ -62,7 +74,10 @@ impl FortKind {
             "mines" => Ok(Self::Mines),
             "demine" => Ok(Self::Demine),
             "aid" => Ok(Self::Aid),
-            "bridge" | "fill" | "wall" | "gate" => Err(Error::UnsupportedKind),
+            "bridge" => Ok(Self::Bridge),
+            "fill" => Ok(Self::Fill),
+            "wall" => Ok(Self::Wall),
+            "gate" => Ok(Self::Gate),
             _ => Err(Error::Refused(Reason::Blocked)),
         }
     }
@@ -107,12 +122,12 @@ impl std::fmt::Display for Error {
     }
 }
 impl std::error::Error for Error {}
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct WorkCell {
     pub cell: usize,
     pub ch: u8,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Dig {
     pub project: Option<ProjectId>,
     pub kind: FortKind,
@@ -123,9 +138,13 @@ pub struct Dig {
     /// Written on the first in-reach work phase, as in the source's lazy `dig.n`.
     pub original_cells: Option<usize>,
     pub front: Option<f64>,
-    /// Only the distant Clear mines work has a source reach field in this slice.
+    /// Long-reach work caches an approach point on the builder's side.
     pub reach: Option<f64>,
     pub from: Option<Point>,
+    /// Total occupied-cell retries across the paid concrete line.
+    pub waits: u8,
+    /// Retain an occupied-cell escape while the deterministic path budget is exhausted.
+    pub step_back: Option<Point>,
 }
 #[derive(Clone, Copy, Debug)]
 pub struct StartRequest {
@@ -137,7 +156,7 @@ pub struct StartRequest {
     pub at: Point,
     pub direction: Option<f64>,
 }
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FieldWorksRuntime {
     jobs: BTreeMap<u32, Dig>,
     pits: BTreeSet<usize>,
@@ -169,6 +188,8 @@ pub struct StepResult {
     pub completed: Option<usize>,
     /// Scheduler must add real Dig eligibility before acting on this request.
     pub route: Option<Point>,
+    /// The Match publishes the finished building and its canonical metadata.
+    pub concrete: Option<(FortKind, usize, f64)>,
 }
 struct Definition {
     cost: f64,
@@ -213,6 +234,10 @@ fn definitions() -> Result<&'static Definitions, Error> {
             FortKind::Mines,
             FortKind::Demine,
             FortKind::Aid,
+            FortKind::Bridge,
+            FortKind::Fill,
+            FortKind::Wall,
+            FortKind::Gate,
         ] {
             let source = table.get(kind.as_str()).ok_or(Error::Rules)?;
             let count = if kind == FortKind::Nest {
@@ -224,7 +249,9 @@ fn definitions() -> Result<&'static Definitions, Error> {
                 }
                 n as usize
             };
-            let ch = if kind == FortKind::Nest {
+            let ch = if matches!(kind, FortKind::Wall | FortKind::Gate) {
+                0
+            } else if kind == FortKind::Nest {
                 b'T'
             } else {
                 let ch = source
@@ -282,6 +309,9 @@ fn center(w: &World, c: usize) -> Point {
         z: (c / w.game.w) as f64 * 2. + 1.,
     }
 }
+pub(crate) fn square_direction(direction: f64) -> f64 {
+    math::round(direction / std::f64::consts::FRAC_PI_2) * std::f64::consts::FRAC_PI_2
+}
 fn offsets(kind: FortKind, count: usize) -> Vec<(f64, f64, u8)> {
     if kind == FortKind::Nest {
         vec![
@@ -320,6 +350,11 @@ pub fn placement(
         return Err(Error::Refused(Reason::Blocked));
     }
     let d = &definitions()?.forts[&kind];
+    let direction = if kind == FortKind::Gate {
+        square_direction(direction)
+    } else {
+        direction
+    };
     let sx = math::cos(direction);
     let sz = math::sin(direction);
     let plan = offsets(kind, d.count);
@@ -340,7 +375,11 @@ pub fn placement(
         ) else {
             continue;
         };
-        let valid = if kind == FortKind::Demine {
+        let valid = if kind == FortKind::Bridge {
+            w.game.chars[cell] == b'W'
+        } else if kind == FortKind::Fill {
+            w.fillable(cell)
+        } else if kind == FortKind::Demine {
             w.game.chars[cell] == b'N' && team.is_none_or(|team| mine_known(w, cell, team))
         } else {
             b".+RDM".contains(&w.game.chars[cell])
@@ -350,6 +389,31 @@ pub fn placement(
                 cell,
                 ch: if kind == FortKind::Nest { ch } else { d.ch },
             });
+        }
+    }
+    if kind == FortKind::Bridge {
+        let mut accepted = BTreeSet::new();
+        let mut pending = cells;
+        cells = Vec::new();
+        loop {
+            let before = pending.len();
+            pending.retain(|work| {
+                if w.bridge_supported_at(work.cell)
+                    || w.neighbors(work.cell)
+                        .into_iter()
+                        .flatten()
+                        .any(|c| accepted.contains(&c))
+                {
+                    accepted.insert(work.cell);
+                    cells.push(*work);
+                    false
+                } else {
+                    true
+                }
+            });
+            if pending.len() == before {
+                break;
+            }
         }
     }
     if cells.is_empty() {
@@ -397,7 +461,16 @@ impl FieldWorksRuntime {
             .filter(|u| u.owner == request.owner)
             .ok_or(Error::Refused(Reason::NoBuilders))?;
         let kind = defs.rules.kinds.get(unit.kind).ok_or(Error::InvalidInput)?;
-        if !request.control_eligible || unit.riding || !defs.builders.contains(&kind.name) {
+        let builder = if matches!(request.kind, FortKind::Wall | FortKind::Gate)
+            && matches!(
+                w.game.mode,
+                Some(crate::game::ModeKind::Classic | crate::game::ModeKind::World)
+            ) {
+            kind.name == "engineer"
+        } else {
+            defs.builders.contains(&kind.name)
+        };
+        if !request.control_eligible || unit.riding || !builder {
             return Err(Error::Refused(Reason::NoBuilders));
         }
         if unit.retreating {
@@ -417,7 +490,12 @@ impl FieldWorksRuntime {
             .direction
             .filter(|v| v.is_finite())
             .unwrap_or_else(|| {
-                math::atan2(at.z - unit.z, at.x - unit.x) + std::f64::consts::FRAC_PI_2
+                math::atan2(at.z - unit.z, at.x - unit.x)
+                    + if request.kind == FortKind::Bridge {
+                        0.
+                    } else {
+                        std::f64::consts::FRAC_PI_2
+                    }
             });
         let cells = placement(w, request.kind, at, direction, Some(wallet.team), sees)?;
         if request.kind == FortKind::Aid
@@ -447,6 +525,8 @@ impl FieldWorksRuntime {
                 front: None,
                 reach: d.reach,
                 from: None,
+                waits: 0,
+                step_back: None,
             },
         })
     }
@@ -504,6 +584,13 @@ impl FieldWorksRuntime {
         if unit.hp <= 0. {
             return Ok(StepResult::default());
         }
+        if !unit.path.is_empty()
+            || job
+                .step_back
+                .is_some_and(|at| math::hypot(unit.x - at.x, unit.z - at.z) < 1.)
+        {
+            job.step_back = None;
+        }
         let distance = math::hypot(unit.x - job.at.x, unit.z - job.at.z);
         if distance > job.reach.unwrap_or(3.) {
             let route = if unit.repath <= 0. && unit.path.is_empty() {
@@ -551,11 +638,56 @@ impl FieldWorksRuntime {
             && w.game.units.values().any(|v| {
                 !defs.rules.kinds[v.kind].infantry && w.game.cell_of(v.x, v.z) == Some(cell.cell)
             });
+        let mut result = StepResult::default();
         job.elapsed = 0.;
         job.cells.remove(0);
-        if job.kind == FortKind::Demine {
+        if matches!(job.kind, FortKind::Wall | FortKind::Gate) {
+            if b".+RDM".contains(&w.game.chars[cell.cell]) {
+                let occupied = w.game.flags[cell.cell] & crate::game::MOVE != 0
+                    || w.game.units.values().any(|v| {
+                        v.hp > 0.
+                            && !defs.rules.kinds[v.kind].air
+                            && !defs.rules.kinds[v.kind].structure
+                            && !v.riding
+                            && w.game.cell_of(v.x, v.z) == Some(cell.cell)
+                    });
+                if !occupied {
+                    result.concrete = Some((
+                        job.kind,
+                        cell.cell,
+                        if job.kind == FortKind::Gate {
+                            square_direction(job.direction)
+                        } else {
+                            job.direction
+                        },
+                    ));
+                } else {
+                    job.waits += 1;
+                    if job.waits < 20 {
+                        job.cells.push(cell);
+                        let at = center(w, cell.cell);
+                        if math::hypot(unit.x - at.x, unit.z - at.z) < 2.5 {
+                            let goal = Point {
+                                x: at.x - math::sin(job.direction) * 4.,
+                                z: at.z + math::cos(job.direction) * 4.,
+                            };
+                            job.step_back = Some(goal);
+                            result.route = Some(goal);
+                        }
+                    }
+                }
+            }
+        } else if job.kind == FortKind::Demine {
             if w.game.chars[cell.cell] == b'N' {
                 w.set_cell(cell.cell, b'.')?;
+            }
+        } else if job.kind == FortKind::Fill {
+            if w.fillable(cell.cell) {
+                w.fill_cell(cell.cell)?;
+            }
+        } else if job.kind == FortKind::Bridge {
+            if w.game.chars[cell.cell] == b'W' && w.bridge_supported_at(cell.cell) {
+                w.build_bridge_cell(cell.cell)?;
             }
         } else if b".+RDM".contains(&w.game.chars[cell.cell]) && !under {
             w.set_cell(cell.cell, cell.ch)?;
@@ -587,13 +719,11 @@ impl FieldWorksRuntime {
                 p.active -= 1;
             }
             self.jobs.remove(&unit_id);
-            Ok(StepResult {
-                completed: Some(owner),
-                ..Default::default()
-            })
+            result.completed = Some(owner);
+            Ok(result)
         } else {
             self.jobs.insert(unit_id, job);
-            Ok(StepResult::default())
+            Ok(result)
         }
     }
 }

@@ -370,7 +370,7 @@ fn actual_match_project_phases_match_original_source() {
         "e4e579a838aabae3b1d9dadbc17a0a87147bc52d"
     );
     assert_eq!(fixture["node"], "v24.21.0");
-    let (mut cases, mut actions, mut component_only, mut unsupported) = (0, 0, 0, 0);
+    let (mut cases, mut actions, mut component_only) = (0, 0, 0);
     for case in fixture["traces"].as_array().unwrap() {
         let name = case["name"].as_str().unwrap();
         if name == "actual-join-take-helpers-with-source-preconditions" {
@@ -378,18 +378,6 @@ fn actual_match_project_phases_match_original_source() {
             continue;
         }
         let mut m = make(case);
-        if name == "source-wall-tier-admission-boundary" {
-            let before = snapshot(&m);
-            let a = &case["actions"][0];
-            let cmd = Command::from_json(&decode_command(&a["cmd"])).unwrap();
-            assert_eq!(
-                m.execute_command(0, &cmd, false).unwrap(),
-                Some(crate::match_commands::Denial::Unsupported)
-            );
-            assert_eq!(snapshot(&m), before);
-            unsupported += 1;
-            continue;
-        }
         cases += 1;
         let mut path_budget = 4096usize;
         let mut path_retry_limit = 20u32;
@@ -479,6 +467,7 @@ fn actual_match_project_phases_match_original_source() {
                 }
                 op => panic!("unrepresented Match project action {op}"),
             }
+            crate::unit_placement::tests::assert_current(&m.world.game, &m.grid);
             m.grid.rebuild(&m.world.game.units);
             assert_eq!(
                 result, case["results"][index],
@@ -491,10 +480,9 @@ fn actual_match_project_phases_match_original_source() {
             );
         }
     }
-    assert_eq!(cases, 23);
-    assert_eq!(actions, 131);
+    assert_eq!(cases, 24);
+    assert_eq!(actions, 132);
     assert_eq!(component_only, 1);
-    assert_eq!(unsupported, 1);
 }
 #[test]
 fn malformed_membership_rejects_before_project_payment_or_control_writes() {

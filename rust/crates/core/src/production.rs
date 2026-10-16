@@ -76,7 +76,7 @@ impl std::fmt::Display for Error {
     }
 }
 impl std::error::Error for Error {}
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ProductionJob {
     pub id: u64,
     pub kind: String,
@@ -92,7 +92,7 @@ pub struct JobRow {
     pub job: ProductionJob,
     pub status: JobStatus,
 }
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct BuildingProduction {
     jobs: Vec<ProductionJob>,
     progress: f64,
@@ -122,13 +122,13 @@ impl BuildingProduction {
             .collect()
     }
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ResearchJob {
     pub kind: Technology,
     pub progress: f64,
     pub time: f64,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct PlayerResearch {
     tech: TechState,
     jobs: Vec<ResearchJob>,
@@ -141,7 +141,7 @@ impl PlayerResearch {
         &self.jobs
     }
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ProductionState {
     buildings: BTreeMap<u32, BuildingProduction>,
     players: Vec<PlayerResearch>,
@@ -177,6 +177,7 @@ impl PreparedBuildingStep<'_> {
 /// An admitted Conquest purchase, ready for the caller's staged placement.
 #[derive(Clone, Debug, PartialEq)]
 pub struct RecruitRequest {
+    // Building zero denotes Tutorial recruitment at the player spawn.
     pub building: u32,
     pub owner: usize,
     pub kind: String,
@@ -558,9 +559,10 @@ impl ProductionState {
             wallets.population_cap(&context, slot)?,
         ))
     }
-    /// Prepare instant Conquest recruitment without changing wallets or queues.
-    /// Default represents the absent mode object of ordinary Conquest. Other
-    /// modes are outside this API. Winner/away/out/rate admission stays with Match.
+    /// Prepare instant skirmish recruitment without changing wallets or queues.
+    /// Default represents the absent Conquest mode object. Construction modes use
+    /// training queues. Horde names its scripted seat for shared allied facilities.
+    /// Winner, away, out and rate admission stay with Match.
     pub fn prepare_recruit<'a, 'facts>(
         &'a self,
         c: &'a Context<'facts>,
@@ -572,9 +574,47 @@ impl ProductionState {
     ) -> Result<PreparedRecruit<'a, 'facts>, Error> {
         self.validate(c, wallets)?;
         self.slot(slot)?;
-        if !matches!(c.mode.kind, Mode::Default | Mode::Conquest) {
-            return Err(Error::InvalidInput("recruitment supports Conquest only"));
+        let horde = c.mode.kind == Mode::Horde
+            && c.mode
+                .income_excluded_slot
+                .is_some_and(|slot| slot.checked_add(1) == Some(self.players.len()));
+        if !matches!(
+            c.mode.kind,
+            Mode::Default | Mode::Conquest | Mode::Assault | Mode::Annihilation
+        ) && !horde
+        {
+            return Err(Error::InvalidInput(
+                "recruitment requires a represented skirmish mode or initialized Horde",
+            ));
         }
+        self.prepare_home_or_building_recruit(c, wallets, slot, faction, kind, from)
+    }
+    pub(crate) fn prepare_tutorial_recruit<'a, 'facts>(
+        &'a self,
+        c: &'a Context<'facts>,
+        wallets: &'a mut EconomyState,
+        slot: usize,
+        faction: Faction,
+        kind: &str,
+    ) -> Result<PreparedRecruit<'a, 'facts>, Error> {
+        self.validate(c, wallets)?;
+        self.slot(slot)?;
+        if c.mode.kind != Mode::Tutorial {
+            return Err(Error::InvalidInput(
+                "Tutorial home recruitment requires Tutorial",
+            ));
+        }
+        self.prepare_home_or_building_recruit(c, wallets, slot, faction, kind, None)
+    }
+    fn prepare_home_or_building_recruit<'a, 'facts>(
+        &'a self,
+        c: &'a Context<'facts>,
+        wallets: &'a mut EconomyState,
+        slot: usize,
+        faction: Faction,
+        kind: &str,
+        from: Option<u32>,
+    ) -> Result<PreparedRecruit<'a, 'facts>, Error> {
         let cat = Catalog::compiled()?;
         let Ok(def) = cat.unit(kind) else {
             return denial(Denial::Blocked);
@@ -617,14 +657,23 @@ impl ProductionState {
         {
             return denial(Denial::Max);
         }
-        let makers = self.production_buildings(c, wallets, slot, Some(kind))?;
-        let building = if let Some(id) = from {
-            makers.into_iter().find(|n| *n == id)
+        let building = if c.mode.kind == Mode::Tutorial {
+            0
         } else {
-            makers.first().copied()
-        };
-        let Some(building) = building else {
-            return denial(Denial::Needs);
+            let makers = self.production_buildings(c, wallets, slot, Some(kind))?;
+            let maker = from
+                .and_then(|id| makers.iter().copied().find(|candidate| *candidate == id))
+                .or_else(|| {
+                    if from.is_none() {
+                        makers.first().copied()
+                    } else {
+                        None
+                    }
+                });
+            let Some(maker) = maker else {
+                return denial(Denial::Needs);
+            };
+            maker
         };
         Ok(PreparedRecruit {
             request: RecruitRequest {

@@ -11,8 +11,8 @@
 //! - the default entry points preserve the frozen workload's disabled path search. The `with_routes`
 //!   entry points call supplied routing at the real recovery/replan point; callers select terrain,
 //!   apply routes and handle deferred searches. Full order scheduling is separate;
-//! - logistics: fuel limits and fuel use (`consumeDrivingFuel`), convoys, and units forced back by
-//!   shortages; the loader refuses units that have reserves or a convoy;
+//! - logistics selection and fuel use remain caller-owned. Match supplies the
+//!   fuel-scaled speed and requests the convoy/reserve displacement bound;
 //! - crushing, ground wear and the mud it makes, and mines going off under a unit (the workload turns
 //!   crushing and wear off, and asserts the terrain never changes); with wear unchanged, `touch` only
 //!   tells clients about a cell whose look changed, and the workload checks none did;
@@ -33,6 +33,14 @@ use crate::traffic::{
 use crate::traffic_knowledge::TrafficKnowledge;
 use crate::vehicle::{VehicleStep, angle_delta, swept_vehicle_clear, vehicle_step};
 use crate::vision::{in_trench, or_one};
+
+#[cfg(test)]
+#[path = "movement_runtime_tests.rs"]
+mod runtime_tests;
+
+#[cfg(test)]
+#[path = "mov_runtime_wreck_tests.rs"]
+mod wreck_runtime_tests;
 
 fn dist(a: Point, b: Point) -> f64 {
     math::hypot(a.x - b.x, a.z - b.z)
@@ -153,6 +161,25 @@ pub(crate) fn move_unit_with_march(
     knowledge: &TrafficKnowledge<'_>,
     march: f64,
 ) -> Result<Option<Moved>, KnowledgeError> {
+    move_unit_with_march_and_limit(
+        g, rules, grid, id, supp_speed, routes, knowledge, march, false,
+    )
+}
+
+/// Match selects the bound for reserve-bearing and convoy units. It applies to
+/// the final proposal, including retained momentum and clearance recovery.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn move_unit_with_march_and_limit(
+    g: &mut Game,
+    rules: &Rules,
+    grid: &mut SpatialGrid,
+    id: UnitId,
+    supp_speed: f64,
+    routes: &mut impl FnMut(&Game, &Rules, &mut Unit, Point, RouteRequest),
+    knowledge: &TrafficKnowledge<'_>,
+    march: f64,
+    limit_travel: bool,
+) -> Result<Option<Moved>, KnowledgeError> {
     if !march.is_finite() || march < 0.0 {
         return Err(KnowledgeError::InvalidValue);
     }
@@ -161,7 +188,17 @@ pub(crate) fn move_unit_with_march(
     let Some(mut u) = g.units.remove(&id) else {
         return Ok(None);
     };
-    let speed = block(g, rules, grid, &mut u, supp_speed, routes, knowledge, march);
+    let speed = block(
+        g,
+        rules,
+        grid,
+        &mut u,
+        supp_speed,
+        routes,
+        knowledge,
+        march,
+        limit_travel,
+    );
     grid.update(id, &u);
     let infantry = rules.kinds[u.kind].infantry;
     g.units.insert(id, u);
@@ -201,7 +238,9 @@ pub(crate) fn trial_move_with_march(
         return Ok(None);
     };
     let mut u = original.clone();
-    let speed = block(g, rules, grid, &mut u, supp_speed, routes, knowledge, march);
+    let speed = block(
+        g, rules, grid, &mut u, supp_speed, routes, knowledge, march, false,
+    );
     g.units.insert(id, original);
     Ok(Some(TrialMove { id, unit: u, speed }))
 }
@@ -239,6 +278,7 @@ fn block(
     routes: &mut impl FnMut(&Game, &Rules, &mut Unit, Point, RouteRequest),
     knowledge: &TrafficKnowledge<'_>,
     march: f64,
+    limit_travel: bool,
 ) -> Result<f64, KnowledgeError> {
     let m = &rules.movement;
     let dt = m.tick;
@@ -326,7 +366,19 @@ fn block(
     };
     let dropped = if ground_vehicle {
         drive_vehicle(
-            g, rules, grid, u, kind, route, speed, dt, back, &steer, before, knowledge,
+            g,
+            rules,
+            grid,
+            u,
+            kind,
+            route,
+            speed,
+            dt,
+            back,
+            &steer,
+            before,
+            knowledge,
+            limit_travel,
         );
         false
     } else {
@@ -468,6 +520,7 @@ fn drive_vehicle(
     steer: &Steer,
     before: Pose,
     knowledge: &TrafficKnowledge<'_>,
+    limit_travel: bool,
 ) {
     use std::f64::consts::PI;
     let profile = kind
@@ -571,6 +624,16 @@ fn drive_vehicle(
                 };
                 break;
             }
+        }
+    }
+    if limit_travel {
+        let proposed = math::hypot(next.x - before.x, next.z - before.z);
+        let budget = speed * dt;
+        if proposed > budget {
+            let fraction = budget / proposed;
+            next.x = before.x + (next.x - before.x) * fraction;
+            next.z = before.z + (next.z - before.z) * fraction;
+            next.move_speed *= fraction;
         }
     }
     // Never let a hull rotate or travel through a cell during this tick.
