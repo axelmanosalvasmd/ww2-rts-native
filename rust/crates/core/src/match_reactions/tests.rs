@@ -298,11 +298,11 @@ fn reaction_timer_and_unsupported_exit_preserve_canonical_state() {
     let before = snapshot(&m, id);
     assert!(m.decrement_reaction_timer(id, f64::NAN).is_err());
     assert_eq!(snapshot(&m, id), before);
-    m.world.game.units.get_mut(&id).unwrap().garrison = Some(1);
+    m.world.game.units.get_mut(&id).unwrap().riding = true;
     let before = snapshot(&m, id);
     assert!(m.retreat_unit(id).is_err());
     assert_eq!(snapshot(&m, id), before);
-    m.world.game.units.get_mut(&id).unwrap().garrison = None;
+    m.world.game.units.get_mut(&id).unwrap().riding = false;
     for (build, entrench, dig) in [
         (true, false, false),
         (false, true, false),

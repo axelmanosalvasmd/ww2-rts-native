@@ -1,5 +1,5 @@
 //! Ordinary ground carrier commands and physical boarding using canonical Match owners.
-//! Boat/rail, garrison exit and wrecked-carrier ejection remain explicit boundaries.
+//! Wreck ejection shares canonical placement, damage and grid owners. Boat commands, rail and garrison exit remain explicit boundaries.
 
 use crate::{
     catalog::Catalog,
@@ -382,8 +382,8 @@ impl Match {
             Ok(BoardingOutcome::Idle)
         }
     }
-    /// Source early riding branch. Caller skips the remaining unit turn on Riding;
-    /// dead-carrier ejection must be handled by the future drop/effect actuator.
+    /// Caller skips the remaining unit turn on Riding. A wreck ejects passengers
+    /// before their ordinary on-foot turn continues.
     pub fn apply_unit_riding(&mut self, id: UnitId, dt: f64) -> Result<RidingOutcome, String> {
         self.validate_carrier_world()?;
         if self.world.game.units.contains_key(&id) {
@@ -424,13 +424,30 @@ impl Match {
             }
             return Ok(RidingOutcome::OnFoot);
         };
-        let Some(c) = self.world.game.units.get(&carrier) else {
-            return Ok(RidingOutcome::UnsupportedEjection);
-        };
-        self.validate_carrier_unit(carrier)?;
-        if c.hp <= 0. {
-            return Ok(RidingOutcome::UnsupportedEjection);
+        if self
+            .world
+            .game
+            .units
+            .get(&carrier)
+            .is_none_or(|c| c.hp <= 0.0)
+        {
+            if self
+                .combat
+                .get(carrier)
+                .is_none_or(|m| !m.cargo.contains(&id))
+            {
+                return Err("inconsistent wrecked carrier relation".into());
+            }
+            let effects = self.eject_carrier_riders(carrier)?;
+            self.firing.events.extend(
+                effects
+                    .into_iter()
+                    .map(crate::match_firing::LaunchEvent::Environment),
+            );
+            return Ok(RidingOutcome::OnFoot);
         }
+        let c = &self.world.game.units[&carrier];
+        self.validate_carrier_unit(carrier)?;
         if self.carrier_boundary(id) || self.carrier_boundary(carrier) {
             return Err("unsupported riding actor/carrier".into());
         }
@@ -455,6 +472,116 @@ impl Match {
         self.abilities.get_mut(id).unwrap().cooldown -= dt;
         self.grid.update(id, u);
         Ok(RidingOutcome::Riding)
+    }
+    pub(crate) fn prepare_carrier_ejections(
+        &self,
+        carrier: UnitId,
+    ) -> Result<Vec<(UnitId, Point, f64)>, String> {
+        let meta = self
+            .combat
+            .get(carrier)
+            .ok_or("missing wrecked carrier metadata")?;
+        if meta.cargo.is_empty() {
+            return Ok(Vec::new());
+        }
+        self.validate_carrier_world()?;
+        let cfg = Catalog::compiled()
+            .map_err(|e| e.to_string())?
+            .table("CFG")
+            .map_err(|e| e.to_string())?;
+        let shore = cfg
+            .get("shoreReach")
+            .and_then(|v| v.number())
+            .ok_or("missing shore reach")?;
+        let evict = cfg
+            .get("aid")
+            .and_then(|v| v.get("evict"))
+            .and_then(|v| v.number())
+            .ok_or("missing carrier damage")?;
+        let mut placer = SpawnPlacer::new();
+        let mut drops = Vec::new();
+        for &id in &meta.cargo {
+            let Some(u) = self.world.game.units.get(&id) else {
+                continue;
+            };
+            self.validate_carrier_unit(id)?;
+            if self.carrier_boundary(id)
+                || !self.rules.kinds[u.kind].infantry
+                || self.combat.get(id).unwrap().carrier != Some(carrier)
+                || !u.riding
+            {
+                return Err("inconsistent wrecked carrier rider".into());
+            }
+            let cell = placer
+                .nearest_free(view(self), u.at(), self.rules.kinds[u.kind].block(), None)
+                .map_err(|e| format!("wrecked carrier exit: {e:?}"))?;
+            let at = Point {
+                x: (cell % self.world.game.w) as f64 * CELL + CELL * 0.5,
+                z: (cell / self.world.game.w) as f64 * CELL + CELL * 0.5,
+            };
+            let def = Catalog::compiled()
+                .map_err(|e| e.to_string())?
+                .unit(&self.rules.kinds[u.kind].name)
+                .map_err(|e| e.to_string())?;
+            let max_hp = def
+                .get("models")
+                .and_then(|v| v.number())
+                .ok_or("missing rider models")?
+                * def
+                    .get("hpPer")
+                    .and_then(|v| v.number())
+                    .ok_or("missing rider health")?;
+            let hp = if math::hypot(u.x - at.x, u.z - at.z) > shore {
+                0.0
+            } else {
+                u.hp - max_hp * evict
+            };
+            if !hp.is_finite() {
+                return Err("invalid wrecked rider health".into());
+            }
+            drops.push((id, at, hp));
+        }
+        Ok(drops)
+    }
+    /// Resolve placements before retirement removes a carrier or the tick advances.
+    pub(crate) fn validate_carrier_ejections(&self, actors: &[UnitId]) -> Result<(), String> {
+        for &id in actors {
+            if self.world.game.units.get(&id).is_some_and(|u| u.hp <= 0.0)
+                && self.combat.get(id).is_some_and(|m| !m.cargo.is_empty())
+            {
+                self.prepare_carrier_ejections(id)?;
+            }
+        }
+        Ok(())
+    }
+    /// A wreck throws its squads onto land, damaging survivors and drowning distant passengers.
+    pub(crate) fn eject_carrier_riders(
+        &mut self,
+        carrier: UnitId,
+    ) -> Result<Vec<crate::environment::Effect>, String> {
+        let drops = self.prepare_carrier_ejections(carrier)?;
+        let mut effects = Vec::new();
+        for (id, at, hp) in drops {
+            self.combat.get_mut(id).unwrap().carrier = None;
+            let u = self.world.game.units.get_mut(&id).unwrap();
+            u.riding = false;
+            u.x = at.x;
+            u.z = at.z;
+            u.hp = hp;
+            self.grid.update(id, u);
+            effects.push(crate::environment::Effect::Hurt(crate::environment::Hurt {
+                unit: id,
+                owner: u.owner,
+                at,
+                killed: hp <= 0.0,
+                from: None,
+                local: false,
+            }));
+        }
+        if let Some(meta) = self.combat.get_mut(carrier) {
+            meta.cargo.clear();
+        }
+        Ok(effects)
     }
     /// Manual ground unload. Full ordered placements are staged before relations change;
     /// no thrown damage, shore landing or rail drop is silently substituted.

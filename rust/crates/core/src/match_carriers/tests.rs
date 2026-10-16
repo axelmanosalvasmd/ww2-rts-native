@@ -327,12 +327,12 @@ fn invalid_or_unavailable_carrier_work_preserves_canonical_state() {
     m.carrier_board_command(0, &[1], Some(2), false).unwrap();
     m.apply_unit_boarding(1).unwrap();
     m.world.game.units.get_mut(&2).unwrap().hp = 0.;
-    let before = atomic(&m);
-    assert_eq!(
-        m.apply_unit_riding(1, 0.05).unwrap(),
-        RidingOutcome::UnsupportedEjection
-    );
-    assert_eq!(atomic(&m), before);
+    let before = m.world.game.units[&1].hp;
+    assert_eq!(m.apply_unit_riding(1, 0.05).unwrap(), RidingOutcome::OnFoot);
+    assert!(!m.world.game.units[&1].riding);
+    assert!((m.world.game.units[&1].hp - before * 0.7).abs() < 1e-9);
+    assert_eq!(m.combat.get(1).unwrap().carrier, None);
+    assert!(m.combat.get(2).unwrap().cargo.is_empty());
 }
 
 #[test]

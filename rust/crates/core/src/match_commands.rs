@@ -1024,7 +1024,11 @@ impl crate::match_runtime::Match {
                 }) else {
                     return Ok(Some(Denial::Unseen));
                 };
-                if target.air.is_none() {
+                if target.air.is_none()
+                    && selected
+                        .iter()
+                        .any(|id| !self.is_aircraft_command_unit(*id))
+                {
                     return Ok(Some(Denial::Unsupported));
                 }
                 if target.hp <= 0.0 {
@@ -1116,13 +1120,8 @@ impl crate::match_runtime::Match {
                             u32::try_from(*target).expect("validated escort target"),
                         ),
                         Command::Retreat { .. } => AircraftOrder::Retreat,
-                        Command::Stance { stance, on, .. } => {
+                        Command::Stance { .. } => {
                             self.validate_aviation()?;
-                            if *stance == Stance::HoldFire && !*on {
-                                return Err(crate::match_aviation::AviationError::Unsupported(
-                                    "aircraft automatic weapons are unavailable",
-                                ));
-                            }
                             continue;
                         }
                         _ => unreachable!(),

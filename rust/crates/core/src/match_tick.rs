@@ -392,7 +392,14 @@ impl crate::match_runtime::Match {
                 continue;
             }
             if unit.garrison.is_some() && self.automatic_retreat_candidate(id)? {
-                return Err("automatic garrison retreat tick exit is not connected".into());
+                if unit.build {
+                    return Err("automatic garrison retreat has unsupported construction".into());
+                }
+                crate::existing_observers::PreparedGroundExit::prepare(
+                    &self.world.game,
+                    &self.rules,
+                    id,
+                )?;
             }
         }
         Ok(())

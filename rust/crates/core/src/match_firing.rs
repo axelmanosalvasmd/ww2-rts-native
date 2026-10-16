@@ -366,8 +366,7 @@ impl Match {
         self.firing.prior_tick = Some(self.world.game.tick + 1);
         Ok(())
     }
-    /// Admit aircraft as observed context only. Their canonical sortie owner
-    /// validates physical state and metadata; this does not admit air weapons.
+    /// Validate aircraft through their canonical sortie owner before ground or air firing.
     pub(crate) fn validate_aircraft_firing_context(&self) -> Result<(), String> {
         if self
             .world
@@ -588,7 +587,7 @@ impl Match {
             shooter: p.shooter,
             kind: p.source_kind,
             owner: p.owner as i32,
-            airborne: false,
+            airborne: self.rules.kinds[p.source_kind].air,
         };
         let impact = Impact {
             owner: p.owner as i32,
@@ -1071,7 +1070,12 @@ impl Match {
         }
         Ok(best)
     }
-    fn fire_weapon(&mut self, id: UnitId, target: UnitId, moving: bool) -> Result<(), String> {
+    pub(crate) fn fire_weapon(
+        &mut self,
+        id: UnitId,
+        target: UnitId,
+        moving: bool,
+    ) -> Result<(), String> {
         let g = &self.world.game;
         let u = &g.units[&id];
         let t = &g.units[&target];
@@ -1179,8 +1183,7 @@ impl Match {
         let bearing = math::atan2(aim.z - u.z, aim.x - u.x);
         let from = projectiles::Point3::new(
             u.x,
-            f64::from(g.level_at(u.x, u.z)) * level_height
-                + if u.garrison.is_some() { 3.5 } else { 1.2 },
+            f64::from(g.level_at(u.x, u.z)) * level_height + self.weapon_launch_height(u),
             u.z,
         );
         let profile = projectiles::projectile_profile(
@@ -1263,7 +1266,7 @@ impl Match {
                 sequence: 0,
                 max_contacts: profile.max_contacts,
                 near: profile.near,
-                start_cell: g.cell_of(u.x, u.z).ok_or("shooter outside battlefield")?,
+                start_cell: self.weapon_start_cell(u)?,
                 intended: Some(target),
                 damage_scale,
                 armor_piercing: ap,
@@ -1800,7 +1803,7 @@ impl Match {
         row.retarget -= dt;
         Ok(())
     }
-    fn pick_firing_target(&self, id: UnitId) -> Result<UnitId, String> {
+    pub(crate) fn pick_firing_target(&self, id: UnitId) -> Result<UnitId, String> {
         let g = &self.world.game;
         let u = &g.units[&id];
         let w = self.weapon(u)?.ok_or("unarmed target selection")?;
@@ -1809,17 +1812,19 @@ impl Match {
         let team = actor.team;
         let salvo = flag(w, "salvo");
         let pool = if salvo {
-            self.grid
-                .unordered(&g.units, (u.x, u.z), n(w, "range", 0.0) + 6.0, |_, t| {
-                    !t.riding && !g.allied(t.owner, u.owner) && actor.sees(t.id)
-                })
+            self.grid.unordered(
+                &g.units,
+                (u.x, u.z),
+                self.weapon_range(u, w)? + 6.0,
+                |_, t| !t.riding && !g.allied(t.owner, u.owner) && actor.sees(t.id),
+            )
         } else {
             vec![]
         };
         let targets = self.grid.in_order(
             &g.units,
             (u.x, u.z),
-            n(w, "range", 0.0) + if g.naval { 55.0 } else { 0.0 },
+            self.weapon_range(u, w)? + if g.naval { 55.0 } else { 0.0 },
             |_, t| t.hp > 0.0 && t.air.is_none() && !g.allied(t.owner, u.owner) && actor.sees(t.id),
         );
         let mut best = 0;
@@ -2026,7 +2031,7 @@ impl Match {
         let Some(w) = self.weapon(u)? else {
             return Ok(false);
         };
-        let range = n(w, "range", 0.0);
+        let range = self.weapon_range(u, w)?;
         if range == 0.0
             || !self.logistics.can_fire(u.id, 1.0)
             || t.hp <= 0.0
@@ -2039,7 +2044,7 @@ impl Match {
             return Ok(false);
         }
         if u.air.is_some() {
-            return Err("air weapon firing is unsupported".into());
+            return Ok(true);
         }
         Ok(if flag(w, "salvo") {
             dist(u.at(), self.hull_point(u.at(), t)) >= n(w, "minRange", f64::NAN)
@@ -2166,8 +2171,7 @@ impl Match {
             || self.combat.get(id).is_none()
             || self.firing.get(id).is_none()
             || self.logistics.get(id).is_some_and(|r| !r.ammo.is_finite())
-            || u.air.is_some()
-            || flag(self.definition(u)?, "air")
+            || (self.rules.kinds[u.kind].air && !vision::airborne(u))
             || u.riding
             || ![at.x, at.z].iter().all(|v| v.is_finite())
             || !(0.0..=self.world.game.w as f64 * CELL).contains(&at.x)
@@ -2225,7 +2229,7 @@ impl Match {
         let height = n(self.firing_config()?, "levelHeight", 2.5);
         let from = projectiles::Point3::new(
             u.x,
-            f64::from(g.level_at(u.x, u.z)) * height + if u.garrison.is_some() { 3.5 } else { 1.2 },
+            f64::from(g.level_at(u.x, u.z)) * height + self.weapon_launch_height(u),
             u.z,
         );
         let end = projectiles::Point3::new(
@@ -2262,7 +2266,7 @@ impl Match {
             sequence: 0,
             max_contacts: profile.max_contacts,
             near: profile.near,
-            start_cell: g.cell_of(u.x, u.z).ok_or("shooter outside battlefield")?,
+            start_cell: self.weapon_start_cell(u)?,
             intended: None,
             damage_scale: 1.0,
             armor_piercing: false,
@@ -2470,3 +2474,14 @@ mod world_ground_actor_tests;
 #[cfg(test)]
 #[path = "mov_audit_reaction_tests.rs"]
 mod mov_audit;
+
+#[path = "match_firing_geometry.rs"]
+mod geometry;
+
+#[cfg(test)]
+#[path = "runtime_combat_batch3.rs"]
+mod runtime_batch3;
+
+#[cfg(test)]
+#[path = "audit_combat_damage.rs"]
+mod audit_damage;

@@ -49,13 +49,23 @@ impl Match {
                     return Err("unsupported riding tick actor".into());
                 }
                 let carrier = meta.carrier.ok_or("missing riding carrier identity")?;
-                let parent = self
+                let Some(parent) = self
                     .world
                     .game
                     .units
                     .get(&carrier)
                     .filter(|parent| parent.hp > 0.0)
-                    .ok_or("thrown carrier ejection tick phase is not connected")?;
+                else {
+                    if self
+                        .combat
+                        .get(carrier)
+                        .is_none_or(|m| !m.cargo.contains(&id))
+                    {
+                        return Err("inconsistent wrecked carrier relation".into());
+                    }
+                    self.prepare_carrier_ejections(carrier)?;
+                    continue;
+                };
                 self.validate_carrier_unit(carrier)?;
                 if self.carrier_boundary(carrier) || self.commands.units[&carrier].operative {
                     return Err("unsupported riding tick carrier".into());
