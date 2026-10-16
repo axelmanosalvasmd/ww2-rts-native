@@ -315,7 +315,7 @@ pub fn max_hp(g: &Game, rules: &Rules, c: usize) -> f64 {
                 .copied()
                 .unwrap_or(f64::NAN)
         } else {
-            m.terrain_hp(ch).unwrap_or(0.0) * g.tough.as_ref().map_or(1.0, |t| t[c])
+            m.terrain_hp(ch).unwrap_or(0.0) * g.tough.as_ref().map_or(1.0, |t| f64::from(t[c]))
         }
     })
 }

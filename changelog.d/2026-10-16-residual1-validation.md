@@ -1,0 +1,1 @@
+- Verify the completed residual runtime batch with 30 focused checks and strict workspace Clippy, including six ordinary ticks with recipient snapshots and the existing movement replay.

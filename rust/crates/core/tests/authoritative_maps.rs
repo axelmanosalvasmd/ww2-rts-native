@@ -93,7 +93,7 @@ fn authoritative_maps_match_pinned_validation_and_static_terrain() {
     );
     assert_eq!(fixture["node"], "v24.21.0");
     assert_eq!(fixture["arch"], "x64");
-    let (mut authored, mut terrain_count, mut rejected, mut unsupported) = (0, 0, 0, 0);
+    let (mut authored, mut terrain_count, mut rejected, mut validated_scenarios) = (0, 0, 0, 0);
     for case in fixture["cases"].as_array().unwrap() {
         let mut case = case.clone();
         if case["encoding"] == "world-runs" {
@@ -135,11 +135,12 @@ fn authoritative_maps_match_pinned_validation_and_static_terrain() {
         let name = case["name"].as_str().unwrap();
         let result = AuthoritativeMap::from_json(&serde_json::to_vec(&case["map"]).unwrap());
         if let Some(feature) = case["unsupported"].as_str() {
-            assert!(
-                matches!(result, Err(MapError::Unsupported { feature: f }) if f == feature),
-                "{name}: {result:?}"
+            assert_eq!(feature, "scenario");
+            assert_eq!(
+                result.unwrap().source()["scenario"],
+                case["map"]["scenario"]
             );
-            unsupported += 1;
+            validated_scenarios += 1;
             continue;
         }
         if !case["error"].is_null() {
@@ -297,7 +298,7 @@ fn authoritative_maps_match_pinned_validation_and_static_terrain() {
         terrain_count += 1;
     }
     assert_eq!(
-        (authored, terrain_count, rejected, unsupported),
+        (authored, terrain_count, rejected, validated_scenarios),
         (33, 58, 79, 1)
     );
 }
