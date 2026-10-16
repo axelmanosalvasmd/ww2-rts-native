@@ -156,6 +156,7 @@ pub mod match_world_tick;
 pub mod match_world_memory;
 pub mod world_memory;
 pub mod world_recipient_metadata;
+pub mod world_territories;
 
 pub mod staged_observer;
 

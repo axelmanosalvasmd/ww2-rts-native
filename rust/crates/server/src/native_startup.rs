@@ -9,6 +9,9 @@ use ww2_core::{
 };
 
 pub(crate) const MAX_MATCH_ID: u64 = 9_007_199_254_740_991;
+#[cfg(test)]
+#[path = "native_map_batch3_tests.rs"]
+mod map_runtime_batch3;
 pub(crate) struct StartupSettings<'a> {
     pub map: &'a str,
     pub mode: &'a str,
@@ -32,6 +35,15 @@ pub(crate) struct StartEnvelope {
 }
 impl NativeStartup {
     pub(crate) fn prepare(state: &Match, settings: StartupSettings<'_>) -> Result<Self, String> {
+        let authored = crate::authoritative_maps::load(settings.map).map_err(|e| e.to_string())?;
+        Self::prepare_authored(state, settings, authored)
+    }
+
+    fn prepare_authored(
+        state: &Match,
+        settings: StartupSettings<'_>,
+        authored: &ww2_core::map::AuthoritativeMap,
+    ) -> Result<Self, String> {
         if settings.mode != "conquest"
             || !matches!(state.options.mode, Mode::Default | Mode::Conquest)
             || state.world.game.mode.is_some()
@@ -50,8 +62,7 @@ impl NativeStartup {
         if army != settings.army {
             return Err("native startup army disagrees with the lobby".into());
         }
-        let authored = crate::authoritative_maps::load(settings.map).map_err(|e| e.to_string())?;
-        let public = crate::maps::public_map(settings.map).ok_or("public startup map absent")?;
+        let public = ww2_core::map::map_for_client(authored.source()).map_err(|e| e.to_string())?;
         let initial = World::from_map(authored).map_err(|e| e.to_string())?;
         let expected = initial.initial();
         let actual = state.world.initial();
