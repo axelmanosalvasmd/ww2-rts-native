@@ -1,0 +1,1 @@
+- Add 31 native engineering intent tests and literal mappings for all 36 remaining owned rows. Keep unsupported and partially covered rows unpromoted; native execution and prototype review are pending. Preserve earlier fixtures, failures and PR272 evidence.

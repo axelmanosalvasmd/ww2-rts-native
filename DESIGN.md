@@ -4814,3 +4814,12 @@ fixture, provider, registry, guard, FFI, wire, contract or reference.
 Root owns fresh exact-child review, incoming-main preservation, any hosted
 gates and publication. Wider terrain features, World, recipient delivery
 and Unreal acceptance are not completed by these selected component rows.
+
+
+## Remaining engineering native intent tests (2026-10-16, unrun)
+
+Apply Axel6206861267's approved rules 1 to 5 exactly. Add one cfg(test) native module with 31 tests spanning all 36 remaining IMPL_ENGINEERING rows, with literal row/test/prototype references in engineering.md. Existing canonical Match, World, environment, field-work, combat, vision, movement and recipient producers execute the supported behavior. The tests author initial map/actor inputs directly; no expected frame, captured state or random tape enters a running match. Existing pure/component fixtures remain intact.
+
+Bridge, fill, wall, gate, garrison-entry, fire-at and hostile mine actuators remain unsupported. Pit construction does not prove pit range or projectile exemptions. Partial tests and refusal guards cannot complete these rows. The mapping lists other uncovered clauses explicitly so qualification can exclude them without stopping supported rows. This candidate changes no shipping provider, interface, reference pin or gameplay rule. ENG_AUDIT owns ENG15/16/17/23/24 separately; reserved PR272 rows and b984 checkpoint remain unchanged.
+
+Source counts are 31 new tests and 36 mapped rows, not passes. Root authorized one mechanical Rust 1.99.0 rustfmt pass on only the new module, with edition 2024 and skip_children=true. It exits 0 and git diff --check is clean. No Source, native, Cargo, discovery or Clippy job has run for this new batch. Root must grant one focused nextest batch with --no-fail-fast, then obtain prototype intent review before any status promotion. Retain all earlier failures and producing-head results. Root owns publication and the eventual combined engineering-file PR after PR272.
