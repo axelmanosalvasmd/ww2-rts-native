@@ -608,3 +608,58 @@ fn base19_tutorial_buy_faces_personal_rally_or_centre_and_walks_without_a_produc
         }
     }
 }
+
+#[test]
+fn tutorial_building_repair_rejects_before_any_mutation() {
+    let mut m = tutorial();
+    let rifle = m
+        .world
+        .game
+        .units
+        .values()
+        .find(|u| u.owner == 0 && m.rules.kinds[u.kind].name == "rifle")
+        .unwrap()
+        .id;
+    let site = m.next_unit_id;
+    assert_eq!(
+        m.execute_build(
+            0,
+            &[i64::from(rifle)],
+            "flakpos",
+            Some(Point { x: 20.0, z: 42.0 }),
+            None,
+            false,
+        )
+        .unwrap(),
+        None
+    );
+    let full_hp = crate::catalog::Catalog::compiled()
+        .unwrap()
+        .unit("flakpos")
+        .unwrap()
+        .get("hpPer")
+        .and_then(crate::catalog::Value::number)
+        .unwrap();
+    assert_eq!(m.world.game.units[&site].hp, full_hp * 0.25);
+    assert_eq!(m.world.game.units[&site].built, Some(0.0));
+    m.validate_actor_mode().unwrap();
+    let before = format!("{:?}", m.world);
+    let controls = m.commands.units.clone();
+    let recovery = m.recovery.clone();
+    let story = m.story.clone();
+    let wallet = m.start.economy.players[0].mp;
+    assert_eq!(
+        m.preflight_building_repair(site, 1.0).unwrap_err(),
+        "invalid Conquest repair request"
+    );
+    assert_eq!(format!("{:?}", m.world), before);
+    assert_eq!(
+        m.repair_building_sections(site, 1.0).unwrap_err(),
+        "invalid Conquest repair request"
+    );
+    assert_eq!(format!("{:?}", m.world), before);
+    assert_eq!(m.commands.units, controls);
+    assert_eq!(m.recovery, recovery);
+    assert_eq!(m.story, story);
+    assert_eq!(m.start.economy.players[0].mp, wallet);
+}

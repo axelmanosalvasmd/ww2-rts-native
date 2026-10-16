@@ -129,6 +129,7 @@ fn admission_facts<'a>(
         || player_rallies.len() != count
         || game.tick < 0
         || (!crate::match_actor::ordinary_ground_mode(game, options.mode) && !horde)
+        || options.mode.is_construction()
         || options.logistics
     {
         return Err(RecruitError::InvalidState("Conquest recruitment state"));
@@ -251,7 +252,11 @@ impl Match {
         if self.finish.is_some() || wallet.away || wallet.out {
             return Err(production::Error::Denied(Denial::Blocked).into());
         }
-        self.validate_ordinary_finish_state()
+        if self.options.mode == crate::economy::Mode::Tutorial {
+            self.validate_tutorial_state()
+                .map_err(RecruitError::Story)?;
+        }
+        self.validate_match_finish_state()
             .map_err(RecruitError::Story)?;
         if self
             .rules

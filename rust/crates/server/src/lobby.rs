@@ -2379,6 +2379,10 @@ mod net_batch50;
 mod net83_followup_tests;
 
 #[cfg(test)]
+#[path = "mode_runtime_a_tests.rs"]
+mod mode_runtime_a_tests;
+
+#[cfg(test)]
 #[path = "net_runtime3_tests.rs"]
 mod net_runtime3;
 
