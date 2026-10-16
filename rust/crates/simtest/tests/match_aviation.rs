@@ -626,6 +626,16 @@ fn mixed_aircraft_selections_preserve_canonical_supply_and_control_boundaries() 
                 }
                 _ => unreachable!(),
             }
+        } else if index == 4 {
+            assert_eq!(denial, None, "mixed retreat");
+            assert_eq!(m.world.game.units[&1000].air, Some(PlaneState::Home));
+            assert_eq!(m.aviation.planes[&1000].mission, None);
+            assert_eq!(m.logistics.get(1002).unwrap(), &reserves);
+            assert!(!m.commands.units[&1002].supply_hold);
+            assert!(m.commands.units[&1002].supply_escape);
+            assert!(!m.world.game.units[&1002].entrench);
+            assert_eq!(m.field_works.membership(1002), None);
+            assert!(!m.world.game.units[&1002].path.is_empty());
         } else {
             assert_eq!(denial, Some(Denial::Unsupported), "case {index}");
             assert_eq!(command_snapshot(&m), before, "case {index}");

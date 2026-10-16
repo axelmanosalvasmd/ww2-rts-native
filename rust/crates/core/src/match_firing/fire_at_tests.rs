@@ -447,3 +447,19 @@ fn fire_at_live_flight_is_visible_without_disclosing_its_hidden_shooter() {
         json!([])
     );
 }
+
+#[test]
+fn fire_at_mixed_aircraft_and_ground_sheller_keeps_main_refusal_atomic() {
+    for queue in [false, true] {
+        let (mut m, id) = scene("howitzer");
+        let bomber = m.spawn_aircraft(0, "bomber").unwrap();
+        let before = format!("{:?}", (&m.world, &m.commands.units, &m.aviation));
+        let random = m.start.random.snapshot();
+        assert_eq!(
+            dispatch(&mut m, json!({"t":"fireat","ids":[bomber,id],"x":41,"z":41,"queue":queue})),
+            Some(Denial::Unsupported)
+        );
+        assert_eq!(format!("{:?}", (&m.world, &m.commands.units, &m.aviation)), before);
+        assert_eq!(m.start.random.snapshot(), random);
+    }
+}

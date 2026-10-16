@@ -67,8 +67,7 @@ pub enum Stance {
 /// Internal recorded input. This is not a WebSocket or C interface.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Command {
-    /// Bounded internal compound order, with queue inherited by every part.
-    Group {
+    Compound {
         commands: Vec<serde_json::Value>,
         queue: bool,
     },
@@ -451,6 +450,17 @@ impl Command {
                 rows.iter().map(|v| safe_id(v).unwrap_or(-1)).collect()
             });
         match object.get("t").and_then(|v| v.as_str()) {
+            Some("orders") => Ok(Self::Compound {
+                commands: object
+                    .get("commands")
+                    .and_then(|v| v.as_array())
+                    .ok_or(Denial::Blocked)?
+                    .iter()
+                    .take(8)
+                    .cloned()
+                    .collect(),
+                queue: object.get("queue").and_then(|v| v.as_bool()) == Some(true),
+            }),
             Some("build" | "assist") => {
                 let at = object
                     .get("x")
@@ -685,34 +695,6 @@ impl Command {
                     face,
                 })
             }
-            Some("orders") => Ok(Self::Group {
-                commands: object
-                    .get("commands")
-                    .and_then(|v| v.as_array())
-                    .ok_or(Denial::Blocked)?
-                    .iter()
-                    .take(8)
-                    .filter(|v| {
-                        matches!(
-                            v["t"].as_str(),
-                            Some(
-                                "move"
-                                    | "amove"
-                                    | "attack"
-                                    | "garrison"
-                                    | "fireat"
-                                    | "escort"
-                                    | "assist"
-                                    | "rally"
-                                    | "entrench"
-                                    | "board"
-                            )
-                        )
-                    })
-                    .cloned()
-                    .collect(),
-                queue: object.get("queue").and_then(|v| v.as_bool()) == Some(true),
-            }),
             Some("cover") => Ok(Self::Cover {
                 ids,
                 queue: object.get("queue").and_then(|v| v.as_bool()) == Some(true),
@@ -777,27 +759,6 @@ impl Command {
     }
     fn valid(&self) -> bool {
         match self {
-            Self::Group { commands, .. } => {
-                commands.len() <= 8
-                    && commands.iter().all(|v| {
-                        v.is_object()
-                            && matches!(
-                                v["t"].as_str(),
-                                Some(
-                                    "move"
-                                        | "amove"
-                                        | "attack"
-                                        | "garrison"
-                                        | "fireat"
-                                        | "escort"
-                                        | "assist"
-                                        | "rally"
-                                        | "entrench"
-                                        | "board"
-                                )
-                            )
-                    })
-            }
             Self::Rail { at, .. } | Self::Enter { at, .. } | Self::FireAt { at, .. } => {
                 at.x.is_finite() && at.z.is_finite()
             }
@@ -952,28 +913,8 @@ impl crate::match_runtime::Match {
         if matches!(command, Command::Unsupported) {
             return Ok(Some(Denial::Unsupported));
         }
-        if let Command::Group { commands, queue } = command {
-            let mut done = false;
-            let mut reason = None;
-            for part in commands.iter().take(8) {
-                let mut part = part.clone();
-                part["queue"] = serde_json::Value::Bool(*queue);
-                let denial = match Command::from_json(&part) {
-                    Ok(Command::Unsupported) => Some(Denial::Blocked),
-                    Ok(part) => self.execute_command(owner, &part, winner_decided)?,
-                    Err(denial) => Some(denial),
-                };
-                if let Some(denial) = denial {
-                    reason = reason.or(Some(denial));
-                } else {
-                    done = true;
-                }
-            }
-            return Ok(if done {
-                None
-            } else {
-                Some(reason.unwrap_or(Denial::Blocked))
-            });
+        if let Command::Compound { commands, queue } = command {
+            return self.execute_compound_orders(owner, commands, *queue, winner_decided);
         }
         self.validate_building_activity_rows()?;
         if let Command::Rally { ids, id, at } = command {
@@ -1008,16 +949,8 @@ impl crate::match_runtime::Match {
         {
             return self.ground_attack_command(owner, ids, *target, *queue);
         }
-        if let Command::Retreat { ids } = command
-            && !ids
-                .iter()
-                .take(50.max(self.world.game.units.len()))
-                .any(|raw| {
-                    self.eligible_command_unit(*raw, owner, command)
-                        .is_some_and(|id| self.is_aircraft_command_unit(id))
-                })
-        {
-            return self.ground_retreat_command(owner, ids);
+        if let Command::Retreat { ids } = command {
+            return self.retreat_command(owner, ids);
         }
         if let Command::Cancel { id } = command {
             return match u32::try_from(*id) {
@@ -1172,7 +1105,7 @@ impl crate::match_runtime::Match {
             | Command::Attack { ids, .. }
             | Command::Escort { ids, .. }
             | Command::Retreat { ids } => ids.clone(),
-            Command::Group { .. }
+            Command::Compound { .. }
             | Command::Build { .. }
             | Command::Assist { .. }
             | Command::Cancel { .. }
@@ -1641,7 +1574,7 @@ impl crate::match_runtime::Match {
                     self.commands.units.get_mut(&id).unwrap().auto_cast = *on;
                 }
             }
-            Command::Group { .. }
+            Command::Compound { .. }
             | Command::Attack { .. }
             | Command::Build { .. }
             | Command::Assist { .. }
@@ -2535,6 +2468,9 @@ impl crate::match_runtime::Match {
         result.map_err(|e| format!("command path request: {e:?}"))
     }
 }
+
+#[path = "match_compound_orders.rs"]
+mod compound;
 
 #[cfg(test)]
 mod tests;
