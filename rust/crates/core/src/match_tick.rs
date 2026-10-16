@@ -678,6 +678,7 @@ impl crate::match_runtime::Match {
                 continue;
             }
             self.apply_attack_move(id)?;
+            self.apply_fire_at_order(id)?;
             if self.options.mode != crate::economy::Mode::World {
                 self.apply_ground_attack(id)?;
             }
