@@ -1,4 +1,6 @@
 //! Main-supported native checks under owner decision 6206861267.
+#[path = "bases_runtime2_tests.rs"]
+mod runtime2;
 use super::*;
 use crate::{
     economy::{self, Faction, Mode, TechState, Technology},

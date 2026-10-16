@@ -559,9 +559,9 @@ impl ProductionState {
             wallets.population_cap(&context, slot)?,
         ))
     }
-    /// Prepare instant Conquest recruitment without changing wallets or queues.
-    /// Default represents the absent mode object of ordinary Conquest. Other
-    /// modes are outside this API. Winner/away/out/rate admission stays with Match.
+    /// Prepare instant recruitment without changing wallets or queues. Horde
+    /// names its scripted seat so allied facilities retain the shared access rule.
+    /// Winner/away/out/rate admission stays with Match.
     pub fn prepare_recruit<'a, 'facts>(
         &'a self,
         c: &'a Context<'facts>,
@@ -573,8 +573,14 @@ impl ProductionState {
     ) -> Result<PreparedRecruit<'a, 'facts>, Error> {
         self.validate(c, wallets)?;
         self.slot(slot)?;
-        if !matches!(c.mode.kind, Mode::Default | Mode::Conquest) {
-            return Err(Error::InvalidInput("recruitment supports Conquest only"));
+        let horde = c.mode.kind == Mode::Horde
+            && c.mode
+                .income_excluded_slot
+                .is_some_and(|slot| slot.checked_add(1) == Some(self.players.len()));
+        if !matches!(c.mode.kind, Mode::Default | Mode::Conquest) && !horde {
+            return Err(Error::InvalidInput(
+                "recruitment requires Conquest or initialized Horde",
+            ));
         }
         self.prepare_home_or_building_recruit(c, wallets, slot, faction, kind, from)
     }

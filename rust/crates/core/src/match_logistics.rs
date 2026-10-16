@@ -1,6 +1,8 @@
 //! Executable ordinary-Conquest supply phases over canonical Match state.
 #[cfg(test)]
 mod causal_tests;
+#[cfg(test)]
+mod runtime_tests;
 
 use crate::{
     catalog::Catalog,
@@ -60,6 +62,20 @@ fn facts<'a>(u: &Unit, rules: &'a Rules) -> UnitFacts<'a> {
     }
 }
 impl Match {
+    #[cfg(test)]
+    pub(crate) fn test_supply_truck(&mut self, owner: usize) -> u32 {
+        self.with_supply_world(|_, state, _, world| {
+            let source = state
+                .stores
+                .iter()
+                .find(|store| store.source && store.owner == owner)
+                .unwrap()
+                .clone();
+            Ok(state.add_truck(owner, &source, world))
+        })
+        .unwrap()
+    }
+
     /// Initialize after troop/base/scenario setup and metadata registration. The constructor invokes this after base and recipient setup.
     pub fn initialize_logistics(&mut self) -> Result<(), String> {
         if !self.options.logistics {
@@ -89,8 +105,14 @@ impl Match {
         &self,
         unit: &Unit,
     ) -> Result<Option<logistics::Reserves>, String> {
-        if !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode) {
-            return Err("new reserves require ordinary Conquest".into());
+        let horde_spawn = self.options.mode == crate::economy::Mode::Horde
+            && self.world.game.mode == Some(crate::game::ModeKind::Horde)
+            && self.start.shared_defenders.is_some()
+            && !self.options.logistics;
+        if !(crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode)
+            || horde_spawn)
+        {
+            return Err("new reserves require ordinary Conquest or no-logistics Horde".into());
         }
         if unit.id == 0
             || unit.owner >= self.start.players.len()
@@ -340,12 +362,12 @@ impl Match {
         self.step_supply_convoys_with_dt(winner_decided, self.rules.movement.tick)
     }
     pub(crate) fn validate_supply(&self) -> Result<(), String> {
-        self.validate_supply_context(false)
+        self.validate_supply_context()
     }
     pub(crate) fn validate_withdrawal_supply(&self) -> Result<(), String> {
-        self.validate_supply_context(true)
+        self.validate_supply_context()
     }
-    fn validate_supply_context(&self, garrisons: bool) -> Result<(), String> {
+    fn validate_supply_context(&self) -> Result<(), String> {
         if !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode) {
             return Err("supply adapter supports ordinary Conquest only".into());
         }
@@ -458,8 +480,14 @@ impl Match {
                 .map_err(|e| e.to_string())?
                 .unit(&self.rules.kinds[u.kind].name)
                 .map_err(|e| e.to_string())?;
-            if u.garrison.is_some_and(|c| !garrisons || c >= n) {
-                return Err("supply garrison entry is not represented".into());
+            if u.garrison.is_some_and(|c| c >= n)
+                || (u.garrison.is_some()
+                    && !u.riding
+                    && self.commands.units[&u.id]
+                        .garrison_entry
+                        .is_some_and(|p| !p.x.is_finite() || !p.z.is_finite()))
+            {
+                return Err("invalid supply garrison entry".into());
             }
             queued_points(
                 &self.commands.units[&u.id],
@@ -486,6 +514,7 @@ impl Match {
             &self.world,
             &self.rules,
             &self.combat,
+            &self.commands,
             &mut self.supply_routes,
             PhysicalHandoff {
                 unit: id,
@@ -758,6 +787,7 @@ impl supply_convoys::World for ConvoyWorld<'_> {
             self.world,
             self.rules,
             self.combat,
+            self.commands,
             self.routing,
             PhysicalHandoff {
                 unit: u.id,
@@ -966,6 +996,7 @@ fn physical_handoff(
     world: &World,
     rules: &Rules,
     combat: &CombatState,
+    commands: &MatchCommands,
     routing: &mut SupplyRouting,
     request: PhysicalHandoff,
 ) -> bool {
@@ -981,8 +1012,21 @@ fn physical_handoff(
         .get(id)
         .and_then(|c| c.carrier)
         .and_then(|id| g.units.get(&id))
-        .unwrap_or(native)
-        .at();
+        .map(Unit::at)
+        .unwrap_or_else(|| {
+            if native.garrison.is_none() {
+                return native.at();
+            }
+            commands.units[&id].garrison_entry.unwrap_or_else(|| {
+                let c = SpawnPlacer::new()
+                    .nearest_free(view(g), native.at(), MOVE, None)
+                    .expect("validated garrison handoff terrain");
+                Point {
+                    x: (c % g.w) as f64 * CELL + CELL / 2.0,
+                    z: (c / g.w) as f64 * CELL + CELL / 2.0,
+                }
+            })
+        });
     let mut near = vec![0u8; g.flags.len()];
     for (c, &f) in g.flags.iter().enumerate() {
         if f & (MOVE | crate::game::SIGHT) == (MOVE | crate::game::SIGHT) {

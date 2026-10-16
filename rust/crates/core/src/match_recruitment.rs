@@ -1,4 +1,4 @@
-//! Atomic Conquest purchase, produced-unit placement and owner-observed rally routing.
+//! Atomic instant recruitment, produced-unit placement and owner-observed rally routing.
 use super::{Match, terrain_view};
 use crate::{
     catalog::Catalog,
@@ -90,6 +90,7 @@ struct RecruitParts<'a> {
 }
 struct RecruitFacts<'a> {
     count: usize,
+    horde_slot: Option<usize>,
     units: Vec<UnitView<'a>>,
     drops: Vec<PendingDrop<'static>>,
 }
@@ -98,7 +99,8 @@ impl RecruitFacts<'_> {
         Context {
             mode: ModeContext {
                 kind: options.mode,
-                ..Default::default()
+                defender_team: self.horde_slot.map(|_| 0),
+                income_excluded_slot: self.horde_slot,
             },
             army: options.army,
             tech_enabled: options.tech,
@@ -118,11 +120,15 @@ fn admission_facts<'a>(
     player_rallies: &[Option<crate::game::Point>],
 ) -> Result<RecruitFacts<'a>, RecruitError> {
     let count = start.players.len();
+    let horde = options.mode == crate::economy::Mode::Horde
+        && game.mode == Some(crate::game::ModeKind::Horde)
+        && (2..=6).contains(&count)
+        && start.shared_defenders == Some(count - 1);
     if count != game.players.len()
         || count != start.economy.players.len()
         || player_rallies.len() != count
         || game.tick < 0
-        || !crate::match_actor::ordinary_ground_mode(game, options.mode)
+        || (!crate::match_actor::ordinary_ground_mode(game, options.mode) && !horde)
         || options.logistics
     {
         return Err(RecruitError::InvalidState("Conquest recruitment state"));
@@ -172,6 +178,7 @@ fn admission_facts<'a>(
         .collect();
     Ok(RecruitFacts {
         count,
+        horde_slot: horde.then(|| count - 1),
         units,
         drops,
     })

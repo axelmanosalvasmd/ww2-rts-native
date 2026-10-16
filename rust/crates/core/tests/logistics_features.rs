@@ -768,6 +768,102 @@ fn feature_log40_relief_preserves_payer_and_recipient_permissions() {
         15.0
     );
     assert_eq!(s.available(1, true).provisions, 15.0);
+
+    // Two real manual unloading jobs share the cache and retain both payers.
+    let mut ps = players();
+    ps[2].team = 0;
+    let mut ctx = context(&ps);
+    let mut world = ComponentWorld::new(vec![unit(50, 1, UnitRole::Cache, 61.0)]);
+    let mut state = ConvoyState::setup(true).unwrap();
+    state.sync_stores(ctx, &world).unwrap();
+    let mut r = LogisticsState::default();
+    let mut ids = vec![];
+    for owner in [0, 2] {
+        let root = source(&state, owner);
+        let id = state.add_truck(owner, &root, &mut world);
+        state.trucks.get_mut(&id).unwrap().cargo.provisions = 240.0;
+        world.units.iter_mut().find(|u| u.id == id).unwrap().at = at(61.0);
+        assert!(state.supply(ctx, owner, &[id], 50, &r, &mut world).unwrap());
+        assert_eq!(
+            state.trucks[&id].target.as_ref().unwrap().relief,
+            Some(true)
+        );
+        world
+            .units
+            .iter_mut()
+            .find(|u| u.id == id)
+            .unwrap()
+            .path
+            .clear();
+        ids.push(id);
+    }
+    state.next_schedule = 1000;
+    state.step(ctx, &mut r, &mut world, 0.0).unwrap();
+    assert!(
+        ids.iter()
+            .all(|id| state.trucks[id].state == TruckState::Unloading)
+    );
+    ctx.tick += 1;
+    state.step(ctx, &mut r, &mut world, 0.5).unwrap();
+    assert_eq!(
+        ids.iter()
+            .map(|id| state.trucks[id].cargo.provisions)
+            .sum::<f64>(),
+        360.0
+    );
+    let cache = state.store_mut(&StoreId::Cache(50)).unwrap();
+    assert_eq!(cache.total().provisions, 120.0);
+    assert_eq!(cache.available(1, true).provisions, 120.0);
+    assert_eq!(cache.available(1, false).provisions, 0.0);
+    for owner in [0, 2] {
+        assert_eq!(cache.available(owner, true).provisions, 0.0);
+        assert_eq!(cache.available(owner, false).provisions, 0.0);
+        assert_eq!(
+            cache
+                .buckets
+                .iter()
+                .find(|(p, _)| *p == owner)
+                .unwrap()
+                .1
+                .provisions,
+            60.0
+        );
+    }
+    for id in &ids {
+        state.trucks.get_mut(id).unwrap().hold = true;
+    }
+    world.units.push(unit(60, 1, UnitRole::Other, 61.0));
+    let mut recipient = equipped("rifle").remove(1).unwrap();
+    recipient.provisions = 0.0;
+    r.insert(60, recipient);
+    for (tick, received, remaining) in [(3, 60.0, 60.0), (4, 120.0, 0.0)] {
+        ctx.tick = tick;
+        state.step(ctx, &mut r, &mut world, 4.0).unwrap();
+        assert_eq!(r.get(60).unwrap().provisions, received);
+        let cache = state.store_mut(&StoreId::Cache(50)).unwrap();
+        assert_eq!(cache.total().provisions, remaining);
+        assert_eq!(cache.available(1, true).provisions, remaining);
+        assert_eq!(
+            cache
+                .buckets
+                .iter()
+                .find(|(p, _)| *p == 0)
+                .unwrap()
+                .1
+                .provisions,
+            0.0
+        );
+        assert_eq!(
+            cache
+                .buckets
+                .iter()
+                .find(|(p, _)| *p == 2)
+                .unwrap()
+                .1
+                .provisions,
+            remaining
+        );
+    }
 }
 #[test]
 fn feature_log41_trucks_start_at_own_source_and_ally_service_excludes_enemy() {
@@ -846,8 +942,27 @@ fn feature_log42_death_discards_cargo_and_delays_replacement() {
     assert!(!state.trucks.contains_key(&id));
     assert_eq!(state.losses[&0], vec![35.0]);
     state.retire_unit(100, 8, Some(0), false);
+    world.retire(8);
     assert!(state.store_mut(&StoreId::Cache(8)).is_none());
     assert_eq!(state.losses[&0], vec![35.0]);
+
+    state.next_schedule = 10000;
+    state.jobs.insert(0, 1);
+    let mut ctx = context(&ps);
+    let mut r = LogisticsState::default();
+    for tick in [100, 699] {
+        ctx.tick = tick;
+        state.step(ctx, &mut r, &mut world, 0.0).unwrap();
+        assert!(state.trucks.is_empty());
+    }
+    ctx.tick = 700;
+    state.step(ctx, &mut r, &mut world, 0.0).unwrap();
+    assert_eq!(state.trucks.len(), 1);
+    let (&replacement, cargo) = state.trucks.iter().next().unwrap();
+    assert_ne!(replacement, id);
+    assert_eq!(cargo.cargo, Stock::default());
+    assert_eq!(world.unit(replacement).unwrap().at, ps[0].spawn);
+    assert!(state.losses[&0].is_empty());
 }
 #[test]
 fn feature_log44_component_recipient_rows_are_owner_private() {
@@ -1112,7 +1227,8 @@ fn feature_log32_fleet_limits_spawning_retires_newest_and_obeys_loss_delay() {
 }
 #[test]
 fn feature_log34_manual_supply_selects_nearest_own_stock_excluding_grants() {
-    let ps = players();
+    let mut ps = players();
+    ps[1].spawn = ps[0].spawn;
     let ctx = context(&ps);
     let mut world = ComponentWorld::new(vec![
         unit(8, 0, UnitRole::Cache, 30.0),
@@ -1152,6 +1268,45 @@ fn feature_log34_manual_supply_selects_nearest_own_stock_excluding_grants() {
     assert!(state.supply(ctx, 0, &[id], 1, &r, &mut world).unwrap());
     assert_eq!(state.trucks[&id].origin, StoreId::Cache(8));
     assert_eq!(state.trucks[&id].state, TruckState::Collecting);
+
+    // Store deliveries must draw from upstream inventory, not their own stock.
+    world.units.extend([
+        unit(20, 0, UnitRole::Cache, 81.0),
+        unit(21, 0, UnitRole::Cache, 73.0),
+        unit(22, 1, UnitRole::Cache, 72.5),
+        unit(23, 2, UnitRole::Cache, 72.9),
+    ]);
+    state.sync_stores(ctx, &world).unwrap();
+    for cache in [20, 21, 22, 23] {
+        state
+            .store_mut(&StoreId::Cache(cache))
+            .unwrap()
+            .buckets
+            .push((
+                0,
+                Stock {
+                    provisions: 20.0,
+                    ..Stock::default()
+                },
+            ));
+    }
+    // Exactly eight metres closer is excluded. An active ally just beyond it wins.
+    assert!(state.supply(ctx, 0, &[id], 20, &r, &mut world).unwrap());
+    assert_eq!(state.trucks[&id].origin, StoreId::Cache(22));
+    state.store_mut(&StoreId::Cache(22)).unwrap().active = false;
+    assert!(state.supply(ctx, 0, &[id], 20, &r, &mut world).unwrap());
+    assert_eq!(state.trucks[&id].origin, StoreId::Cache(8));
+    state.store_mut(&StoreId::Cache(8)).unwrap().buckets[0]
+        .1
+        .provisions = 1.0;
+    assert!(state.supply(ctx, 0, &[id], 20, &r, &mut world).unwrap());
+    assert!(state.trucks[&id].origin != StoreId::Cache(8));
+    assert!(
+        state
+            .stores
+            .iter()
+            .any(|s| s.source && s.id == state.trucks[&id].origin)
+    );
 }
 #[test]
 fn feature_log36_loading_waits_four_seconds_and_delivery_is_incremental() {

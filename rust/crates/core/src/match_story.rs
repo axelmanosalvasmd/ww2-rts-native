@@ -346,9 +346,16 @@ impl Match {
             mode: match self.options.mode {
                 crate::economy::Mode::World => "world",
                 crate::economy::Mode::Assault => "assault",
+                crate::economy::Mode::Annihilation => "annihilation",
+                crate::economy::Mode::Classic => "classic",
+                crate::economy::Mode::Horde => "horde",
                 crate::economy::Mode::Tutorial => "tutorial",
                 _ => "conquest",
             },
         }))
     }
 }
+
+#[cfg(test)]
+#[path = "match_story_intent_tests.rs"]
+mod intent_tests;

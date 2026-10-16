@@ -4,6 +4,10 @@ The explicit `Match::new_tutorial` constructor adds the unattended Enemy seat an
 
 Instant Tutorial recruitment reuses the existing admission, debit and unit-publication transaction, with a separate home-placement path because Tutorial has no production buildings. The public Conquest production component keeps its existing mode gate. Tutorial reinforcements use the player's spawn and exclude the unattended enemy. The prototype's 5 MP/s base income and lack of a defeat condition are preserved. Public server admission, agreed interfaces and parity statuses stay unchanged.
 
+## Runtime engineering: native bridge identity (2026-10-16)
+
+Paid bridges and Fill use the existing field-work jobs and canonical World mutations. Newly constructed bridge graphs use deterministic identities derived from the first cell and the append-only structure count. Repair reuses an existing bridge section identity, restores wood and 200 HP, and reconnects neighboring sections. These graph identities stay separate from the shared actor ID allocator, so construction does not advance actor IDs. Support, terrain invalidation and hull-width queries continue to use the canonical graph and physical terrain. This is an internal identity choice; no new wire or ABI shape is introduced.
+
 ## AI test-only integration on main40fe (2026-10-16, unrun)
 
 Start this candidate from literal40fe9e296b46060241693c6c627ecd615d4f8ea4 in the assigned physical checkout. Preserve prior8cb01c00 and passing0aaea3da refs. Import only nine new task tests in existing human_commander_state_tests.rs and match_human_observation/tests.rs. Main already has their complete helper types and test registration. No old81-line diagnostic helper, ai_receipt implementation, fixture, inherited runtime/history or replacement test provider is required. All docs/parity files stay exact main.
@@ -11,6 +15,12 @@ Start this candidate from literal40fe9e296b46060241693c6c627ecd615d4f8ea4 in the
 Read current main before integration: it lacks ai_receipt_input and ai_delivered_sight and their Observation/Match/vision integration. Therefore prior AI01/02/04/06 candidates remain held on main; the test PR proposes only AI08/19/20/21/22/23/24/27. AI05's authorized history successor remains on the prior preserved branch, where its actual28-test PASS belongs to0aaea3da/Rust2f9cf68c. No old result transfers to this new unrun source. The14-name focused filter selects nine new and five existing library tests. Both full63-row maps and a concrete PR body live under docs/testing. Root owns the new integrated execution grant, independent review, public PR and proven-row ledger/status follow-up.
 
 # Three Crossroads Native: design decisions
+
+## Typed scenario conditions and core refunds (2026-10-16)
+
+Scenario condition evaluation borrows typed authored state while reading current units, point owners and World region teams from Match. A caller supplies the context and shares an explicit work budget across evaluations. This keeps condition reads separate from scenario admission, trigger scheduling, actions and recipient projection. The evaluator follows the pinned condition semantics, including historical captures, pending arrivals, context fallback and short-circuit work charges. A 64-level guard protects callers that construct trees directly; validated authored trees remain below it.
+
+Waiting-job refunds prepare small production and wallet drafts before publishing the negative MP-spent tally. Site cancellation uses the existing World transaction before the wallet, story and metadata cleanup commit. These core operations add no network admission. Full MODE-91 remains held beyond the selected refund and recovery checks. MODE-83 proves the condition component, not an admitted authored-scenario match.
 
 
 ## First-five engineering merged with MAP273 main (2026-10-16, source only)
@@ -4830,3 +4840,20 @@ and Unreal acceptance are not completed by these selected component rows.
 ## AI sighting test lint correction (2026-10-16)
 
 PR #274 strict Clippy rejected a nested conditional in the stillness-reset assertion. Combine the existing option match and movement threshold with a let chain. The condition, assertions and authored inputs stay the same.
+
+## Horde wave phase and scenario type validation (2026-10-16)
+
+`Match::step_horde` is an explicit late phase after ordinary capture, income
+and death removal. It does not advance the clock or run combat. Wave purchases,
+reserve entry and clearing use canonical Match state; newly entered units act
+on the following tick. Full Horde tick and server admission remain guarded.
+Vehicle entry must pass the current World navigation and obstruction versions
+to the persistent production placer, just as ordinary recruitment does, so
+terrain changes invalidate cached clearance between entries.
+
+Native scenario validation deliberately requires a JSON string for each authored
+unit or reinforcement roster `type`. It rejects `type: ["rifle"]`, whereas the
+prototype's `Object.hasOwn(unitTypes, v)` and `unitTypes[v]` coerce that array to
+the property name `"rifle"`. This stricter choice rejects malformed schema values
+instead of carrying JavaScript property-key coercion into the native validator.
+It does not admit or execute general authored scenarios.
