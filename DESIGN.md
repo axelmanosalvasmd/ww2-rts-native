@@ -4769,8 +4769,9 @@ The combat checks register a cfg(test)-only child module. Shipping runtime,
 interfaces, dependencies and reference pin are unchanged. Normal native RNG
 advances in the 3,000-volley high-ground comparison and artillery journey.
 
-The compact mapping in docs/parity/maps.md covers every owned row. Twenty-five
-rows are candidates, all UNRUN; seventeen remain held with concrete provider or
+The compact mapping now lives in docs/testing/map-native-feature-batch.md. At
+the initial source freeze, twenty-five rows were unrun candidates and seventeen
+remained held with concrete provider or
 exact-value gaps. In particular, moved vehicle crushing is explicitly refused
 by match_ground_contact.rs, editor movement/pruning is absent, and World
 validation strings differ from the retained exact oracle. Do not silently mark
@@ -4811,3 +4812,24 @@ The seventeen earlier held rows retain their concrete gaps, even where partial
 component tests pass. Update only normal documentation in a same-Rust-tree
 child, promote no row, and leave all 140 Acceptance cells exact. No new Source
 job, fixture, recorder or provenance bundle is produced.
+
+## MAP native test PR scope child (2026-10-16, source only)
+
+Apply the authoritative 03:35 split after the completed S1 batch. Restore
+only this task's docs/parity/maps.md delta to exact pre-task eff82a91 and move
+its appended forty-two-row mapping and normal results to
+[the test map](docs/testing/map-native-feature-batch.md). All 140 canonical
+rows, status cells and Acceptance cells are byte-identical to the parent.
+Status promotion and the proven-row ledger remain Root-owned and separate.
+
+Preserve every failed MAP33 body, input and assertion. Add one explicit ignore
+attribute naming its actual 549b5a8c tick-0 production-building failure and its
+unreached artillery/timed-collapse clauses. This is failed-row scope exclusion,
+not a repair. All other Rust bytes remain exact. Keep the original 35/36 result
+on its producing head; this new Rust tree is unrun. No formatter, Cargo, native,
+Source, public or ledger operation runs during this source-only preparation.
+
+Task-only integration starts after eff82a91. That inherited parent separately
+contains the owned MAP49 native function, which passed in the selected batch;
+Root must extract that native hunk separately if proving MAP49. Do not import
+its old unrun Source checker or the entire inherited unpublished branch.

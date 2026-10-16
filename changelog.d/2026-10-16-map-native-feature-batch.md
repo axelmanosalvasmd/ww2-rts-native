@@ -2,3 +2,4 @@
 - Record MAP-33's authored setup failure: clearing constructor units leaves a missing production building at tick 0. Artillery and timed collapse remain unreached; preserve the failed test and output without repair or retry.
 - Apply Root's one targeted pinned-formatter grant to the four authorized MAP test modules. Preserve all test inputs, assertions and provider code.
 - Format the separate 42-row test mapping IDs as code so inventory readers still count exactly 140 canonical MAP rows.
+- Prepare the native-only test PR: restore the parity file exactly to its pre-task parent, move only this task's mapping/results to the normal test notes, and mark the unchanged failed MAP-33 body ignored with its actual tick-0 failure reason. Status and ledger updates remain separate. This scope-only source child is unrun.
