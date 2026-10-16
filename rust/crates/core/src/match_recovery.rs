@@ -121,7 +121,7 @@ impl Match {
     /// Returns a conservative mutation reservation; no health or terrain is published.
     pub(crate) fn preflight_building_repair(&self, id: UnitId, amount: f64) -> Result<u64, String> {
         if self.validate_actor_mode().is_err()
-            || self.options.mode == crate::economy::Mode::World
+            || !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode)
             || !amount.is_finite()
             || amount < 0.0
         {
@@ -176,7 +176,7 @@ impl Match {
     pub fn repair_building_sections(&mut self, id: UnitId, amount: f64) -> Result<f64, String> {
         self.preflight_building_repair(id, amount)?;
         if self.validate_actor_mode().is_err()
-            || self.options.mode == crate::economy::Mode::World
+            || !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode)
             || !amount.is_finite()
             || amount < 0.
         {

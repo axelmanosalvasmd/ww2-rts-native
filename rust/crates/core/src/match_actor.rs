@@ -36,12 +36,19 @@ pub(crate) fn ordinary_ground_mode(game: &Game, mode: Mode) -> bool {
 
 /// Validate only the represented actor modes, not their complete tick capabilities.
 pub(crate) fn checked_game_mode(game: &Game, mode: Mode) -> Result<(), String> {
-    if ordinary_ground_mode(game, mode)
-        || (mode == Mode::World && game.mode == Some(ModeKind::World))
-    {
-        Ok(())
-    } else {
-        Err("actor mode does not match canonical Game mode".into())
+    match (mode, game.mode) {
+        _ if ordinary_ground_mode(game, mode) => Ok(()),
+        (Mode::World, Some(ModeKind::World)) => Ok(()),
+        (Mode::Horde, Some(ModeKind::Horde))
+            if (2..=6).contains(&game.players.len())
+                && game.players.iter().enumerate().all(|(slot, player)| {
+                    player.slot == slot
+                        && player.team == if slot + 1 == game.players.len() { 1 } else { 0 }
+                }) =>
+        {
+            Ok(())
+        }
+        _ => Err("actor mode does not match canonical Game mode".into()),
     }
 }
 pub(crate) fn checked_game_owner(game: &Game, owner: usize) -> Result<i32, String> {
@@ -66,6 +73,14 @@ impl Match {
     /// This is an actor lookup gate. The sole tick owner validates phase capabilities separately.
     pub(crate) fn validate_actor_mode(&self) -> Result<(), String> {
         checked_game_mode(&self.world.game, self.options.mode)?;
+        if self.options.mode == Mode::Horde
+            && self.horde.as_ref().is_none_or(|horde| {
+                horde.defenders.checked_add(1) != Some(self.world.game.players.len())
+                    || horde.slot != horde.defenders
+            })
+        {
+            return Err("Horde actor policy requires canonical defender and enemy slots".into());
+        }
         if self.options.mode == Mode::Tutorial {
             self.validate_tutorial_state()?;
         }

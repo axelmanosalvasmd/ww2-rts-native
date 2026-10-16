@@ -1,7 +1,6 @@
 //! Paid sites and the source-positioned builder/crew phases. No second job or queue authority.
 use crate::{
     catalog::{Catalog, Value},
-    economy::Mode,
     game::Unit,
     grid::UnitId,
     match_commands::UnitControl,
@@ -267,7 +266,7 @@ impl Match {
     /// Read-only admission. The sole runner calls this before inputs and again before its clock.
     pub fn validate_construction_tick(&self) -> Result<(), String> {
         if self.validate_actor_mode().is_err()
-            || self.options.mode == Mode::World
+            || !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode)
             || self.world.game.tick < 0
         {
             return Err("construction phases require ordinary Conquest".into());
@@ -324,7 +323,9 @@ impl Match {
         id: UnitId,
         frame: &mut ConstructionFrame,
     ) -> Result<(), String> {
-        if self.validate_actor_mode().is_err() || self.options.mode == Mode::World {
+        if self.validate_actor_mode().is_err()
+            || !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode)
+        {
             return Err("construction worker requires ordinary Conquest".into());
         }
         if frame.tick != self.world.game.tick || frame.workers.contains(&id) {

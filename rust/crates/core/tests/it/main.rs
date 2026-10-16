@@ -21,6 +21,8 @@ mod bases_batch3_training;
 mod client_view;
 #[path = "../combat.rs"]
 mod combat;
+#[path = "../combat_enemy_faction.rs"]
+mod combat_enemy_faction;
 #[path = "../commander_ai.rs"]
 mod commander_ai;
 #[path = "../convoys.rs"]
