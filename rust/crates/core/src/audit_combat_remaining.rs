@@ -339,7 +339,7 @@ fn cmb67_original_hold_fire_patrol_then_explicit_ground_attack_uses_ammo() {
     s.m.aviation.planes.get_mut(&plane).unwrap().mission = Some(PlaneMission {
         kind: MissionKind::Patrol, at: Point {x:50.0,z:50.0}, target: None,
     });
-    s.m.firing.get_mut(&plane).unwrap().retarget = 99.0;
+    s.m.firing.get_mut(plane).unwrap().retarget = 99.0;
     s.m.grid.rebuild(&s.m.world.game.units);
     ww2_core::vision::update_vision(&mut s.m.world.game, &s.m.rules, &s.m.grid);
     assert!(s.m.world.game.players[0].sees(target));

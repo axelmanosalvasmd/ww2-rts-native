@@ -4331,3 +4331,17 @@ sniper rifle/MG distances12/30 m and AT rifle/tank distances7/28 m, with tank
 front toward the gun. Source inspection caught the authored sniper7/30 m
 copy error before any native attempt. Role weights and expected target IDs
 remain unchanged; the real native selection and firing providers are exercised.
+
+### First native compile result and mechanical correction
+
+One authorized S2 nextest invocation at4439a828 / Rustd02a9091 terminated
+with compile exit101 before test selection or execution. E0308 came from the
+inherited ignored aircraft consumer in audit_combat_remaining.rs:342 passing
+&plane to FiringState::get_mut, whose parameter is a value UnitId. The normal
+0323 native log and terminal/release JSON remain unchanged. All39 rows are
+UNRUN, with no native PASS or semantic test failure from this attempt.
+
+Under the overseer's03:23 fix authorization, remove only that erroneous borrow,
+as the compiler requests. Keep every assertion/input, ignore and runtime guard
+unchanged. This source child does not inherit the prior execution grant and
+requires Root's new exact-head selection/slot grant before another invocation.

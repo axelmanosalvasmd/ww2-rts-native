@@ -1,3 +1,4 @@
 - Add 32 native combat feature tests and literal test mappings for the 39-row owned combat window under Axel's approved native intent rule. Keep missing and partial providers in progress, preserve prior failures, and leave all new native results and reviewer qualification pending.
 - Place the authored rifle and sniper profile targets beyond the launch solver's 0.025-second minimum flight time before the first native attempt, so the speed check exercises its stated condition.
 - Correct the unrun role-selection scenes to the prototype's sniper 12/30 m and AT 7/28 m distances, with the tank facing the AT gun.
+- Preserve the first batch's compile E0308 with all 39 rows unrun, then fix the inherited ignored aircraft test's unit-ID argument without changing its inputs, assertions or ignore.
