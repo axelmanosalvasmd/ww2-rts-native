@@ -49,7 +49,7 @@ ownership would refuse the resumed AI alert frame as `InvalidBatch`.
 
 The delivered adapters have focused tests for exact typed Horde facts, owner
 plan tuples, queue invalidation, paid-Dig busy state, private fields, remembered
-terrain, sighting expiry and transaction rollback. A real six-tick Horde
+terrain, sighting expiry and transaction rollback. A real sixteen-tick Horde
 recipient test proves hidden HP, suppression and cooldown mutations never enter
 the policy packet or consume the match random stream.
 

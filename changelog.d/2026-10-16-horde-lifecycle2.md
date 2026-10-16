@@ -3,3 +3,4 @@
 - Replaced the old hosted-Horde refusal assertion with canonical full-tick and recipient-snapshot coverage. World admission and aircraft weapon delivery remain guarded.
 - Paused snapshot sends now reset the AI alert event cursor with the cleared event batch, so resuming cannot fault on a shorter batch.
 - Ground projectile flights and grenade throws now survive recipient delivery through impact and cleanup, with fog and shooter privacy preserved. Internal AI support orders use the existing hosted capability restriction before payment.
+- The delivered Horde policy regression now follows the first normal reserve spawn before checking populated views.

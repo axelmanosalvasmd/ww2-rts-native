@@ -194,8 +194,10 @@ fn real_horde_ticks_deliver_policy_packets_without_hidden_enemy_inputs() {
     let mut memory = state.ordinary_ai_view_memory(slot).unwrap();
     let mut defender = state.ordinary_ai_view_memory(0).unwrap();
     let mut delivery = DeliveryState::new(&state).unwrap();
-    state.end_horde_break().unwrap();
-    for _ in 0..6 {
+    assert!(state.end_horde_break().unwrap());
+    let mut staffed_deliveries = 0;
+    // The wave activates next tick; ordinary reserve units enter every tenth tick.
+    for _ in 0..16 {
         state.advance_tick().unwrap();
         let seat = state
             .ordinary_ai_view(&mut memory, &mut delivery, true)
@@ -203,7 +205,10 @@ fn real_horde_ticks_deliver_policy_packets_without_hidden_enemy_inputs() {
         let (view, facts) = seat.horde_packet(slot).unwrap();
         assert_eq!(view.wave.number, 1);
         assert_eq!(view.tick, state.world.game.tick);
-        assert!(!view.units.is_empty());
+        if view.tick >= 10 {
+            assert!(!view.units.is_empty());
+            staffed_deliveries += 1;
+        }
         let mut policy = HordePolicy::default();
         policy.observe(&view, &facts).unwrap();
         policy.plan(&view, &facts).unwrap();
@@ -215,6 +220,10 @@ fn real_horde_ticks_deliver_policy_packets_without_hidden_enemy_inputs() {
             "foreign seat has no scripted wallet"
         );
     }
+    assert!(
+        staffed_deliveries >= 6,
+        "normal wave spawning must reach the delivered packet"
+    );
     let hidden = state
         .world
         .game
