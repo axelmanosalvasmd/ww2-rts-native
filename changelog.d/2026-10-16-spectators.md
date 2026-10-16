@@ -1,3 +1,4 @@
 - Admit spectators to running ordinary native matches and send the prototype's current full-map view with no fog or delay, through victory and the ending hold.
 - Keep spectator terrain and shared snapshot history separate from commander memory. Remove the prototype's private orders, jobs, economy and logistics fields, and keep its cached unit privacy mask.
 - Drop spectator army commands silently and close spectators over 4 MiB behind with code 1013. Replace the old newcomer-refusal expectation with spectator admission. World, operatives and save loading remain deferred.
+- Count queued socket bytes with diagnostics off so spectator limits always apply. Update the old test that expected this counter to be disabled.
