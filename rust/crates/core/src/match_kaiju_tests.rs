@@ -1,4 +1,4 @@
-//! Horde combat component checks. Full Horde tick and hosting remain guarded.
+//! Horde combat component checks. Hosted room admission remains separate.
 use super::*;
 use crate::{
     combat::{Impact, WeaponDamage},
@@ -9,7 +9,7 @@ use crate::{
     match_combat::FlightSource,
     match_commands::{MatchCommands, UnitControl},
     match_runtime::{MatchOptions, PlayerConfig},
-    recipient_snapshot::{SnapshotCache, SnapshotError},
+    recipient_snapshot::SnapshotCache,
     unit_spawn::initial_unit,
     weather::WeatherChoice,
     world::{CellChange, World},
@@ -229,11 +229,17 @@ fn horde_breath_hits_whole_line_once_and_overlapping_trench_cells_once() {
     assert_eq!(m.firing.get(boss).unwrap().cooldown, 6.0);
     assert_eq!(m.world.game.units[&boss].shot_at, Some(0.0));
     assert!(m.firing.flights.is_empty());
-    assert!(m.advance_tick().is_err(), "full Horde tick remains closed");
-    assert!(matches!(
-        SnapshotCache::new(&m),
-        Err(SnapshotError::UnsupportedMode)
-    ));
+    assert!(
+        m.advance_tick().is_err(),
+        "detached combat scene lacks tick metadata"
+    );
+    assert!(
+        matches!(
+            SnapshotCache::new(&m),
+            Err(crate::recipient_snapshot::SnapshotError::Rules)
+        ),
+        "detached combat world lacks full Match metadata"
+    );
 }
 
 #[test]

@@ -34,3 +34,18 @@ Incoming #374: `0a712ac4f909f130fa3518b1586b2089e6e07b0f`.
 - `lobby.rs` (five): retain both spectator and operative starts, admit operative hello before commander restrictions, preserve spectator joins in running rooms, retain optional returning-seat handling, and register both test modules.
 - `room_runtime.rs` (one): retain latency telemetry and incoming operative event/list methods.
 - Incoming `operative_flights::project` delegates to the canonical projector after its dedicated operative validation. This preserves original ballistic stamps and all operative tests.
+
+## Hosted Horde merge
+
+Incoming #413: `a1be2f7419faa90fedfb6138e7a1a4d0e692ba5d` (#399/#357 ancestry).
+
+- `match_tick.rs` (one): retain initialized ordinary convoy validation and World logistics refusal; add Horde economy validation.
+- `recipient_snapshot.rs` (two): preserve wave-zero field omission and current mode rows; retain companion validation plus projectile validation.
+- Composition (two): preserve canonical flights and complete flight/grenade/salvo validation.
+- Public state (one): retain the general mode owner rather than replacing it with Horde-only mode projection.
+- Shots (five): union Aviation and Horde tick events; retain ordinary producer-buffer guards, operative SmallArms checks and invalid Throw test; admit breath for sandbox or Horde; retain general Throw identities and owners.
+- `lobby.rs` (four): retain spectator-capable attachment and Horde canonical seat count; preserve operative/spectator hello, with five-defender Horde lobby capacity; retain both operative and Horde control dispatch and both modules.
+- `main.rs` (two): retain existing help plus Horde/map-directory help and authored map configuration.
+- Incoming `projectiles::for_seat` delegates to the same canonical flight projector. Its complete validator and all projectile tests remain. The duplicate geometry/contact implementation is superseded.
+
+All inherited World, aircraft-weapon, privacy, invalid-state, terminal tick and command guards remain unless their explicitly documented runtime owner replaces the old admission restriction.

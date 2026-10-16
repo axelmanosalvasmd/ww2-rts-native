@@ -21,6 +21,7 @@ pub enum ShotRef<'a> {
     Support(&'a SupportEvent),
     Environment(&'a Effect),
     Scenario(&'a SayAction),
+    Horde(&'a crate::match_horde::HordeEvent),
 }
 
 impl<'a> TryFrom<&'a TickEvent> for ShotRef<'a> {
@@ -33,6 +34,7 @@ impl<'a> TryFrom<&'a TickEvent> for ShotRef<'a> {
             TickEvent::Environment(value) => Ok(Self::Environment(value)),
             TickEvent::Scenario(value) => Ok(Self::Scenario(value)),
             TickEvent::Aviation(value) => Ok(Self::Aviation(value)),
+            TickEvent::Horde(value) => Ok(Self::Horde(value)),
         }
     }
 }
@@ -204,6 +206,15 @@ fn event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
 
 fn raw_event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
     match shot {
+        ShotRef::Horde(value) => {
+            if state.options.mode != Mode::Horde {
+                return Err(SnapshotError::Rules);
+            }
+            match value {
+                crate::match_horde::HordeEvent::BossSurfaced { at } => finite(&[at.x, at.z])?,
+            }
+            Ok(value.shot_json())
+        }
         ShotRef::Scenario(value) => {
             validate_public_say(value).map_err(|_| SnapshotError::Rules)?;
             if state.scenario.is_none()
@@ -343,7 +354,7 @@ fn raw_event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
                     target_owner,
                     at,
                 } => {
-                    if !state.options.sandbox {
+                    if !state.options.sandbox && state.options.mode != Mode::Horde {
                         return Err(refused());
                     }
                     identity(u64::from(*shooter))?;
@@ -353,7 +364,7 @@ fn raw_event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
                     numbers(&[at.x, at.z])?;
                 }
                 LaunchEvent::BreathShell { at } => {
-                    if !state.options.sandbox {
+                    if !state.options.sandbox && state.options.mode != Mode::Horde {
                         return Err(refused());
                     }
                     numbers(&[at.x, at.z])?;
@@ -363,7 +374,8 @@ fn raw_event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
                     owner: seat,
                     at,
                 } => {
-                    operative_flights::shooter(state, *shooter, *seat)?;
+                    identity(u64::from(*shooter))?;
+                    owner(state, *seat)?;
                     numbers(&[at.x, at.z])?;
                 }
                 LaunchEvent::SmallArms(value) => {

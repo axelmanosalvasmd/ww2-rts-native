@@ -54,6 +54,7 @@ pub enum TickPhase {
     Convoys,
     Victory,
     Tutorial,
+    Horde,
 }
 
 /// Persistent simulation state, never wall-clock state. A phase failure poisons
@@ -102,6 +103,7 @@ pub enum TickEvent {
     Aviation(crate::match_aviation::AviationEvent),
     Environment(crate::environment::Effect),
     Scenario(crate::legacy_scenario::SayAction),
+    Horde(crate::match_horde::HordeEvent),
 }
 
 /// A failed phase keeps the effects already emitted at their original boundaries.
@@ -310,6 +312,9 @@ impl crate::match_runtime::Match {
         if !world && self.options.logistics {
             self.validate_supply()?;
         }
+        if self.options.mode == crate::economy::Mode::Horde {
+            self.validate_horde_economy()?;
+        }
         self.preflight_legacy_scenario()?;
         self.tick_state.paths.validate()?;
         let boundary = game.tick as u64 + 1;
@@ -489,6 +494,8 @@ impl crate::match_runtime::Match {
         if tick % 4 == 1 {
             if self.options.mode == crate::economy::Mode::World {
                 self.refresh_world_visibility()?;
+            } else if self.options.mode == crate::economy::Mode::Horde {
+                self.refresh_horde_visibility()?;
             } else {
                 vision::update_vision(&mut self.world.game, &self.rules, &self.grid);
                 if self.options.mode == crate::economy::Mode::Classic {
@@ -899,6 +906,10 @@ impl crate::match_runtime::Match {
                     world_removed.extend(eliminated.removed);
                 }
                 crate::economy::Mode::Tutorial => {}
+                crate::economy::Mode::Horde => {
+                    events.extend(self.step_horde(dt)?.into_iter().map(TickEvent::Horde));
+                    phases.push(TickPhase::Horde);
+                }
                 _ => {
                     self.apply_conquest_victory()?;
                 }
