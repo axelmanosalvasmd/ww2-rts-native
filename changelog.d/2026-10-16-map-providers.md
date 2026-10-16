@@ -1,0 +1,1 @@
+- Add pure World geography validation with the prototype's six error strings and check order, and run it before typed map import. Strengthen the existing MAP-92 tests to compare full diagnostics and cover permissive authoring values separately from native storage checks. World room admission and editor/placement C queries remain deferred.
