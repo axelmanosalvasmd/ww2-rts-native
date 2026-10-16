@@ -13,9 +13,13 @@ fn cmb137_world_recorded_compound_moves_pass_the_existing_actuator_boundary() {
     let case = &fixture["cases"][0];
     for unsupported in [false, true] {
         let mut m = common::construct(&fixture, case).unwrap();
-        let unit = m.world.game.units.values().find(|u| {
-            u.owner == 0 && !m.rules.kinds[u.kind].structure && u.air.is_none()
-        }).unwrap();
+        let unit = m
+            .world
+            .game
+            .units
+            .values()
+            .find(|u| u.owner == 0 && !m.rules.kinds[u.kind].structure && u.air.is_none())
+            .unwrap();
         let id = unit.id;
         let at = unit.at();
         let mut parts = vec![
@@ -27,14 +31,28 @@ fn cmb137_world_recorded_compound_moves_pass_the_existing_actuator_boundary() {
             parts.push(json!({"t":"board","ids":[id],"target":999999}));
         }
         let tick = m.world.game.tick;
-        let key = OrderKey { tick: tick as u64 + 1, issuer: 0, sequence: 0 };
-        m.enqueue_command(key, Command::from_json(&json!({"t":"orders","queue":false,"commands":parts})).unwrap()).unwrap();
+        let key = OrderKey {
+            tick: tick as u64 + 1,
+            issuer: 0,
+            sequence: 0,
+        };
+        m.enqueue_command(
+            key,
+            Command::from_json(&json!({"t":"orders","queue":false,"commands":parts})).unwrap(),
+        )
+        .unwrap();
         let before = format!("{:?}", (&m.world.game.units, &m.commands.units));
         if unsupported {
             let error = m.advance_tick().unwrap_err();
-            assert!(format!("{error:?}").contains("World command requires an unrepresented tick actuator"));
+            assert!(
+                format!("{error:?}")
+                    .contains("World command requires an unrepresented tick actuator")
+            );
             assert_eq!(m.world.game.tick, tick);
-            assert_eq!(format!("{:?}", (&m.world.game.units, &m.commands.units)), before);
+            assert_eq!(
+                format!("{:?}", (&m.world.game.units, &m.commands.units)),
+                before
+            );
         } else {
             let report = m.advance_tick().unwrap();
             assert_eq!(report.tick, tick + 1);

@@ -9,18 +9,33 @@ impl Command {
         parts: &[serde_json::Value],
         queue: bool,
     ) -> Vec<Result<Self, Denial>> {
-        parts.iter().take(8).filter_map(|part| {
-            let object = part.as_object()?;
-            if !matches!(object.get("t").and_then(|v| v.as_str()), Some(
-                "move" | "amove" | "attack" | "garrison" | "fireat" | "escort"
-                | "assist" | "rally" | "entrench" | "board"
-            )) {
-                return None;
-            }
-            let mut leaf = object.clone();
-            leaf.insert("queue".into(), serde_json::Value::Bool(queue));
-            Some(Self::from_json(&serde_json::Value::Object(leaf)))
-        }).collect()
+        parts
+            .iter()
+            .take(8)
+            .filter_map(|part| {
+                let object = part.as_object()?;
+                if !matches!(
+                    object.get("t").and_then(|v| v.as_str()),
+                    Some(
+                        "move"
+                            | "amove"
+                            | "attack"
+                            | "garrison"
+                            | "fireat"
+                            | "escort"
+                            | "assist"
+                            | "rally"
+                            | "entrench"
+                            | "board"
+                    )
+                ) {
+                    return None;
+                }
+                let mut leaf = object.clone();
+                leaf.insert("queue".into(), serde_json::Value::Bool(queue));
+                Some(Self::from_json(&serde_json::Value::Object(leaf)))
+            })
+            .collect()
     }
 }
 

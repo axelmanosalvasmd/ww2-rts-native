@@ -288,10 +288,13 @@ impl Match {
                 if index < limit
                     && let Some(id) = self.eligible_command_unit(raw, owner, &command)
                 {
-                    aircraft.push(
-                        self.prepare_aircraft_order(owner, id, AircraftOrder::Retreat)
-                            .map_err(|e| e.to_string())?,
-                    );
+                    match self.prepare_aircraft_order(owner, id, AircraftOrder::Retreat) {
+                        Ok(order) => aircraft.push(order),
+                        Err(crate::match_aviation::AviationError::Unsupported(_)) => {
+                            return Ok(Some(Denial::Unsupported));
+                        }
+                        Err(error) => return Err(error.to_string()),
+                    }
                 }
                 // Retain original positions and the full tail for ground admission checks.
                 ground.push(-1);

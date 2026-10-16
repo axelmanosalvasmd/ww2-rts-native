@@ -204,7 +204,10 @@ impl Match {
         use crate::match_commands::Command;
         match command {
             Command::Compound { commands, queue } => {
-                for leaf in Command::compound_leaves(commands, *queue).into_iter().flatten() {
+                for leaf in Command::compound_leaves(commands, *queue)
+                    .into_iter()
+                    .flatten()
+                {
                     self.validate_world_tick_command(&leaf)?;
                 }
                 Ok(())

@@ -69,6 +69,14 @@ fn cmb144_retreat_is_immediate_for_mixed_air_ground_and_working_units() {
         command(&mut m, json!({"t":"retreat","ids":[2,999999]})),
         Some(Denial::Needs)
     );
+    m.options.mode = Mode::Classic;
+    let before = format!("{:?}", (&m.world.game.units, &m.commands.units));
+    assert_eq!(
+        command(&mut m, json!({"t":"retreat","ids":[plane]})),
+        Some(Denial::Unsupported),
+        "unavailable aircraft modes retain ordinary command denial"
+    );
+    assert_eq!(format!("{:?}", (&m.world.game.units, &m.commands.units)), before);
 }
 
 #[test]
