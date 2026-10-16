@@ -1,0 +1,4 @@
+- Deliver remembered Classic buildings through the internal recipient adapter, and test real ticks, allied memory, hidden changes and airborne rediscovery.
+- Build recipient snapshot rows once per send and reuse them through terrain and list publication. Compare cached and direct uncached projections and protect shared rows from recipient edits.
+- Test each seat's unit visibility, airborne gating, target redaction, cooldown privacy and public flags under owner decision P.
+- Hold Fire and complete combat phase ordering remain follow-up rows; room delivery still restricts aircraft weapons and live flights.
