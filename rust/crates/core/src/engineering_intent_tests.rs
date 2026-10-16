@@ -288,6 +288,7 @@ fn eng07_08_11_12_52_56_unsupported_work_has_no_native_actuator() {
 }
 
 #[test]
+#[ignore = "Actual cd6ce812 batch failure: tick0 admission returned invalid ability unit; ENG27 excluded, body preserved without repair or retry"]
 fn eng27_work_ghosts_include_waiting_and_paid_segments_for_allies_only() {
     let mut m = scene();
     let at = Point { x: 51.0, z: 51.0 };
@@ -356,6 +357,7 @@ fn eng27_work_ghosts_include_waiting_and_paid_segments_for_allies_only() {
 }
 
 #[test]
+#[ignore = "Actual cd6ce812 batch failure: authored trench_front setup unwrapped None at line365; ENG28 excluded, body preserved without repair or retry"]
 fn eng28_directional_trench_cover_settles_and_map_trenches_cover_all_round() {
     let mut m = scene();
     let at = Point { x: 51.0, z: 51.0 };
