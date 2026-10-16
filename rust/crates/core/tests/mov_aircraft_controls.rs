@@ -1,4 +1,4 @@
-//! Native aircraft intent checks for MOV-85 and MOV-89.
+//! Native aircraft component checks and ordinary weather match evidence.
 use serde_json::json;
 use ww2_core::{
     catalog::Catalog,
@@ -12,12 +12,15 @@ use ww2_core::{
 };
 
 fn scene() -> Match {
+    scene_with(WeatherChoice::Map, json!({"x":32,"y":32}))
+}
+fn scene_with(weather: WeatherChoice, objective: serde_json::Value) -> Match {
     let map = ww2_core::map::AuthoritativeMap::from_json(
         &serde_json::to_vec(&json!({
             "name":"Aircraft controls", "w":64, "h":64,
             "rows":vec![".".repeat(64);64],
             "spawns":[{"x":8,"y":8},{"x":54,"y":54}],
-            "points":[{"x":32,"y":32}]
+            "points":[objective]
         }))
         .unwrap(),
     )
@@ -41,9 +44,9 @@ fn scene() -> Match {
             ],
             shuffle: false,
             army: ArmySize::Standard,
-            weather: WeatherChoice::Map,
+            weather,
             weather_seed: Some(1),
-            living_weather: false,
+            living_weather: weather != WeatherChoice::Map,
             map_key: None,
             tech: false,
             supply: false,
@@ -394,4 +397,189 @@ fn mov89_aa_spends_physical_rounds_and_respects_forced_and_empty_controls() {
     let hp = m.world.game.units[&target].hp;
     m.step_aircraft_anti_air(&[gun], interval).unwrap();
     close(m.world.game.units[&target].hp, hp);
+}
+
+#[test]
+fn mov86_component_readiness_matrix_preserves_rejected_sorties() {
+    for kind in ["fighter", "attacker", "bomber"] {
+        let mut m = scene();
+        let id = m.spawn_aircraft(0, kind).unwrap();
+        m.commands.units.get_mut(&id).unwrap().hold_fire = true;
+        let initial = m.aviation.planes[&id];
+        let mission = PlaneMission {
+            kind: MissionKind::Patrol,
+            target: None,
+            at: at(80., 80.),
+        };
+        for state in [
+            PlaneState::Base,
+            PlaneState::Rearm,
+            PlaneState::Out,
+            PlaneState::Station,
+            PlaneState::Home,
+        ] {
+            for (fuel, ammo) in [
+                (initial.fuel, initial.ammo),
+                (0., initial.ammo),
+                (initial.fuel, 0.),
+                (0., 0.),
+            ] {
+                m.world.game.units.get_mut(&id).unwrap().air = Some(state);
+                *m.aviation.planes.get_mut(&id).unwrap() = initial;
+                m.aviation.planes.get_mut(&id).unwrap().fuel = fuel;
+                m.aviation.planes.get_mut(&id).unwrap().ammo = ammo;
+                let before = m.aviation.planes[&id];
+                let ready = state != PlaneState::Rearm && fuel > 0. && ammo > 0.;
+                assert_eq!(
+                    m.send_aircraft_mission(0, id, mission).unwrap(),
+                    ready,
+                    "{kind}: {state:?}, fuel={fuel}, ammo={ammo}"
+                );
+                if ready {
+                    assert_eq!(m.world.game.units[&id].air, Some(PlaneState::Out));
+                    assert_eq!(
+                        m.aviation.planes[&id],
+                        ww2_core::match_aviation::AircraftRuntime {
+                            mission: Some(mission),
+                            ..before
+                        }
+                    );
+                } else {
+                    assert_eq!(m.world.game.units[&id].air, Some(state));
+                    assert_eq!(m.aviation.planes[&id], before);
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn mov86_component_hold_fire_fighter_only_hits_its_explicit_attack_target() {
+    let mut m = scene();
+    let ally = ground(&mut m, "rifle");
+    let fighter = m.spawn_aircraft(0, "fighter").unwrap();
+    let near = m.spawn_aircraft(1, "bomber").unwrap();
+    let ordered = m.spawn_aircraft(1, "bomber").unwrap();
+    place(&mut m, fighter, at(60., 60.), PlaneState::Station);
+    place(&mut m, near, at(62., 60.), PlaneState::Station);
+    place(&mut m, ordered, at(70., 60.), PlaneState::Station);
+    m.world.game.players[0].visible = vec![near, ordered];
+    m.commands.units.get_mut(&fighter).unwrap().hold_fire = true;
+    let near_hp = m.world.game.units[&near].hp;
+    let ordered_hp = m.world.game.units[&ordered].hp;
+    for kind in [
+        MissionKind::Patrol,
+        MissionKind::Escort,
+        MissionKind::Attack,
+    ] {
+        let target = match kind {
+            MissionKind::Patrol => None,
+            MissionKind::Escort => Some(ally),
+            MissionKind::Attack => Some(ordered),
+            MissionKind::Area => unreachable!(),
+        };
+        assert!(
+            m.send_aircraft_mission(
+                0,
+                fighter,
+                PlaneMission {
+                    kind,
+                    target,
+                    at: at(70., 60.)
+                }
+            )
+            .unwrap()
+        );
+        m.step_aircraft_anti_air(&[fighter], 0.1).unwrap();
+        close(m.world.game.units[&near].hp, near_hp);
+        close(
+            m.world.game.units[&ordered].hp,
+            ordered_hp
+                - if kind == MissionKind::Attack {
+                    3.0
+                } else {
+                    0.0
+                },
+        );
+    }
+    // Losing visibility never permits a held fighter to switch to a nearer enemy.
+    m.world.game.players[0].visible = vec![near];
+    m.step_aircraft_anti_air(&[fighter], 0.1).unwrap();
+    close(m.world.game.units[&near].hp, near_hp);
+    close(m.world.game.units[&ordered].hp, ordered_hp - 3.0);
+}
+
+#[test]
+fn mac_air_weather_survives_ordinary_match_finish_and_every_seat_snapshot() {
+    use ww2_core::{
+        match_commands::Command, match_end::EndReason, recipient_snapshot::DeliveryState,
+        weather::WeatherKind,
+    };
+    for weather in [WeatherKind::Mud, WeatherKind::Snow] {
+        // The authored point uses the highest admitted income; capture and victory stay ordinary.
+        let mut m = scene_with(WeatherChoice::Fixed(weather), json!({"x":10,"y":10,"vp":5}));
+        assert_eq!(m.start.weather.now, weather);
+        assert!(m.finish.is_none());
+        assert!(m.start.economy.players.iter().all(|p| p.vp == 0.));
+        let ids: Vec<_> = m
+            .world
+            .game
+            .units
+            .values()
+            .filter(|u| u.owner == 0 && m.rules.kinds[u.kind].infantry)
+            .map(|u| u.id)
+            .collect();
+        let command = Command::from_json(&json!({"t":"move","ids":ids,"x":21.,"z":21.})).unwrap();
+        m.enqueue_command(
+            ww2_core::orders::OrderKey {
+                tick: 1,
+                issuer: 0,
+                sequence: 0,
+            },
+            command,
+        )
+        .unwrap();
+        let mut delivery = DeliveryState::new(&m).unwrap();
+        let mut snapshots = 0;
+        for _ in 0..10000 {
+            let report = m.advance_tick().unwrap();
+            assert_eq!(
+                m.world.game.weather,
+                Some(m.rules.weather_kind(weather.name()).unwrap())
+            );
+            assert_eq!(m.start.weather.now, weather);
+            assert!(m.tick_state.fault().is_none());
+            let effects: Vec<_> = report.environment().cloned().collect();
+            let frame = delivery
+                .capture_with_lists(&mut m, &[false, false], &[false, false], &effects)
+                .unwrap();
+            for slot in 0..2 {
+                let snapshot = frame.recipient(slot).unwrap().into_json();
+                assert_eq!(snapshot["t"], "s");
+                assert_eq!(snapshot["weather"], json!([weather.name()]));
+                assert!(snapshot["units"].is_array());
+                snapshots += 1;
+            }
+            if m.finish
+                .is_some_and(|finish| m.world.game.tick >= finish.end_tick + 5)
+            {
+                break;
+            }
+        }
+        let finish = m.finish.expect("ordinary point income reaches victory");
+        assert_eq!(finish.reason, EndReason::VictoryPoints);
+        assert_eq!(finish.winner, 0);
+        assert!(finish.end_tick > 1);
+        assert!(m.world.game.tick >= finish.end_tick + 5);
+        assert_eq!(snapshots, m.world.game.tick * 2);
+        assert!(m.aviation.planes.is_empty());
+        assert!(m.firing.flights.is_empty());
+        println!(
+            "weather={} finish_tick={} final_tick={} snapshots={}",
+            weather.name(),
+            finish.end_tick,
+            m.world.game.tick,
+            snapshots
+        );
+    }
 }

@@ -470,7 +470,7 @@ impl Match {
                 frame.depots.push((owner, point.at));
             }
         }
-        for (&cell, &owner) in &self.world.aid {
+        for (&cell, &owner) in self.world.aid.iter() {
             if cell >= self.world.game.chars.len() {
                 return Err("invalid recovery aid".into());
             }
@@ -834,3 +834,7 @@ impl Match {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+#[path = "interface_collection_keys.rs"]
+mod interface_collection_keys;
