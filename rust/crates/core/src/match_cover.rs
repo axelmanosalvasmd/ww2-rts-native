@@ -79,6 +79,7 @@ impl Match {
                             .map(|r| r.at)
                             .ok_or("missing queued move anchor")?,
                         Command::Cover { at: Some(at), .. }
+                        | Command::Garrison { at: Some(at), .. }
                         | Command::Ability { at: Some(at), .. }
                         | Command::Attack { at: Some(at), .. }
                         | Command::Assist { at: Some(at), .. }

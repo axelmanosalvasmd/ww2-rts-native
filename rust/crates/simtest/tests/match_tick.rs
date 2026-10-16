@@ -653,7 +653,6 @@ fn unsupported_reaction_actors_reject_before_clock_commands_or_timers() {
     use ww2_core::{match_commands::Command, orders::OrderKey};
     let fixture: Value = serde_json::from_str(include_str!("fixtures/match-tick.json")).unwrap();
     for actor in [
-        "garrison",
         "rail",
         "riding",
         "reverse riding",
@@ -672,10 +671,6 @@ fn unsupported_reaction_actors_reject_before_clock_commands_or_timers() {
         unit.repath = 0.5;
         unit.sprint = 0.25;
         match actor {
-            "garrison" => {
-                unit.garrison = Some(166);
-                unit.hp = 34.0;
-            }
             "rail" => unit.kind = rail_kind,
             "riding" => {
                 unit.riding = true;
@@ -741,7 +736,6 @@ fn unsupported_reaction_actors_reject_before_clock_commands_or_timers() {
         let error = m.advance_tick().unwrap_err();
         assert!(
             error.reason.contains(match actor {
-                "garrison" => "automatic garrison retreat tick exit",
                 "logistics" | "convoys" => "reserve and convoy tick phases",
                 "mode mismatch" | "unsupported mode" => {
                     "tick execution requires represented ordinary or World mode"

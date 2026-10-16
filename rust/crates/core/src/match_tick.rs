@@ -343,6 +343,7 @@ impl crate::match_runtime::Match {
             self.validate_production_phases(self.rules.movement.tick)
                 .map_err(|error| format!("production admission: {error:?}"))?;
             self.validate_carrier_tick()?;
+            self.validate_garrison_tick()?;
             self.validate_construction_tick()?;
             self.validate_ground_attacks()?;
             self.validate_reaction_tick_actors()?;
@@ -392,7 +393,14 @@ impl crate::match_runtime::Match {
                 continue;
             }
             if unit.garrison.is_some() && self.automatic_retreat_candidate(id)? {
-                return Err("automatic garrison retreat tick exit is not connected".into());
+                if self.uses_world_routes() {
+                    return Err("automatic garrison retreat tick exit is not connected".into());
+                }
+                crate::existing_observers::PreparedGroundExit::prepare(
+                    &self.world.game,
+                    &self.rules,
+                    id,
+                )?;
             }
         }
         Ok(())
@@ -591,8 +599,8 @@ impl crate::match_runtime::Match {
             let result = self.step_aimed_ability(id);
             self.take_firing_tick_events(events);
             result?;
-            // Entry-building execution remains excluded. Boarding uses its live
-            // owner-view goal and the one already-started path scheduler.
+            self.apply_unit_enter(id)?;
+            // Boarding uses its live owner-view goal and the path scheduler.
             if self.options.mode != crate::economy::Mode::World
                 && matches!(
                     self.apply_unit_boarding_with_routes(id)?,
@@ -615,6 +623,9 @@ impl crate::match_runtime::Match {
                 events.push(TickEvent::Environment(effect));
             })?;
             let unit = &self.world.game.units[&id];
+            if unit.hp <= 0.0 {
+                continue;
+            }
             let moving = !unit.path.is_empty()
                 || crate::math::hypot(unit.x - before.x, unit.z - before.z) > 0.001;
             let result = self.apply_unit_firing(id, moving, dt);

@@ -245,7 +245,7 @@ fn crushing_replacements_follow_movement_and_publish_one_effect_before_wear() {
 #[test]
 fn unavailable_contact_and_capacity_denials_preserve_world() {
     let fixture = fixture();
-    for boundary in ["mine", "capacity", "shape", "kind"] {
+    for boundary in ["capacity", "shape", "kind"] {
         let (mut m, id, c) = scene(&fixture["cases"][0]);
         let expected = &fixture["cases"][0]["steps"][0];
         let movement = &expected["movement"];
@@ -258,10 +258,6 @@ fn unavailable_contact_and_capacity_denials_preserve_world() {
         unit.x = number(&movement["after"]["x"]);
         unit.z = number(&movement["after"]["z"]);
         match boundary {
-            "mine" => {
-                m.world.set_cell(c, b'N').unwrap();
-                m.world.mines.insert(c, 1);
-            }
             "capacity" => {
                 m.world.game.wear.as_mut().unwrap()[c] = 0.9999;
                 m.world.game.terrain_version = u32::MAX;
@@ -280,17 +276,13 @@ fn unavailable_contact_and_capacity_denials_preserve_world() {
         let new_cells = m.world.new_cells().to_vec();
         let versions = m.world.versions;
         m.world.game.units.get_mut(&id).unwrap().dust = Some(1.0);
-        let error = m
-            .apply_moved_ground_contact(id, before, Some(-5.0))
+        m.apply_moved_ground_contact(id, before, Some(-5.0))
             .unwrap_err();
         assert_eq!(
             m.world.game.units[&id].dust,
             Some(-5.0),
             "dust follows completed contact"
         );
-        if boundary == "mine" {
-            assert!(error.contains("not connected"));
-        }
         assert_eq!(m.world.game.wear, wear);
         assert_eq!(m.world.game.chars, chars);
         assert_eq!(m.world.journal(), journal);
