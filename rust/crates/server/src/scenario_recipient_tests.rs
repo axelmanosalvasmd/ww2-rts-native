@@ -112,15 +112,12 @@ fn mode86_ordinary_room_filters_scenario_reads_without_execution_and_keeps_norma
     .unwrap();
     let mut runtime = RoomRuntime::new(state, 0).unwrap();
     let initial = read(&mut runtime, FrameKind::Current);
-    for slot in 0..3 {
-        assert_eq!(
-            initial[slot]["scenario"],
-            json!({"version":1,"objectives":[]})
-        );
+    for (slot, message) in initial.iter().enumerate() {
+        assert_eq!(message["scenario"], json!({"version":1,"objectives":[]}));
         let start = startup
             .envelope(runtime.state(), &["p0".into(), "p1".into(), "p2".into()], 1)
             .unwrap()
-            .message(slot, initial[slot].clone());
+            .message(slot, message.clone());
         assert!(start["map"].get("scenario").is_none());
     }
     runtime.advance_tick(&[false; 3]).unwrap();

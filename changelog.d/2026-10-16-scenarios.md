@@ -2,3 +2,4 @@
 - Add an ordinary-room lifecycle test for MODE-86, including recipient snapshots through the ending hold. General scenario conditions, repeats, reinforcement and damage actions remain unavailable.
 - Write authored mission saves as version 2 so older hosts refuse them before discarding mission state. Existing saves remain version 1 and stay loadable. Update the unsupported-version test to use version 3.
 - Update the map-save validation test to expect the bounded mission executor's refusal of authored groups instead of the former blanket scenario refusal.
+- Keep scenario test adapters exhaustive for authored announcements, and replace the setup match when preparing the authored mission save/load test.

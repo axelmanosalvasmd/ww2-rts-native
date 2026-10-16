@@ -717,7 +717,7 @@ fn authored_objectives_save_v2_rejects_downgrade_and_restores_mission_and_pendin
         ww2_core::map::AuthoritativeMap::from_json(&serde_json::to_vec(&raw).unwrap()).unwrap();
     let state = Match::new(&map, options).unwrap();
     let prepared = hub
-        .prepare_native_room(&hub.rooms["ABC"], state, 0, false, Some(&raw))
+        .prepare_native_room(&hub.rooms["ABC"], state, 0, true, Some(&raw))
         .unwrap();
     hub.publish_native("ABC", prepared);
     let runtime = &mut hub
