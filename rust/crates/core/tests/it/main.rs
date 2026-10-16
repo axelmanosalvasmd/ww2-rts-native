@@ -21,6 +21,8 @@ mod bases_batch3_training;
 mod client_view;
 #[path = "../combat.rs"]
 mod combat;
+#[path = "../combat_enemy_faction.rs"]
+mod combat_enemy_faction;
 #[path = "../commander_ai.rs"]
 mod commander_ai;
 #[path = "../convoys.rs"]
@@ -57,6 +59,8 @@ mod human_commander_state;
 mod human_commander_timing;
 #[path = "../interface_intent.rs"]
 mod interface_intent;
+#[path = "../interface_map_helpers.rs"]
+mod interface_map_helpers;
 #[path = "../interface_runtime_batch3.rs"]
 mod interface_runtime_batch3;
 #[path = "../interface_stream_consumers.rs"]
@@ -102,6 +106,8 @@ mod produced_units;
 mod production;
 #[path = "../projectiles.rs"]
 mod projectiles;
+#[path = "../recipient_availability.rs"]
+mod recipient_availability;
 #[path = "../recruitment.rs"]
 mod recruitment;
 #[path = "../route_knowledge.rs"]
