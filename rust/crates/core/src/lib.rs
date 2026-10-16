@@ -55,6 +55,7 @@ pub mod human_commander_inputs;
 pub mod human_commander_policy;
 pub mod human_commander_state;
 pub mod human_commander_timing;
+pub mod match_horde;
 
 #[cfg(test)]
 use crate as core_api;
@@ -66,6 +67,7 @@ pub mod legacy_scenario_runtime;
 pub mod match_companion_effects;
 mod match_companion_tick;
 pub mod match_companions;
+pub mod scenario_validation;
 
 pub(crate) mod existing_observers;
 pub mod logistics;
