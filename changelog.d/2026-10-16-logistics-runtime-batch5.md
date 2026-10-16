@@ -3,3 +3,4 @@
 - Replace the test for unconditional convoy retreat refusal with atomic refusal when no supply source exists, including trucks beyond the ordinary troop selection cap.
 - Check capture-square edges and the tick 40/41 supply boundary, keeping unsupported mode refusals explicit.
 - Correct the new convoy test import and set an explicit truck position for nearest-source retreat.
+- Create canonical trucks explicitly in the Match adapter tests instead of assuming the fleet scheduler has already spawned them.

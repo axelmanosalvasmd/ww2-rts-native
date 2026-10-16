@@ -61,7 +61,7 @@ fn assert_guards(m: &mut Match) {
 fn intent_log39_match_supply_hold_resume_queued_moves_and_nearest_source_retreat() {
     let mut m = arena(true);
     let target = troop(&m);
-    let truck = *m.convoys.as_ref().unwrap().trucks.keys().next().unwrap();
+    let truck = m.test_supply_truck(0);
     place(&mut m, truck, Point { x: 65., z: 81. });
     let stock = cargo(&mut m, truck);
     let destination = Point { x: 67., z: 77. };
@@ -147,7 +147,7 @@ fn intent_log39_match_supply_hold_resume_queued_moves_and_nearest_source_retreat
 #[test]
 fn intent_log39_match_refuses_missing_source_and_malformed_orders_atomically() {
     let mut m = arena(true);
-    let truck = *m.convoys.as_ref().unwrap().trucks.keys().next().unwrap();
+    let truck = m.test_supply_truck(0);
     cargo(&mut m, truck);
     let troop = troop(&m);
     m.commands.units.get_mut(&troop).unwrap().follow = 99;
@@ -202,7 +202,7 @@ fn intent_log39_match_refuses_missing_source_and_malformed_orders_atomically() {
 #[test]
 fn intent_log39_match_unreachable_existing_source_refuses_before_route_publication() {
     let mut m = arena_with_barrier(true, true);
-    let truck = *m.convoys.as_ref().unwrap().trucks.keys().next().unwrap();
+    let truck = m.test_supply_truck(0);
     let troop = troop(&m);
     place(&mut m, truck, Point { x: 65., z: 81. });
     cargo(&mut m, truck);
