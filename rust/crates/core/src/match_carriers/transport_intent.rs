@@ -84,7 +84,8 @@ fn add(m: &mut Match, kind: &str, at: Point) -> u32 {
 
 fn loaded(m: &mut Match, kind: &str, at: Point) -> (u32, Vec<u32>) {
     let carrier = add(m, kind, at);
-    let riders = (0..2).map(|_| add(m, "rifle", at)).collect::<Vec<_>>();
+    let seats = if kind == "lcvp" { 1 } else { 2 };
+    let riders = (0..seats).map(|_| add(m, "rifle", at)).collect::<Vec<_>>();
     for &id in &riders {
         m.world.game.units.get_mut(&id).unwrap().riding = true;
         m.combat.get_mut(id).unwrap().carrier = Some(carrier);
@@ -179,7 +180,7 @@ fn tick(m: &mut Match, delivery: &mut DeliveryState) {
 }
 
 fn sail(m: &mut Match, delivery: &mut DeliveryState, boat: u32, at: Point) {
-    let command = Command::from_json(&json!({"t":"move","ids":[boat],"x":at.x,"z":at.z})).unwrap();
+    let command = Command::from_json(&json!({"t":"move","orders":[[boat,at.x,at.z]]})).unwrap();
     assert_eq!(m.execute_command(0, &command, false).unwrap(), None);
     for _ in 0..400 {
         tick(m, delivery);
@@ -195,10 +196,7 @@ fn sail(m: &mut Match, delivery: &mut DeliveryState, boat: u32, at: Point) {
 fn mov75_board_sail_refuse_deep_unload_then_land_with_every_seat_snapshots() {
     let mut m = scene();
     let boat = add(&mut m, "lcvp", Point { x: 81., z: 65. });
-    let riders = [
-        add(&mut m, "rifle", Point { x: 79., z: 65. }),
-        add(&mut m, "rifle", Point { x: 79., z: 63. }),
-    ];
+    let riders = [add(&mut m, "rifle", Point { x: 79., z: 65. })];
     let board = Command::from_json(&json!({"t":"board","ids":riders,"target":boat})).unwrap();
     assert_eq!(m.execute_command(0, &board, false).unwrap(), None);
     let mut delivery = DeliveryState::new(&m).unwrap();
@@ -208,7 +206,7 @@ fn mov75_board_sail_refuse_deep_unload_then_land_with_every_seat_snapshots() {
             break;
         }
     }
-    assert_eq!(m.combat.get(boat).unwrap().cargo.len(), 2);
+    assert_eq!(m.combat.get(boat).unwrap().cargo.len(), 1);
     sail(&mut m, &mut delivery, boat, Point { x: 101., z: 65. });
     assert_eq!(unload(&mut m, &[boat]), Some(Denial::Shore));
     for _ in 0..4 {

@@ -1,4 +1,4 @@
 - Let boats unload within five metres of dry or wadeable ground, return the prototype's shore refusal offshore, and keep mixed-carrier unloads independent.
 - Apply canonical passenger eligibility and the prototype's station and cut-line reasons to rail orders, including follow-order clearing on semantic refusals.
 - Prefer the nearest active allied source in convoy home queries and refresh forced-withdrawal stranded status after movement, before firing.
-- Add native intent checks for retreat homes, unloads, rail selection and withdrawal guards. Complete logistics delivery, World room admission, World retreat completion and boarding from garrisons or active work remain unfinished.
+- Use the landing craft's single squad seat and canonical Move payload in transport lifecycle checks, and add native intent checks for retreat homes, unloads, rail selection and withdrawal guards. Complete logistics delivery, World room admission, World retreat completion and boarding from garrisons or active work remain unfinished.
