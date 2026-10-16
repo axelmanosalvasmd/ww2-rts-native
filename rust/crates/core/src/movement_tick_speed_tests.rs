@@ -314,9 +314,9 @@ fn mov04_ground_factor_branches_footprint_average_and_naval_bypass_move_the_unit
         step(g, "tank", expected, expected * 0.05);
     }
 
-    // With no admissible samples, speedMul falls back to one. Physical
-    // collision still prevents infantry from walking through the blocked cells.
+    // With no admissible samples, speedMul falls back to one. This short step
+    // stays within the starting cell, which clear() excludes (sim.js:2780-2800).
     let mut g = ground();
     g.flags.fill(MOVE | FORD);
-    step(g, "rifle", 4.5, 0.);
+    step(g, "rifle", 4.5, 4.5 * 0.05);
 }

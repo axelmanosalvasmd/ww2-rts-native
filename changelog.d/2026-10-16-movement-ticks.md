@@ -2,3 +2,4 @@
 - Verify movement speed precedence, terrain, slope, weather, road march and carried fuel limits through native movement and ordinary matches with every-seat snapshots.
 - Verify that hidden terrain, wrecks and enemies cannot steer voluntary traffic, with revealed controls that change the movement choice.
 - Verify territory networks at creation and every twentieth tick, active-team exclusion and the zero-interval freeze hook. Add ordinary movement checks for crushing, wet and dry wear, mud conversion, dust and hostile mines.
+- Correct the speed test's initial-cell fallback expectation to follow the prototype's line check, which excludes the starting cell.
