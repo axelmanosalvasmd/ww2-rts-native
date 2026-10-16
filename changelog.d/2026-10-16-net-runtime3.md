@@ -1,0 +1,1 @@
+- Add opt-in server diagnostics: JSONL room records every five seconds, clamped browser ping metrics, queued output bytes, scheduler delay and tick timing. `WW2_TICKLOG=1` prints phase percentiles every thirty seconds.
