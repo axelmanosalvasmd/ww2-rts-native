@@ -386,8 +386,7 @@ fn aircraft_purchase_ready(mut m: Match) -> (Match, u32) {
                     + size as f64 * ww2_core::game::CELL / 2.,
             };
             cells.iter().all(|&cell| {
-                g.chars[cell] == b'.'
-                    && g.height.as_ref().is_none_or(|h| h[cell] == h[cells[0]])
+                g.chars[cell] == b'.' && g.height.as_ref().is_none_or(|h| h[cell] == h[cells[0]])
             }) && g
                 .units
                 .values()
@@ -395,10 +394,8 @@ fn aircraft_purchase_ready(mut m: Match) -> (Match, u32) {
         })
         .unwrap();
     let at = Point {
-        x: (cells[0] % g.w) as f64 * ww2_core::game::CELL
-            + size as f64 * ww2_core::game::CELL / 2.,
-        z: (cells[0] / g.w) as f64 * ww2_core::game::CELL
-            + size as f64 * ww2_core::game::CELL / 2.,
+        x: (cells[0] % g.w) as f64 * ww2_core::game::CELL + size as f64 * ww2_core::game::CELL / 2.,
+        z: (cells[0] / g.w) as f64 * ww2_core::game::CELL + size as f64 * ww2_core::game::CELL / 2.,
     };
     for &cell in &cells {
         m.world.set_cell(cell, b'K').unwrap();
@@ -966,12 +963,16 @@ fn aircraft_and_artillery_fire_while_every_seat_receives_every_tick_through_vict
 #[test]
 fn base21_hosted_classic_aircraft_train_fifo_at_exact_times_and_pause_without_losing_jobs() {
     use ww2_core::game::PlaneState;
-    let map = AuthoritativeMap::from_json(&serde_json::to_vec(&json!({
-        "name":"Hosted aircraft training", "w":96,"h":96,
-        "rows":vec![".".repeat(96);96],
-        "spawns":[{"x":10,"y":10},{"x":80,"y":80}],
-        "points":[{"x":48,"y":48,"mp":1}]
-    })).unwrap()).unwrap();
+    let map = AuthoritativeMap::from_json(
+        &serde_json::to_vec(&json!({
+            "name":"Hosted aircraft training", "w":96,"h":96,
+            "rows":vec![".".repeat(96);96],
+            "spawns":[{"x":10,"y":10},{"x":80,"y":80}],
+            "points":[{"x":48,"y":48,"mp":1}]
+        }))
+        .unwrap(),
+    )
+    .unwrap();
     let mut options = arena(&[]).options;
     options.mode = Mode::Classic;
     options.tech = false;
@@ -982,69 +983,162 @@ fn base21_hosted_classic_aircraft_train_fifo_at_exact_times_and_pause_without_lo
         control.auto_retreat = false;
     }
     let at = state.world.game.units[&field].at();
-    state.building_rallies.insert(field, Some(Point { x:140., z:140. }));
+    state
+        .building_rallies
+        .insert(field, Some(Point { x: 140., z: 140. }));
     let initial_mp = state.start.economy.players[0].mp;
     let initial_fuel = state.start.economy.players[0].fuel;
     for name in ["fighter", "attacker", "bomber"] {
-        assert_eq!(state.execute_command(0, &Command::Buy {kind:name.into(), from:Some(field)}, false).unwrap(), None);
+        assert_eq!(
+            state
+                .execute_command(
+                    0,
+                    &Command::Buy {
+                        kind: name.into(),
+                        from: Some(field)
+                    },
+                    false
+                )
+                .unwrap(),
+            None
+        );
     }
     assert_eq!(state.start.economy.players[0].mp, initial_mp - 740.);
     assert_eq!(state.start.economy.players[0].fuel, initial_fuel - 210.);
     let first_id = state.next_unit_id;
     let paid = state.production.building(field).unwrap().jobs().to_vec();
-    assert_eq!(paid.iter().map(|j|j.kind.as_str()).collect::<Vec<_>>(), ["fighter", "attacker", "bomber"]);
-    let selected = (0..2).map(|slot| SelectedSeat {slot,full:true,omit:false}).collect::<Vec<_>>();
+    assert_eq!(
+        paid.iter().map(|j| j.kind.as_str()).collect::<Vec<_>>(),
+        ["fighter", "attacker", "bomber"]
+    );
+    let selected = (0..2)
+        .map(|slot| SelectedSeat {
+            slot,
+            full: true,
+            omit: false,
+        })
+        .collect::<Vec<_>>();
     let mut runtime = RoomRuntime::new(state, 0).unwrap();
-    let initial_frames = runtime.collect_frame(&selected, FrameKind::Current).unwrap();
+    let initial_frames = runtime
+        .collect_frame(&selected, FrameKind::Current)
+        .unwrap();
     let owner = &initial_frames.iter().find(|f| f.slot == 0).unwrap().message;
-    let jobs = owner["productionJobs"].as_array().unwrap().iter().find(|row| row[0] == field).unwrap();
-    assert_eq!(jobs, &json!([field, [
-        {"id":paid[0].id,"type":"fighter","mp":200.,"fuel":40.,"status":"active"},
-        {"id":paid[1].id,"type":"attacker","mp":240.,"fuel":70.,"status":"waiting"},
-        {"id":paid[2].id,"type":"bomber","mp":300.,"fuel":100.,"status":"waiting"}
-    ]]));
-    let queue = owner["queues"].as_array().unwrap().iter().find(|row| row[0] == field).unwrap();
-    assert_eq!(queue, &json!([field,0.,140.,140.,"fighter","attacker","bomber"]));
+    let jobs = owner["productionJobs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|row| row[0] == field)
+        .unwrap();
+    assert_eq!(
+        jobs,
+        &json!([field, [
+            {"id":paid[0].id,"type":"fighter","mp":200.,"fuel":40.,"status":"active"},
+            {"id":paid[1].id,"type":"attacker","mp":240.,"fuel":70.,"status":"waiting"},
+            {"id":paid[2].id,"type":"bomber","mp":300.,"fuel":100.,"status":"waiting"}
+        ]])
+    );
+    let queue = owner["queues"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|row| row[0] == field)
+        .unwrap();
+    assert_eq!(
+        queue,
+        &json!([field, 0., 140., 140., "fighter", "attacker", "bomber"])
+    );
     // An unfinished producer cannot advance even its active paid job.
-    runtime.state_mut().world.game.units.get_mut(&field).unwrap().built = Some(0.5);
+    runtime
+        .state_mut()
+        .world
+        .game
+        .units
+        .get_mut(&field)
+        .unwrap()
+        .built = Some(0.5);
     for _ in 0..4 {
-        runtime.advance_tick(&[false;2]).unwrap();
-        let frames = runtime.collect_frame(&selected, FrameKind::Current).unwrap();
+        runtime.advance_tick(&[false; 2]).unwrap();
+        let frames = runtime
+            .collect_frame(&selected, FrameKind::Current)
+            .unwrap();
         assert_eq!(frames.len(), 2);
-        assert_eq!(runtime.state().production.building(field).unwrap().progress(), 0.);
-        assert_eq!(runtime.state().production.building(field).unwrap().jobs(), paid);
+        assert_eq!(
+            runtime
+                .state()
+                .production
+                .building(field)
+                .unwrap()
+                .progress(),
+            0.
+        );
+        assert_eq!(
+            runtime.state().production.building(field).unwrap().jobs(),
+            paid
+        );
         assert!(runtime.fault().is_none());
     }
-    runtime.state_mut().world.game.units.get_mut(&field).unwrap().built = Some(1.);
+    runtime
+        .state_mut()
+        .world
+        .game
+        .units
+        .get_mut(&field)
+        .unwrap()
+        .built = Some(1.);
     let mut born = Vec::new();
-    for (name, seconds) in [("fighter",30.), ("attacker",35.), ("bomber",45.)] {
+    for (name, seconds) in [("fighter", 30.), ("attacker", 35.), ("bomber", 45.)] {
         let start_tick = runtime.state().world.game.tick;
         let id = runtime.state().next_unit_id;
         loop {
-            runtime.advance_tick(&[false;2]).unwrap();
-            let frames = runtime.collect_frame(&selected, FrameKind::Current).unwrap();
+            runtime.advance_tick(&[false; 2]).unwrap();
+            let frames = runtime
+                .collect_frame(&selected, FrameKind::Current)
+                .unwrap();
             assert_eq!(frames.len(), 2);
             let state = runtime.state();
             let elapsed = (state.world.game.tick - start_tick) as f64 * 0.05;
-            let owner = &frames.iter().find(|f|f.slot==0).unwrap().message;
-            let other = &frames.iter().find(|f|f.slot==1).unwrap().message;
+            let owner = &frames.iter().find(|f| f.slot == 0).unwrap().message;
+            let other = &frames.iter().find(|f| f.slot == 1).unwrap().message;
             for key in ["queues", "productionJobs", "air"] {
-                assert!(!other[key].as_array().unwrap().iter().any(|r|r[0]==field || r[0]==id), "{key} stays private");
+                assert!(
+                    !other[key]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .any(|r| r[0] == field || r[0] == id),
+                    "{key} stays private"
+                );
             }
-            let queue = owner["queues"].as_array().unwrap().iter().find(|r|r[0]==field).unwrap();
+            let queue = owner["queues"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|r| r[0] == field)
+                .unwrap();
             assert_eq!(queue[2], 140.);
             assert_eq!(queue[3], 140.);
             assert!(runtime.fault().is_none());
             if let Some(unit) = state.world.game.units.get(&id) {
-                assert!(elapsed >= seconds && elapsed <= seconds + 0.051, "{name}: {elapsed}");
+                assert!(
+                    elapsed >= seconds && elapsed <= seconds + 0.051,
+                    "{name}: {elapsed}"
+                );
                 assert_eq!(state.rules.kinds[unit.kind].name, name);
                 assert_eq!(unit.air, Some(PlaneState::Base));
                 assert_eq!(unit.at(), at);
                 assert!(unit.path.is_empty());
-                let air = owner["air"].as_array().unwrap().iter().find(|r|r[0]==id).unwrap();
+                let air = owner["air"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .find(|r| r[0] == id)
+                    .unwrap();
                 let def = Catalog::compiled().unwrap().unit(name).unwrap();
-                assert_eq!(air, &json!([id,0,50.,def.get("ammo").unwrap().number().unwrap(),0.]));
-                assert_eq!(state.production.building(field).unwrap().progress(),0.);
+                assert_eq!(
+                    air,
+                    &json!([id, 0, 50., def.get("ammo").unwrap().number().unwrap(), 0.])
+                );
+                assert_eq!(state.production.building(field).unwrap().progress(), 0.);
                 born.push(id);
                 break;
             }
@@ -1052,19 +1146,73 @@ fn base21_hosted_classic_aircraft_train_fifo_at_exact_times_and_pause_without_lo
             assert_eq!(queue[4], name);
         }
     }
-    assert_eq!(born, vec![first_id,first_id+1,first_id+2]);
-    assert!(runtime.state().production.building(field).unwrap().jobs().is_empty());
+    assert_eq!(born, vec![first_id, first_id + 1, first_id + 2]);
+    assert!(
+        runtime
+            .state()
+            .production
+            .building(field)
+            .unwrap()
+            .jobs()
+            .is_empty()
+    );
     // Sudden Death freezes a real paid job, including its existing progress.
-    assert_eq!(runtime.state_mut().execute_command(0,&Command::Buy {kind:"fighter".into(),from:Some(field)},false).unwrap(), None);
-    runtime.advance_tick(&[false;2]).unwrap();
-    let progress = runtime.state().production.building(field).unwrap().progress();
-    let pending = runtime.state().production.building(field).unwrap().jobs().to_vec();
-    runtime.state_mut().elimination.as_mut().unwrap().sudden_death = true;
+    assert_eq!(
+        runtime
+            .state_mut()
+            .execute_command(
+                0,
+                &Command::Buy {
+                    kind: "fighter".into(),
+                    from: Some(field)
+                },
+                false
+            )
+            .unwrap(),
+        None
+    );
+    runtime.advance_tick(&[false; 2]).unwrap();
+    let progress = runtime
+        .state()
+        .production
+        .building(field)
+        .unwrap()
+        .progress();
+    let pending = runtime
+        .state()
+        .production
+        .building(field)
+        .unwrap()
+        .jobs()
+        .to_vec();
+    runtime
+        .state_mut()
+        .elimination
+        .as_mut()
+        .unwrap()
+        .sudden_death = true;
     for _ in 0..5 {
-        runtime.advance_tick(&[false;2]).unwrap();
-        assert_eq!(runtime.collect_frame(&selected,FrameKind::Current).unwrap().len(),2);
-        assert_eq!(runtime.state().production.building(field).unwrap().progress(),progress);
-        assert_eq!(runtime.state().production.building(field).unwrap().jobs(),pending);
+        runtime.advance_tick(&[false; 2]).unwrap();
+        assert_eq!(
+            runtime
+                .collect_frame(&selected, FrameKind::Current)
+                .unwrap()
+                .len(),
+            2
+        );
+        assert_eq!(
+            runtime
+                .state()
+                .production
+                .building(field)
+                .unwrap()
+                .progress(),
+            progress
+        );
+        assert_eq!(
+            runtime.state().production.building(field).unwrap().jobs(),
+            pending
+        );
         assert!(runtime.fault().is_none());
     }
 }
