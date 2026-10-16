@@ -1,0 +1,1 @@
+- Record CMB-88 as a private ported proposal from the complete six-rifle spread check passed at `715c6c54`: three rifles per target and exact claim snapshots in Default and Conquest. Preserve the other four combat rows, all Acceptance cells and producing-head failures; no project command was rerun.
