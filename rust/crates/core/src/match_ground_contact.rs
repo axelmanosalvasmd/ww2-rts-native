@@ -12,7 +12,7 @@ impl Match {
         self.apply_moved_ground_contact_emitting(id, before, before_dust, &mut |_| {})
     }
 
-    /// After real movement and before firing. Hostile mines remain unavailable.
+    /// Apply ground consequences after real movement and before firing.
     pub(crate) fn apply_moved_ground_contact_emitting(
         &mut self,
         id: UnitId,
@@ -100,6 +100,7 @@ impl Match {
         let g = &self.world.game;
         let unit = &g.units[&id];
         let ch = g.chars[c];
+        let infantry = profile.infantry;
         if ch == b'N' {
             let source_owner = self.world.mines.get(&c).copied().unwrap_or(-1);
             let owner = if source_owner >= 0 {
@@ -110,12 +111,25 @@ impl Match {
                 None
             };
             if !owner.is_some_and(|owner| g.allied(owner, unit.owner)) {
-                return Err("moved hostile mine detonation is not connected".into());
+                if source_owner < -1
+                    || source_owner >= 0 && source_owner as usize >= g.players.len()
+                {
+                    return Err("invalid mine layer identity".into());
+                }
+                let ids: Vec<_> = g.units.keys().copied().collect();
+                let (mut damage, retarget) = self.firing_damage_view(&ids);
+                damage
+                    .detonate_mine_emitting(c, source_owner, retarget, out)
+                    .map_err(|e| format!("moved mine detonation: {e}"))?;
+                if self.world.game.units[&id].hp <= 0. {
+                    return Ok(());
+                }
             }
         }
-        if profile.infantry {
+        if infantry {
             return Ok(());
         }
+        let g = &self.world.game;
         let wet = crate::terrain::wet_at(g, c);
         if matches!(ch, b'.' | b'M') {
             let wear = g

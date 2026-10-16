@@ -1,3 +1,9 @@
+## Tutorial runtime over existing Match systems (2026-10-16)
+
+The explicit `Match::new_tutorial` constructor adds the unattended Enemy seat and uses the existing `tutorial_steps` definitions. Tutorial shares the ordinary ground, routing, combat, objective and support systems. Its private step state owns only the current index, spawned IDs and pending dialogue. Lines leave through the core tick report from tick 40; no server or client transport is introduced. The runner advances at most one step per tick after capture and income, and finishes at the bridgehead through the common Match finish state.
+
+Instant Tutorial recruitment reuses the existing admission, debit and unit-publication transaction, with a separate home-placement path because Tutorial has no production buildings. The public Conquest production component keeps its existing mode gate. Tutorial reinforcements use the player's spawn and exclude the unattended enemy. The prototype's 5 MP/s base income and lack of a defeat condition are preserved. Public server admission, agreed interfaces and parity statuses stay unchanged.
+
 ## Concrete work and waiting Dig orders (2026-10-16)
 
 ## Interface collection order and recipient queries (2026-10-16)
