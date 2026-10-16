@@ -76,7 +76,10 @@ fn cmb144_retreat_is_immediate_for_mixed_air_ground_and_working_units() {
         Some(Denial::Unsupported),
         "unavailable aircraft modes retain ordinary command denial"
     );
-    assert_eq!(format!("{:?}", (&m.world.game.units, &m.commands.units)), before);
+    assert_eq!(
+        format!("{:?}", (&m.world.game.units, &m.commands.units)),
+        before
+    );
 }
 
 #[test]

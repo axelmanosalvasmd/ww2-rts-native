@@ -32,4 +32,21 @@ CMB-141, 142, 146, 149, 150, 151 and 158 remain for the next batch. CMB-159 and 
 
 ## Verification
 
-Pending final focused tests, formatting and strict workspace Clippy. The first focused run compiled but exposed invalid weather setup and NaN-sensitive test comparisons. The second run passed Retreat and neutral visibility, but exposed a compound test's incorrect assumption about a leaf's denial code. Those are test corrections, not changes to leaf refusal behavior.
+After merging main `09e03d07`, clean qualification passed on the Vostro: 19 selected tests passed, 774 were skipped, formatting passed, and strict workspace Clippy passed. The run held the S2 flock through package clean, rebuild and all checks, using only `/tmp/ww2-native-target-S2-0e8d6d9b`. There were 48,705,986,560 bytes free before cleaning. Cargo ran with four jobs, a 6 GiB memory limit and no swap.
+
+Commands ran from `rust/` inside that guarded scope:
+
+```sh
+cargo clean -p ww2-core -p ww2-simtest
+cargo fmt --all --check
+cargo nextest run --locked --cargo-profile ci-test -j4 \
+  -p ww2-core -p ww2-simtest --no-fail-fast \
+  -E 'test(combat_feature_tests::runtime3) | test(intent_cmb133) | test(cmb147_field_work) | test(cmb148_support_commands) | test(cmb137_world_recorded) | test(match_commands::tests) | test(match_ground_orders::tests) | test(accepted_retreat_cancels_paid_work) | test(unsupported_mixed_aircraft_selections) | test(actual_dispatch_matches_ground_order_command_prefixes)'
+cargo clippy --workspace --all-targets -j4 -- -D warnings
+```
+
+The first final attempt had discovered only 14 tests, omitting all five new core checks; it reported 13 passes and a World compound refusal, and its chained Clippy did not run. The package clean removed 2,039 files (5.1 GiB), restored all 19 expected tests and produced a passing World compound check without another runtime-source change. The underlying artifact mismatch was not traced further.
+
+This is internal runtime coverage, not end-to-end room admission or a complete snapshot claim. Server admission still accepts only Move, Stop and Stance, so neither compound nor Retreat commands enter hosted rooms. World and aircraft snapshot guards remain unchanged. The new compound preflight retains each leaf's existing World actuator refusal.
+
+The early focused runs also exposed invalid weather setup, NaN-sensitive test comparisons and an incorrect assumption about a leaf's denial code. Those were test corrections, not changes to leaf refusal behavior.
