@@ -1,3 +1,11 @@
+## Seat lifecycle controls and metadata (2026-10-16)
+
+Socket `pause` and `resume` remain rejected through `UNAVAILABLE`, including for the host. The existing host-side `RoomRuntime` pause APIs remain available without a public client caller. The server owns the supplied wall-clock deadlines and the one-second pause/frame cadence; the deterministic core receives no timer. Paused ingress ignores new orders while preserving the queue for resume. Operative and AI room admission remain closed on R1.
+
+Every admitted seat receives the existing roster-ordered `online` and `ping` arrays, as in reference `e4e579a` (`server.js:504,774`, `server/room-tick.js:30`). AI seats project `true` and `-1`, and unknown human RTT stays null. The common frame sender applies these fields to scheduled, paused and catch-up delivery without changing recipient visibility or wire shape.
+
+AI-19 evidence covers the existing detached core state: lazy spawn camera, private RNG, sampled opening delay and explicit resets through ordinary ticks and both recipient snapshots. It does not enable room AI or its takeover/departure callers. Only AI-19 and NET-66 are claimed. NET-79 is dropped because socket pause/resume ingress needs owner approval. NET-80 remains outside the proven set because live AI handover and loaded-save pause need separate activation and save work.
+
 ## Gate lifecycle in ordinary matches (2026-10-16)
 
 Gate jobs use the existing paid field-work owner. Placement rounds the line to the grid, while the paid job retains the original direction for its work row and crew escape. Each of its three cells publishes a finished Gate through the existing building factory, structural sections and shared actor allocator. The existing occupied-cell retries, construction time, cancellation and story owners apply to both concrete kinds.
@@ -15,6 +23,12 @@ The explicit `Match::new_tutorial` constructor adds the unattended Enemy seat an
 Instant Tutorial recruitment reuses the existing admission, debit and unit-publication transaction, with a separate home-placement path because Tutorial has no production buildings. The public Conquest production component keeps its existing mode gate. Tutorial reinforcements use the player's spawn and exclude the unattended enemy. The prototype's 5 MP/s base income and lack of a defeat condition are preserved. Public server admission, agreed interfaces and parity statuses stay unchanged.
 
 ## Concrete work and waiting Dig orders (2026-10-16)
+
+## Interface collection order and recipient queries (2026-10-16)
+
+Field hospitals use insertion order plus keyed membership, matching the prototype's Map semantics. Replacing an owner preserves placement order; removing and rebuilding a hospital appends it. World transactions clone both parts, and recovery and logistics consume the ordered iterator. Existing fire, soak, contact, navigation and live ascending-unit traversal keep their native implementations, with focused consumer tests for each collection. The hospital test advances an ordinary one-VP match through victory and three subsequent ticks, capturing complete snapshots for every seat without a fault. The World training test exercises the existing live unit loop without changing World admission or claiming World snapshot delivery.
+
+Availability and denial queries borrow only the reconstructed recipient ClientView. Map presentation helpers consume only the supplied received map; authoritative map validation still uses its stricter layer validation. The pure queries compare against pinned JavaScript fixtures, while collection tests assert the prototype's traversal intent. ABI exports and Unreal adoption remain separate. No header, wire, contract, privacy or public ingress change is included.
 
 Concrete cells use the existing finished-building publisher so their unit, control, combat, firing, ability, recovery, production and terrain records share the normal Match owners. The paid job retains its bounded occupancy retry count. A separate step-back goal keeps a deferred crew escape valid when the deterministic path budget is exhausted. This preserves the intended four-metre escape on a later tick without changing wall cost, build time or retry limits.
 

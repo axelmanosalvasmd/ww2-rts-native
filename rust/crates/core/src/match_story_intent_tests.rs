@@ -302,3 +302,36 @@ fn story_sampler_counts_classic_buildings_and_other_mode_bunkers() {
         m.finish = None;
     }
 }
+
+#[test]
+fn mode91_every_counter_counts_each_real_slot_only_while_undecided() {
+    for decided in [false, true] {
+        for recipient in [None, Some(0), Some(1), Some(2)] {
+            let mut m = scene();
+            if decided {
+                m.initialize_tick_scene_finish(0, EndReason::Headquarters, None)
+                    .unwrap();
+            }
+            for key in StoryKey::ALL {
+                m.record_story_tally(recipient, key, 7.0).unwrap();
+            }
+            // Refunds reduce the same counter and follow the same counting gate.
+            m.record_story_tally(recipient, StoryKey::MpSpent, -2.0)
+                .unwrap();
+            for (slot, story) in m.story.iter().enumerate() {
+                for key in StoryKey::ALL {
+                    let expected = if !decided && recipient == Some(slot) {
+                        if key == StoryKey::MpSpent { 5.0 } else { 7.0 }
+                    } else {
+                        0.0
+                    };
+                    assert_eq!(
+                        story.value(key),
+                        expected,
+                        "{decided} {recipient:?} {slot} {key:?}"
+                    );
+                }
+            }
+        }
+    }
+}

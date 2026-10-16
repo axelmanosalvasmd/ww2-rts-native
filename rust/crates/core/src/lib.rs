@@ -56,6 +56,7 @@ pub mod human_commander_policy;
 pub mod human_commander_state;
 pub mod human_commander_timing;
 pub mod match_horde;
+pub mod recipient_availability;
 
 #[cfg(test)]
 use crate as core_api;

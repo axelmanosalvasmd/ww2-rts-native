@@ -243,7 +243,11 @@ impl DamageWorld<'_> {
         CombatContext {
             tick: self.world.game.tick as f64,
             mode: self.mode,
-            horde_defenders: 0,
+            horde_defenders: if self.mode == Mode::Horde {
+                self.world.game.players.len().saturating_sub(1) as u32
+            } else {
+                0
+            },
             allied: self.alliance(owner, target),
             tech_enabled: self.tech_enabled,
             attacker_tech: usize::try_from(owner)
@@ -989,6 +993,7 @@ impl DamageWorld<'_> {
         };
         let damage = base
             * shrug
+            * combat::bunker_mul(target.kind, context.mode, context.horde_defenders)?
             * fall
             * if combat::retreat_protected(target.retreat)? {
                 number(cfg, "retreatDamage")?
@@ -1311,6 +1316,7 @@ impl crate::match_runtime::Match {
             .kill_bounty(
                 crate::economy_state::ModeContext {
                     kind: self.options.mode,
+                    income_excluded_slot: self.horde.as_ref().map(|h| h.slot),
                     ..Default::default()
                 },
                 self.actor_policy(unit.owner)
@@ -1423,7 +1429,7 @@ impl crate::match_runtime::Match {
             || !self.aviation.planes.is_empty()
             || !self.aviation.anti_air.is_empty()
         {
-            self.validate_aviation()
+            self.validate_aviation_observation()
                 .map_err(|_| CombatError::InvalidInput("aircraft retirement registry"))?;
         }
         let mut wallets = self
