@@ -1,0 +1,4 @@
+- Add detached World footprint visibility, ownership and rail-yard queries, preserving empty explored runs and sight-denial precedence.
+- Add detached World supply graphs and float32 region rates with terrain-version invalidation, armed occupation and stable cheapest-region scanning.
+- Check World rails, home construction space, regional-base capture locks and supply components against the prototype's pure values or native behavior tests. World hosting and complete logistics ticks and snapshots remain guarded.
+- Verify all six component rows with eight passing focused core checks, formatting and strict workspace/all-target Clippy.

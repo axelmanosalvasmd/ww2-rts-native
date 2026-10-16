@@ -1,9 +1,11 @@
 //! Main-supported native checks under owner decision 6206861267.
+#[path = "bases_batch5_tests.rs"]
+mod batch5;
 #[path = "bases_runtime2_tests.rs"]
 mod runtime2;
 use super::*;
 use crate::{
-    economy::{self, Faction, TechState, Technology},
+    economy::{self, Faction, Mode, TechState, Technology},
     economy_state::{ArmySize, EconomyState, ModeContext, PlayerEconomy},
     map::AuthoritativeMap,
     match_commands::Command,

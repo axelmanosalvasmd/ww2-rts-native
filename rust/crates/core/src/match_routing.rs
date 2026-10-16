@@ -1,6 +1,5 @@
 //! Conquest recipient routing. Discovery queries current units, not fog masks.
 use crate::{
-    economy::Mode,
     existing_observers::{ExistingObservers, ObserverOverlay},
     game::{CELL, Game, Point, Unit, Wreck},
     grid::SpatialGrid,
@@ -601,7 +600,7 @@ fn validate_context<'a>(
     }) {
         return Err("routing needs valid unique wreck identities and positions".into());
     }
-    if !matches!(context.options.mode, Mode::Default | Mode::Conquest) || g.mode.is_some() {
+    if !crate::match_actor::ordinary_ground_mode(g, context.options.mode) {
         return Err("owned routing currently supports ordinary Conquest".into());
     }
     if g.players.len() != context.start.players.len()
@@ -1061,9 +1060,7 @@ impl PreparedOrdinaryLists {
         source: OrdinaryListPublication<'e>,
         targets: &'a mut [RecipientRouting],
     ) -> Result<OrdinaryListsCommit<'a, 'e>, String> {
-        if !matches!(source.options.mode, Mode::Default | Mode::Conquest)
-            || source.world.game.mode.is_some()
-        {
+        if !crate::match_actor::ordinary_ground_mode(&source.world.game, source.options.mode) {
             return Err("ordinary list publication mode changed".into());
         }
         self.source.validate_source(source.world)?;
@@ -1099,9 +1096,7 @@ pub fn prepare_ordinary_recipient_lists(
     state: &Match,
     owners: &[usize],
 ) -> Result<PreparedOrdinaryLists, String> {
-    if !matches!(state.options.mode, Mode::Default | Mode::Conquest)
-        || state.world.game.mode.is_some()
-    {
+    if !crate::match_actor::ordinary_ground_mode(&state.world.game, state.options.mode) {
         return Err("ordinary list batch requires ordinary Conquest".into());
     }
     let mut unique = std::collections::BTreeSet::new();

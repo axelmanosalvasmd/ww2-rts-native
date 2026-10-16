@@ -88,6 +88,9 @@ impl Match {
         let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
         for (&id, unit) in &self.world.game.units {
             self.validate_world_command_prelude(id)?;
+            if self.validate_rail_tick_actor(id)? {
+                continue;
+            }
             if unit.hp > 0.0 {
                 self.validate_firing_weapon_metadata(unit)?;
             }
@@ -182,7 +185,9 @@ impl Match {
             | Command::Stance { .. }
             | Command::Destroy { .. }
             | Command::Rally { .. }
-            | Command::Technology { .. } => Ok(()),
+            | Command::Technology { .. }
+            | Command::Cancel { .. }
+            | Command::CancelProduction { .. } => Ok(()),
             Command::Autocast { ids, on }
                 if !*on
                     || ids.iter().all(|raw| {

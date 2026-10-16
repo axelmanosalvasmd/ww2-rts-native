@@ -1,0 +1,1 @@
+- Use the merged server connection constructor in the seat lifecycle tests.

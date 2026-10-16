@@ -1,0 +1,2442 @@
+{
+  "graph": [
+    {
+      "name": "open-grid-preserves-first-edge-order",
+      "terrain": {
+        "w": 4,
+        "h": 4,
+        "map": [
+          0,
+          1,
+          2,
+          -1,
+          3,
+          0,
+          1,
+          2,
+          0,
+          3,
+          2,
+          1,
+          4,
+          4,
+          5,
+          5
+        ],
+        "n": 6,
+        "chars": "................",
+        "initial": "................",
+        "heights": null,
+        "initialHeights": null,
+        "flags": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "version": 0
+      },
+      "edits": [],
+      "expected": [
+        {
+          "key": 0,
+          "reused": false,
+          "edges": [
+            [
+              1,
+              3,
+              4
+            ],
+            [
+              0,
+              2,
+              5
+            ],
+            [
+              1,
+              3,
+              5
+            ],
+            [
+              0,
+              2,
+              4
+            ],
+            [
+              0,
+              3,
+              5
+            ],
+            [
+              2,
+              1,
+              4
+            ]
+          ],
+          "damage": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "movement-blocks-height-steps-and-damage",
+      "terrain": {
+        "w": 4,
+        "h": 4,
+        "map": [
+          0,
+          1,
+          2,
+          -1,
+          3,
+          0,
+          1,
+          2,
+          0,
+          3,
+          2,
+          1,
+          4,
+          4,
+          5,
+          5
+        ],
+        "n": 6,
+        "chars": "R+FR.F+..R.+F...",
+        "initial": "R.F..F...F......",
+        "heights": [
+          0,
+          1,
+          3,
+          0,
+          1,
+          0,
+          0,
+          0,
+          3,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0
+        ],
+        "initialHeights": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "flags": [
+          0,
+          1,
+          0,
+          0,
+          0,
+          64,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "version": 0
+      },
+      "edits": [],
+      "expected": [
+        {
+          "key": 0,
+          "reused": false,
+          "edges": [
+            [
+              3
+            ],
+            [
+              2,
+              5
+            ],
+            [
+              1,
+              3,
+              5
+            ],
+            [
+              0,
+              2,
+              4
+            ],
+            [
+              3,
+              5
+            ],
+            [
+              2,
+              1,
+              4
+            ]
+          ],
+          "damage": [
+            0,
+            1077936128,
+            1065353216,
+            1065353216,
+            1065353216,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "same-version-cache-and-invalidation",
+      "terrain": {
+        "w": 3,
+        "h": 1,
+        "map": [
+          0,
+          1,
+          2
+        ],
+        "n": 3,
+        "chars": "...",
+        "initial": "...",
+        "heights": null,
+        "initialHeights": null,
+        "flags": [
+          0,
+          0,
+          0
+        ],
+        "version": 0
+      },
+      "edits": [
+        {
+          "version": 0,
+          "flags": [
+            0,
+            1,
+            0
+          ],
+          "chars": ".+."
+        },
+        {
+          "version": 1,
+          "flags": [
+            0,
+            1,
+            0
+          ],
+          "chars": ".+."
+        },
+        {
+          "version": 2,
+          "flags": [
+            0,
+            0,
+            0
+          ],
+          "chars": "..."
+        },
+        {
+          "version": 3,
+          "heights": [
+            0,
+            2,
+            2
+          ]
+        }
+      ],
+      "expected": [
+        {
+          "key": 0,
+          "reused": false,
+          "edges": [
+            [
+              1
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              1
+            ]
+          ],
+          "damage": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "key": 0,
+          "reused": true,
+          "edges": [
+            [
+              1
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              1
+            ]
+          ],
+          "damage": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "key": 1,
+          "reused": false,
+          "edges": [
+            [],
+            [],
+            []
+          ],
+          "damage": [
+            0,
+            1065353216,
+            0
+          ]
+        },
+        {
+          "key": 2,
+          "reused": false,
+          "edges": [
+            [
+              1
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              1
+            ]
+          ],
+          "damage": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "key": 3,
+          "reused": false,
+          "edges": [
+            [],
+            [
+              2
+            ],
+            [
+              1
+            ]
+          ],
+          "damage": [
+            0,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "diagonal-does-not-connect-and-missing-regions",
+      "terrain": {
+        "w": 2,
+        "h": 2,
+        "map": [
+          0,
+          -1,
+          -1,
+          1
+        ],
+        "n": 3,
+        "chars": "....",
+        "initial": "....",
+        "heights": null,
+        "initialHeights": null,
+        "flags": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "version": 0
+      },
+      "edits": [],
+      "expected": [
+        {
+          "key": 0,
+          "reused": false,
+          "edges": [
+            [],
+            [],
+            []
+          ],
+          "damage": [
+            0,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "repeated-region-boundaries",
+      "terrain": {
+        "w": 4,
+        "h": 3,
+        "map": [
+          0,
+          2,
+          1,
+          3,
+          0,
+          4,
+          1,
+          3,
+          5,
+          4,
+          6,
+          3
+        ],
+        "n": 7,
+        "chars": "............",
+        "initial": "............",
+        "heights": null,
+        "initialHeights": null,
+        "flags": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "version": 0
+      },
+      "edits": [],
+      "expected": [
+        {
+          "key": 0,
+          "reused": false,
+          "edges": [
+            [
+              2,
+              4,
+              5
+            ],
+            [
+              2,
+              3,
+              4,
+              6
+            ],
+            [
+              0,
+              1,
+              4
+            ],
+            [
+              1,
+              6
+            ],
+            [
+              2,
+              0,
+              1,
+              5,
+              6
+            ],
+            [
+              0,
+              4
+            ],
+            [
+              1,
+              4,
+              3
+            ]
+          ],
+          "damage": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ]
+    }
+  ],
+  "rates": [
+    {
+      "terrain": {
+        "w": 11,
+        "h": 1,
+        "map": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ],
+        "n": 11,
+        "chars": "...........",
+        "initial": "...........",
+        "heights": null,
+        "initialHeights": null,
+        "flags": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "version": 0
+      },
+      "teams": [
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "players": [
+        {
+          "team": 7,
+          "spawn": {
+            "x": 1,
+            "z": 1
+          },
+          "out": false
+        },
+        {
+          "team": 7,
+          "spawn": {
+            "x": 3,
+            "z": 1
+          },
+          "out": false
+        },
+        {
+          "team": 2,
+          "spawn": {
+            "x": 21,
+            "z": 1
+          },
+          "out": false
+        },
+        {
+          "team": 9,
+          "spawn": {
+            "x": 19,
+            "z": 1
+          },
+          "out": true
+        }
+      ],
+      "units": [],
+      "points": [],
+      "name": "clean-chain-neighbour-floor-and-f32",
+      "expected": [
+        {
+          "team": 2,
+          "rate": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "team": 7,
+          "rate": [
+            1065353216,
+            1065353216,
+            1065353216,
+            1062836634,
+            1060320051,
+            1057803469,
+            1053609165,
+            1048576000,
+            1048576000,
+            1048576000,
+            1048576000
+          ]
+        }
+      ]
+    },
+    {
+      "terrain": {
+        "w": 11,
+        "h": 1,
+        "map": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ],
+        "n": 11,
+        "chars": ".+++++++...",
+        "initial": "...........",
+        "heights": null,
+        "initialHeights": null,
+        "flags": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "version": 0
+      },
+      "teams": [
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "players": [
+        {
+          "team": 7,
+          "spawn": {
+            "x": 1,
+            "z": 1
+          },
+          "out": false
+        },
+        {
+          "team": 7,
+          "spawn": {
+            "x": 3,
+            "z": 1
+          },
+          "out": false
+        },
+        {
+          "team": 2,
+          "spawn": {
+            "x": 21,
+            "z": 1
+          },
+          "out": false
+        },
+        {
+          "team": 9,
+          "spawn": {
+            "x": 19,
+            "z": 1
+          },
+          "out": true
+        }
+      ],
+      "units": [],
+      "points": [],
+      "name": "damaged-chain-rounds-cost-at-each-hop",
+      "expected": [
+        {
+          "team": 2,
+          "rate": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "team": 7,
+          "rate": [
+            1065353216,
+            1065353216,
+            1065227387,
+            1062584976,
+            1059942564,
+            1057300153,
+            1052350874,
+            1048576000,
+            1048576000,
+            1048576000,
+            1048576000
+          ]
+        }
+      ]
+    },
+    {
+      "terrain": {
+        "w": 11,
+        "h": 1,
+        "map": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ],
+        "n": 11,
+        "chars": "...........",
+        "initial": "...........",
+        "heights": null,
+        "initialHeights": null,
+        "flags": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "version": 0
+      },
+      "teams": [
+        7,
+        7,
+        7,
+        2,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "players": [
+        {
+          "team": 7,
+          "spawn": {
+            "x": 1,
+            "z": 1
+          },
+          "out": false
+        },
+        {
+          "team": 7,
+          "spawn": {
+            "x": 3,
+            "z": 1
+          },
+          "out": false
+        },
+        {
+          "team": 2,
+          "spawn": {
+            "x": 21,
+            "z": 1
+          },
+          "out": false
+        },
+        {
+          "team": 9,
+          "spawn": {
+            "x": 19,
+            "z": 1
+          },
+          "out": true
+        }
+      ],
+      "units": [],
+      "points": [],
+      "name": "enemy-owner-breaks-chain",
+      "expected": [
+        {
+          "team": 2,
+          "rate": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "team": 7,
+          "rate": [
+            1065353216,
+            1065353216,
+            1065353216,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "terrain": {
+        "w": 11,
+        "h": 1,
+        "map": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ],
+        "n": 11,
+        "chars": "...........",
+        "initial": "...........",
+        "heights": null,
+        "initialHeights": null,
+        "flags": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "version": 0
+      },
+      "teams": [
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "players": [
+        {
+          "team": 7,
+          "spawn": {
+            "x": 1,
+            "z": 1
+          },
+          "out": false
+        },
+        {
+          "team": 7,
+          "spawn": {
+            "x": 3,
+            "z": 1
+          },
+          "out": false
+        },
+        {
+          "team": 2,
+          "spawn": {
+            "x": 21,
+            "z": 1
+          },
+          "out": false
+        },
+        {
+          "team": 9,
+          "spawn": {
+            "x": 19,
+            "z": 1
+          },
+          "out": true
+        }
+      ],
+      "units": [
+        {
+          "type": "rifle",
+          "owner": 2,
+          "x": 7,
+          "z": 1,
+          "hp": 100,
+          "retreating": true
+        }
+      ],
+      "points": [],
+      "name": "retreating-enemy-armed-ground-blocks",
+      "expected": [
+        {
+          "team": 2,
+          "rate": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "team": 7,
+          "rate": [
+            1065353216,
+            1065353216,
+            1065353216,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "terrain": {
+        "w": 11,
+        "h": 1,
+        "map": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ],
+        "n": 11,
+        "chars": "...........",
+        "initial": "...........",
+        "heights": null,
+        "initialHeights": null,
+        "flags": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "version": 0
+      },
+      "teams": [
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "players": [
+        {
+          "team": 7,
+          "spawn": {
+            "x": 1,
+            "z": 1
+          },
+          "out": false
+        },
+        {
+          "team": 7,
+          "spawn": {
+            "x": 3,
+            "z": 1
+          },
+          "out": false
+        },
+        {
+          "team": 2,
+          "spawn": {
+            "x": 21,
+            "z": 1
+          },
+          "out": false
+        },
+        {
+          "team": 9,
+          "spawn": {
+            "x": 19,
+            "z": 1
+          },
+          "out": true
+        }
+      ],
+      "units": [
+        {
+          "type": "rifle",
+          "owner": -1,
+          "x": 7,
+          "z": 1,
+          "hp": 100
+        }
+      ],
+      "points": [],
+      "name": "neutral-guard-blocks",
+      "expected": [
+        {
+          "team": 2,
+          "rate": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "team": 7,
+          "rate": [
+            1065353216,
+            1065353216,
+            1065353216,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "terrain": {
+        "w": 11,
+        "h": 1,
+        "map": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ],
+        "n": 11,
+        "chars": "...........",
+        "initial": "...........",
+        "heights": null,
+        "initialHeights": null,
+        "flags": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "version": 0
+      },
+      "teams": [
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "players": [
+        {
+          "team": 7,
+          "spawn": {
+            "x": 1,
+            "z": 1
+          },
+          "out": false
+        },
+        {
+          "team": 7,
+          "spawn": {
+            "x": 3,
+            "z": 1
+          },
+          "out": false
+        },
+        {
+          "team": 2,
+          "spawn": {
+            "x": 21,
+            "z": 1
+          },
+          "out": false
+        },
+        {
+          "team": 9,
+          "spawn": {
+            "x": 19,
+            "z": 1
+          },
+          "out": true
+        }
+      ],
+      "units": [
+        {
+          "type": "rifle",
+          "owner": 2,
+          "x": 7,
+          "z": 1,
+          "hp": 100
+        },
+        {
+          "type": "rifle",
+          "owner": 0,
+          "x": 7,
+          "z": 1,
+          "hp": 100,
+          "retreating": true
+        }
+      ],
+      "points": [],
+      "name": "friendly-presence-opens-contested-region",
+      "expected": [
+        {
+          "team": 2,
+          "rate": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "team": 7,
+          "rate": [
+            1065353216,
+            1065353216,
+            1065353216,
+            1062836634,
+            1060320051,
+            1057803469,
+            1053609165,
+            1048576000,
+            1048576000,
+            1048576000,
+            1048576000
+          ]
+        }
+      ]
+    },
+    {
+      "terrain": {
+        "w": 11,
+        "h": 1,
+        "map": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ],
+        "n": 11,
+        "chars": "...........",
+        "initial": "...........",
+        "heights": null,
+        "initialHeights": null,
+        "flags": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "version": 0
+      },
+      "teams": [
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "players": [
+        {
+          "team": 7,
+          "spawn": {
+            "x": 1,
+            "z": 1
+          },
+          "out": false
+        },
+        {
+          "team": 7,
+          "spawn": {
+            "x": 3,
+            "z": 1
+          },
+          "out": false
+        },
+        {
+          "team": 2,
+          "spawn": {
+            "x": 21,
+            "z": 1
+          },
+          "out": false
+        },
+        {
+          "team": 9,
+          "spawn": {
+            "x": 19,
+            "z": 1
+          },
+          "out": true
+        }
+      ],
+      "units": [
+        {
+          "type": "rifle",
+          "owner": 2,
+          "x": 7,
+          "z": 1,
+          "hp": 100,
+          "air": true
+        },
+        {
+          "type": "rifle",
+          "owner": 2,
+          "x": 9,
+          "z": 1,
+          "hp": 100,
+          "riding": 1
+        },
+        {
+          "type": "rifle",
+          "owner": 2,
+          "x": 11,
+          "z": 1,
+          "hp": 0
+        },
+        {
+          "type": "medic",
+          "owner": 2,
+          "x": 13,
+          "z": 1,
+          "hp": 100
+        },
+        {
+          "type": "rifle",
+          "owner": 2,
+          "x": -1,
+          "z": 1,
+          "hp": 100
+        },
+        {
+          "type": "rifle",
+          "owner": 2,
+          "x": 99,
+          "z": 1,
+          "hp": 100
+        }
+      ],
+      "points": [],
+      "name": "dead-airborne-riding-unarmed-outside-and-unassigned-ignore",
+      "expected": [
+        {
+          "team": 2,
+          "rate": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "team": 7,
+          "rate": [
+            1065353216,
+            1065353216,
+            1065353216,
+            1062836634,
+            1060320051,
+            1057803469,
+            1053609165,
+            1048576000,
+            1048576000,
+            1048576000,
+            1048576000
+          ]
+        }
+      ]
+    },
+    {
+      "terrain": {
+        "w": 11,
+        "h": 1,
+        "map": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ],
+        "n": 11,
+        "chars": "...........",
+        "initial": "...........",
+        "heights": null,
+        "initialHeights": null,
+        "flags": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "version": 0
+      },
+      "teams": [
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "players": [
+        {
+          "team": 7,
+          "spawn": {
+            "x": 1,
+            "z": 1
+          },
+          "out": false
+        },
+        {
+          "team": 7,
+          "spawn": {
+            "x": 3,
+            "z": 1
+          },
+          "out": false
+        },
+        {
+          "team": 2,
+          "spawn": {
+            "x": 21,
+            "z": 1
+          },
+          "out": false
+        },
+        {
+          "team": 9,
+          "spawn": {
+            "x": 19,
+            "z": 1
+          },
+          "out": true
+        }
+      ],
+      "units": [
+        {
+          "type": "hq",
+          "owner": 1,
+          "x": 9,
+          "z": 1,
+          "hp": 100,
+          "built": 1
+        }
+      ],
+      "points": [],
+      "name": "completed-allied-hq-replaces-fallback-spawns",
+      "expected": [
+        {
+          "team": 2,
+          "rate": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "team": 7,
+          "rate": [
+            1057803469,
+            1060320051,
+            1062836634,
+            1065353216,
+            1065353216,
+            1065353216,
+            1062836634,
+            1060320051,
+            1057803469,
+            1053609165,
+            1048576000
+          ]
+        }
+      ]
+    },
+    {
+      "terrain": {
+        "w": 11,
+        "h": 1,
+        "map": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ],
+        "n": 11,
+        "chars": "...........",
+        "initial": "...........",
+        "heights": null,
+        "initialHeights": null,
+        "flags": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "version": 0
+      },
+      "teams": [
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "players": [
+        {
+          "team": 7,
+          "spawn": {
+            "x": 1,
+            "z": 1
+          },
+          "out": false
+        },
+        {
+          "team": 7,
+          "spawn": {
+            "x": 3,
+            "z": 1
+          },
+          "out": false
+        },
+        {
+          "team": 2,
+          "spawn": {
+            "x": 21,
+            "z": 1
+          },
+          "out": false
+        },
+        {
+          "team": 9,
+          "spawn": {
+            "x": 19,
+            "z": 1
+          },
+          "out": true
+        }
+      ],
+      "units": [
+        {
+          "type": "hq",
+          "owner": 0,
+          "x": 9,
+          "z": 1,
+          "hp": 100,
+          "built": 0.9
+        },
+        {
+          "type": "hq",
+          "owner": 1,
+          "x": 13,
+          "z": 1,
+          "hp": 0
+        },
+        {
+          "type": "hq",
+          "owner": 3,
+          "x": 17,
+          "z": 1,
+          "hp": 100
+        },
+        {
+          "type": "hq",
+          "owner": -1,
+          "x": 7,
+          "z": 1,
+          "hp": 100
+        }
+      ],
+      "points": [],
+      "name": "unfinished-dead-out-and-neutral-hq-ignore",
+      "expected": [
+        {
+          "team": 2,
+          "rate": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "team": 7,
+          "rate": [
+            1065353216,
+            1065353216,
+            1065353216,
+            1062836634,
+            1060320051,
+            1057803469,
+            1053609165,
+            1048576000,
+            1048576000,
+            1048576000,
+            1048576000
+          ]
+        }
+      ]
+    },
+    {
+      "terrain": {
+        "w": 11,
+        "h": 1,
+        "map": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ],
+        "n": 11,
+        "chars": "...........",
+        "initial": "...........",
+        "heights": null,
+        "initialHeights": null,
+        "flags": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "version": 0
+      },
+      "teams": [
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "players": [
+        {
+          "team": 7,
+          "spawn": {
+            "x": 1,
+            "z": 1
+          },
+          "out": false
+        },
+        {
+          "team": 7,
+          "spawn": {
+            "x": 3,
+            "z": 1
+          },
+          "out": false
+        },
+        {
+          "team": 2,
+          "spawn": {
+            "x": 21,
+            "z": 1
+          },
+          "out": false
+        },
+        {
+          "team": 9,
+          "spawn": {
+            "x": 19,
+            "z": 1
+          },
+          "out": true
+        }
+      ],
+      "units": [
+        {
+          "type": "hq",
+          "owner": 0,
+          "x": 7,
+          "z": 1,
+          "hp": 100
+        },
+        {
+          "type": "hq",
+          "owner": 1,
+          "x": 15,
+          "z": 1,
+          "hp": 100,
+          "built": 1
+        }
+      ],
+      "points": [],
+      "name": "multiple-completed-hq-seeds",
+      "expected": [
+        {
+          "team": 2,
+          "rate": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "team": 7,
+          "rate": [
+            1060320051,
+            1062836634,
+            1065353216,
+            1065353216,
+            1065353216,
+            1062836634,
+            1065353216,
+            1065353216,
+            1065353216,
+            1062836634,
+            1060320051
+          ]
+        }
+      ]
+    },
+    {
+      "terrain": {
+        "w": 11,
+        "h": 1,
+        "map": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ],
+        "n": 11,
+        "chars": "...........",
+        "initial": "...........",
+        "heights": null,
+        "initialHeights": null,
+        "flags": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "version": 0
+      },
+      "teams": [
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "players": [
+        {
+          "team": 7,
+          "spawn": {
+            "x": 1,
+            "z": 1
+          },
+          "out": false
+        },
+        {
+          "team": 7,
+          "spawn": {
+            "x": 3,
+            "z": 1
+          },
+          "out": false
+        },
+        {
+          "team": 2,
+          "spawn": {
+            "x": 21,
+            "z": 1
+          },
+          "out": false
+        },
+        {
+          "team": 9,
+          "spawn": {
+            "x": 19,
+            "z": 1
+          },
+          "out": true
+        }
+      ],
+      "units": [],
+      "points": [
+        {
+          "id": 15,
+          "x": 15,
+          "z": 1,
+          "owner": 0,
+          "kind": "depot",
+          "cut": false,
+          "contested": false
+        },
+        {
+          "id": 5,
+          "x": 5,
+          "z": 1,
+          "owner": 0,
+          "kind": "depot",
+          "cut": true,
+          "contested": false
+        },
+        {
+          "id": 9,
+          "x": 9,
+          "z": 1,
+          "owner": 0,
+          "kind": "depot",
+          "cut": false,
+          "contested": true
+        },
+        {
+          "id": 11,
+          "x": 11,
+          "z": 1,
+          "owner": 0,
+          "kind": "radio",
+          "cut": false,
+          "contested": false
+        },
+        {
+          "id": 13,
+          "x": 13,
+          "z": 1,
+          "owner": -1,
+          "kind": "depot",
+          "cut": false,
+          "contested": false
+        }
+      ],
+      "name": "only-held-connected-uncontested-depot-seeds",
+      "expected": [
+        {
+          "team": 2,
+          "rate": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "team": 7,
+          "rate": [
+            1065353216,
+            1065353216,
+            1065353216,
+            1062836634,
+            1060320051,
+            1062836634,
+            1065353216,
+            1065353216,
+            1065353216,
+            1062836634,
+            1060320051
+          ]
+        }
+      ]
+    },
+    {
+      "terrain": {
+        "w": 11,
+        "h": 1,
+        "map": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ],
+        "n": 11,
+        "chars": "...........",
+        "initial": "...........",
+        "heights": null,
+        "initialHeights": null,
+        "flags": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "version": 0
+      },
+      "teams": [
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "players": [
+        {
+          "team": 7,
+          "spawn": {
+            "x": 1,
+            "z": 1
+          },
+          "out": false
+        },
+        {
+          "team": 7,
+          "spawn": {
+            "x": 3,
+            "z": 1
+          },
+          "out": false
+        },
+        {
+          "team": 2,
+          "spawn": {
+            "x": 21,
+            "z": 1
+          },
+          "out": false
+        },
+        {
+          "team": 9,
+          "spawn": {
+            "x": 19,
+            "z": 1
+          },
+          "out": true
+        }
+      ],
+      "units": [
+        {
+          "type": "rifle",
+          "owner": -1,
+          "x": 1,
+          "z": 1,
+          "hp": 100
+        }
+      ],
+      "points": [],
+      "name": "source-under-neutral-guard-is-unusable",
+      "expected": [
+        {
+          "team": 2,
+          "rate": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "team": 7,
+          "rate": [
+            0,
+            1065353216,
+            1065353216,
+            1062836634,
+            1060320051,
+            1057803469,
+            1053609165,
+            1048576000,
+            1048576000,
+            1048576000,
+            1048576000
+          ]
+        }
+      ]
+    },
+    {
+      "terrain": {
+        "w": 11,
+        "h": 1,
+        "map": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ],
+        "n": 11,
+        "chars": "...........",
+        "initial": "...........",
+        "heights": null,
+        "initialHeights": null,
+        "flags": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "version": 0
+      },
+      "teams": [
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "players": [
+        {
+          "team": 7,
+          "spawn": {
+            "x": 1,
+            "z": 1
+          },
+          "out": true
+        }
+      ],
+      "units": [],
+      "points": [],
+      "name": "zero-live-teams",
+      "expected": []
+    },
+    {
+      "terrain": {
+        "w": 4,
+        "h": 3,
+        "map": [
+          0,
+          2,
+          1,
+          3,
+          0,
+          4,
+          1,
+          3,
+          5,
+          4,
+          6,
+          3
+        ],
+        "n": 7,
+        "chars": ".+...+......",
+        "initial": "............",
+        "heights": null,
+        "initialHeights": null,
+        "flags": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "version": 0
+      },
+      "teams": [
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "players": [
+        {
+          "team": 7,
+          "spawn": {
+            "x": 1,
+            "z": 1
+          },
+          "out": false
+        },
+        {
+          "team": 7,
+          "spawn": {
+            "x": 3,
+            "z": 1
+          },
+          "out": false
+        },
+        {
+          "team": 2,
+          "spawn": {
+            "x": 21,
+            "z": 1
+          },
+          "out": false
+        },
+        {
+          "team": 9,
+          "spawn": {
+            "x": 19,
+            "z": 1
+          },
+          "out": true
+        }
+      ],
+      "units": [],
+      "points": [],
+      "name": "alternative-routes-and-stable-index-scan",
+      "expected": [
+        {
+          "team": 2,
+          "rate": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "team": 7,
+          "rate": [
+            1065353216,
+            1065353216,
+            1065353216,
+            1062836634,
+            1065227387,
+            1065353216,
+            1062836634
+          ]
+        }
+      ]
+    },
+    {
+      "terrain": {
+        "w": 11,
+        "h": 1,
+        "map": [
+          -1,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ],
+        "n": 11,
+        "chars": "...........",
+        "initial": "...........",
+        "heights": null,
+        "initialHeights": null,
+        "flags": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "version": 0
+      },
+      "teams": [
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "players": [
+        {
+          "team": 7,
+          "spawn": {
+            "x": 1,
+            "z": 1
+          },
+          "out": false
+        }
+      ],
+      "units": [],
+      "points": [],
+      "name": "unassigned-source-region",
+      "expected": [
+        {
+          "team": 7,
+          "rate": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ]
+    }
+  ],
+  "reference": "e4e579a838aabae3b1d9dadbc17a0a87147bc52d",
+  "functions": [
+    "worldSupplyGraph",
+    "worldSupply",
+    "fillable",
+    "supplySources",
+    "cellOf",
+    "level",
+    "level0"
+  ]
+}

@@ -10,6 +10,9 @@ use std::collections::BTreeMap;
 const BLOCKED: usize = usize::MAX;
 
 #[cfg(test)]
+#[path = "interface_navigation_order_tests.rs"]
+mod interface_navigation_order_tests;
+#[cfg(test)]
 #[path = "mov_audit_navigation_tests.rs"]
 mod mov_audit;
 const CARDINAL: [(isize, isize); 4] = [(-1, 0), (1, 0), (0, -1), (0, 1)];

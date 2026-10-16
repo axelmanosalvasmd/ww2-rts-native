@@ -1118,7 +1118,7 @@ impl EnvironmentRuntime {
             {
                 continue;
             }
-            cells.sort_by(|a, b| b.1.total_cmp(&a.1));
+            crate::sort::sort_by(&mut cells, |a, b| b.1 - a.1);
             let mut left = cells[0].1;
             for (c, _) in cells {
                 if left <= 0. {

@@ -1,0 +1,3 @@
+- Preserve aircraft target clearing and queued movement orders alongside canonical combat firing, carrier ejection and recipient-room weapon restrictions when merging the movement batch with current main.
+- Keep the MOV-76 wreck-survival and drowning checks on the canonical cargo-wide Hurt event, including an exact single-event assertion; retain separate singleton ejection checks.
+- Preserve the registered World rail validator before wrecked-train ejection and retirement, while keeping ordinary cargo preflight on its existing carrier path.
