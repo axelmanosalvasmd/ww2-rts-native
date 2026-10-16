@@ -110,4 +110,21 @@ World inventory remains deferred: simulation 1209, 1210, 1256, 3549, 3551 and 35
 
 ## Validation
 
-Pending final source qualification. Local iterative compiler diagnostics are retained under `/tmp/if25-focused-v*.log`; they are not passing receipts. The orchestrator owns hosted CI, Hermes' final-head acknowledgement, status cells and merge.
+The producing code commit is `e2ce89a9278b39139e11d73969c46d5d6952db0c`, Rust tree `bb8e46950d73774db8a3eb80a3601db427f32912`. This receipt update preserves that complete Rust tree.
+
+```text
+cargo fmt --all --check: PASS
+cargo clippy --locked --workspace --all-targets -j4 -- -D warnings: PASS
+cargo nextest run --locked --cargo-profile ci-test -j4 --no-fail-fast
+  -p ww2-core
+  -E 'test(if25_) | test(intent_ai29_watched_home_threat) |
+      test(intent_ai66_classic_site_draws)'
+Summary: 66 tests run, 66 passed, 1162 skipped
+SLOT=S1 released, exit=0
+```
+
+The checks used pinned Rust 1.99.0, a matching shared slot target, four build jobs, a 6 GiB memory limit and zero swap. Raw logs: `/tmp/if25-final-v7.log` and `/tmp/if25-clippy-v2.log`. The Clippy receipt covers the same Rust tree; its scope started before the code commit. No full-workspace test run was performed.
+
+Earlier broad affected-suite execution at Rust tree `14c7336a2524f2113ef68cad29f715aac9019d86` passed 250 of 251 tests. Its sole failure was AI66's old empty-Depot-proposal expectation. The updated test retains the original RNG assertions and requires the newly implemented build; it passes in the final 66. Earlier compiler/fixture failures remain diagnostic in `/tmp/if25-focused-v*.log`, not passing receipts. The broad run is not claimed as a full pass at this final tree.
+
+Independent source review accepted the 51 ordinary consumer mappings, discovery-order correction, bridge continuation and finite off-map aircraft exception. It ran no native checks. No interface or owner consent is inferred. Current main `b113bb959f95499f04b47213bd27efb805f18e95` is already an ancestor, so the final main merge made no changes or conflict resolutions. The orchestrator owns hosted CI, Hermes' final-head acknowledgement, status cells and merge.
