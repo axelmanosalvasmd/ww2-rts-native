@@ -119,6 +119,7 @@ impl Drop for Lifetime {
 
 #[derive(Clone)]
 struct Front {
+    map_editor: Option<MapEditor>,
     workers: Vec<Worker>,
     stop: watch::Receiver<bool>,
 }
@@ -140,8 +141,10 @@ pub async fn serve_sharded(
     }
     let (stop, stopped) = watch::channel(false);
     let lifetime = Lifetime { stop: stop.clone() };
+    let map_editor = config.map_editor.clone();
     let (workers, mut supervisors) = start_workers(config, trusted, count, stopped.clone());
     let front = Front {
+        map_editor,
         workers,
         stop: stopped,
     };
@@ -200,6 +203,7 @@ async fn serve_front(
         .route("/maps", any(maps::serve))
         .route("/ws", get(front_upgrade))
         .fallback(maps::serve)
+        .layer(axum::Extension(front.map_editor.clone()))
         .with_state(front);
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown)
@@ -309,6 +313,8 @@ async fn run_worker(
     let mut hub = Hub::new(config.max_rooms.clamp(1, 256), config.public_url);
     hub.configure_trusted_room(trusted);
     hub.configure_saves(config.saves_dir);
+    hub.configure_maps(config.map_editor);
+    hub.configure_records(config.horde_records);
     if let Err(error) = hub.configure_diagnostics(config.diagnostic_dir, config.tick_log) {
         let _ = started.send(Err(error));
         return Ok(());

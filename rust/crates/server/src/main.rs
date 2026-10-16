@@ -1,7 +1,7 @@
 use std::{env, net::IpAddr};
 use tokio::net::TcpListener;
 use ww2_server::shards::{serve_sharded, shard_count};
-use ww2_server::{Config, TrustedRoomConfig, serve, serve_trusted_room};
+use ww2_server::{Config, MapEditor, TrustedRoomConfig, serve, serve_trusted_room};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -39,6 +39,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let listener = TcpListener::bind(&address).await?;
     println!("LISTENING http://{}", listener.local_addr()?);
     let config = Config {
+        map_editor: Some(MapEditor::from_password_file(
+            "maps".into(),
+            env::var("EDIT_PASSWORD").ok().as_deref(),
+            std::path::Path::new(".edit-password"),
+        )?),
         saves_dir: env::var_os("SAVES_DIR")
             .map(Into::into)
             .unwrap_or_else(|| "saves".into()),

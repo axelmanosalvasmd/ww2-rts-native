@@ -1,0 +1,1 @@
+- Update `port_zero_directory_and_public_map_requests_use_the_real_router` for the authenticated editor POST route introduced in #376: missing and incorrect passwords return 403 with the exact error body. Retain 405 coverage for unsupported PUT requests and all public-map privacy assertions.

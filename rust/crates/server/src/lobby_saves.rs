@@ -100,7 +100,7 @@ impl Hub {
         let settings = json!({"mode":room.mode,"worldSize":room.world_size,"mapName":room.map,
             "mapSpawns":native.startup.raw_map()["spawns"],"army":room.army,"weather":room.weather,
             "defenderTeam":room.defender,"logistics":state.options.logistics,"tech":state.options.tech});
-        let save = json!({"version":crate::saves::VERSION,"g":native.runtime.save_json()?,"guard":null,
+        let save = json!({"version":crate::saves::version_for(state),"g":native.runtime.save_json()?,"guard":null,
             "map":native.startup.raw_map(),"seats":seats,"settings":settings,"ai":null});
         room.saves.write(
             code,
@@ -137,6 +137,9 @@ impl Hub {
             return Err("save needs an unavailable room capability".into());
         }
         let state = Match::from_save_json(saved["g"]["state"].clone())?;
+        if state.authored_scenario.is_some() && saved["version"] != crate::saves::AUTHORED_VERSION {
+            return Err("authored scenarios require save version 2".into());
+        }
         if !matches!(
             state.options.mode,
             Mode::Default | Mode::Conquest | Mode::Assault | Mode::Annihilation | Mode::Classic
@@ -257,6 +260,7 @@ impl Hub {
         let staged = Room {
             code: room.code.clone(),
             saves: room.saves.clone(),
+            records: room.records.clone(),
             listed: room.listed,
             title: room.title.clone(),
             players,

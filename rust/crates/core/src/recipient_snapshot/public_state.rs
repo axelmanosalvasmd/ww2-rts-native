@@ -111,7 +111,9 @@ pub(super) fn capture(state: &Match) -> Result<Vec<Map<String, Value>>, Snapshot
                 .collect::<Result<Vec<_>, SnapshotError>>()?;
             fields.insert("ghosts".into(), json!(ghosts));
         }
-        if state.scenario.is_some() {
+        if let Some(scenario) = &state.authored_scenario {
+            fields.insert("scenario".into(), scenario.recipient(state, slot));
+        } else if state.scenario.is_some() {
             // The admitted migrated engine has no authored objectives.
             fields.insert("scenario".into(), json!({"version":1,"objectives":[]}));
         }

@@ -111,6 +111,7 @@ pub enum TickEvent {
     Aviation(crate::match_aviation::AviationEvent),
     Environment(crate::environment::Effect),
     Scenario(crate::legacy_scenario::SayAction),
+    AuthoredScenario(crate::authored_scenario::ScenarioSay),
 }
 
 /// A failed phase keeps the effects already emitted at their original boundaries.
@@ -803,6 +804,7 @@ impl crate::match_runtime::Match {
                 },
             )
             .map_err(|error| format!("legacy scenario: {error}"))?;
+            self.step_authored_scenario(tick as u64, events)?;
             phases.push(TickPhase::Scenario);
         }
 
