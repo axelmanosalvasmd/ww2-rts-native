@@ -1,0 +1,3 @@
+- Record every manual resolution in the five post-review PR #301 merges and the five updated behavior tests.
+- Preserve Tutorial and bounded mode runners together, including guarded purchases, shared recovery, transactional training refunds and lobby test accounting.
+- Keep Horde construction and building repair guarded when combining its actor support with the ordinary mode runners, and extend the existing setup test to check those refusals.
