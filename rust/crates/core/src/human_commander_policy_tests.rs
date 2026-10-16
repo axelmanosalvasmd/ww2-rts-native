@@ -785,3 +785,142 @@ fn runtime_observation_attack_move_goal_obeys_owner_order_precedence() {
         None
     );
 }
+
+#[test]
+fn intent_ai33_construction_spending_survives_ordinary_ticks_and_recipient_snapshots() {
+    use crate::{match_commands::Command, orders::OrderKey, recipient_snapshot::SnapshotCache};
+    let mut m = runtime_match();
+    m.start.economy.players[0].mp = 1000.0;
+    let mut policy = HumanPolicy::new(0, 771);
+    let view = m
+        .human_commander_observation(
+            &mut crate::match_human_observation::HumanObservationMemory::new(0),
+        )
+        .unwrap();
+    let commands = policy.plan(screen(&view), Level::Normal).unwrap();
+    let raw = commands
+        .iter()
+        .find(|c| c["t"] == "build")
+        .expect("base construction precedes shopping");
+    assert_eq!(raw["kind"], "motorpool");
+    let before = m.start.economy.players[0].mp;
+    let cost = crate::catalog::Catalog::compiled()
+        .unwrap()
+        .unit("motorpool")
+        .unwrap()
+        .get("cost")
+        .unwrap()
+        .number()
+        .unwrap();
+    let buy_cost: f64 = commands
+        .iter()
+        .filter(|c| c["t"] == "buy")
+        .map(|c| {
+            crate::economy::price_of(m.options.mode, c["unit"].as_str().unwrap())
+                .unwrap()
+                .mp
+        })
+        .sum();
+    for (sequence, raw) in commands.iter().enumerate() {
+        m.enqueue_command(
+            OrderKey {
+                tick: 1,
+                issuer: 0,
+                sequence: sequence as u64,
+            },
+            Command::from_json(raw).unwrap(),
+        )
+        .unwrap();
+    }
+    let report = m.advance_tick().unwrap();
+    assert_eq!(report.commands.len(), commands.len());
+    assert!(
+        report.commands.iter().all(|c| c.denial.is_none()),
+        "{:?}",
+        report.commands
+    );
+    assert!((m.start.economy.players[0].mp - (before - cost - buy_cost + 0.2)).abs() < 1e-9);
+    let id = *m
+        .world
+        .game
+        .units
+        .iter()
+        .find(|(_, u)| m.rules.kinds[u.kind].name == "motorpool")
+        .unwrap()
+        .0;
+    assert!(m.world.game.units[&id].built.unwrap() < 1.0);
+    // Construction must remain admitted while walking, working and publishing owner orders.
+    for _ in 0..1200 {
+        m.advance_tick().unwrap();
+        if m.world.game.tick % 20 == 0 {
+            let cache = SnapshotCache::new(&m).unwrap();
+            for seat in 0..2 {
+                cache.recipient(seat).unwrap();
+            }
+        }
+    }
+    assert_eq!(m.tick_state.fault(), None);
+    assert_eq!(m.world.game.units[&id].built, Some(1.0));
+    let view = m.human_commander_observation(
+        &mut crate::match_human_observation::HumanObservationMemory::new(0),
+    );
+    // Delivery is on even ticks, so advance once to the next ordinary observation boundary.
+    assert!(view.is_err());
+    m.advance_tick().unwrap();
+    m.human_commander_observation(
+        &mut crate::match_human_observation::HumanObservationMemory::new(0),
+    )
+    .unwrap();
+}
+
+#[test]
+fn intent_ai33_fortification_jobs_and_gate_denial_do_not_fault_the_match() {
+    use crate::{match_commands::{Command,Denial},orders::OrderKey,recipient_snapshot::SnapshotCache};
+    let mut m=runtime_match();
+    for _ in 0..3000 {m.advance_tick().unwrap();}
+    let mut policy=HumanPolicy::new(0,771);
+    let mut sequence=0;
+    for expected in ["motorpool","airfield","tower","pillbox"] {
+        if m.world.game.tick%2!=0 {m.advance_tick().unwrap();}
+        m.start.economy.players[0].mp=if expected=="motorpool" {400.0} else {2000.0};
+        let view=m.human_commander_observation(&mut crate::match_human_observation::HumanObservationMemory::new(0)).unwrap();
+        let commands=policy.plan(screen(&view),Level::Normal).unwrap();
+        let builds:Vec<_>=commands.iter().filter(|c|c["t"]=="build").collect();
+        assert_eq!(builds.len(),1,"{expected}: {commands:?}");
+        assert_eq!(builds[0]["kind"],expected);
+        let tick=m.world.game.tick as u64+1;
+        for raw in &commands {
+            m.enqueue_command(OrderKey{tick,issuer:0,sequence},Command::from_json(raw).unwrap()).unwrap();
+            sequence+=1;
+        }
+        let report=m.advance_tick().unwrap();
+        assert_eq!(report.commands.len(),commands.len());
+        assert!(report.commands.iter().all(|c|c.denial.is_none()),"{expected}: {:?}",report.commands);
+        let id=m.world.game.units.values().find(|u|m.rules.kinds[u.kind].name==expected).unwrap().id;
+        for _ in 0..2000 {
+            if m.world.game.units[&id].built==Some(1.0) {break;}
+            m.advance_tick().unwrap();
+            if m.world.game.tick%20==0 {SnapshotCache::new(&m).unwrap().recipient(0).unwrap();}
+        }
+        assert_eq!(m.world.game.units[&id].built,Some(1.0),"{expected}");
+        SnapshotCache::new(&m).unwrap().recipient(0).unwrap();
+    }
+    let hq=m.world.game.units.values().find(|u|u.owner==0 && m.rules.kinds[u.kind].name=="hq").unwrap().id;
+    assert_eq!(policy.tactics.fort_steps.get(&hq),Some(&2));
+    // Existing wall and gate admission guards keep unsupported actors and links out.
+    for raw in [json!({"t":"entrench","ids":[3],"pattern":"line","fort":"wall","x":50.0,"z":50.0,"x2":60.0,"z2":50.0}),json!({"t":"dig","kind":"gate","ids":[3],"x":50.0,"z":50.0})] {
+        let tick=m.world.game.tick as u64+1;
+        m.enqueue_command(OrderKey{tick,issuer:0,sequence},Command::from_json(&raw).unwrap()).unwrap();
+        sequence+=1;
+        assert_eq!(m.advance_tick().unwrap().commands[0].denial,Some(Denial::Unsupported));
+        for _ in 0..8 {m.advance_tick().unwrap();}
+        SnapshotCache::new(&m).unwrap().recipient(0).unwrap();
+    }
+    m.start.economy.players[0].vp=m.start.win_vp;
+    m.advance_tick().unwrap();
+    assert!(m.finish.is_some());
+    for _ in 0..4 {m.advance_tick().unwrap();}
+    SnapshotCache::new(&m).unwrap().recipient(0).unwrap();
+    assert_eq!(policy.tactics.fort_steps.get(&hq),Some(&2));
+    assert_eq!(m.tick_state.fault(),None);
+}

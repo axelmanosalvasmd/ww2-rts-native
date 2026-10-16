@@ -29,6 +29,8 @@ pub mod client_view;
 pub mod combat;
 pub mod command_destinations;
 pub mod commander_ai;
+mod commander_construction;
+mod commander_fortification;
 mod commander_forward_hq;
 pub mod commander_mind;
 mod commander_shopping;

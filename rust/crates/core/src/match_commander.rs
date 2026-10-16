@@ -1099,9 +1099,10 @@ impl Match {
                         .collect()
                 },
                 sight: g.sight_mul(&self.rules),
-                build_reserve: 0.0,
-                fort_reserve: 0.0,
-                free_nodes: 0,
+                nodes: Vec::new(),
+                known_depots: Vec::new(),
+                owned_nodes: BTreeSet::new(),
+                naval: g.naval,
                 support: self.start.players[owner]
                     .support
                     .iter()
