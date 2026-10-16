@@ -6,6 +6,10 @@ Every admitted seat receives the existing roster-ordered `online` and `ping` arr
 
 AI-19 evidence covers the existing detached core state: lazy spawn camera, private RNG, sampled opening delay and explicit resets through ordinary ticks and both recipient snapshots. It does not enable room AI or its takeover/departure callers. Only AI-19 and NET-66 are claimed. NET-79 is dropped because socket pause/resume ingress needs owner approval. NET-80 remains outside the proven set because live AI handover and loaded-save pause need separate activation and save work.
 
+## Shared-enemy authored spawns (2026-10-16)
+
+Tutorial startup selects authored spawn indices 0 and 1 directly. It must not map those indices through the non-Assault spawn list, which can move both sides when a map marks its first spawns Assault-only. World already uses direct authored indices; ordinary Conquest keeps its existing filtered allocation. Horde continues to select the middle entry of the authored defender list and the first non-defender index. No persistent state, command or recipient capability is added.
+
 ## Gate lifecycle in ordinary matches (2026-10-16)
 
 Gate jobs use the existing paid field-work owner. Placement rounds the line to the grid, while the paid job retains the original direction for its work row and crew escape. Each of its three cells publishes a finished Gate through the existing building factory, structural sections and shared actor allocator. The existing occupied-cell retries, construction time, cancellation and story owners apply to both concrete kinds.
@@ -33,6 +37,14 @@ Availability and denial queries borrow only the reconstructed recipient ClientVi
 Concrete cells use the existing finished-building publisher so their unit, control, combat, firing, ability, recovery, production and terrain records share the normal Match owners. The paid job retains its bounded occupancy retry count. A separate step-back goal keeps a deferred crew escape valid when the deterministic path budget is exhausted. This preserves the intended four-metre escape on a later tick without changing wall cost, build time or retry limits.
 
 Waiting Dig orders use the existing unit queue and ordinary paid Dig activation. The recipient adapter emits the existing engineering order kind for those waiting orders. Default/Conquest admission remains bounded; Classic and World field-work rooms stay guarded. No FFI, header, wire schema, contract or privacy policy changes.
+
+## AI shopping construction inputs (2026-10-16)
+
+Shopping receives the remaining budget and the reserves produced by the same detached planning pass. The observation no longer carries estimated build and fortification reserve amounts or a precomputed free-node count. Public resource positions, delivered depot memories and explicit owned-node indices provide the inputs. Node claims use only delivered depots and remembered enemy depots, at strictly less than eight metres. World engineer demand counts every unclaimed delivered node; its construction reserve considers only nodes on delivered owned ground.
+
+Construction and fortification proposals use the existing canonical command path. Builders assigned earlier in the pass remain busy, so later movement cannot replace their new jobs. Fortification still computes its reserve after base construction or repair. Assigned workers stay excluded, and proposed building positions join the fortification site exclusions so two jobs cannot spend against overlapping footprints. A delivered own-worker wall-work fact distinguishes wall Dig from ordinary Dig when deciding whether another crew may fortify. Candidate and worker ties use stable node indices and unit IDs. Fortification progress belongs to the existing private per-seat policy state, outside Match and recipient snapshots. Wall fortification dispatch remains separate work. Gate Dig remains unsupported at command admission. The planner computes their reserve thresholds but emits neither command and charges neither cost.
+
+The live observation producer remains limited to Default and Conquest. Classic and World shopping and reserve decisions can be exercised with detached inputs; this does not admit those modes or complete their construction and observation providers. Full construction, fortification and FireAt chores remain separate parity work. No FFI, C header, wire, contract or privacy change is included.
 
 ## Runtime engineering: native bridge identity (2026-10-16)
 
@@ -4917,3 +4929,73 @@ prototype's `Object.hasOwn(unitTypes, v)` and `unitTypes[v]` coerce that array t
 the property name `"rifle"`. This stricter choice rejects malformed schema values
 instead of carrying JavaScript property-key coercion into the native validator.
 It does not admit or execute general authored scenarios.
+
+## MAC-AI-5: staged assaults and detached base tactics (2026-10-16)
+
+The seat tactics planner now calls a stateless skirmish construction pass before
+shopping. It finishes or repairs an existing building before searching for a
+new site, reserves the next facility's cost and removes an assigned builder
+from that look's combat candidates. The same detached geometry helper uses
+remembered terrain, delivered occupancy, building lanes and caller-supplied
+supply-node positions. Node positions are placement facts, separate from the
+Classic economy's node rates, visibility and engineer assignments in PR #342.
+No additional terrain or mine memory decoder is introduced here.
+
+Classic adaptive tactics consume delivered building ghosts and the last minute
+of strategic sighting reports. Empty current ground can invalidate a tactical
+armor contact without erasing the recent rush, depot-guard or army-value report.
+World recon skips homes marked undiscovered by the caller. This consumes
+existing delivery knowledge without discovering any new spawn. Raids retain
+two unit IDs privately and prefer armored cars. Stable unit IDs,
+building IDs and player indices break distance ties. Classic and World remain
+detached planner contexts; their existing admission boundaries stay unchanged.
+The ordinary producer supplies public naval and weather facts and leaves the
+unsupported modes' building ghosts and node positions empty.
+
+Staged assaults retain their members and release times outside canonical Match
+orders. Their breadth-first placement search uses delivered terrain and native
+LOS, the prototype's left/right/up/down neighbor order and a 2,048-cell limit.
+Assembly, advance, engagement, regroup and withdrawal use the pinned tuning.
+Operation claims and recent player releases suppress the quick movement and
+retreat orders from that look. Orders still pass through canonical admission.
+Horde scheduling, seat delivery and Classic economy construction remain the
+separate work in #340, #342 and runtime/horde-ai-20261016.
+
+The row evidence is Rust intent tests checked against the pinned prototype,
+with literal expected values for tuning and pure placement cases. No Source
+recorder is added. An ordinary Conquest lifecycle exercises private assault and
+raid state, admits their movement orders and collects both recipient snapshots
+through a natural VP finish and ending ticks. This does not admit Classic,
+World, Assault or Horde rooms and does not alter public ingress, snapshots,
+privacy, wire shapes, FFI or the full logistics guards.
+
+AI-48 is held for remembered bridge, original-ground and found-mine job inputs
+and receipt-driven field-work retries, including the pending seat-delivery work.
+AI-49 needs the missing Garrison actuator and complete holder fortification.
+AI-50 needs the currently unsupported Gate actuator and its complete lifecycle.
+AI-56 remains held for that HQ fortification dependency, despite the existing
+70-metre defender rule and the added detached bunker-target selection.
+
+## PR 352 repair after AI-33 integration (2026-10-16)
+
+PR #352 merges after #351. The merged tactics caller runs one construction
+pass in `commander_construction`, retaining AI-33's reserves and rider
+exclusion together with the skirmish repair, tech, visible-site, supply-node
+and coast rules. Forward HQ planning follows repairs within that pass.
+Later assault planning receives a detached view with this look's build,
+assist and field-work assignments mirrored into unit state, as the prototype
+does before its assault pass. Assault threats use the same live sightings
+that tactics retains after clearing visible empty ground. Recent strategic
+reports still serve the separate Classic adaptive rules.
+
+The regression tests exercise construction assignments during an assault
+phase transition and distinguish cleared contacts from armor still under
+fog. Ordinary Conquest lifecycle coverage also runs the tactics caller,
+canonical commands and every seat's snapshots through victory and ending
+ticks. Existing mode, command, tick and snapshot guards remain in force.
+
+## Construction-mode building memory (CMB-130 deferred, 2026-10-16)
+
+Building memory follows the prototype's `isConstructionMode` gate: Classic and World only (`shared/sim.js:384,4444`). World keeps its existing memory phase, and Classic keeps its explicit component refresh. Default and Conquest no longer accumulate remembered buildings. The recipient adapter also gates the existing six-field `ghosts` encoding on Classic/World, matching `shared/sim.js:6037`, so ordinary snapshots omit the field even if component memory is present.
+
+Classic full ticks and non-ordinary recipient snapshots remain guarded. CMB-130 is dropped from this batch's claim: building memory runs in Classic/World only; waits on #301 Classic runner and World admission. Its component tests retain last-observed identity, type, owner, position and construction progress, shared team sight, hidden changes, unseen destruction and ground/airborne invalidation. Default/Conquest regressions cover seeing a barracks, retreating, hidden changes, retirement, VP finish and revisit with no memory or ghosts. Ability, base dispatch, research and bunker checks retain their full-match continuations and every-seat snapshots. No ABI, wire shape, contract or public command admission changes.

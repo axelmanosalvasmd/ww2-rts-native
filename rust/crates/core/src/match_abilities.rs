@@ -156,10 +156,13 @@ impl Match {
             self.options.mode,
             crate::economy::Mode::Default
                 | crate::economy::Mode::Conquest
+                | crate::economy::Mode::Classic
                 | crate::economy::Mode::Tutorial
                 | crate::economy::Mode::World
         ) {
-            return Err("abilities currently require represented Conquest or World state".into());
+            return Err(
+                "abilities currently require represented Conquest, Classic, Tutorial or World state".into(),
+            );
         }
         self.validate_actor_mode()?;
         if self.world.game.tick < 0
@@ -221,7 +224,7 @@ impl Match {
             }
             self.ability_kind(id)?;
             self.ability_munitions_cost(id)?;
-            if self.options.mode == crate::economy::Mode::World {
+            if self.options.mode.is_construction() {
                 self.ability_munitions_available(unit.owner)?;
             }
         }
@@ -578,7 +581,7 @@ impl Match {
             if self.abilities.get(id).unwrap().cooldown > 0.
                 || u.retreating
                 || kind.ammo() && !self.logistics.can_fire(id, count)
-                || self.options.mode == crate::economy::Mode::World
+                || self.options.mode.is_construction()
                     && self.ability_munitions_available(u.owner)?
                         < self.ability_munitions_cost(id)?
             {
@@ -728,7 +731,7 @@ impl Match {
                 continue;
             }
             let cost = self.ability_munitions_cost(id)?;
-            if self.options.mode == crate::economy::Mode::World
+            if self.options.mode.is_construction()
                 && self.ability_munitions_available(u.owner)? < cost
             {
                 reason = Denial::Munitions;

@@ -1101,3 +1101,7 @@ pub(crate) mod tests {
 #[cfg(test)]
 #[path = "map_house_selected_tests.rs"]
 mod map_house_selected_tests;
+
+#[cfg(test)]
+#[path = "recipient_snapshot/net52_tests.rs"]
+mod net52_tests;

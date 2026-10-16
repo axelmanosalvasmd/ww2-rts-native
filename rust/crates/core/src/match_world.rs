@@ -41,15 +41,7 @@ pub struct LocalDefender {
     pub spawn: Point,
     pub visible: Vec<u32>,
 }
-/// Intentional remembered building rows. Live units and health remain in Game.
-#[derive(Clone, Debug, PartialEq)]
-pub struct KnownBuilding {
-    pub id: u32,
-    pub kind: usize,
-    pub owner: usize,
-    pub at: Point,
-    pub built: Option<f64>,
-}
+pub use crate::vision::KnownBuilding;
 pub struct WorldRuntime {
     pub memory: crate::world_memory::WorldMemory,
     pub regions: Vec<RegionState>,
@@ -321,6 +313,7 @@ impl Match {
             routing_fog: crate::fog::Fog::default(),
             tick_state: crate::match_tick::TickState::default(),
             world_runtime: Some(runtime),
+            classic_known_buildings: Default::default(),
             commands: crate::match_commands::MatchCommands::new(4096),
             grid: SpatialGrid::new(&world.game.units, 16.0),
             world,
@@ -762,7 +755,9 @@ impl Match {
         Ok(())
     }
 }
-fn world_can_stamp(game: &Game, rules: &crate::rules::Rules, cells: &[usize]) -> bool {
+/// Test a bounded, nonempty footprint against physical terrain and live occupancy.
+/// World ownership, visibility and rail exclusions are separate placement queries.
+pub fn world_can_stamp(game: &Game, rules: &crate::rules::Rules, cells: &[usize]) -> bool {
     if cells.is_empty()
         || cells.iter().any(|&c| {
             c >= game.flags.len()

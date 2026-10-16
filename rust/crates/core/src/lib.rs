@@ -29,7 +29,12 @@ pub mod catalog;
 pub mod client_view;
 pub mod combat;
 pub mod command_destinations;
+pub mod command_feedback;
 pub mod commander_ai;
+pub mod commander_assault;
+pub mod commander_classic_rules;
+mod commander_construction;
+mod commander_fortification;
 mod commander_forward_hq;
 pub mod commander_mind;
 mod commander_shopping;
@@ -166,7 +171,9 @@ pub mod match_world_tick;
 
 pub mod match_world_memory;
 pub mod world_memory;
+pub mod world_placement;
 pub mod world_recipient_metadata;
+pub mod world_supply;
 pub mod world_territories;
 
 pub mod staged_observer;
@@ -175,6 +182,12 @@ pub mod world_route_retention;
 
 pub mod startup_tables;
 
+#[cfg(test)]
+mod cmb5_ability_tests;
+#[cfg(test)]
+mod cmb5_base_dispatch_tests;
+#[cfg(test)]
+mod cmb5_match_tests;
 #[cfg(test)]
 mod combat_feature_tests;
 
@@ -186,3 +199,6 @@ mod engineering_intent_tests;
 
 #[cfg(test)]
 mod mov_intent_batch;
+
+#[cfg(test)]
+mod point_supply_intent_tests;
