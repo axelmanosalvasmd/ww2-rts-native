@@ -33,7 +33,7 @@ impl TrustedRoomConfig {
                 "players": state.options.players.iter().map(|p| json!({
                     "name": p.name, "team": p.team, "faction": p.faction as u8
                 })).collect::<Vec<_>>(),
-                "shuffle": state.options.shuffle, "army": "standard",
+                "shuffle": state.options.shuffle, "army": state.options.army.key(),
                 "weather": weather,
                 "weatherSeed": state.options.weather_seed,
                 "livingWeather": state.options.living_weather,

@@ -354,6 +354,9 @@ pub enum Denial {
     NoBuilders,
     NotVisible,
     Coast,
+    Shore,
+    Station,
+    RailCut,
 }
 impl Denial {
     pub fn name(self) -> &'static str {
@@ -378,6 +381,9 @@ impl Denial {
             Self::NoBuilders => "noBuilders",
             Self::NotVisible => "notVisible",
             Self::Coast => "coast",
+            Self::Shore => "shore",
+            Self::Station => "station",
+            Self::RailCut => "railCut",
         }
     }
 }

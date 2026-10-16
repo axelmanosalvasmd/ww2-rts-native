@@ -6,6 +6,14 @@ use crate::{
 };
 
 pub(super) fn project(state: &Match, slot: usize) -> Result<Value, SnapshotError> {
+    project_perspective(state, slot, false)
+}
+
+pub(super) fn project_perspective(
+    state: &Match,
+    slot: usize,
+    full_map: bool,
+) -> Result<Value, SnapshotError> {
     let g = &state.world.game;
     let player = g.players.get(slot).ok_or(SnapshotError::InvalidRecipient)?;
     // Source teamSees uses current objects, independent of cached visible IDs
@@ -22,7 +30,8 @@ pub(super) fn project(state: &Match, slot: usize) -> Result<Value, SnapshotError
         {
             return Err(SnapshotError::InvalidNumber);
         }
-        if g.reveal
+        if full_map
+            || g.reveal
             || vision::team_sees(
                 g,
                 &state.rules,

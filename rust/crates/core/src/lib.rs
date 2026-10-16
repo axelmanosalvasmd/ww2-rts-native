@@ -59,6 +59,7 @@ pub mod formation;
 pub mod game;
 pub mod grid;
 pub mod horde_commander;
+pub mod horde_policy;
 pub mod human_commander;
 pub mod human_commander_inputs;
 pub mod human_commander_policy;
@@ -232,3 +233,6 @@ mod mov_followup_garrison_tests;
 
 mod save_codec;
 mod save_state;
+
+pub mod commander_field_policy;
+pub mod commander_world_policy;
