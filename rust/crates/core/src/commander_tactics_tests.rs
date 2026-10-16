@@ -270,6 +270,8 @@ fn intent_ai36_reinforcement_wait_uses_finished_hq_radius_and_available_budget()
         .get_mut(&2)
         .unwrap()
         .built = 0.999;
+    // This fighter's active target excludes it from the unfinished HQ's assist crew.
+    input.units[0].target_id = 99;
     assert!(acts(
         &run(input, &mut State::default(), Level::Normal),
         "retreat",
