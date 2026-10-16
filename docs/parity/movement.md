@@ -213,7 +213,7 @@ Ground component evidence: `match_support.rs` passes 60 original-source traces a
 | ID | Behavior / content | Evidence | Rust (Julio) | Unreal (Axel) | Depends on | Acceptance check | Status |
 |---|---|---|---|---|---|---|---|
 | MOV-107 | Vehicle rows carry [moveSpeed, vx, vz, travelDir] (0.1 precision); the client poses hulls on the ground from them | sim.js:5884-5885; client/engine-presentation.js:1-25 | server: row tail. Unreal-only; client parity owned by Axel | Interpolate and pose hulls, wheels and tracks from the tail | IF, UI | Side-by-side recording of a tank route: hull pose follows the same arc | accepted |
-| MOV-108 | Squad men are visual followers of the server's squad centre (stride phases, own turning, within the footprint plus 0.65 m) | client/squad-motion.js:1-3; DESIGN.md:2556-2563 | none | Animate men around the authoritative centre | UI | Visual check: selection and fire use the centre, men stay within 0.65 m of their slots | todo |
+| MOV-108 | Squad men are visual followers of the server's squad centre (stride phases, own turning, within the footprint plus 0.65 m) | client/squad-motion.js:1-3; DESIGN.md:2556-2563 | none | Animate men around the authoritative centre | UI | Visual check: selection and fire use the centre, men stay within 0.65 m of their slots [Unreal-only, owner decision B (#5)](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6218552386). | accepted |
 
 ## Existing limitations
 
