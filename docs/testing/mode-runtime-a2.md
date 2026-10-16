@@ -33,7 +33,9 @@ MODE-04, MODE-10, MODE-21, MODE-22 and MODE-97 to MODE-103 are outside this stre
 
 ## Validation
 
-On the Vostro in locked slot S2, the repaired scene passed all 25 focused nextest tests (the five new tests and 20 retained weather/opening-policy regressions), formatting and `cargo clippy --workspace --all-targets -j4 -- -D warnings`. Nextest used ci-test, four test workers and zero retries. Cargo was limited to 6 GiB memory and zero swap. No full workspace test run, Source recorder or hosted CI job was run. The post-merge checks remain pending.
+Initial checks in locked slot S2 passed all 25 focused nextest tests (the five new tests and 20 retained weather/opening-policy regressions), formatting and strict workspace Clippy.
+
+After merging main `09e03d07dfb7a0458c0d795db1fbb7a9a3912e51`, source head `73ae6bb2690254e56f4ec8af1d93c078bae3c31c` (Rust tree `041c2186e8979d062c2b26c2e7533962feb45adf`) passed the same 25 tests, `cargo fmt --all --check` and `cargo clippy --workspace --all-targets -j4 -- -D warnings` in locked slot S3. This run used ci-test, four build jobs, four test workers, zero retries, 6 GiB memory and zero swap on the Vostro. S3 was released with exit zero. The published head preserves that exact Rust tree. No full workspace test run or Source recorder ran. Hosted checks remain a separate coordinator gate.
 
 The first S2 invocation passed formatting, then nextest rejected a duplicated `--test-threads` argument before compilation: nextest's `-j4` already sets test threads. It produced no test result. The corrected invocation omits the duplicate option; both logs are retained under `/tmp/ww2-mode-a2-20261016/`.
 

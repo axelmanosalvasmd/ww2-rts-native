@@ -1,2 +1,3 @@
 - Add a core Normal-AI handover entry point for ordinary Conquest. It starts with fresh policy memory and observations while preserving accepted commands and avoiding their sequence keys. Server activation remains separate.
 - Check core weather startup, recorded seed replay, fixed weather, soaked Rain/Mud starts and both announced weather transitions through ordinary ticks. Fresh server seed generation remains separate.
+- Verify the core weather and handover changes with 25 focused tests, formatting and strict workspace Clippy after merging main on the Vostro.
