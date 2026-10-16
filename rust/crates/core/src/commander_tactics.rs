@@ -482,7 +482,7 @@ fn plan_inner(
     let mut budget = input.manpower - reserved;
     let mut newly_busy = BTreeSet::new();
     let mut build_reserve = 0.0;
-    let mut construction_work = false;
+    let construction_work;
     let adaptive = context.mode.is_construction() && skill.adaptive;
     let rush = adaptive
         && now < 240.0

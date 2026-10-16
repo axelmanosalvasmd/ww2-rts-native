@@ -75,6 +75,7 @@ pub(crate) fn plan(
                     builders.iter().any(|k| k.string() == Some(u.kind.as_str()))
                 })
                 && !u.retreating
+                && !u.riding
                 && !u.build
                 && u.target_id == 0
                 && !u.dig
@@ -168,7 +169,7 @@ pub(crate) fn plan(
                 result.builders.push(worker.id);
             }
         }
-        // Wall projects and gate Dig are refused by the current canonical callers.
+        // Wall dispatch remains separate; gate Dig is refused by the canonical caller.
         // Their unspent funds remain available to shopping; never charge a denied job.
         steps.insert(hq.id, step + 1);
         return Ok(result);

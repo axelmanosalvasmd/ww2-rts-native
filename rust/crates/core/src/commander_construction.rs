@@ -279,6 +279,7 @@ pub(crate) fn plan(
             u.owner == input.slot
                 && u.hp > 0.0
                 && !u.retreating
+                && !u.riding
                 && !u.build
                 && u.target_id == 0
                 && !u.dig

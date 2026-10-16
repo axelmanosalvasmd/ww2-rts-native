@@ -907,8 +907,8 @@ fn intent_ai33_fortification_jobs_and_gate_denial_do_not_fault_the_match() {
     }
     let hq=m.world.game.units.values().find(|u|u.owner==0 && m.rules.kinds[u.kind].name=="hq").unwrap().id;
     assert_eq!(policy.tactics.fort_steps.get(&hq),Some(&2));
-    // Existing wall and gate admission guards keep unsupported actors and links out.
-    for raw in [json!({"t":"entrench","ids":[3],"pattern":"line","fort":"wall","x":50.0,"z":50.0,"x2":60.0,"z2":50.0}),json!({"t":"dig","kind":"gate","ids":[3],"x":50.0,"z":50.0})] {
+    // Existing gate admission keeps unsupported actors and links out.
+    for raw in [json!({"t":"dig","kind":"gate","ids":[3],"x":50.0,"z":50.0})] {
         let tick=m.world.game.tick as u64+1;
         m.enqueue_command(OrderKey{tick,issuer:0,sequence},Command::from_json(&raw).unwrap()).unwrap();
         sequence+=1;

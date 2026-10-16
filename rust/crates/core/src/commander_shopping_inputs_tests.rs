@@ -297,7 +297,7 @@ fn intent_ai33_classic_reserves_only_non_depot_builds_and_rush_releases_them() {
 }
 
 #[test]
-fn intent_ai33_unsupported_fort_jobs_do_not_consume_the_shopping_wallet() {
+fn intent_ai33_deferred_fort_jobs_do_not_consume_the_shopping_wallet() {
     let mut input = fixture(vec![
         unit(1, "rifle", 30.0),
         unit(2, "mg", 32.0),
@@ -379,4 +379,42 @@ fn intent_ai33_base_construction_defers_overlapping_fortification_without_spendi
     assert!(!state.fort_steps.contains_key(&10));
     let buys:f64=commands.iter().filter(|c|c["t"]=="buy").map(|c|economy::price_of(Mode::Conquest,c["unit"].as_str().unwrap()).unwrap().mp).sum();
     assert!(cost("motorpool")+buys<=400.0);
+}
+
+#[test]
+fn intent_ai33_mounted_squads_cannot_spend_or_advance_construction() {
+    let mut input=fixture(vec![unit(1,"rifle",12.0),unit(2,"rifle",30.0),unit(3,"hq",18.0),unit(4,"barracks",24.0)]);
+    input.units[0].riding=true;
+    input.tick=3000;
+    let observation=Observation::new(input.clone()).unwrap();
+    let context=observation.input().runtime.as_ref().unwrap();
+    let ground=sight_game(&observation,context);
+    let crew=observation.input().units[..2].iter().collect::<Vec<_>>();
+    let base=crate::commander_construction::plan(&observation,&crew,1000.0,false,&ground,|_|true).unwrap();
+    assert_eq!(base.builders,vec![2]);
+    let fort=crate::commander_fortification::plan(&observation,&crew,1000.0,0.0,0.0,&ground,|_|true,&mut BTreeMap::new()).unwrap();
+    assert_eq!(fort.builders,vec![2]);
+    input.units[1].riding=true;
+    let observation=Observation::new(input).unwrap();
+    let crew=observation.input().units[..2].iter().collect::<Vec<_>>();
+    let base=crate::commander_construction::plan(&observation,&crew,1000.0,false,&ground,|_|true).unwrap();
+    assert!(base.commands.is_empty());
+    assert_eq!(base.remaining_mp,1000.0);
+    let mut steps=BTreeMap::new();
+    let fort=crate::commander_fortification::plan(&observation,&crew,1000.0,0.0,0.0,&ground,|_|true,&mut steps).unwrap();
+    assert!(fort.commands.is_empty());
+    assert_eq!(fort.remaining_mp,1000.0);
+    assert!(steps.is_empty());
+    // The earlier forward-HQ spender must apply the same canonical rider exclusion.
+    let mut input=fixture(vec![unit(1,"rifle",110.0),unit(2,"rifle",125.0),unit(3,"rifle",130.0),unit(4,"hq",20.0)]);
+    input.units[0].riding=true;
+    let observation=Observation::new(input.clone()).unwrap();
+    let ground=sight_game(&observation,observation.input().runtime.as_ref().unwrap());
+    let crew=observation.input().units[..3].iter().collect::<Vec<_>>();
+    let forward=crate::commander_forward_hq::plan(&observation,&crew,1000.0,&ground,|_|true).unwrap().unwrap();
+    assert_eq!(forward.unit,2);
+    for u in &mut input.units[..3] {u.riding=true;}
+    let observation=Observation::new(input).unwrap();
+    let crew=observation.input().units[..3].iter().collect::<Vec<_>>();
+    assert!(crate::commander_forward_hq::plan(&observation,&crew,1000.0,&ground,|_|true).unwrap().is_none());
 }
