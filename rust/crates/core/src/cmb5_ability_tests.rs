@@ -30,7 +30,7 @@ fn scene(mode: Mode) -> Match {
                 let x = i % 8 * 64;
                 let y = i / 8 * 64;
                 let mut region = json!({"id":i,"x":x+32,"y":y+32,
-                    "bounds":[x,y,x+64,y+64],"kind":"resource"});
+                    "bounds":[x,y,x+64,y+64],"kind":"rural"});
                 if i == 0 { region["home"] = json!(0); }
                 if i == 63 { region["home"] = json!(1); }
                 region

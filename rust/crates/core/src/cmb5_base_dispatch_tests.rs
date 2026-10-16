@@ -223,8 +223,7 @@ fn world() -> Match {
         .map(|i| {
             let x = i % 8 * 64;
             let y = i / 8 * 64;
-            let mut r =
-                json!({"id":i,"x":x+32,"y":y+32,"bounds":[x,y,x+64,y+64],"kind":"resource"});
+            let mut r = json!({"id":i,"x":x+32,"y":y+32,"bounds":[x,y,x+64,y+64],"kind":"rural"});
             if i == 0 {
                 r["home"] = json!(0);
             }
