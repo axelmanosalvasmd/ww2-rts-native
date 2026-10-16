@@ -78,6 +78,7 @@ pub struct StartPlan {
     pub initial_wet: Option<f64>,
     pub random: MatchRandom,
     pub starting_kinds: Vec<usize>,
+    pub(crate) shared_defenders: Option<usize>,
 }
 
 fn field<'a>(v: &'a Value, name: &str) -> Result<&'a Value, String> {
@@ -93,6 +94,7 @@ fn number(v: &Value, name: &str) -> Result<f64, String> {
 
 enum StartupProfile {
     Conquest,
+    Horde,
     World(MatchRandom),
     Assault { defender_team: i32 },
 }
@@ -145,6 +147,21 @@ impl StartPlan {
         )
     }
 
+    pub(crate) fn prepare_horde(
+        map: &crate::map::AuthoritativeMap,
+        options: &MatchOptions,
+        rules: &Rules,
+    ) -> Result<Self, String> {
+        Self::prepare_mode(
+            map,
+            options,
+            rules,
+            StartupProfile::Horde,
+            #[cfg(test)]
+            None,
+        )
+    }
+
     fn prepare_mode(
         map: &crate::map::AuthoritativeMap,
         options: &MatchOptions,
@@ -153,6 +170,7 @@ impl StartPlan {
         #[cfg(test)] replay: Option<crate::aligned_replay::Replay>,
     ) -> Result<Self, String> {
         let world_mode = matches!(&profile, StartupProfile::World(_));
+        let horde_mode = matches!(&profile, StartupProfile::Horde);
         let defender_team = match &profile {
             StartupProfile::Assault { defender_team } => Some(*defender_team),
             _ => None,
@@ -165,9 +183,13 @@ impl StartPlan {
         }
         if !world_mode
             && defender_team.is_none()
+            && !horde_mode
             && !matches!(options.mode, Mode::Default | Mode::Conquest)
         {
             return Err("native startup currently supports Conquest".into());
+        }
+        if horde_mode && options.mode != Mode::Horde {
+            return Err("Horde startup requires explicit Horde mode".into());
         }
         if !options.living_weather && options.weather != WeatherChoice::Map {
             return Err("disabled living weather requires the map weather choice".into());
@@ -275,6 +297,18 @@ impl StartPlan {
                 };
             }
         }
+        if horde_mode {
+            let defend = map.defend().ok_or("Horde needs defender spawns")?;
+            let home = *defend
+                .get(defend.len() / 2)
+                .ok_or("Horde needs defender spawns")?;
+            let gate = (0..spawns.len())
+                .find(|slot| !defend.contains(slot))
+                .ok_or("Horde needs an attacker spawn")?;
+            for (index, team) in teams.iter().enumerate() {
+                authored_slots[index] = if *team == 0 { home } else { gate };
+            }
+        }
         #[cfg(test)]
         if let Some(replay) = &replay {
             // Explicit constructor input, before player positions, placement or IDs exist.
@@ -334,7 +368,13 @@ impl StartPlan {
                 .map(|&team| {
                     Ok(PlayerEconomy {
                         team,
-                        mp: if let Some(defender) = defender_team {
+                        mp: if horde_mode {
+                            if team == 0 {
+                                number(field(cfg, "assault")?, "defenderMp")? * income_scale
+                            } else {
+                                0.0
+                            }
+                        } else if let Some(defender) = defender_team {
                             number(
                                 field(cfg, "assault")?,
                                 if team == defender {
@@ -356,7 +396,9 @@ impl StartPlan {
             .points()
             .iter()
             .enumerate()
-            .filter_map(|(i, p)| (defender_team.is_none() || p.mp > 0.0).then_some(i))
+            .filter_map(|(i, p)| {
+                ((defender_team.is_none() && !horde_mode) || p.mp > 0.0).then_some(i)
+            })
             .collect();
         let points = map
             .points()
@@ -488,6 +530,7 @@ impl StartPlan {
             initial_wet,
             random,
             starting_kinds,
+            shared_defenders: horde_mode.then_some(options.players.len() - 1),
         })
     }
 
@@ -504,6 +547,12 @@ impl StartPlan {
         let mut units = BTreeMap::new();
         let mut next_id = 1;
         for (owner, player) in self.players.iter().enumerate() {
+            if self
+                .shared_defenders
+                .is_some_and(|defenders| owner >= defenders)
+            {
+                continue;
+            }
             for (index, &kind) in self.starting_kinds.iter().enumerate() {
                 let view = TerrainView {
                     width: game.w,
@@ -517,7 +566,12 @@ impl StartPlan {
                     changes: &[],
                 };
                 let at = placer
-                    .scatter_position(view, &rules.kinds[kind], player.spawn, index as u32)
+                    .scatter_position(
+                        view,
+                        &rules.kinds[kind],
+                        player.spawn,
+                        (index + self.shared_defenders.map_or(0, |_| owner * 3)) as u32,
+                    )
                     .map_err(|e| format!("starting placement: {e:?}"))?
                     .point;
                 let unit = unit_spawn::initial_unit(rules, catalog, kind, next_id, owner, at)
@@ -564,6 +618,7 @@ pub struct Match {
     pub abilities: crate::match_abilities::AbilityState,
     pub recovery: crate::match_recovery::RecoveryState,
     pub assault: Option<crate::assault_runtime::AssaultState>,
+    pub horde: Option<crate::match_horde::HordeState>,
     pub commands: crate::match_commands::MatchCommands,
     pub combat: crate::match_combat::CombatState,
     pub environment: crate::environment::EnvironmentRuntime,
@@ -704,9 +759,18 @@ impl Match {
         }
         let initial_tech =
             TechState::new(1, 0, 0, 0).map_err(|e| format!("initial research: {e:?}"))?;
+        let initial_research = (0..start.players.len())
+            .map(|slot| {
+                if let Some(defenders) = start.shared_defenders {
+                    TechState::new(if slot < defenders { 2 } else { 3 }, 0, 0, 0)
+                        .map_err(|e| format!("Horde initial research: {e:?}"))
+                } else {
+                    Ok(initial_tech)
+                }
+            })
+            .collect::<Result<Vec<_>, String>>()?;
         let production =
-            crate::production::ProductionState::new(vec![initial_tech; start.players.len()])
-                .map_err(|e| e.to_string())?;
+            crate::production::ProductionState::new(initial_research).map_err(|e| e.to_string())?;
         let scenario = if map.triggers().is_empty() {
             None
         } else {
@@ -734,6 +798,7 @@ impl Match {
             abilities: crate::match_abilities::AbilityState::default(),
             recovery: crate::match_recovery::RecoveryState::default(),
             assault: None,
+            horde: None,
             commands: crate::match_commands::MatchCommands::new(4096),
             combat: crate::match_combat::CombatState::default(),
             environment: crate::environment::EnvironmentRuntime::default(),
@@ -965,6 +1030,9 @@ impl Match {
         )?;
         let mut placer = SpawnPlacer::new();
         for owner in 0..self.start.players.len() {
+            if self.horde.is_some() && owner != 0 {
+                continue;
+            }
             let spawn = self.start.players[owner].spawn;
             let mut avoid: Vec<(Point, f64)> = self
                 .start
