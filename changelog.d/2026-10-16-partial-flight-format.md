@@ -1,0 +1,1 @@
+- Apply the workspace formatter to the partial-flight snapshot repair and its regression assertions.
