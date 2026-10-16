@@ -4345,3 +4345,11 @@ Under the overseer's03:23 fix authorization, remove only that erroneous borrow,
 as the compiler requests. Keep every assertion/input, ignore and runtime guard
 unchanged. This source child does not inherit the prior execution grant and
 requires Root's new exact-head selection/slot grant before another invocation.
+
+### Separate native-test and row-status delivery
+
+The overseer's03:35 direction separates test PRs from parity-status PRs.
+Restore this task's39 parity edits to exactdcf84cd6; retain the full literal
+row/test/prototype map and actual compile outcome in the normal testing doc.
+Rust stays exact to the compile-only fixec8fcc54. Root owns the separate
+proven-row ledger and later status PR after merged tests and intent review.

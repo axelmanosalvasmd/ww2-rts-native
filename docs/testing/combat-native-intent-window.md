@@ -1,6 +1,6 @@
 # Combat native intent window
 
-The owned window is all 39 IDs in `AUDIT_COMBAT.json`, one candidate window in `docs/parity/combat.md`. Axel approved rules 1 to 5 without added conditions in [6206861267](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6206861267). Hermes 6206844573 notes are not requirements. Behavior qualification uses native tests and reviewer confirmation against prototype intent. Data tables and pure functions retain exact comparison.
+The owned window is all 39 IDs in `AUDIT_COMBAT.json`, one native test window for `docs/parity/combat.md`. Axel approved rules 1 to 5 without added conditions in [6206861267](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6206861267). Hermes 6206844573 notes are not requirements. Behavior qualification uses native tests and reviewer confirmation against prototype intent. Data tables and pure functions retain exact comparison.
 
 This checkpoint adds 32 tests for 34 rows through existing native providers. Five rows have missing providers. Partial rows stay in progress individually. Every new test is unrun, and reviewer confirmation is pending. No row is ported by this checkpoint. The physical scene helper declares component inputs, uses seeded native randomness and calls actual Match providers. It does not claim ordinary purchase/history except the paid-birth test, which executes recorded_buy.
 
@@ -62,3 +62,5 @@ Execution remains gated by a new literal Root grant for the frozen head, exact s
 First native attempt: the single S2 batch on `4439a82820b55eab955743fd08bd4abb2dc31d71` / Rust `d02a909109a5c356b4f55e5759a541b5bd27a786` terminated with compile exit101. E0308 at `audit_combat_remaining.rs:342` is an inherited ignored aircraft consumer passing `&plane` to a value-ID method. No test was selected or executed: all 39 rows remain UNRUN, PASS0/testFAIL0. The ordinary `/tmp/native-feature-batches-0323/audit_combat/native.log`, `RESULT.json` and `LAUNCH-RESULT.json` retain the producing failure and confirmed inherited-lock release.
 
 The successor removes only that erroneous borrow, as the compiler requests. It changes no assertion, input, ignore, runtime provider or guard. The 03:23 overseer correction authorizes this source repair, while a new exact-head Root grant is still required for execution. The failed producing head and its outputs remain unchanged.
+
+The overseer03:35 test-PR/status-PR split supersedes the initial combined parity-file workflow. This test candidate leaves `docs/parity/combat.md` exact to its task parent. The full row mapping remains in this document. Root owns the separate proven-row ledger and later status PR, after test-PR merge and reviewer confirmation.

@@ -2,3 +2,4 @@
 - Place the authored rifle and sniper profile targets beyond the launch solver's 0.025-second minimum flight time before the first native attempt, so the speed check exercises its stated condition.
 - Correct the unrun role-selection scenes to the prototype's sniper 12/30 m and AT 7/28 m distances, with the tank facing the AT gun.
 - Preserve the first batch's compile E0308 with all 39 rows unrun, then fix the inherited ignored aircraft test's unit-ID argument without changing its inputs, assertions or ignore.
+- Keep the combat parity file unchanged in the native-test candidate under the separate test and status PR workflow; retain all 39 row mappings in the testing document.
