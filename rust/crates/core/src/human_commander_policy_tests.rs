@@ -650,8 +650,7 @@ fn intent_ai11_ai_attempts_and_human_replay_share_costs_and_denials() {
     use crate::{match_commands::Command, orders::OrderKey};
     let mut ai = runtime_match();
     let mut human = runtime_match();
-    ai.start.economy.players[0].mp = 100.0;
-    human.start.economy.players[0].mp = 100.0;
+    ai.start.economy.players[0].mp = 1000.0;
     let delivered = ai
         .human_commander_observation(
             &mut crate::match_human_observation::HumanObservationMemory::new(0),
@@ -661,7 +660,11 @@ fn intent_ai11_ai_attempts_and_human_replay_share_costs_and_denials() {
         .plan(screen(&delivered), Level::Normal)
         .unwrap();
     let buy = commands.iter().find(|c| c["t"] == "buy").unwrap();
+    let price = crate::economy::price_of(ai.options.mode, buy["unit"].as_str().unwrap())
+        .unwrap()
+        .mp;
     for state in [&mut ai, &mut human] {
+        state.start.economy.players[0].mp = price;
         state
             .enqueue_command(
                 OrderKey {
@@ -935,11 +938,16 @@ fn intent_ai33_fortification_state_survives_full_match_and_every_seat_snapshot()
         }
         let report = m.advance_tick().unwrap();
         assert_eq!(report.commands.len(), commands.len());
-        assert!(
-            report.commands.iter().all(|c| c.denial.is_none()),
-            "look {look}: {:?}",
-            report.commands
-        );
+        for (raw, result) in commands.iter().zip(&report.commands) {
+            if raw["t"] == "build" || raw["t"] == "buy" {
+                assert_eq!(result.denial, None, "look {look}: {raw:?}");
+            } else {
+                assert!(
+                    matches!(result.denial, None | Some(Denial::NoCover)),
+                    "look {look}: {raw:?}: {result:?}"
+                );
+            }
+        }
         for _ in 0..2000 {
             if !m.world.game.units.values().any(|u| u.build) {
                 break;

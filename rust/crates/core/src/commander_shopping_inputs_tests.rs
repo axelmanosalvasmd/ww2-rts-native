@@ -492,7 +492,9 @@ fn intent_ai33_mounted_squads_cannot_spend_or_advance_construction() {
 
 #[test]
 fn intent_ai33_assist_and_ordinary_dig_keep_other_builders_fortification_reserve() {
-    let mut units: Vec<_> = (1..=4).map(|id| unit(id, "mg", 30.0 + id as f64)).collect();
+    let mut units: Vec<_> = (1..=4)
+        .map(|id| unit(id, if id <= 2 { "rifle" } else { "mg" }, 30.0 + id as f64))
+        .collect();
     units.extend([
         unit(10, "hq", 20.0),
         unit(11, "barracks", 24.0),
