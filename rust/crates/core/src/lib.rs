@@ -30,6 +30,8 @@ pub mod client_view;
 pub mod combat;
 pub mod command_destinations;
 pub mod commander_ai;
+pub mod commander_assault;
+pub mod commander_classic_rules;
 mod commander_construction;
 mod commander_fortification;
 mod commander_forward_hq;
