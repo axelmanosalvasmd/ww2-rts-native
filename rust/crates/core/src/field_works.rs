@@ -37,6 +37,7 @@ pub enum FortKind {
     Nest,
     Mines,
     Demine,
+    Fill,
     Aid,
 }
 impl FortKind {
@@ -49,6 +50,7 @@ impl FortKind {
             Self::Nest => "nest",
             Self::Mines => "mines",
             Self::Demine => "demine",
+            Self::Fill => "fill",
             Self::Aid => "aid",
         }
     }
@@ -61,8 +63,9 @@ impl FortKind {
             "nest" => Ok(Self::Nest),
             "mines" => Ok(Self::Mines),
             "demine" => Ok(Self::Demine),
+            "fill" => Ok(Self::Fill),
             "aid" => Ok(Self::Aid),
-            "bridge" | "fill" | "wall" | "gate" => Err(Error::UnsupportedKind),
+            "bridge" | "wall" | "gate" => Err(Error::UnsupportedKind),
             _ => Err(Error::Refused(Reason::Blocked)),
         }
     }
@@ -212,6 +215,7 @@ fn definitions() -> Result<&'static Definitions, Error> {
             FortKind::Nest,
             FortKind::Mines,
             FortKind::Demine,
+            FortKind::Fill,
             FortKind::Aid,
         ] {
             let source = table.get(kind.as_str()).ok_or(Error::Rules)?;
@@ -340,7 +344,9 @@ pub fn placement(
         ) else {
             continue;
         };
-        let valid = if kind == FortKind::Demine {
+        let valid = if kind == FortKind::Fill {
+            w.fillable(cell)
+        } else if kind == FortKind::Demine {
             w.game.chars[cell] == b'N' && team.is_none_or(|team| mine_known(w, cell, team))
         } else {
             b".+RDM".contains(&w.game.chars[cell])
@@ -556,6 +562,10 @@ impl FieldWorksRuntime {
         if job.kind == FortKind::Demine {
             if w.game.chars[cell.cell] == b'N' {
                 w.set_cell(cell.cell, b'.')?;
+            }
+        } else if job.kind == FortKind::Fill {
+            if w.fillable(cell.cell) {
+                w.fill_cell(cell.cell)?;
             }
         } else if b".+RDM".contains(&w.game.chars[cell.cell]) && !under {
             w.set_cell(cell.cell, cell.ch)?;

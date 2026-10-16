@@ -695,6 +695,69 @@ impl World {
     pub fn initial(&self) -> &InitialTerrain {
         &self.initial
     }
+
+    /// Battle damage that a shovel can repair. Authored World spoil tips are scenery.
+    pub fn fillable(&self, cell: usize) -> bool {
+        let Some(&ch) = self.game.chars.get(cell) else {
+            return false;
+        };
+        ch == b'+'
+            || ch == b'R' && !(self.geography.is_some() && self.initial.chars[cell] == b'R')
+            || ch == b'F' && self.initial.chars[cell] != b'F'
+            || ch == b'.' && self.fill_height(cell) < self.initial_fill_height(cell)
+    }
+
+    fn fill_height(&self, cell: usize) -> i8 {
+        self.game.height.as_ref().map_or(0, |heights| heights[cell])
+    }
+
+    fn initial_fill_height(&self, cell: usize) -> i8 {
+        self.initial
+            .height
+            .as_ref()
+            .map_or(0, |heights| heights[cell])
+    }
+
+    /// Restore the original height as far as adjacent slopes allow, and uncover the surface.
+    pub fn fill_cell(&mut self, cell: usize) -> Result<(), WorldError> {
+        self.valid_cell(cell)?;
+        if !self.fillable(cell) {
+            return Ok(());
+        }
+        let width = self.game.w;
+        let x = cell % width;
+        let low = [
+            cell.checked_sub(width),
+            (cell + width < self.game.chars.len()).then_some(cell + width),
+            cell.checked_sub(1).filter(|_| x > 0),
+            (x + 1 < width).then_some(cell + 1),
+        ]
+        .into_iter()
+        .flatten()
+        .map(|neighbor| self.fill_height(neighbor))
+        .min()
+        .unwrap_or(self.initial_fill_height(cell));
+        let height = self.initial_fill_height(cell).min(low + 1);
+        let ch = if self.game.objects.as_ref().unwrap()[cell] != b'.' {
+            self.game.ground.as_ref().unwrap()[cell]
+        } else {
+            b'.'
+        };
+        self.mutation_capacity(2)?;
+        if height > self.fill_height(cell) {
+            self.mutate_cell(
+                cell,
+                CellChange {
+                    height: Some(height),
+                    ..Default::default()
+                },
+            )?;
+        }
+        if self.game.chars[cell] != ch {
+            self.set_cell(cell, ch)?;
+        }
+        Ok(())
+    }
     pub fn cell_log(&self) -> &[CellRow] {
         &self.log
     }
