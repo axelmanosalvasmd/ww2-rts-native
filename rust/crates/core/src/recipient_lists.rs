@@ -159,7 +159,7 @@ impl WreckSourceFrame {
 pub struct RecipientLists {
     pub wrecks: Vec<WreckRow>,
     pub found_mines: Vec<usize>,
-    /// Absent in ordinary Conquest. World rows use the canonical ResourceNode owner.
+    /// Classic publishes every node. World filters nodes through team exploration.
     pub nodes: Option<Vec<[f64; 4]>>,
 }
 
@@ -183,12 +183,16 @@ impl crate::match_runtime::Match {
             .filter_map(|(&c, &bits)| ((bits >> team & 1) != 0 && g.chars[c] == b'N').then_some(c))
             .collect();
         match (self.options.mode, g.mode) {
-            (crate::economy::Mode::Default | crate::economy::Mode::Conquest, None) => {
+            (crate::economy::Mode::Default | crate::economy::Mode::Conquest, None)
+            | (crate::economy::Mode::Classic, Some(ModeKind::Classic))
+            | (crate::economy::Mode::Assault, Some(ModeKind::Assault))
+            | (crate::economy::Mode::Annihilation, Some(ModeKind::Annihilation)) => {
+                let nodes = self.classic_snapshot_nodes()?;
                 let wrecks = self.observed_wreck_rows(owner)?;
                 Ok(RecipientLists {
                     wrecks,
                     found_mines,
-                    nodes: None,
+                    nodes,
                 })
             }
             (crate::economy::Mode::World, Some(ModeKind::World)) => {
@@ -300,14 +304,50 @@ pub struct OrdinaryRawLists {
     pub nodes: Option<Value>,
 }
 impl crate::match_runtime::Match {
+    /// The prototype exposes the static Classic node locations to every seat,
+    /// including unexplored cells, and never includes the private depot link.
+    pub(crate) fn classic_snapshot_nodes(&self) -> Result<Option<Vec<[f64; 4]>>, String> {
+        if self.options.mode != crate::economy::Mode::Classic {
+            return Ok(None);
+        }
+        self.validate_elimination_state()?;
+        self.elimination
+            .as_ref()
+            .ok_or("missing Classic nodes")?
+            .nodes
+            .iter()
+            .map(|node| {
+                let row = [
+                    rounded(node.at.x),
+                    rounded(node.at.z),
+                    node.rate,
+                    f64::from(u8::from(node.fuel)),
+                ];
+                if row.iter().all(|value| value.is_finite()) {
+                    Ok(row)
+                } else {
+                    Err("invalid Classic node display facts".into())
+                }
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map(Some)
+    }
+
     pub fn ordinary_snapshot_raw_lists(&self) -> Result<OrdinaryRawLists, String> {
         let game = &self.world.game;
         if !matches!(
-            self.options.mode,
-            crate::economy::Mode::Default | crate::economy::Mode::Conquest
-        ) || game.mode.is_some()
-        {
-            return Err("global ordinary lists require absent Game mode".into());
+            (self.options.mode, game.mode),
+            (
+                crate::economy::Mode::Default | crate::economy::Mode::Conquest,
+                None
+            ) | (crate::economy::Mode::Classic, Some(ModeKind::Classic))
+                | (crate::economy::Mode::Assault, Some(ModeKind::Assault))
+                | (
+                    crate::economy::Mode::Annihilation,
+                    Some(ModeKind::Annihilation)
+                )
+        ) {
+            return Err("global ordinary lists require a represented ordinary mode".into());
         }
         let mut ids = std::collections::BTreeSet::new();
         let mut rows = Vec::with_capacity(game.wrecks.len());
@@ -328,7 +368,7 @@ impl crate::match_runtime::Match {
         }
         Ok(OrdinaryRawLists {
             wrecks: Value::Array(rows),
-            nodes: None,
+            nodes: self.classic_snapshot_nodes()?.map(|rows| json!(rows)),
         })
     }
 }

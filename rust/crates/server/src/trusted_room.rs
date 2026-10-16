@@ -29,11 +29,16 @@ impl TrustedRoomConfig {
             "reference": "e4e579a838aabae3b1d9dadbc17a0a87147bc52d",
             "randomVersion": RANDOM_VERSION,
             "options": {
-                "seed": state.options.seed, "mode": "conquest",
+                "seed": state.options.seed, "mode": match state.options.mode {
+                    ww2_core::economy::Mode::Assault => "assault",
+                    ww2_core::economy::Mode::Annihilation => "annihilation",
+                    ww2_core::economy::Mode::Classic => "classic",
+                    _ => "conquest",
+                },
                 "players": state.options.players.iter().map(|p| json!({
                     "name": p.name, "team": p.team, "faction": p.faction as u8
                 })).collect::<Vec<_>>(),
-                "shuffle": state.options.shuffle, "army": "standard",
+                "shuffle": state.options.shuffle, "army": state.options.army.key(),
                 "weather": weather,
                 "weatherSeed": state.options.weather_seed,
                 "livingWeather": state.options.living_weather,

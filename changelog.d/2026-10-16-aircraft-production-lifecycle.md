@@ -1,0 +1,2 @@
+- Complete standalone aircraft training in Classic with parked-plane state and canonical combat metadata, and let Horde defenders buy planes from shared allied airfields.
+- Add native tests for the training birth boundary, maker selection, payment, rally orders, queue pauses and failed-publication rollback. Keep aircraft purchases and queued training out of bound recipient rooms until aviation event delivery is available. Full logistics and Horde room execution remain separate work.

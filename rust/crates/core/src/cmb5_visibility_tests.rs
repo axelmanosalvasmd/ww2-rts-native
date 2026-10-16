@@ -193,10 +193,10 @@ fn cmb130_classic_remembers_last_seen_buildings_until_an_airborne_observer_revis
         assert!(m.tick_state.fault().is_none());
         assert!(remembered(&m, 0).is_empty());
     }
-    assert!(matches!(
-        SnapshotCache::new(&m),
-        Err(SnapshotError::UnsupportedMode)
-    ));
+    let cache = SnapshotCache::new(&m).unwrap();
+    for slot in 0..m.start.players.len() {
+        cache.recipient(slot).unwrap();
+    }
 }
 
 #[test]

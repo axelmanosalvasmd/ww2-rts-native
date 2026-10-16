@@ -235,3 +235,6 @@ mod mov_followup_garrison_tests;
 
 mod save_codec;
 mod save_state;
+
+#[cfg(test)]
+mod production_lifecycle_intent_tests;
