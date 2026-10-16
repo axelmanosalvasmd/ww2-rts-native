@@ -304,9 +304,12 @@ impl crate::match_runtime::Match {
         let game = &self.world.game;
         if !matches!(
             (self.options.mode, game.mode),
-            (crate::economy::Mode::Default | crate::economy::Mode::Conquest, None)
-                | (crate::economy::Mode::Classic, Some(ModeKind::Classic))
-        ) || self.world_runtime.is_some() || self.world.geography().is_some()
+            (
+                crate::economy::Mode::Default | crate::economy::Mode::Conquest,
+                None
+            ) | (crate::economy::Mode::Classic, Some(ModeKind::Classic))
+        ) || self.world_runtime.is_some()
+            || self.world.geography().is_some()
         {
             return Err("global ordinary lists require an admitted ordinary mode".into());
         }
