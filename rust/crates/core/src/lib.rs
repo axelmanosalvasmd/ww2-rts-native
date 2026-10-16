@@ -151,3 +151,6 @@ pub mod staged_observer;
 pub mod world_route_retention;
 
 pub mod startup_tables;
+
+#[cfg(test)]
+mod combat_feature_tests;
