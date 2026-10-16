@@ -608,3 +608,109 @@ fn operative_death_respawn_and_full_match_finish_keep_every_recipient_live() {
     assert_eq!(state.finish.as_ref().unwrap().winner, 0);
     assert!(state.world.game.tick >= finish_tick.unwrap() + 8);
 }
+
+#[test]
+fn net53_cached_rows_keep_only_public_bits_for_allies_and_enemies() {
+    // Single-component exact check of prototype shared/sim.js:5899-5905.
+    // Seed each defined or reserved bit at the cache boundary, independently
+    // of the gameplay producers that legitimately cannot set every bit together.
+    let (mut state, id) = scene();
+    state.world.game.reveal = true;
+    state.abilities.get_mut(id).unwrap().cooldown = 3.2;
+    let mut cache = SnapshotCache::new(&state).unwrap();
+    let row_index = cache.rows.iter().position(|row| row[0] == id).unwrap();
+    let original = cache.rows[row_index].clone();
+    assert_eq!(original[11], 4.);
+    let public_bits = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 18, 20, 21, 22];
+    for flags in (0..25).map(|bit| 1_u64 << bit).chain([33_554_431]) {
+        cache.rows[row_index][12] = json!(flags);
+        for slot in 0..3 {
+            let projection = cache.recipient(slot).unwrap();
+            let actual = projection.fields["units"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|row| row[0] == id)
+                .unwrap();
+            let mut expected = original.clone();
+            expected[11] = if slot == 0 {
+                original[11].clone()
+            } else {
+                json!(0)
+            };
+            expected[12] = json!(if slot == 0 {
+                flags
+            } else {
+                public_bits
+                    .iter()
+                    .filter(|bit| flags & (1 << **bit) != 0)
+                    .map(|bit| 1_u64 << bit)
+                    .sum::<u64>()
+            });
+            assert_eq!(actual, &expected, "slot={slot}, flags={flags}");
+        }
+    }
+}
+
+#[test]
+fn net53_real_rows_hide_targets_per_recipient_and_restore_them_when_seen() {
+    let (mut state, id) = scene();
+    let enemy = state
+        .world
+        .game
+        .units
+        .values()
+        .find(|unit| unit.owner == 2 && state.rules.kinds[unit.kind].name == "rifle")
+        .unwrap()
+        .id;
+    state.abilities.get_mut(id).unwrap().cooldown = 3.2;
+    state.commands.units.get_mut(&id).unwrap().auto_retreat = true;
+    state.commands.units.get_mut(&id).unwrap().auto_cast = true;
+    state.firing.get_mut(id).unwrap().target_id = enemy;
+    // The enemy sees the operative, but that must not grant the allies sight
+    // of its target. An allied recipient still has no owner-only row fields.
+    state.world.game.players[2].visible = vec![id];
+    for (owner_sees, ally_sees) in [
+        (false, false),
+        (true, false),
+        (false, true),
+        (true, true),
+        (false, false),
+    ] {
+        state.world.game.players[0].visible = if owner_sees { vec![enemy] } else { vec![] };
+        state.world.game.players[1].visible = if ally_sees { vec![enemy] } else { vec![] };
+        let cache = SnapshotCache::new(&state).unwrap();
+        for slot in 0..3 {
+            let projection = cache.recipient(slot).unwrap();
+            let row = projection.fields["units"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|row| row[0] == id)
+                .unwrap();
+            let sees = [owner_sees, ally_sees, true][slot];
+            assert_eq!(row[9], if sees { enemy } else { 0 });
+            assert_eq!(row[11].as_f64(), Some(if slot == 0 { 4. } else { 0. }));
+            assert_eq!(
+                row[12],
+                if slot == 0 {
+                    131072 | 2048 | 4096 | 8192 | 16384
+                } else {
+                    0
+                }
+            );
+        }
+    }
+    state.firing.get_mut(id).unwrap().target_id = 0;
+    let cache = SnapshotCache::new(&state).unwrap();
+    for slot in 0..3 {
+        let projection = cache.recipient(slot).unwrap();
+        let row = projection.fields["units"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row[0] == id)
+            .unwrap();
+        assert_eq!(row[9], 0);
+    }
+}

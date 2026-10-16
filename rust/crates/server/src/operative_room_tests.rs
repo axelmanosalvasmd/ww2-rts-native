@@ -481,7 +481,7 @@ fn operative_room_members_deliver_every_tick_through_natural_finish_lobby_and_re
 }
 
 #[test]
-fn operative_load_merge_retains_membership_and_remaps_the_commander_person() {
+fn fps39_loaded_operatives_keep_identity_through_finish_start_and_restart() {
     // Prototype server.js:436-450,411. Loading replaces the seat array, while
     // each operative keeps the same commander person and receives a fresh start.
     struct SaveDir(std::path::PathBuf);
@@ -501,6 +501,22 @@ fn operative_load_merge_retains_membership_and_remaps_the_commander_person() {
     hub.attach_native("ABC", native_tests::native_match(), 0)
         .unwrap();
     let soldier = state(&hub).companions.get("friend").unwrap().unit_id;
+    {
+        let state = hub
+            .rooms
+            .get_mut("ABC")
+            .unwrap()
+            .native
+            .as_mut()
+            .unwrap()
+            .runtime
+            .state_mut();
+        for control in state.commands.units.values_mut() {
+            control.hold_fire = true;
+            control.auto_cast = false;
+            control.auto_retreat = false;
+        }
+    }
     command(&mut hub, &op, fps(8), 20);
     let saved = hub.save_room("ABC", seats[0].id).unwrap();
     messages(&mut receiver);
@@ -557,14 +573,9 @@ fn operative_load_merge_retains_membership_and_remaps_the_commander_person() {
     assert!(hub.native_status("ABC").unwrap().paused);
     command(&mut hub, &seats[0], json!({"t":"resume"}), 52);
     assert!(!hub.native_status("ABC").unwrap().paused);
-    let mut observer = DeliveryState::new(state(&hub)).unwrap();
-    let mut op_observers = [
-        OperativeDelivery::new(state(&hub), 0).unwrap(),
-        OperativeDelivery::new(state(&hub), 1).unwrap(),
-    ];
-    for callback in 0..=8_u64 {
-        let now = 100 + callback * 50;
-        hub.poll_native(now, now * 1_000_000);
+    {
+        // Preserve the authored save layout through load admission, then arrange
+        // ordinary VP income to exercise the complete loaded-room lifecycle.
         let state = hub
             .rooms
             .get_mut("ABC")
@@ -574,11 +585,122 @@ fn operative_load_merge_retains_membership_and_remaps_the_commander_person() {
             .unwrap()
             .runtime
             .state_mut();
-        assert_every_recipient_tick(state, &mut observer, &mut op_observers);
-        drain_commanders(&mut hub, &mut commanders, now);
-        messages(&mut receiver);
-        messages(&mut peer_rx);
-        assert!(hub.native_status("ABC").unwrap().fault.is_none());
+        for (index, point) in state.start.points.iter_mut().enumerate() {
+            point.owner = Some(0);
+            point.progress = 1.;
+            point.vp = if index == 0 { 1. } else { 0. };
+        }
+        state.start.win_vp = 1.;
     }
-    assert!(hub.native_status("ABC").unwrap().tick >= 8);
+    let mut observer = DeliveryState::new(state(&hub)).unwrap();
+    let mut op_observers = [
+        OperativeDelivery::new(state(&hub), 0).unwrap(),
+        OperativeDelivery::new(state(&hub), 1).unwrap(),
+    ];
+    let mut finish_tick = None;
+    let mut final_lobbies = 0;
+    let mut last_tick = -1;
+    let mut last_now = 100;
+    for callback in 0..=1000_u64 {
+        let now = 100 + callback * 50;
+        last_now = now;
+        hub.poll_native(now, (now - 100) * 1_000_000);
+        if let Some(native) = hub.rooms.get_mut("ABC").unwrap().native.as_mut() {
+            let state = native.runtime.state_mut();
+            if state.world.game.tick != last_tick {
+                if last_tick >= 0 {
+                    assert_eq!(state.world.game.tick, last_tick + 1);
+                }
+                assert_every_recipient_tick(state, &mut observer, &mut op_observers);
+                last_tick = state.world.game.tick;
+            }
+            if let Some(finish) = &state.finish {
+                assert_eq!(finish.winner, 0);
+                finish_tick.get_or_insert(last_tick);
+            }
+        }
+        drain_commanders(&mut hub, &mut commanders, now);
+        for (slot, output) in [messages(&mut receiver), messages(&mut peer_rx)]
+            .iter()
+            .enumerate()
+        {
+            for lobby in output
+                .iter()
+                .filter(|m| m["t"] == "lobby" && m["state"] == "lobby")
+            {
+                final_lobbies += 1;
+                assert_eq!(lobby["role"], "operative");
+                assert_eq!(lobby["commander"], slot);
+                assert_eq!(lobby["spectator"], false);
+                assert_eq!(lobby["result"]["you"], Value::Null);
+            }
+        }
+        assert!(hub.native_status("ABC").unwrap().fault.is_none());
+        assert_eq!(hub.rooms["ABC"].operatives.len(), 2);
+        if hub.rooms["ABC"].native.is_none() {
+            break;
+        }
+    }
+    assert_eq!(final_lobbies, 2);
+    assert_eq!(hub.native_status("ABC").unwrap().held, 120);
+    assert!(last_tick >= finish_tick.unwrap() + 59);
+    assert!(hub.rooms["ABC"].native.is_none());
+    hub.configure_trusted_room(Some(crate::TrustedRoomConfig::new("ABC", 3936341).unwrap()));
+    let mut previous_epoch = epoch;
+    for restart in [false, true] {
+        last_now += 50;
+        let next = hub
+            .start_trusted("ABC", seats[0].id, restart, last_now)
+            .unwrap();
+        assert!(next > previous_epoch);
+        previous_epoch = next;
+        let seat_starts = drain_commanders(&mut hub, &mut commanders, last_now);
+        for (slot, output) in [messages(&mut receiver), messages(&mut peer_rx)]
+            .iter()
+            .enumerate()
+        {
+            let lobby_at = output.iter().position(|m| m["t"] == "lobby").unwrap();
+            let start_at = output.iter().position(|m| m["t"] == "start").unwrap();
+            assert!(lobby_at < start_at);
+            assert_eq!(output[lobby_at]["role"], "operative");
+            assert_eq!(output[lobby_at]["result"], Value::Null);
+            let seat_start = seat_starts[slot]
+                .iter()
+                .find(|m| m["t"] == "start")
+                .unwrap();
+            let key = if slot == 0 { "friend" } else { "peer" };
+            assert_start(
+                &output[start_at],
+                seat_start,
+                slot,
+                state(&hub).companions.get(key).unwrap().unit_id,
+            );
+            assert_eq!(output[start_at]["matchId"], next);
+            assert_eq!(output[start_at]["operative"]["seq"], -1);
+        }
+        let mut observer = DeliveryState::new(state(&hub)).unwrap();
+        let mut op_observers = [
+            OperativeDelivery::new(state(&hub), 0).unwrap(),
+            OperativeDelivery::new(state(&hub), 1).unwrap(),
+        ];
+        for offset in 0..=4 {
+            let now = last_now + offset * 50;
+            hub.poll_native(now, (now - 100) * 1_000_000);
+            let state = hub
+                .rooms
+                .get_mut("ABC")
+                .unwrap()
+                .native
+                .as_mut()
+                .unwrap()
+                .runtime
+                .state_mut();
+            assert_every_recipient_tick(state, &mut observer, &mut op_observers);
+            drain_commanders(&mut hub, &mut commanders, now);
+            messages(&mut receiver);
+            messages(&mut peer_rx);
+            assert!(hub.native_status("ABC").unwrap().fault.is_none());
+        }
+        last_now += 200;
+    }
 }

@@ -1,0 +1,3 @@
+- Add operative lifecycle tests through save/load, natural victory, lobby return, a new match and restart, with every recipient checked on each advancing tick.
+- Check the complete cached nonowner flag mask, per-recipient target visibility and cooldown privacy. Replay native command arrival order, 20 Hz timing, operative throttling, pauses and socket presence against full deterministic checkpoints.
+- Extend ordered save-list and rename broadcasts to every room role. Add lobby spectator takeover and cleanup checks. Running spectator joins, silent army-command handling and no-pause disconnects still need the spectator stream; seated rejoin still needs AI and commander-helper resets.
