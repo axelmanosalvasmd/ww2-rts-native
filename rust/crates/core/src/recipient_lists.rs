@@ -304,10 +304,13 @@ impl crate::match_runtime::Match {
         let game = &self.world.game;
         if !matches!(
             self.options.mode,
-            crate::economy::Mode::Default | crate::economy::Mode::Conquest
-        ) || game.mode.is_some()
+            crate::economy::Mode::Default
+                | crate::economy::Mode::Conquest
+                | crate::economy::Mode::Tutorial
+                | crate::economy::Mode::Assault
+        ) || !crate::match_actor::ordinary_ground_mode(game, self.options.mode)
         {
-            return Err("global ordinary lists require absent Game mode".into());
+            return Err("global ordinary lists require a supported ordinary mode".into());
         }
         let mut ids = std::collections::BTreeSet::new();
         let mut rows = Vec::with_capacity(game.wrecks.len());

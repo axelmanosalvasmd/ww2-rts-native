@@ -20,6 +20,12 @@ pub struct TutorialLine {
     pub at: Point,
 }
 
+impl TutorialLine {
+    pub fn shot_json(&self) -> serde_json::Value {
+        serde_json::json!({"k":"say", "text":self.text, "x":self.at.x, "z":self.at.z, "pub":true})
+    }
+}
+
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct TutorialRuntime {
     enemy: usize,

@@ -966,6 +966,27 @@ impl Match {
         start_fraction: f64,
         end_fraction: f64,
     ) -> Result<Option<FlightContact>, String> {
+        self.filtered_flight_contact(p, a, b, (start_fraction, end_fraction), |_| true, false)
+    }
+    pub(crate) fn recipient_flight_contact(
+        &self,
+        p: &LiveFlight,
+        a: projectiles::Point3,
+        b: projectiles::Point3,
+        visible: impl Fn(UnitId) -> bool,
+    ) -> Result<Option<FlightContact>, String> {
+        self.filtered_flight_contact(p, a, b, (1., 1.), visible, true)
+    }
+    fn filtered_flight_contact(
+        &self,
+        p: &LiveFlight,
+        a: projectiles::Point3,
+        b: projectiles::Point3,
+        fractions: (f64, f64),
+        visible: impl Fn(UnitId) -> bool,
+        current_pose: bool,
+    ) -> Result<Option<FlightContact>, String> {
+        let (start_fraction, end_fraction) = fractions;
         let g = &self.world.game;
         let level_height = n(self.firing_config()?, "levelHeight", 2.5);
         let mut best: Option<FlightContact> = None;
@@ -1016,6 +1037,7 @@ impl Match {
         // Exact unit-contact ties use numeric IDs instead of bucket or registration history.
         let mut candidates = self.grid.in_order(&g.units, center, reach, |_, t| {
             t.hp > 0.0
+                && visible(t.id)
                 && t.air.is_none()
                 && !t.riding
                 && t.id != p.shooter
@@ -1028,12 +1050,15 @@ impl Match {
             if def.building && t.cells.as_ref().is_some_and(|c| !c.is_empty()) {
                 continue;
             }
-            let old = self
-                .firing
-                .prior
-                .get(&id)
-                .copied()
-                .unwrap_or_else(|| t.pose());
+            let old = if current_pose {
+                t.pose()
+            } else {
+                self.firing
+                    .prior
+                    .get(&id)
+                    .copied()
+                    .unwrap_or_else(|| t.pose())
+            };
             let before = projectiles::BodyPosition {
                 x: old.x + (t.x - old.x) * start_fraction,
                 z: old.z + (t.z - old.z) * start_fraction,
@@ -1445,13 +1470,7 @@ impl Match {
         Ok(())
     }
 
-    /// Physical salvos retain the reference timer's two draws for each emitted segment.
-    /// The projectile already carries the physical payload, so this timer emits no second blast.
-    pub fn advance_firing_salvos(&mut self, dt: f64) -> Result<(), String> {
-        self.supported_firing_mode()?;
-        if !dt.is_finite() || dt < 0.0 {
-            return Err("invalid salvo timer step".into());
-        }
+    pub(crate) fn validate_firing_salvos(&self) -> Result<(), String> {
         if self.firing.salvos.iter().any(|s| {
             s.left == 0
                 || s.left > 4096
@@ -1464,6 +1483,17 @@ impl Match {
         }) {
             return Err("invalid physical salvo".into());
         }
+        Ok(())
+    }
+
+    /// Physical salvos retain the reference timer's two draws for each emitted segment.
+    /// The projectile already carries the physical payload, so this timer emits no second blast.
+    pub fn advance_firing_salvos(&mut self, dt: f64) -> Result<(), String> {
+        self.supported_firing_mode()?;
+        if !dt.is_finite() || dt < 0.0 {
+            return Err("invalid salvo timer step".into());
+        }
+        self.validate_firing_salvos()?;
         for s in &mut self.firing.salvos {
             s.next -= dt;
             if s.next > 0.0 {

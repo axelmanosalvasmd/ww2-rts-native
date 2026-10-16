@@ -104,6 +104,23 @@ pub(super) fn capture(state: &Match) -> Result<Vec<Map<String, Value>>, Snapshot
             // The admitted migrated engine has no authored objectives.
             fields.insert("scenario".into(), json!({"version":1,"objectives":[]}));
         }
+        if let Some(tutorial) = state.tutorial_state() {
+            let step = crate::tutorial_steps::TutorialStep::ALL
+                .iter()
+                .position(|s| *s == tutorial.step())
+                .ok_or(SnapshotError::Rules)?;
+            fields.insert(
+                "mode".into(),
+                json!({"kind":"tutorial", "suddenDeath":false,
+                "slot":tutorial.enemy(), "goal":tutorial.goal(), "step":step,
+                "steps":crate::tutorial_steps::TutorialStep::ALL.len()}),
+            );
+        } else if let Some(assault) = state.assault {
+            finite(&[assault.time_left])?;
+            fields.insert("mode".into(), json!({"kind":"assault", "defenderTeam":assault.defender_team,
+                "attackerTeam":assault.attacker_team, "timeLeft":math::max(0., assault.time_left.ceil()),
+                "suddenDeath":false, "total":assault.total}));
+        }
         fields.insert("army".into(), json!({"pop":pop,"income":income}));
         fields.insert("wx".into(), json!(wx.map(r)));
         let player = state

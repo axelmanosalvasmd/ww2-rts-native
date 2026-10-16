@@ -19,6 +19,7 @@ pub enum ShotRef<'a> {
     Support(&'a SupportEvent),
     Environment(&'a Effect),
     Scenario(&'a SayAction),
+    Tutorial(&'a crate::match_tutorial::TutorialLine),
 }
 
 impl<'a> TryFrom<&'a TickEvent> for ShotRef<'a> {
@@ -30,6 +31,7 @@ impl<'a> TryFrom<&'a TickEvent> for ShotRef<'a> {
             TickEvent::Support(value) => Ok(Self::Support(value)),
             TickEvent::Environment(value) => Ok(Self::Environment(value)),
             TickEvent::Scenario(value) => Ok(Self::Scenario(value)),
+            TickEvent::Tutorial(value) => Ok(Self::Tutorial(value)),
             TickEvent::Aviation(_) => Err(SnapshotError::Unsupported {
                 unit: 0,
                 capability: SnapshotCapability::Air,
@@ -202,6 +204,13 @@ fn event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
 
 fn raw_event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
     match shot {
+        ShotRef::Tutorial(value) => {
+            if state.tutorial_state().is_none() {
+                return Err(SnapshotError::Rules);
+            }
+            numbers(&[value.at.x, value.at.z])?;
+            Ok(value.shot_json())
+        }
         ShotRef::Scenario(value) => {
             validate_public_say(value).map_err(|_| SnapshotError::Rules)?;
             if state.scenario.is_none()
@@ -393,6 +402,58 @@ fn until(state: &Match, visible: &[u8], shot: &Value) -> Result<f64, SnapshotErr
     Ok(until)
 }
 
+pub(super) fn flights_for(state: &Match, slot: usize) -> Result<Value, SnapshotError> {
+    let g = &state.world.game;
+    let time = g.tick as f64 * state.rules.movement.tick;
+    let mut fog = state.routing_fog.clone();
+    let visible = &fog.team(g, &state.rules, g.players[slot].team).vis;
+    let mut rows = Vec::new();
+    let catalog = Catalog::compiled().map_err(|_| SnapshotError::Rules)?;
+    for p in state.firing.flights.values() {
+        if p.launched > time {
+            continue;
+        }
+        let at = projectiles::flight_at(p.solution, time).map_err(|_| SnapshotError::Rules)?;
+        if !flight_visible(state, visible, Point { x: at.x, z: at.z }) {
+            continue;
+        }
+        let velocity =
+            projectiles::velocity_at(p.solution, time).map_err(|_| SnapshotError::Rules)?;
+        let mut row = json!({"flight":p.id,"kind":state.rules.kinds[p.source_kind].name,
+            "seq":p.sequence,"x":at.x,"y":at.y,"z":at.z,
+            "v":[velocity.x,velocity.y,velocity.z],"gravity":p.solution.gravity,
+            "time":time,"launched":p.launched,"expires":p.expires});
+        if let Some(effect) = p.effect {
+            row["effect"] = json!(effect);
+        }
+        let mut bound = until(state, visible, &row)?;
+        // The prototype's live flight preview tests current, visible bodies only.
+        let has_weapon = catalog
+            .unit(&state.rules.kinds[p.source_kind].name)
+            .map_err(|_| SnapshotError::Rules)?
+            .get("w")
+            .is_some_and(|w| matches!(w, crate::catalog::Value::Object(_)));
+        if has_weapon && bound > time {
+            let end =
+                projectiles::flight_at(p.solution, bound).map_err(|_| SnapshotError::Rules)?;
+            if let Some(hit) = state
+                .recipient_flight_contact(p, at, end, |id| seen_by(state, slot, id))
+                .map_err(|_| SnapshotError::Rules)?
+            {
+                bound = time + (bound - time) * hit.hit.fraction;
+            }
+        }
+        row["until"] = json!(bound);
+        if seen_by(state, slot, p.shooter) {
+            row["f"] = json!(p.shooter);
+            row["fo"] = crate::game::source_owner_json(p.owner);
+        }
+        crate::match_firing::normalize_json_zero(&mut row);
+        rows.push(row);
+    }
+    Ok(Value::Array(rows))
+}
+
 fn project_shots(
     state: &Match,
     selected: &[SelectedSeat],
@@ -401,7 +462,14 @@ fn project_shots(
     let events = shots
         .iter()
         .copied()
-        .map(|shot| event(state, shot).map(|row| (matches!(shot, ShotRef::Scenario(_)), row)))
+        .map(|shot| {
+            event(state, shot).map(|row| {
+                (
+                    matches!(shot, ShotRef::Scenario(_) | ShotRef::Tutorial(_)),
+                    row,
+                )
+            })
+        })
         .collect::<Result<Vec<_>, _>>()?;
     state
         .routing_fog
@@ -465,6 +533,85 @@ fn project_shots(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn live_flight_shape_visibility_and_extrapolation_match_prototype() {
+        let fixture: Value =
+            serde_json::from_str(include_str!("../../tests/fixtures/recipient-snapshot.json"))
+                .unwrap();
+        let mut state = super::super::tests::initialize(&fixture["cases"][0]);
+        let kind = state.world.game.units[&1].kind;
+        let blast = crate::match_firing::AbilityBlast::from_unit(kind, &state.rules).unwrap();
+        let id = state
+            .launch_ability_flight(1, Point { x: 35., z: 35. }, blast, Some(2.), None)
+            .unwrap();
+        state.firing.take_events();
+        let time = state.world.game.tick as f64 * state.rules.movement.tick;
+        let p = state.firing.flights.get_mut(&id).unwrap();
+        p.solution = Flight {
+            origin: Point3::new(35., 10., 35.),
+            velocity: Point3::new(10., 0., 0.),
+            gravity: 0.,
+            stamp: time,
+        };
+        p.launched = time;
+        p.expires = time + 2.;
+        p.effect = None;
+        state.world.game.reveal = true;
+        // These are exactly the keys/values of sim.js:5985-5994 for this flight.
+        let expected = json!({"flight":id,"kind":"rifle","seq":0,"x":35.,"y":10.,"z":35.,
+            "v":[10.,0,0],"gravity":0,"time":time,"launched":time,"expires":time+2.,"until":time+0.15,
+            "f":1,"fo":0});
+        assert_eq!(flights_for(&state, 0).unwrap(), json!([expected.clone()]));
+        state.world.game.reveal = false;
+        state.world.game.players[2].visible.clear();
+        let mut hidden = expected;
+        hidden.as_object_mut().unwrap().remove("f");
+        hidden.as_object_mut().unwrap().remove("fo");
+        assert_eq!(flights_for(&state, 2).unwrap(), json!([hidden]));
+        // A shot over an unseen cell stays hidden even to its own shooter.
+        state.firing.flights.get_mut(&id).unwrap().solution.origin = Point3::new(-10., 10., -10.);
+        assert_eq!(flights_for(&state, 0).unwrap(), json!([]));
+        state.world.game.reveal = true;
+        state.firing.flights.get_mut(&id).unwrap().launched = time + 1.;
+        assert_eq!(flights_for(&state, 0).unwrap(), json!([]));
+        let p = state.firing.flights.get_mut(&id).unwrap();
+        p.launched = time;
+        p.solution.origin = Point3::new(35., 1., 25.);
+        // A visible terrain contact clips the preview at x=36, without stepping damage.
+        state
+            .world
+            .set_cell(12 * state.world.game.w + 18, b'K')
+            .unwrap();
+        let rows = flights_for(&state, 0).unwrap();
+        assert!((rows[0]["until"].as_f64().unwrap() - (time + 0.1)).abs() < 1e-12);
+        assert_eq!(state.world.game.tick, 125);
+        assert_eq!(state.firing.flights.len(), 1);
+        state
+            .world
+            .set_cell(12 * state.world.game.w + 18, b'.')
+            .unwrap();
+        state.world.game.reveal = false;
+        state.world.game.units.get_mut(&1).unwrap().x = 32.;
+        state.world.game.units.get_mut(&1).unwrap().z = 25.;
+        state.world.game.units.get_mut(&3).unwrap().x = 36.5;
+        state.world.game.units.get_mut(&3).unwrap().z = 25.;
+        state.grid.rebuild(&state.world.game.units);
+        state.routing_fog = crate::fog::Fog::default();
+        state.world.game.players[0].visible = vec![1, 3];
+        let visible = flights_for(&state, 0).unwrap()[0]["until"]
+            .as_f64()
+            .unwrap();
+        state.world.game.players[0].visible = vec![1];
+        let hidden = flights_for(&state, 0).unwrap()[0]["until"]
+            .as_f64()
+            .unwrap();
+        assert!(visible < hidden, "a visible blocker bounds extrapolation");
+        assert!(
+            (hidden - (time + 0.15)).abs() < 1e-12,
+            "a hidden blocker must not affect until"
+        );
+    }
 
     #[test]
     fn actual_legacy_say_keeps_public_order_and_rejects_a_later_bad_row() {

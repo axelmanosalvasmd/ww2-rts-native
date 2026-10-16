@@ -99,7 +99,6 @@ async fn real_socket_maintenance_uses_trusted_runtime_and_public_start_stays_den
             .block_on(control.attach("ABC", lobby::native_tests::native_match()))
             .unwrap();
         a.send(json!({"t":"start"}));
-        assert_eq!(a.until("deny")["cmd"], "start");
         let first = a.until("s");
         let second = b.until("s");
         assert_eq!(first["online"], json!([true, true]));

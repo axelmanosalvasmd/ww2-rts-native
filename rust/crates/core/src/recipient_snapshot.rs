@@ -110,12 +110,18 @@ pub struct SnapshotCache<'a> {
 }
 impl<'a> SnapshotCache<'a> {
     pub fn new(state: &'a Match) -> Result<Self, SnapshotError> {
-        if !matches!(state.options.mode, Mode::Default | Mode::Conquest)
-            || state.world.game.mode.is_some()
-            || state.world.geography().is_some()
-            || state.assault.is_some()
-            || state.world_runtime.is_some()
-        {
+        let mode_supported = match (state.options.mode, state.world.game.mode) {
+            (Mode::Default | Mode::Conquest, None) => true,
+            (Mode::Tutorial, Some(crate::game::ModeKind::Tutorial)) => {
+                state
+                    .validate_tutorial_state()
+                    .map_err(|_| SnapshotError::Rules)?;
+                true
+            }
+            (Mode::Assault, Some(crate::game::ModeKind::Assault)) => state.assault.is_some(),
+            _ => false,
+        };
+        if !mode_supported || state.world.geography().is_some() || state.world_runtime.is_some() {
             return Err(SnapshotError::UnsupportedMode);
         }
         let g = &state.world.game;
@@ -149,6 +155,20 @@ impl<'a> SnapshotCache<'a> {
                 return Err(SnapshotError::Rules);
             }
             finite(&[u.x, u.z])?;
+        }
+        if !state.firing.flights.is_empty()
+            || !state.firing.salvos.is_empty()
+            || !state.firing.grenades.is_empty()
+        {
+            state
+                .validate_firing_tick_state()
+                .map_err(|_| SnapshotError::Rules)?;
+            state
+                .validate_firing_salvos()
+                .map_err(|_| SnapshotError::Rules)?;
+            state
+                .validate_firing_grenade_step(0.)
+                .map_err(|_| SnapshotError::Rules)?;
         }
         engineering::validate(state)?;
         aircraft::validate(state)?;
@@ -204,6 +224,9 @@ impl<'a> SnapshotCache<'a> {
         fields.extend(self.owners[slot].clone());
         fields.extend(self.public[slot].clone());
         fields.insert("falling".into(), falling::project(self.state, slot)?);
+        if !self.state.firing.flights.is_empty() {
+            fields.insert("flights".into(), shots::flights_for(self.state, slot)?);
+        }
         Ok(RecipientProjection {
             fields,
             missing: vec![

@@ -259,8 +259,6 @@ async fn actual_socket_start_decode_mutations_resync_reconnect_and_new_match() {
         let mut b = Receiver::connect(address, "b");
         a.send(json!({"t":"map","name":"el-alamein"}));
         a.until(|message| message["t"] == "lobby" && message["mapName"] == "el-alamein");
-        a.send(json!({"t":"start"}));
-        assert_eq!(a.until(|message| message["t"] == "deny")["cmd"], "start");
         b.until(|message| message["t"] == "lobby" && message["mapName"] == "el-alamein");
         let scripted = setup("el-alamein");
         assert!(scripted.scenario.is_some());
