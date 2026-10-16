@@ -676,7 +676,11 @@ impl Match {
         self.aviation.planes.insert(id, next.runtime);
         self.firing.units.insert(id, next.firing);
         self.grid.update(id, &self.world.game.units[&id]);
-        self.step_aircraft_weapons(id)?;
+        // Hosted Horde retains its aircraft-weapon boundary. Ordinary rooms use
+        // the incoming validated aircraft-projectile recipient path.
+        if self.options.mode != crate::economy::Mode::Horde || !self.ordinary_snapshot_only {
+            self.step_aircraft_weapons(id)?;
+        }
         Ok(())
     }
     fn prepare_aircraft_anti_air(

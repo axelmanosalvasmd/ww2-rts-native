@@ -276,7 +276,9 @@ fn hosted_horde_save_restores_wave_inputs_and_brain_then_resumes_to_full_ending_
                         for shot in message["shots"].as_array().into_iter().flatten() {
                             if shot["k"] == "aa"
                                 && shot["to"] == 2
-                                && shot["t"].as_u64().is_some_and(|id| saved_aircraft.contains(&id))
+                                && shot["t"]
+                                    .as_u64()
+                                    .is_some_and(|id| saved_aircraft.contains(&id))
                             {
                                 assert!(shot["x"].as_f64().is_some_and(|x| x.is_finite()));
                                 assert!(shot["z"].as_f64().is_some_and(|z| z.is_finite()));
@@ -285,7 +287,9 @@ fn hosted_horde_save_restores_wave_inputs_and_brain_then_resumes_to_full_ending_
                             if shot["k"] == "planedown"
                                 && shot["to"] == 2
                                 && shot.get("t").is_none_or(|target| {
-                                    target.as_u64().is_some_and(|id| saved_aircraft.contains(&id))
+                                    target
+                                        .as_u64()
+                                        .is_some_and(|id| saved_aircraft.contains(&id))
                                 })
                             {
                                 assert!(saw_aircraft_aa[slot], "plane down preceded delivered AA");
@@ -376,13 +380,31 @@ fn hosted_horde_save_restores_wave_inputs_and_brain_then_resumes_to_full_ending_
 }
 
 #[test]
-fn hosted_horde_save_keeps_human_and_atomic_load_capability_guards() {
+fn hosted_horde_save_keeps_host_and_atomic_load_capability_guards() {
     let dir = TestDir::new();
     let (mut hub, host, mut host_rx, guest, mut guest_rx) = setup(&dir, false);
     assert!(hub.save_room("ABC", guest.id).is_err());
-    hub.rooms.get_mut("ABC").unwrap().players[1].ai = true;
+    hub.rooms
+        .get_mut("ABC")
+        .unwrap()
+        .native
+        .as_mut()
+        .unwrap()
+        .runtime
+        .state_mut()
+        .options
+        .mode = Mode::World;
     assert!(hub.save_room("ABC", host.id).is_err());
-    hub.rooms.get_mut("ABC").unwrap().players[1].ai = false;
+    hub.rooms
+        .get_mut("ABC")
+        .unwrap()
+        .native
+        .as_mut()
+        .unwrap()
+        .runtime
+        .state_mut()
+        .options
+        .mode = Mode::Horde;
     let id = hub.save_room("ABC", host.id).unwrap();
     let saved = hub.saves.read("ABC", &id).unwrap();
     hub.rooms.get_mut("ABC").unwrap().native = None;
@@ -399,7 +421,7 @@ fn hosted_horde_save_keeps_human_and_atomic_load_capability_guards() {
         let mut bad = saved.clone();
         match mutate {
             0 => bad["settings"]["mode"] = json!("conquest"),
-            1 => bad["seats"][1]["ai"] = json!(true),
+            1 => bad["seats"][1]["ai"] = json!("invalid"),
             2 => bad["ai"] = json!({"planner":"unsupported"}),
             _ => bad["g"]["held"] = json!(120),
         }

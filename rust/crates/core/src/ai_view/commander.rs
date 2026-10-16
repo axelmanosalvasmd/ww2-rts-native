@@ -846,7 +846,8 @@ mod detached {
         /// Validation and sighting updates commit together after the full packet succeeds.
         /// This accepts no authority handle, visibility oracle or other seat's economy.
         pub fn observe(&mut self, view: &SeatView) -> Result<HumanView<Observation>> {
-            if !(0..=SAFE_TICK).contains(&view.tick) || self.tick.is_some_and(|old| view.tick < old) {
+            if !(0..=SAFE_TICK).contains(&view.tick) || self.tick.is_some_and(|old| view.tick < old)
+            {
                 return Err("delivered commander clock went backwards or is invalid".into());
             }
             let me = view
@@ -1060,14 +1061,18 @@ mod detached {
             }
             context.known_buildings.sort_by_key(|b| b.id);
             context.site_nodes = view.nodes.iter().map(point).collect::<Result<_>>()?;
-            context.nodes = view.nodes.iter().map(|node| {
-                Ok(NodeObservation {
-                    at: point(node)?,
-                    rate: number(&node["rate"])?,
-                    fuel: truth(&node["fuel"]),
-                    visible: false,
+            context.nodes = view
+                .nodes
+                .iter()
+                .map(|node| {
+                    Ok(NodeObservation {
+                        at: point(node)?,
+                        rate: number(&node["rate"])?,
+                        fuel: truth(&node["fuel"]),
+                        visible: false,
+                    })
                 })
-            }).collect::<Result<_>>()?;
+                .collect::<Result<_>>()?;
             context.known_depots = context
                 .known_buildings
                 .iter()
@@ -1212,7 +1217,9 @@ mod detached {
         let owner = unsigned(&me["slot"])? as usize;
         let own_structures = units
             .iter()
-            .filter(|u| u.owner == owner && catalog.unit(&u.kind).is_ok_and(|d| flag(d, "structure")))
+            .filter(|u| {
+                u.owner == owner && catalog.unit(&u.kind).is_ok_and(|d| flag(d, "structure"))
+            })
             .collect::<Vec<_>>();
         let ready = |kind: &str| {
             own_structures

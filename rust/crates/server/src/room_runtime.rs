@@ -115,9 +115,6 @@ impl RoomRuntime {
         Ok(messages)
     }
     pub fn new(mut state: Match, now_ms: u64) -> Result<Self, String> {
-        if state.options.mode == ww2_core::economy::Mode::Horde {
-            state.tick_state.restrict_aircraft_weapons_for_delivery();
-        }
         state.validate_tick_state()?;
         state
             .restrict_to_ordinary_snapshots()

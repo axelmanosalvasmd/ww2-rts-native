@@ -1719,7 +1719,11 @@ impl Hub {
                 // All requested human and internal Horde views refresh before either owner acts.
                 let think_at = Instant::now();
                 if let Err(error) = room.native.as_mut().unwrap().runtime.think(sent) {
-                    room.native.as_mut().unwrap().runtime.fault_stop(format!("Horde AI scheduling: {error}"));
+                    room.native
+                        .as_mut()
+                        .unwrap()
+                        .runtime
+                        .fault_stop(format!("Horde AI scheduling: {error}"));
                     continue;
                 }
                 let horde_think = think_at.elapsed().as_secs_f64() * 1000.0;

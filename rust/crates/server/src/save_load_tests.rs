@@ -808,10 +808,27 @@ fn mode55_lobby_record_uses_current_map_defender_count_and_army_after_reload() {
     // The composed hosted runtime now admits this eligible one-defender lobby.
     room.mode = "horde".into();
     hub.message("ABC", &host, &mut true, json!({"t":"start"}), 1);
-    assert!(messages(&mut hub, &mut rx).iter().any(|m| m["t"] == "start"));
+    assert!(
+        messages(&mut hub, &mut rx)
+            .iter()
+            .any(|m| m["t"] == "start")
+    );
     let native = hub.rooms.get_mut("ABC").unwrap().native.as_mut().unwrap();
     native.runtime.advance_tick(&[false; 2]).unwrap();
-    let seats = (0..2).map(|slot| SelectedSeat {slot, full:false, omit:false}).collect::<Vec<_>>();
-    assert_eq!(native.runtime.collect_frame(&seats, FrameKind::Current).unwrap().len(), 2);
+    let seats = (0..2)
+        .map(|slot| SelectedSeat {
+            slot,
+            full: false,
+            omit: false,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        native
+            .runtime
+            .collect_frame(&seats, FrameKind::Current)
+            .unwrap()
+            .len(),
+        2
+    );
     assert!(native.runtime.fault().is_none());
 }

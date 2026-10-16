@@ -95,7 +95,6 @@ impl Hub {
             || state.options.logistics
             || (state.options.sandbox && state.options.mode != Mode::Horde)
             || state.world_runtime.is_some()
-            || (state.options.mode == Mode::Horde && room.players.iter().any(|p| p.ai))
             || !room.spectators.is_empty()
         {
             return Err("save needs an unavailable room capability".into());
@@ -161,9 +160,6 @@ impl Hub {
             seats.len(),
         ) {
             return Err("saved mode disagrees with the match".into());
-        }
-        if state.options.mode == Mode::Horde && seats.iter().any(|seat| seat["ai"] != false) {
-            return Err("Horde save loading requires human commanders".into());
         }
         let present = room
             .players
@@ -334,10 +330,10 @@ impl Hub {
             .iter()
             .enumerate()
             .map(|(slot, player)| {
-                staged.players.get(slot).map_or_else(
-                    || player.config.name.clone(),
-                    |person| person.name.clone(),
-                )
+                staged
+                    .players
+                    .get(slot)
+                    .map_or_else(|| player.config.name.clone(), |person| person.name.clone())
             })
             .collect::<Vec<_>>();
         prepared.starts = prepared.attached.runtime.collect_starts(

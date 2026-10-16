@@ -460,3 +460,193 @@ fn net94_isolated_game_workers_publish_to_one_record_owner_and_keep_better_run()
         Some(first_best)
     );
 }
+
+#[test]
+fn mode09_hosted_horde_levels_and_normal_handover_preserve_army_and_deliver_views() {
+    let (mut hub, a, mut ra, b, mut rb) = lobby();
+    let dir = MapDir::new();
+    dir.write(&arena());
+    hub.configure_authored_maps(Some(dir.0.clone()));
+    hub.configure_records(crate::HordeRecords::new(dir.0.join("records.json")));
+    command(&mut hub, &a, json!({"t":"addAi"}), 0);
+    assert_eq!(hub.rooms["ABC"].players[2].level, "normal");
+    for level in ["easy", "normal", "hard"] {
+        command(&mut hub, &a, json!({"t":"level","slot":2,"v":level}), 0);
+        assert_eq!(hub.rooms["ABC"].players[2].level, level);
+    }
+    command(&mut hub, &a, json!({"t":"level","slot":0,"v":"hard"}), 0);
+    assert_eq!(hub.rooms["ABC"].players[0].level, "normal");
+    command(&mut hub, &b, json!({"t":"level","slot":2,"v":"easy"}), 0);
+    assert_eq!(hub.rooms["ABC"].players[2].level, "hard");
+    hub.start_horde("ABC", a.id, false, 0).unwrap();
+    outputs(&mut hub, &mut ra, 0);
+    outputs(&mut hub, &mut rb, 0);
+    let army = |hub: &Hub| {
+        hub.rooms["ABC"]
+            .native
+            .as_ref()
+            .unwrap()
+            .runtime
+            .state()
+            .world
+            .game
+            .units
+            .values()
+            .filter(|u| u.owner == 1)
+            .map(|u| (u.id, u.kind, u.hp))
+            .collect::<Vec<_>>()
+    };
+    let before = army(&hub);
+    hub.disconnected("ABC", b.id, 1);
+    assert!(hub.native_status("ABC").unwrap().paused);
+    command(&mut hub, &a, json!({"t":"handAi","slot":1}), 2);
+    assert_eq!(army(&hub), before);
+    assert!(hub.rooms["ABC"].players[1].ai);
+    assert_eq!(hub.rooms["ABC"].players[1].level, "normal");
+    assert_eq!(hub.rooms["ABC"].players[2].level, "hard");
+    assert!(!hub.native_status("ABC").unwrap().paused);
+    let selected = (0..4)
+        .map(|slot| SelectedSeat {
+            slot,
+            full: false,
+            omit: false,
+        })
+        .collect::<Vec<_>>();
+    for callback in 0..40_u64 {
+        hub.poll_native(callback * 50, callback * 50_000_000);
+        outputs(&mut hub, &mut ra, callback * 50);
+        let runtime = &mut hub
+            .rooms
+            .get_mut("ABC")
+            .unwrap()
+            .native
+            .as_mut()
+            .unwrap()
+            .runtime;
+        assert!(runtime.fault().is_none(), "{:?}", runtime.fault());
+        assert_eq!(
+            runtime
+                .collect_frame(&selected, FrameKind::Current)
+                .unwrap()
+                .len(),
+            4
+        );
+        assert!(runtime.ai_commander(1).is_some() && runtime.ai_commander(2).is_some());
+    }
+}
+
+#[test]
+fn net78_hosted_horde_human_ai_and_director_idle_for_all_120_callbacks() {
+    let (mut hub, a, mut ra, _, mut rb) = lobby();
+    let dir = MapDir::new();
+    dir.write(&arena());
+    hub.configure_authored_maps(Some(dir.0.clone()));
+    hub.configure_records(crate::HordeRecords::new(dir.0.join("records.json")));
+    hub.configure_saves(dir.0.join("saves"));
+    command(&mut hub, &a, json!({"t":"addAi"}), 0);
+    hub.start_horde("ABC", a.id, false, 0).unwrap();
+    outputs(&mut hub, &mut ra, 0);
+    outputs(&mut hub, &mut rb, 0);
+    for callback in 0..40_u64 {
+        hub.poll_native(callback * 50, callback * 50_000_000);
+        outputs(&mut hub, &mut ra, callback * 50);
+        outputs(&mut hub, &mut rb, callback * 50);
+        assert!(hub.native_status("ABC").unwrap().fault.is_none());
+    }
+    let runtime = &hub.rooms["ABC"].native.as_ref().unwrap().runtime;
+    assert!(runtime.ai_delivered_view(2).is_some());
+    let id = hub.save_room("ABC", a.id).unwrap();
+    let saved = hub.saves.read("ABC", &id).unwrap();
+    assert!(saved["ai"][2].is_object());
+    hub.rooms.get_mut("ABC").unwrap().native = None;
+    hub.load_room("ABC", a.id, &id, 2000).unwrap();
+    assert!(hub.native_status("ABC").unwrap().paused);
+    assert!(hub.rooms["ABC"].players[2].ai);
+    assert_eq!(hub.rooms["ABC"].players[2].level, "normal");
+    command(&mut hub, &a, json!({"t":"resume"}), 2000);
+    outputs(&mut hub, &mut ra, 2000);
+    outputs(&mut hub, &mut rb, 2000);
+    defeat(&mut hub);
+    let mut frozen = None;
+    let mut frames = [0; 2];
+    for callback in 40..640_u64 {
+        let before = hub.native_status("ABC").unwrap();
+        if let Some((human, director)) = &frozen {
+            let runtime = &hub.rooms["ABC"].native.as_ref().unwrap().runtime;
+            assert_eq!(runtime.ai_commander(2), Some(human));
+            assert_eq!(runtime.ai.as_ref().unwrap().commander(3), Some(director));
+            let pending = runtime.state().commands.pending_commands();
+            command(&mut hub, &a, json!({"t":"stop","ids":[1]}), callback * 50);
+            assert_eq!(
+                hub.rooms["ABC"]
+                    .native
+                    .as_ref()
+                    .unwrap()
+                    .runtime
+                    .state()
+                    .commands
+                    .pending_commands(),
+                pending
+            );
+        }
+        hub.poll_native(callback * 50, callback * 50_000_000);
+        let status = hub.native_status("ABC").unwrap();
+        assert!(status.fault.is_none(), "{:?}", status.fault);
+        for (slot, rx) in [&mut ra, &mut rb].into_iter().enumerate() {
+            let messages = outputs(&mut hub, rx, callback * 50);
+            if frozen.is_some() {
+                let count = messages.iter().filter(|v| v["t"] == "s").count();
+                assert_eq!(count, usize::from(status.held.is_multiple_of(2)));
+                frames[slot] += count;
+                if status.held == 120 {
+                    let lobby = messages.iter().find(|v| v["t"] == "lobby").unwrap();
+                    assert_eq!(lobby["result"]["you"], json!({"team":0,"outcome":"defeat"}));
+                }
+            }
+        }
+        if frozen.is_some() {
+            assert_eq!(status.held, before.held + 1);
+            assert_eq!(
+                status.tick - before.tick,
+                i64::from(status.held.is_multiple_of(2))
+            );
+        }
+        if status.ending_complete {
+            break;
+        }
+        let runtime = &mut hub
+            .rooms
+            .get_mut("ABC")
+            .unwrap()
+            .native
+            .as_mut()
+            .unwrap()
+            .runtime;
+        if frozen.is_none() && runtime.state().finish.is_some() {
+            frozen = Some((
+                runtime.ai_commander(2).unwrap().clone(),
+                runtime.ai.as_ref().unwrap().commander(3).unwrap().clone(),
+            ));
+        }
+        let selected = (0..4)
+            .map(|slot| SelectedSeat {
+                slot,
+                full: false,
+                omit: false,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            runtime
+                .collect_frame(&selected, FrameKind::Current)
+                .unwrap()
+                .len(),
+            4
+        );
+    }
+    assert_eq!(frames, [60, 60]);
+    assert!(hub.rooms["ABC"].native.is_none());
+    let result = &hub.rooms["ABC"].result.as_ref().unwrap().report;
+    assert_eq!(result["teams"], json!([0, 0, 0, 1]));
+    assert_eq!(result["names"], json!(["a", "b", "AI 1", "Horde"]));
+    assert_eq!(result["winner"], 1);
+}
