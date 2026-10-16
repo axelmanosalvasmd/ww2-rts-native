@@ -36,6 +36,141 @@ fn options(mode: Mode, count: usize) -> MatchOptions {
     }
 }
 
+fn weather_match(choice: WeatherChoice, seed: Option<u32>, map_weather: &str) -> Match {
+    let map = AuthoritativeMap::from_json(
+        &serde_json::to_vec(&serde_json::json!({
+            "name": "Weather runtime", "w":64, "h":64,
+            "rows":vec![".".repeat(64);64],
+            "spawns":[{"x":4,"y":4},{"x":59,"y":59}],
+        "points":[{"x":32,"y":32}], "weather":map_weather
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let mut opts = options(Mode::Conquest, 2);
+    opts.weather = choice;
+    opts.weather_seed = seed;
+    opts.living_weather = true;
+    Match::new(&map, opts).unwrap()
+}
+
+#[test]
+fn mode07_core_accepts_fresh_recorded_weather_seeds_and_replays_without_other_stream_changes() {
+    use ww2_core::weather::{WeatherKind, WeatherPlan};
+    // Existing exact weather fixture: random seed 0 starts fog and lifts at tick 4460.
+    let a = weather_match(WeatherChoice::Random, Some(0), "clear");
+    let replay = weather_match(WeatherChoice::Random, Some(0), "clear");
+    let b = weather_match(WeatherChoice::Random, Some(1), "clear");
+    assert_eq!(a.start.weather_seed, 0);
+    assert_eq!(b.start.weather_seed, 1);
+    assert_eq!(
+        a.start.weather,
+        WeatherPlan {
+            now: WeatherKind::Fog,
+            next: Some(WeatherKind::Clear),
+            at: 4460
+        }
+    );
+    assert_eq!(a.start.weather, replay.start.weather);
+    assert_ne!(a.start.weather, b.start.weather);
+    assert_eq!(a.start.environment_seed, b.start.environment_seed);
+    assert_eq!(a.start.wind, b.start.wind);
+    assert_eq!(a.start.random.snapshot(), b.start.random.snapshot());
+    let units = |m: &Match| {
+        m.world
+            .game
+            .units
+            .values()
+            .map(|u| (u.id, u.owner, u.kind, u.x.to_bits(), u.z.to_bits()))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(units(&a), units(&b));
+    // Omitting an explicit plan seed is deterministic, rather than fresh entropy.
+    let derived = weather_match(WeatherChoice::Random, None, "clear");
+    let derived_replay = weather_match(WeatherChoice::Random, None, "clear");
+    assert_eq!(
+        derived.start.weather_seed,
+        derived_replay.start.weather_seed
+    );
+    assert_eq!(derived.start.weather, derived_replay.start.weather);
+    assert_eq!(
+        derived.start.random.snapshot(),
+        derived_replay.start.random.snapshot()
+    );
+}
+
+#[test]
+fn mode07_fixed_and_map_weather_hold_through_ticks_with_rain_and_mud_initialization() {
+    use ww2_core::weather::WeatherKind;
+    for kind in [
+        WeatherKind::Clear,
+        WeatherKind::Fog,
+        WeatherKind::Rain,
+        WeatherKind::Mud,
+        WeatherKind::Snow,
+    ] {
+        for choice in [WeatherChoice::Fixed(kind), WeatherChoice::Map] {
+            let mut m = weather_match(choice, Some(71), kind.name());
+            assert_eq!(m.start.weather.now, kind);
+            assert_eq!(m.world.game.weather, Some(kind as usize));
+            assert_eq!(
+                m.world.game.rain,
+                if kind == WeatherKind::Rain { 1.0 } else { 0.0 }
+            );
+            assert_eq!(
+                m.world.game.wet,
+                Some(if matches!(kind, WeatherKind::Rain | WeatherKind::Mud) {
+                    1.0
+                } else {
+                    0.0
+                })
+            );
+            assert_eq!(m.start.living.unwrap().raining, kind == WeatherKind::Rain);
+            // Pass the latest random transition time, without a wall-clock wait.
+            m.initialize_tick_scene(8_400, Default::default()).unwrap();
+            for _ in 0..3 {
+                m.advance_tick().unwrap();
+                assert_eq!(m.start.weather.now, kind);
+                assert_eq!(m.start.weather.next, None);
+                assert_eq!(m.world.game.weather, Some(kind as usize));
+                if kind == WeatherKind::Rain {
+                    assert_eq!(m.world.game.rain, 1.0);
+                }
+                if kind == WeatherKind::Mud {
+                    assert_eq!(m.world.game.wet, Some(1.0));
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn mode07_random_weather_transitions_once_at_the_announced_core_tick() {
+    use ww2_core::weather::WeatherKind;
+    for (seed, before, after, earliest, latest) in [
+        (0, WeatherKind::Fog, WeatherKind::Clear, 210 * 20, 270 * 20),
+        (6, WeatherKind::Rain, WeatherKind::Mud, 300 * 20, 420 * 20),
+    ] {
+        let mut m = weather_match(WeatherChoice::Random, Some(seed), "clear");
+        let plan = m.start.weather;
+        assert_eq!(plan.now, before);
+        assert_eq!(plan.next, Some(after));
+        assert!((earliest..latest).contains(&plan.at));
+        m.initialize_tick_scene(u64::from(plan.at - 2), Default::default())
+            .unwrap();
+        m.advance_tick().unwrap();
+        assert_eq!(m.start.weather, plan);
+        m.advance_tick().unwrap();
+        assert_eq!(m.start.weather.now, after);
+        assert_eq!(m.start.weather.next, None);
+        assert_eq!(m.start.weather.at, 0);
+        assert_eq!(m.world.game.weather, Some(after as usize));
+        m.advance_tick().unwrap();
+        assert_eq!(m.start.weather.now, after);
+        assert_eq!(m.start.weather.next, None);
+    }
+}
+
 #[test]
 fn mode32_assault_authoring_checks_ranges_sets_flags_and_shared_spawns() {
     use serde_json::json;
