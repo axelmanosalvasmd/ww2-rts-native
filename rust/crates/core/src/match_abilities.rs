@@ -156,6 +156,7 @@ impl Match {
             self.options.mode,
             crate::economy::Mode::Default
                 | crate::economy::Mode::Conquest
+                | crate::economy::Mode::Tutorial
                 | crate::economy::Mode::World
         ) {
             return Err("abilities currently require represented Conquest or World state".into());

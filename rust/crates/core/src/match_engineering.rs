@@ -25,11 +25,7 @@ fn denial(reason: Reason) -> Denial {
 }
 impl Match {
     pub(super) fn validate_field_work_state(&self) -> Result<(), String> {
-        if !matches!(
-            self.options.mode,
-            crate::economy::Mode::Default | crate::economy::Mode::Conquest
-        ) || self.world.game.mode.is_some()
-        {
+        if !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode) {
             return Err("Match field works support Conquest only".into());
         }
         if self.world.game.tick < 0 || self.world.game.tick > 9_007_199_254_740_991 {

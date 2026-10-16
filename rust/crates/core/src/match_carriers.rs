@@ -3,7 +3,6 @@
 
 use crate::{
     catalog::Catalog,
-    economy::Mode,
     game::{CELL, MOVE, Point},
     grid::UnitId,
     match_commands::{Command, Denial, MoveOutcome},
@@ -52,7 +51,7 @@ fn view(m: &Match) -> TerrainView<'_> {
 impl Match {
     pub(crate) fn validate_carrier_world(&self) -> Result<(), String> {
         let g = &self.world.game;
-        if !matches!(self.options.mode, Mode::Default | Mode::Conquest) || g.mode.is_some() {
+        if !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode) {
             return Err("carrier execution requires ordinary Conquest".into());
         }
         if g.w == 0
