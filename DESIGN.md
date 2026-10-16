@@ -5092,9 +5092,9 @@ Building memory follows the prototype's `isConstructionMode` gate: Classic and W
 
 Classic full ticks and non-ordinary recipient snapshots remain guarded. CMB-130 is dropped from this batch's claim: building memory runs in Classic/World only; waits on #301 Classic runner and World admission. Its component tests retain last-observed identity, type, owner, position and construction progress, shared team sight, hidden changes, unseen destruction and ground/airborne invalidation. Default/Conquest regressions cover seeing a barracks, retreating, hidden changes, retirement, VP finish and revisit with no memory or ghosts. Ability, base dispatch, research and bunker checks retain their full-match continuations and every-seat snapshots. No ABI, wire shape, contract or public command admission changes.
 
-## World fort capture remains guarded (2026-10-16)
+## World fort capture follows main's bounded component (2026-10-16)
 
-PR #336 retains main's World fort-capture refusal before region, income, elimination or finish publication. Its proposed ownership-transfer actuator is deferred with uncounted BASE-54. Tick admission likewise refuses an imminent fort transfer before commands. The constructor's existing fort ranks are unchanged and have a read-only regression test. Damaged-fort refusal retains the original units, owners, footprints, wallets and regions. World construction, Gate physics, recipient snapshots and hosted admission remain guarded.
+PR #336 keeps main's World region, elimination and finish behavior from #301, including fort-owner transfers in the bounded component. Tick admission still refuses an imminent fort transfer before commands. The constructor's existing fort ranks retain a read-only regression test. The atomicity witness stages a damaged fort and an eliminated owner's construction plan, then requires the combined income, capture and elimination phase to refuse before changing units, owners, footprints, wallets or regions. World construction, Gate physics, recipient snapshots and hosted admission remain guarded. BASE-54 remains uncounted in this branch.
 
 ## Borrowed building placement (2026-10-16)
 

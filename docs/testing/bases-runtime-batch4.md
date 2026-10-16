@@ -2,31 +2,31 @@
 
 BASE-47 is the only counted row. BASE-27 and BASE-54 remain weak and uncounted.
 
-## World scope after the CI repair
+## World scope after merging main
 
-PR #336 preserves main's World runtime. The proposed fort-owner transfer,
-elimination exemption, finish-owner transition and removed tick preflight guard
-are withdrawn. The World region, tick, elimination and finish implementations
-are restored verbatim from main. World construction, Gate ticks, recipient
-snapshots and hosted admission remain guarded.
+PR #336 keeps main's World runtime from #301, including bounded fort-owner
+transfers before elimination and finish. World tick preflight, construction,
+Gate ticks, recipient snapshots and hosted admission remain guarded.
 
-Both reported regressions remain unchanged:
-`world_epilogue::late_fort_refusal_preserves_decided_phase_and_the_original_terminal_owners`
+Main's regression tests remain unchanged:
+`world_epilogue::late_fort_transfer_preserves_decided_result_story_and_capture_timestamps`
 and
-`world_phases::combined_refusal_is_atomic_but_separate_income_is_an_explicit_committed_phase`.
-The existing `world_finish` and `world_regions` oracle tests also regain main's
-support-marker handling. Refusal and atomicity assertions remain intact.
+`world_phases::fort_transfer_matches_split_phases_and_logistics_refusal_keeps_income_boundaries`.
+The existing `world_finish` and `world_regions` oracle tests retain main's
+support-marker handling and assertions.
 
 The test-only `base54_world_fort_ranks_are_confined_to_source_shares` checks the
-constructor already on main. `base54_fort_capture_refusal_keeps_elimination_atomic`
-retains the atomicity assertions and uses a damaged fort. The four positive
-transfer tests are removed with the deferred actuator: damaged-owner/footprint
-transfer, Gate transfer, survival through previous-owner elimination, and
-replacement-footprint preservation. These are not counted evidence.
+constructor already on main. The former
+`base54_fort_capture_refusal_keeps_elimination_atomic` expected the component's
+withdrawn fort-transfer refusal. It is now
+`base54_elimination_construction_plan_refusal_keeps_fort_capture_atomic`: it uses
+the existing damaged fort and construction-plan blocker, calls the combined
+income, capture and elimination phase, and requires the exact construction-plan
+refusal. Every original assertion about units, pace bits, region state, wallets
+and fort-footprint owners remains. BASE-54 stays uncounted.
 
 The prototype transfers damaged forts in `shared/sim.js:1197-1204` at `e4e579a`.
-This repair chooses case (a), preserving main's bounded World support rather than
-changing expectations to admit more World behavior. No prototype run is claimed.
+No prototype run is claimed by this repair.
 
 BASE-57 remains dropped: accepting a recorded convoy's return to an obstructed
 source through its accessible service edge needs an owner decision.
@@ -71,6 +71,6 @@ claiming and cancellation/destruction release are not claimed.
 - BASE-59: Classic owner production snapshots require recipient/transport work outside this stream.
 
 No Source recorder ran. All new placement facts are transient query inputs or
-outputs. World fort ownership is unchanged; no persistent field is added. The
+outputs. This branch adds no persistent field; bounded fort ownership follows main. The
 complete-logistics tick and snapshot guards remain closed. BASE-01, BASE-02, BASE-46, BASE-55 and BASE-57 are
 outside the continuation's ownership.

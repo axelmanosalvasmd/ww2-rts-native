@@ -259,7 +259,7 @@ fn base54_world_fort_ranks_are_confined_to_source_shares() {
 }
 
 #[test]
-fn base54_fort_capture_refusal_keeps_elimination_atomic() {
+fn base54_elimination_construction_plan_refusal_keeps_fort_capture_atomic() {
     let (mut m, region, forts) = capture_scene();
     let id = forts[0];
     m.world.game.units.get_mut(&id).unwrap().hp *= 0.5;
@@ -283,10 +283,10 @@ fn base54_fort_capture_refusal_keeps_elimination_atomic() {
     let regions = m.world_runtime.as_ref().unwrap().regions.clone();
     let wallets = m.start.economy.clone();
     let order = m.world.game.units.keys().copied().collect::<Vec<_>>();
-    assert!(
-        m.apply_world_regions(&order, 0.05)
-            .unwrap_err()
-            .contains("fort")
+    assert_eq!(
+        m.apply_world_capture_income_and_elimination(&order, &order, 0.05)
+            .unwrap_err(),
+        "unsupported World elimination: mass-work and construction plans"
     );
     assert_eq!(
         m.world.game.units.keys().collect::<Vec<_>>(),
