@@ -483,11 +483,12 @@ impl Match {
             }
             self.combat.get_mut(id).unwrap().carrier = None;
             let unit = self.world.game.units.get_mut(&id).unwrap();
-            unit.riding = false;
-            unit.x = at.x;
-            unit.z = at.z;
-            unit.hp = hp;
-            self.grid.update(id, unit);
+            crate::unit_placement::place_unit(&mut self.grid, unit, |unit| {
+                unit.riding = false;
+                unit.x = at.x;
+                unit.z = at.z;
+                unit.hp = hp;
+            });
             return Ok(RidingOutcome::Ejected(crate::environment::Hurt {
                 unit: id,
                 owner: unit.owner,
@@ -513,14 +514,15 @@ impl Match {
             return Err("inconsistent rider relation".into());
         }
         let u = self.world.game.units.get_mut(&id).unwrap();
-        u.x = x;
-        u.z = z;
-        u.rot = rot;
-        u.supp = 0.;
-        u.still = Some(0.);
+        crate::unit_placement::place_unit(&mut self.grid, u, |u| {
+            u.x = x;
+            u.z = z;
+            u.rot = rot;
+            u.supp = 0.;
+            u.still = Some(0.);
+        });
         self.firing.get_mut(id).unwrap().target_id = 0;
         self.abilities.get_mut(id).unwrap().cooldown -= dt;
-        self.grid.update(id, u);
         Ok(RidingOutcome::Riding)
     }
     /// Manual ground unload. Full ordered placements are staged before relations change;
@@ -599,10 +601,11 @@ impl Match {
             if let Some(at) = at {
                 self.combat.get_mut(id).unwrap().carrier = None;
                 let u = self.world.game.units.get_mut(&id).unwrap();
-                u.riding = false;
-                u.x = at.x;
-                u.z = at.z;
-                self.grid.update(id, u);
+                crate::unit_placement::place_unit(&mut self.grid, u, |u| {
+                    u.riding = false;
+                    u.x = at.x;
+                    u.z = at.z;
+                });
             }
         }
         Ok(None)

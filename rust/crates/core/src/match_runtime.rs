@@ -1106,8 +1106,10 @@ impl Match {
                 let c = placer
                     .nearest_free(view, unit.at(), kind.block(), None)
                     .map_err(|e| format!("base clearance: {e:?}"))?;
-                unit.x = (c % game.w) as f64 * CELL + CELL / 2.0;
-                unit.z = (c / game.w) as f64 * CELL + CELL / 2.0;
+                crate::unit_placement::place_unit(&mut self.grid, unit, |unit| {
+                    unit.x = (c % game.w) as f64 * CELL + CELL / 2.0;
+                    unit.z = (c / game.w) as f64 * CELL + CELL / 2.0;
+                });
             }
         }
         Ok(())

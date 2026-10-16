@@ -130,9 +130,11 @@ pub mod supply_convoys;
 pub mod supply_network;
 pub mod supply_routes;
 pub mod terrain;
+pub mod terrain_surface;
 pub mod traffic;
 pub mod traffic_knowledge;
 pub mod tutorial_steps;
+mod unit_placement;
 pub mod unit_publication;
 pub mod unit_spawn;
 pub mod vehicle;
@@ -176,3 +178,12 @@ mod engineering_intent_tests;
 
 #[cfg(test)]
 mod mov_intent_batch;
+
+#[cfg(test)]
+mod misc_bridge_tests;
+
+#[cfg(test)]
+mod misc_retreat_support_tests;
+
+#[cfg(test)]
+mod misc_map_save_tests;

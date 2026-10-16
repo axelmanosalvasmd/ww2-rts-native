@@ -133,6 +133,7 @@ fn prime(m: &mut Match, id: u32, v: &Value) {
     }
 }
 fn snapshot(m: &Match) -> Value {
+    crate::unit_placement::tests::assert_current(&m.world.game, &m.grid);
     let units=m.world.game.units.values().map(|u| {
         let c=&m.commands.units[&u.id];let meta=m.combat.get(u.id).unwrap();let f=m.firing.get(u.id).unwrap();
         let flags=if u.riding {262144}else{0}|if meta.cargo.is_empty(){0}else{524288|((meta.cargo.len()as u32)<<23)};

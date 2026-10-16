@@ -1,3 +1,13 @@
+## Miscellaneous core components and relocation ownership (2026-10-16)
+
+Rendered cell-centre sampling is separate from simulation height queries. `terrain_surface::FrozenSurface` retains the original nominal levels while callers supply the current terrain and road mask. It reports centre heights, frozen water lines, channel depth and cliff edges without adding Match state or replacing Unreal mesh construction, ramps, cliff rims or picking. The pinned original relief recorder covers all 33 authored maps and four synthetic cases, with 663,399 centre and water samples.
+
+`WorldRailLine::is_open` reads current physical bridge cells and current region teams on each query. Bridge collapse and repair therefore need no cached connectivity flag. This is a core line predicate, not a train scheduler or World admission change. Existing structural damage remains the sole owner of support propagation, ground casualties, terrain logs and falling debris.
+
+Admitted relocation callers now commit their prepared unit fields and spatial membership through one crate-private helper. Staged spawns and buildings retain canonical publication, and movers keep their direct updates. Starting-base clearance updates membership immediately instead of waiting for startup's final rebuild. Ordered queries and bucket membership are checked against fresh grids; unordered encounter order is preserved. The existing World guard-home assignment remains unchanged, as at the pin.
+
+The local retreat home selector uses finished owned HQs in skirmish modes, finished owned production buildings in Classic, and spawn in other non-World modes. World keeps its existing region-aware selector. Convoy withdrawal, garrison work awaiting #302 and aircraft recipient delivery stay with their existing owners and guards. Support price/key tests do not open Classic/World support admission or the five support kinds that recipient snapshots still refuse. Editor save networking, persistence, FFI, wire formats and contracts are unchanged.
+
 ## Concrete work and waiting Dig orders (2026-10-16)
 
 Concrete cells use the existing finished-building publisher so their unit, control, combat, firing, ability, recovery, production and terrain records share the normal Match owners. The paid job retains its bounded occupancy retry count. A separate step-back goal keeps a deferred crew escape valid when the deterministic path budget is exhausted. This preserves the intended four-metre escape on a later tick without changing wall cost, build time or retry limits.

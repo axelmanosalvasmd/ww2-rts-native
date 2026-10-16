@@ -1542,11 +1542,12 @@ impl crate::match_runtime::Match {
                 let c = crate::unit_spawn::SpawnPlacer::new()
                     .nearest_free(nav, u.at(), crate::game::MOVE, None)
                     .map_err(|e| format!("garrison exit: {e:?}"))?;
-                u.x = (c % nav.width) as f64 * 2.0 + 1.0;
-                u.z = (c / nav.width) as f64 * 2.0 + 1.0;
-                u.garrison = None;
+                crate::unit_placement::place_unit(&mut self.grid, &mut u, |u| {
+                    u.x = (c % nav.width) as f64 * 2.0 + 1.0;
+                    u.z = (c / nav.width) as f64 * 2.0 + 1.0;
+                    u.garrison = None;
+                });
                 self.world.game.units.insert(r.id, u.clone());
-                self.grid.update(r.id, &u);
             }
             let result = self.command_route(owner, &u, r.at)?;
             self.commands.requests.clear_failures(r.id);

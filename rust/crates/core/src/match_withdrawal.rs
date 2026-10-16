@@ -129,10 +129,11 @@ impl Match {
 
         if !self.commands.units[&id].supply_started {
             if let Some(at) = exit {
-                unit.x = at.x;
-                unit.z = at.z;
-                unit.garrison = None;
-                self.grid.update(id, &unit);
+                crate::unit_placement::place_unit(&mut self.grid, &mut unit, |unit| {
+                    unit.x = at.x;
+                    unit.z = at.z;
+                    unit.garrison = None;
+                });
             }
             crate::match_runtime::cancel_field_work_state(&mut self.field_works, &mut unit)?;
             unit.build = false;
@@ -217,11 +218,12 @@ impl Match {
                 // The source queries the home path before overriding it with the chosen supply path.
                 if unit.garrison.is_some() {
                     let at = exit.expect("withdrawal exit preflight");
-                    unit.x = at.x;
-                    unit.z = at.z;
-                    unit.garrison = None;
+                    crate::unit_placement::place_unit(&mut self.grid, &mut unit, |unit| {
+                        unit.x = at.x;
+                        unit.z = at.z;
+                        unit.garrison = None;
+                    });
                     self.world.game.units.insert(id, unit.clone());
-                    self.grid.update(id, &unit);
                 }
                 self.cancel_field_work(id)?;
                 self.retreat_unit(id)?;

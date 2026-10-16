@@ -389,3 +389,47 @@ fn accepted_retreat_cancels_paid_work_after_route_preflight_without_refund() {
     assert!(m.world.game.units[&id].retreating);
     assert_eq!(m.start.economy.players[u.owner].mp, paid);
 }
+
+#[test]
+fn mov48_home_component_uses_mode_finished_ownership_and_nearest_distance() {
+    let fixture: Value =
+        serde_json::from_str(include_str!("../../tests/fixtures/misc-home-support.json")).unwrap();
+    let rules = crate::rules::Rules::compiled().unwrap();
+    let catalog = Catalog::compiled().unwrap();
+    let spawn = point(&fixture["spawn"]);
+    let unit = unit_spawn::initial_unit(
+        &rules,
+        catalog,
+        rules.kind("rifle").unwrap(),
+        1,
+        0,
+        point(&fixture["actor"]),
+    )
+    .unwrap();
+    for stage in fixture["stages"].as_array().unwrap() {
+        let mut buildings = std::collections::BTreeMap::new();
+        for row in stage["units"].as_array().unwrap() {
+            let id = row["id"].as_u64().unwrap() as u32;
+            let mut building = unit_spawn::initial_unit(
+                &rules,
+                catalog,
+                rules.kind(row["type"].as_str().unwrap()).unwrap(),
+                id,
+                row["owner"].as_u64().unwrap() as usize,
+                point(row),
+            )
+            .unwrap();
+            building.hp = row["hp"].as_f64().unwrap();
+            building.built = row["built"].as_f64();
+            buildings.insert(id, building);
+        }
+        for row in stage["homes"].as_array().unwrap() {
+            let mode = Mode::from_kind(row["mode"].as_str());
+            assert_eq!(
+                super::ground_home(mode, &unit, &buildings, &rules, spawn).unwrap(),
+                point(&row["home"]),
+                "{mode:?}"
+            );
+        }
+    }
+}
