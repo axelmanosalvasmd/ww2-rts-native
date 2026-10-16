@@ -235,11 +235,16 @@ fn cmb130_classic_remembers_last_seen_buildings_until_an_airborne_observer_revis
     classic_vision_tick(&mut m, &mut delivery);
     assert_eq!(remembered(&m, 0).len(), 1);
     m.commands.units.get_mut(&plane).unwrap().hold_fire = true;
-    m.send_aircraft_mission(0, plane, crate::match_aviation::PlaneMission {
-        kind: crate::match_aviation::MissionKind::Patrol,
-        target: None,
-        at: building_at,
-    }).unwrap();
+    m.send_aircraft_mission(
+        0,
+        plane,
+        crate::match_aviation::PlaneMission {
+            kind: crate::match_aviation::MissionKind::Patrol,
+            target: None,
+            at: building_at,
+        },
+    )
+    .unwrap();
     let observer = m.world.game.units.get_mut(&plane).unwrap();
     observer.x = 60.;
     observer.z = 70.;
