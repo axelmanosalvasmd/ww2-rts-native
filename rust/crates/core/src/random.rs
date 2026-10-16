@@ -10,7 +10,9 @@ pub const RANDOM_VERSION: u32 = 1;
 const GAMMA: u64 = 0x9e37_79b9_7f4a_7c15;
 
 /// Stable purpose identifiers. New purposes must not reuse an existing key.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
 pub enum StreamId {
     Terrain,
     Weather,
@@ -32,7 +34,7 @@ impl StreamId {
 }
 
 /// State is sufficient to resume the next draw exactly.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct SplitMix64 {
     state: u64,
 }
@@ -69,11 +71,12 @@ pub enum RandomError {
     EmptyRange,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct MatchRandom {
     seed: u64,
     streams: BTreeMap<StreamId, SplitMix64>,
     #[cfg(test)]
+    #[serde(skip)]
     pub(crate) replay: Option<crate::aligned_replay::Replay>,
 }
 

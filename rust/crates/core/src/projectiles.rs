@@ -8,7 +8,7 @@
 
 use crate::math;
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Point3 {
     pub x: f64,
     pub y: f64,
@@ -38,7 +38,7 @@ pub struct HullPosition {
     pub rotation: Option<f64>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Flight {
     pub origin: Point3,
     pub velocity: Point3,

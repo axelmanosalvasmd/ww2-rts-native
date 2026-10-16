@@ -265,7 +265,8 @@ impl Match {
 
     /// Read-only admission. The sole runner calls this before inputs and again before its clock.
     pub fn validate_construction_tick(&self) -> Result<(), String> {
-        if !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode)
+        if self.validate_actor_mode().is_err()
+            || !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode)
             || self.world.game.tick < 0
         {
             return Err("construction phases require ordinary Conquest".into());
@@ -322,7 +323,9 @@ impl Match {
         id: UnitId,
         frame: &mut ConstructionFrame,
     ) -> Result<(), String> {
-        if !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode) {
+        if self.validate_actor_mode().is_err()
+            || !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode)
+        {
             return Err("construction worker requires ordinary Conquest".into());
         }
         if frame.tick != self.world.game.tick || frame.workers.contains(&id) {
@@ -452,13 +455,24 @@ impl Match {
                         available = f64::INFINITY;
                     }
                 }
+                let cap = if self.elimination_sudden_death() {
+                    number(classic, "decay")? * 0.6
+                } else {
+                    f64::INFINITY
+                };
                 let amount = math::min(
                     available,
-                    full * (number(classic, "repair")? * crew * (recovery / workers.len() as f64))
-                        * dt,
+                    full * math::min(
+                        number(classic, "repair")? * crew * (recovery / workers.len() as f64),
+                        cap,
+                    ) * dt,
                 );
+
                 (built, amount)
             } else {
+                if self.elimination_sudden_death() {
+                    continue;
+                }
                 let time = definition
                     .get("buildTime")
                     .and_then(Value::number)
@@ -891,6 +905,9 @@ impl Match {
             queue,
         };
         let selected = self.construction_selection(owner, ids, &command)?;
+        if self.elimination_sudden_death() {
+            return Ok(Some(Denial::SuddenDeath));
+        }
         if !crate::economy::build_kinds(self.options.mode)
             .map_err(|e| e.to_string())?
             .contains(&name)

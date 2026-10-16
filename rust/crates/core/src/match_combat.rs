@@ -4,7 +4,7 @@ use crate::{combat::DeathImpulse, grid::UnitId};
 use std::collections::BTreeMap;
 
 /// Metadata absent from Game's movement/query state. No health or position is stored here.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct UnitCombat {
     pub xp: f64,
     pub last_hit: Option<i32>,
@@ -32,7 +32,7 @@ impl Default for UnitCombat {
 }
 /// Dead shooter metadata can remain while a projectile still refers to its source XP.
 /// The firing producer explicitly releases retained IDs after its last flight expires.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct CombatState {
     units: BTreeMap<UnitId, UnitCombat>,
 }
@@ -610,7 +610,7 @@ pub(crate) fn absorb_environment_effect(
 }
 
 /// Source explosion values from a catalog weapon/support entry. No dynamic action JSON is accepted.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ExplosionSource {
     pub infantry: f64,
     pub vehicle: f64,
@@ -969,6 +969,17 @@ impl DamageWorld<'_> {
         } else {
             1.
         };
+        let shrug = shrug
+            * if self.mode == Mode::Annihilation
+                && self.rules.kinds[u.kind].name == "bunker"
+                && profile
+                    .weapon_kind
+                    .is_some_and(|kind| self.rules.kinds[kind].name == "howitzer")
+            {
+                number(cfg.get("assault").ok_or(CombatError::Rules)?, "howitzerMul")?
+            } else {
+                1.0
+            };
         let cover = if u.garrison.is_some() {
             profile
                 .anti_garrison

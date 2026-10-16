@@ -48,6 +48,7 @@ pub mod conquest_end;
 pub mod deployment;
 pub mod economy;
 pub mod economy_state;
+pub mod elimination_modes;
 #[cfg(test)]
 mod engineering_runtime_assertion_tests;
 pub mod environment;
@@ -228,3 +229,6 @@ mod mov_followup_speed_tests;
 
 #[cfg(test)]
 mod mov_followup_garrison_tests;
+
+mod save_codec;
+mod save_state;

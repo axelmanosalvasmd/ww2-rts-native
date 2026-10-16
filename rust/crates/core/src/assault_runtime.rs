@@ -1,4 +1,4 @@
-//! Explicit Assault startup. Generic startup and tick dispatch remain Conquest-only.
+//! Assault deployment and late victory through the shared ordinary tick phases.
 use crate::{
     catalog::{Catalog, Value},
     economy::Mode,
@@ -10,7 +10,7 @@ use crate::{
     unit_spawn::SpawnPlacer,
 };
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct AssaultState {
     pub defender_team: i32,
     /// Source uses -1 when the roster has no attacking player.
@@ -25,7 +25,7 @@ fn number(v: &Value, key: &str) -> Result<f64, String> {
         .ok_or_else(|| format!("invalid Assault rule {key}"))
 }
 impl Match {
-    /// Construct a source Assault deployment without enabling the incomplete Assault tick.
+    /// Construct an Assault deployment for the ordinary tick runner.
     /// The explicit defender argument replaces the source lobby-only option. Team values on
     /// the canonical options/player tables are normalized together before any world is built.
     pub fn new_assault(
@@ -97,7 +97,7 @@ impl Match {
 
     /// Source late Assault phase only. Caller supplies finite elapsed simulation time after
     /// income/convoys. Negative time preserves the source arithmetic; normal ticks use TICK.
-    /// No clock advance or death cleanup is performed, and generic tick dispatch stays closed.
+    /// The tick runner dispatches this after its clock, death cleanup and income phases.
     pub fn apply_assault_victory(
         &mut self,
         dt: f64,
@@ -266,3 +266,6 @@ fn can_stamp_start(game: &Game, cells: &[usize]) -> bool {
             - i16::from(cells.iter().map(|&c| level(c)).min().unwrap_or(0))
             <= 1
 }
+
+#[cfg(test)]
+mod tests;
