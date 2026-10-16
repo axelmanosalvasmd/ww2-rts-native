@@ -215,7 +215,11 @@ impl<'a> SnapshotCache<'a> {
         fields.extend(self.owners[slot].clone());
         fields.extend(self.public[slot].clone());
         fields.insert("falling".into(), falling::project(self.state, slot)?);
-        if !self.state.firing.flights.is_empty() {
+        // Partial projections omit unsupported flights and keep ShotsAndFlights
+        // missing. Complete frames still require admission before delivery writes.
+        if !self.state.firing.flights.is_empty()
+            && operative_flights::validate(self.state).is_ok()
+        {
             fields.insert(
                 "flights".into(),
                 operative_flights::project(self.state, slot)?,
