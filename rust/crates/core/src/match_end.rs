@@ -75,10 +75,20 @@ impl Match {
     pub(crate) fn validate_story_mode(&self) -> Result<(), String> {
         match (self.options.mode, self.world.game.mode) {
             (Mode::Default | Mode::Conquest, None)
+            | (Mode::Tutorial, Some(ModeKind::Tutorial))
             | (Mode::Assault, Some(ModeKind::Assault))
             | (Mode::World, Some(ModeKind::World)) => Ok(()),
             _ => Err("finish/story supports represented Conquest, Assault and World only".into()),
         }
+    }
+    pub(crate) fn validate_ordinary_finish_state(&self) -> Result<(), String> {
+        if !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode) {
+            return Err("ordinary finish state requires Conquest or Tutorial".into());
+        }
+        if self.options.mode == Mode::Tutorial {
+            self.validate_tutorial_state()?;
+        }
+        self.validate_match_finish_state()
     }
     pub(crate) fn validate_match_finish_state(&self) -> Result<(), String> {
         self.validate_story_mode()?;

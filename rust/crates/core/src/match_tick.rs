@@ -53,6 +53,7 @@ pub enum TickPhase {
     WorldRegions,
     Convoys,
     Victory,
+    Tutorial,
 }
 
 /// Persistent simulation state, never wall-clock state. A phase failure poisons
@@ -121,6 +122,7 @@ impl std::error::Error for TickFailure {}
 
 #[derive(Clone, Debug)]
 pub struct TickReport {
+    pub tutorial_lines: Vec<crate::match_tutorial::TutorialLine>,
     pub tick: i64,
     /// Positions from before the increment, used by swept flight contacts.
     pub prior: BTreeMap<UnitId, Pose>,
@@ -287,13 +289,11 @@ impl crate::match_runtime::Match {
         }
         let world = self.options.mode == crate::economy::Mode::World
             && game.mode == Some(crate::game::ModeKind::World);
-        if !(world
-            || matches!(
-                self.options.mode,
-                crate::economy::Mode::Default | crate::economy::Mode::Conquest
-            ) && game.mode.is_none())
-        {
+        if !(world || crate::match_actor::ordinary_ground_mode(game, self.options.mode)) {
             return Err("tick execution requires represented ordinary or World mode".into());
+        }
+        if self.options.mode == crate::economy::Mode::Tutorial {
+            self.validate_tutorial_state()?;
         }
         if self.options.logistics || self.convoys.is_some() {
             return Err("reserve and convoy tick phases are not connected".into());
@@ -460,7 +460,10 @@ impl crate::match_runtime::Match {
         }
         self.tick_environment_phase(EnvironmentPhase::Debris, events)?;
         phases.push(TickPhase::Debris);
-        if self.options.mode == crate::economy::Mode::World {
+        if matches!(
+            self.options.mode,
+            crate::economy::Mode::World | crate::economy::Mode::Tutorial
+        ) {
             self.sample_match_tick()?;
         } else {
             self.sample_conquest_tick()?;
@@ -591,8 +594,8 @@ impl crate::match_runtime::Match {
             let result = self.step_aimed_ability(id);
             self.take_firing_tick_events(events);
             result?;
-            // Entry-building execution remains excluded. Boarding uses its live
-            // owner-view goal and the one already-started path scheduler.
+            self.apply_tutorial_garrison(id)?;
+            // Boarding uses its live owner-view goal and the existing path scheduler.
             if self.options.mode != crate::economy::Mode::World
                 && matches!(
                     self.apply_unit_boarding_with_routes(id)?,
@@ -779,10 +782,19 @@ impl crate::match_runtime::Match {
         } else {
             self.apply_point_capture_income(&unit_order)?;
             phases.push(TickPhase::PointCaptureIncome);
-            self.apply_conquest_victory()?;
-            phases.push(TickPhase::Victory);
+            if self.options.mode != crate::economy::Mode::Tutorial {
+                self.apply_conquest_victory()?;
+                phases.push(TickPhase::Victory);
+            }
         }
+        let tutorial_lines = if self.options.mode == crate::economy::Mode::Tutorial {
+            phases.push(TickPhase::Tutorial);
+            self.step_tutorial()?
+        } else {
+            Vec::new()
+        };
         Ok(TickReport {
+            tutorial_lines,
             tick,
             prior,
             unit_order,

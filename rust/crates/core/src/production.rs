@@ -177,6 +177,7 @@ impl PreparedBuildingStep<'_> {
 /// An admitted Conquest purchase, ready for the caller's staged placement.
 #[derive(Clone, Debug, PartialEq)]
 pub struct RecruitRequest {
+    // Building zero denotes Tutorial recruitment at the player spawn.
     pub building: u32,
     pub owner: usize,
     pub kind: String,
@@ -575,6 +576,34 @@ impl ProductionState {
         if !matches!(c.mode.kind, Mode::Default | Mode::Conquest) {
             return Err(Error::InvalidInput("recruitment supports Conquest only"));
         }
+        self.prepare_home_or_building_recruit(c, wallets, slot, faction, kind, from)
+    }
+    pub(crate) fn prepare_tutorial_recruit<'a, 'facts>(
+        &'a self,
+        c: &'a Context<'facts>,
+        wallets: &'a mut EconomyState,
+        slot: usize,
+        faction: Faction,
+        kind: &str,
+    ) -> Result<PreparedRecruit<'a, 'facts>, Error> {
+        self.validate(c, wallets)?;
+        self.slot(slot)?;
+        if c.mode.kind != Mode::Tutorial {
+            return Err(Error::InvalidInput(
+                "Tutorial home recruitment requires Tutorial",
+            ));
+        }
+        self.prepare_home_or_building_recruit(c, wallets, slot, faction, kind, None)
+    }
+    fn prepare_home_or_building_recruit<'a, 'facts>(
+        &'a self,
+        c: &'a Context<'facts>,
+        wallets: &'a mut EconomyState,
+        slot: usize,
+        faction: Faction,
+        kind: &str,
+        from: Option<u32>,
+    ) -> Result<PreparedRecruit<'a, 'facts>, Error> {
         let cat = Catalog::compiled()?;
         let Ok(def) = cat.unit(kind) else {
             return denial(Denial::Blocked);
@@ -617,14 +646,23 @@ impl ProductionState {
         {
             return denial(Denial::Max);
         }
-        let makers = self.production_buildings(c, wallets, slot, Some(kind))?;
-        let building = if let Some(id) = from {
-            makers.into_iter().find(|n| *n == id)
+        let building = if c.mode.kind == Mode::Tutorial {
+            0
         } else {
-            makers.first().copied()
-        };
-        let Some(building) = building else {
-            return denial(Denial::Needs);
+            let makers = self.production_buildings(c, wallets, slot, Some(kind))?;
+            let maker = from
+                .and_then(|id| makers.iter().copied().find(|candidate| *candidate == id))
+                .or_else(|| {
+                    if from.is_none() {
+                        makers.first().copied()
+                    } else {
+                        None
+                    }
+                });
+            let Some(maker) = maker else {
+                return denial(Denial::Needs);
+            };
+            maker
         };
         Ok(PreparedRecruit {
             request: RecruitRequest {
