@@ -4894,7 +4894,7 @@ World recon skips homes marked undiscovered by the caller. This consumes
 existing delivery knowledge without discovering any new spawn. Raids retain
 two unit IDs privately and prefer armored cars. Stable unit IDs,
 building IDs and player indices break distance ties. Classic and World remain
-detached planner contexts; their Match and recipient admission guards stay shut.
+detached planner contexts; their existing admission boundaries stay unchanged.
 The ordinary producer supplies public naval and weather facts and leaves the
 unsupported modes' building ghosts and node positions empty.
 
