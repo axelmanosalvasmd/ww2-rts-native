@@ -4248,3 +4248,10 @@ MOV-23's reduced powered-speed regression targets a source-inspected gap: native
 The single Root-granted batch at `e1c69647` compiled and ran all 18 selected tests once: 12 passed and 6 failed, with 147 skipped. S3 ran on CPUs 8-11 with a 6 GiB memory cap, zero cgroup swap and CPU quota 400000/100000; the launcher and runner terminated with exit 100 and released the inherited flock. These are execution limits, not performance measurements.
 
 `docs/parity/movement.md` records each actual outcome. MOV-25/26/27/28/29/36/38/40 are native-PASS review candidates only. MOV-11/23/24/30/33/35/37 remain excluded: invalid bridge-scene objective, incomplete logistics context, the same unrun bridge dependency, non-decisive bank setup, an incorrect expansion-count prerequisite, an overstrong wire assertion, and unstable internal region IDs. None of those authored failures is promoted into a demonstrated gameplay defect. No assertion/input repair, runtime change, retry or new Source capture occurred. The source producing these results remains unchanged; this child records results only and promotes no row.
+
+
+## MOV test PR and status PR split (2026-10-16)
+
+Root's overseer redirect makes this a source-only test PR contribution. Its complete own delta is after `29ca35e0c266f86317610e9a481bf198be5868c4`. The MOV mappings and actual result table now live in `docs/testing/mov-audit-native-intent-tests.md`; `docs/parity/movement.md` is restored byte-for-byte to that pre-task parent. Historical design entries above describe their original producing heads; they do not authorize importing the inherited unpublished branch.
+
+Exactly six failed diagnostics are marked ignored with the actual e1c69647 failure reason. Every function body, input and assertion is unchanged; twelve passing tests remain enabled. This is failed-row scope exclusion, with no semantic repair or retry. The original eighteen-test result stays attributed to e1c69647. This new Rust tree has not run and claims no fresh green result. Prototype review, public test-PR integration and any later parity-status PR remain Root-owned.
