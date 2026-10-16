@@ -51,7 +51,10 @@ fn cmb147_field_work_commands_delegate_dig_patterns_and_joins() {
     assert!(m.commands.units.values().all(|c| c.orders.is_empty()));
 
     assert_eq!(
-        command(&mut m, json!({"t":"dig","ids":[1],"x":40,"z":40,"queue":true})),
+        command(
+            &mut m,
+            json!({"t":"dig","ids":[1],"x":40,"z":40,"queue":true})
+        ),
         None
     );
     let waiting = &m.commands.units[&1].orders;
@@ -61,7 +64,12 @@ fn cmb147_field_work_commands_delegate_dig_patterns_and_joins() {
         Command::Dig { ids, kind: FortKind::Trench, at, direction: Some(direction), queue: false }
             if ids == &[1] && *at == p(40., 40.) && direction.is_finite()
     ));
-    assert!(m.commands.units.iter().all(|(id, c)| *id == 1 || c.orders.is_empty()));
+    assert!(
+        m.commands
+            .units
+            .iter()
+            .all(|(id, c)| *id == 1 || c.orders.is_empty())
+    );
     assert_eq!(m.field_works, work);
     assert_eq!(m.start.economy.players[0].mp, mp);
     assert_eq!(m.story, story);
