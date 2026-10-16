@@ -8,6 +8,9 @@ use crate::navigation::{TerrainChange, TerrainView, Versions};
 use crate::pathfinding::PathTerrain;
 use crate::rules::Rules;
 
+mod cover_preview;
+pub use cover_preview::{CoverBody, CoverClass, CoverPreview};
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Material {
     Soil,
