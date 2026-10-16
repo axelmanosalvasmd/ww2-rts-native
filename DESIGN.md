@@ -1,3 +1,9 @@
+## Tutorial runtime over existing Match systems (2026-10-16)
+
+The explicit `Match::new_tutorial` constructor adds the unattended Enemy seat and uses the existing `tutorial_steps` definitions. Tutorial shares the ordinary ground, routing, combat, objective and support systems. Its private step state owns only the current index, spawned IDs and pending dialogue. Lines leave through the core tick report from tick 40; no server or client transport is introduced. The runner advances at most one step per tick after capture and income, and finishes at the bridgehead through the common Match finish state.
+
+Instant Tutorial recruitment reuses the existing admission, debit and unit-publication transaction, with a separate home-placement path because Tutorial has no production buildings. The public Conquest production component keeps its existing mode gate. Tutorial reinforcements use the player's spawn and exclude the unattended enemy. The prototype's 5 MP/s base income and lack of a defeat condition are preserved. Public server admission, agreed interfaces and parity statuses stay unchanged.
+
 ## Concrete work and waiting Dig orders (2026-10-16)
 
 Concrete cells use the existing finished-building publisher so their unit, control, combat, firing, ability, recovery, production and terrain records share the normal Match owners. The paid job retains its bounded occupancy retry count. A separate step-back goal keeps a deferred crew escape valid when the deterministic path budget is exhausted. This preserves the intended four-metre escape on a later tick without changing wall cost, build time or retry limits.
@@ -21,6 +27,14 @@ Read current main before integration: it lacks ai_receipt_input and ai_delivered
 Scenario condition evaluation borrows typed authored state while reading current units, point owners and World region teams from Match. A caller supplies the context and shares an explicit work budget across evaluations. This keeps condition reads separate from scenario admission, trigger scheduling, actions and recipient projection. The evaluator follows the pinned condition semantics, including historical captures, pending arrivals, context fallback and short-circuit work charges. A 64-level guard protects callers that construct trees directly; validated authored trees remain below it.
 
 Waiting-job refunds prepare small production and wallet drafts before publishing the negative MP-spent tally. Site cancellation uses the existing World transaction before the wallet, story and metadata cleanup commit. These core operations add no network admission. Full MODE-91 remains held beyond the selected refund and recovery checks. MODE-83 proves the condition component, not an admitted authored-scenario match.
+
+## Editable map drafts and bounded save preparation (2026-10-16)
+
+Map authoring uses an in-memory draft separate from `World` and `Match`. Selection moves retain the selected layer's material overrides and authored section identities, health and supports. Failed bounds or collision checks leave the draft unchanged. Removal and support pruning can leave an invalid draft, which must pass the ordinary map validator before saving. This keeps unsupported surviving sections visible as authoring errors instead of silently repairing their anchors.
+
+The map loader now calls the scenario validator added in #298. A validated scenario can be edited and prepared for saving, but every startup profile rejects explicit authored scenarios before creating match state because their executor is absent. The previous fixture assertion that scenarios were unsupported by the loader now checks their retained definition. No command, event, flag or other live match state was added.
+
+`map_save::prepare_map_save` applies the prototype's save-field projection and an 8 MiB limit to incoming bytes before parsing, including discarded properties. It prepares bytes in memory and validates the projected document again. HTTP editor authorization, persistence and server integration remain absent, so MAP-23 remains component-only. The existing 16 MiB authoritative-loader limit is unchanged. Generated World documents are outside the demonstrated save scope. MAP-57's rendered-ground sampler and MAP-90's station-yard construction integration remain unimplemented; World admission stays guarded. MAP-92 retains field-specific diagnostics and stronger bounded integer checks for region IDs and ordered bounds, reported as differs candidates rather than approved differences.
 
 
 ## First-five engineering merged with MAP273 main (2026-10-16, source only)

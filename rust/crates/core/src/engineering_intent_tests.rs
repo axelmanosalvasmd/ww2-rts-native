@@ -81,7 +81,7 @@ fn publish(m: &mut Match, name: &str, owner: usize, at: Point) -> u32 {
             next_id: &mut m.next_unit_id,
         },
         &m.rules,
-        2,
+        m.start.players.len(),
         vec![staged],
     )
     .unwrap()
@@ -820,3 +820,9 @@ fn eng74_ground_weather_scaling_reaches_canonical_vision_and_speed() {
         }
     }
 }
+
+#[path = "engineering_runtime2_mine_tests.rs"]
+mod engineering_runtime2_mine_tests;
+
+#[path = "engineering_runtime2_visibility_tests.rs"]
+mod engineering_runtime2_visibility_tests;

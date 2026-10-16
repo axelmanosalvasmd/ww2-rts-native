@@ -533,7 +533,7 @@ fn seen_row(
         landmark,
         cover: CoverBasis {
             house_kind: Some(world.game.house[c]),
-            toughness: world.game.tough.as_ref().map_or(1.0, |v| v[c]),
+            toughness: world.game.tough.as_ref().map_or(1.0, |v| f64::from(v[c])),
         },
     })
 }
