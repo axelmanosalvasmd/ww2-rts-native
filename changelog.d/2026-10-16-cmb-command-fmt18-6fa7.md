@@ -1,0 +1,1 @@
+- Reconstructed only the 18 recorded formatter hunks in the CMB command consumer, preserving all 158 quoted literals and 65 assertion macros. The original formatting failure remains recorded; native and Clippy qualification remain unrun.
