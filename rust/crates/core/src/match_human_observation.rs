@@ -305,7 +305,7 @@ impl Match {
         }
         self.validate_opening_projection(owner)?;
         let g = &self.world.game;
-        if g.mode.is_some()
+        if !crate::match_actor::ordinary_ground_mode(g, self.options.mode)
             || !(0..=SAFE_TICK).contains(&g.tick)
             || (g.tick % 2 != 0 && self.finish.is_none())
         {

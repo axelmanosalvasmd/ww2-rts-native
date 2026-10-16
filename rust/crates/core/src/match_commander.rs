@@ -846,10 +846,19 @@ pub enum OpeningTick {
 
 impl Match {
     pub(crate) fn validate_opening_projection(&self, owner: usize) -> Result<(), String> {
-        if !matches!(self.options.mode, Mode::Default | Mode::Conquest)
+        if !matches!(
+            self.options.mode,
+            Mode::Default | Mode::Conquest | Mode::Classic
+        ) || !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode)
             || self.world.geography().is_some()
+            || self.world_runtime.is_some()
         {
-            return Err("opening commander requires ordinary Conquest".into());
+            return Err(
+                "commander projection requires matching ordinary Conquest or Classic".into(),
+            );
+        }
+        if self.options.mode == Mode::Classic {
+            self.validate_elimination_state()?;
         }
         self.recipient_routing(owner)?; // validates recipient/context before refresh writes
         let g = &self.world.game;
@@ -917,6 +926,9 @@ impl Match {
     /// Snapshot only the fields consumed by this bounded policy, at source public precision.
     /// Includes own research kinds and ready-base facts, but no opponent economy or labs.
     pub fn opening_commander_observation(&mut self, owner: usize) -> Result<Observation, String> {
+        if !matches!(self.options.mode, Mode::Default | Mode::Conquest) {
+            return Err("opening commander requires ordinary Conquest".into());
+        }
         if self.options.logistics {
             return Err("quiet opening commander does not plan logistics".into());
         }

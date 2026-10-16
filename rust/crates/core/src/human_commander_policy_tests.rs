@@ -1059,7 +1059,7 @@ fn intent_ai66_private_streams_drive_ordinary_ai_ticks_and_every_seat_snapshot()
         // planner/motor randomness and buildings, without depending on combat effects.
         let mut game = runtime_match_scene(mode, true);
         for player in &mut game.start.players {
-            for (_, cooldown) in &mut player.support {
+            for cooldown in player.support.values_mut() {
                 *cooldown = 10_000.0;
             }
         }
@@ -1201,4 +1201,30 @@ fn intent_ai66_private_streams_drive_ordinary_ai_ticks_and_every_seat_snapshot()
             );
         }
     }
+}
+
+#[test]
+fn intent_ai66_classic_human_view_requires_matching_mode_and_keeps_quiet_policy_narrow() {
+    use crate::{economy::Mode, game::ModeKind, match_human_observation::HumanObservationMemory};
+    let mut game = runtime_match_scene(Mode::Classic, true);
+    let mut memory = HumanObservationMemory::new(0);
+    let view = game.human_commander_observation(&mut memory).unwrap();
+    assert_eq!(
+        view.packet.input().runtime.as_ref().unwrap().mode,
+        Mode::Classic
+    );
+    assert!(view.packet.input().units.iter().all(|u| u.owner == 0));
+    assert!(game.opening_commander_observation(0).is_err());
+    let before = (memory.clone(), game.start.random.clone());
+    game.world.game.mode = None;
+    assert!(game.human_commander_observation(&mut memory).is_err());
+    assert_eq!((memory.clone(), game.start.random.clone()), before);
+    game.world.game.mode = Some(ModeKind::Classic);
+    let elimination = game.elimination.take();
+    assert!(game.human_commander_observation(&mut memory).is_err());
+    assert_eq!((memory.clone(), game.start.random.clone()), before);
+    game.elimination = elimination;
+    game.options.mode = Mode::World;
+    assert!(game.human_commander_observation(&mut memory).is_err());
+    assert_eq!((memory, game.start.random.clone()), before);
 }
