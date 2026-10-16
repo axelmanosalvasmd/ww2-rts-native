@@ -10,6 +10,8 @@ use crate::{
     weather::{WeatherRow, WeatherRules},
 };
 use serde_json::{Map, Value, json};
+#[path = "recipient_snapshot/aircraft.rs"]
+mod aircraft;
 #[path = "recipient_snapshot/composition.rs"]
 mod composition;
 #[path = "recipient_snapshot/delivery.rs"]
@@ -79,6 +81,25 @@ pub struct RecipientProjection {
     pub missing: Vec<SnapshotCapability>,
 }
 
+/// The public Horde mode component, separate from complete recipient admission.
+/// No seat data or hidden purchase state enters this row. The complete Horde
+/// snapshot and host remain guarded by their existing mode checks.
+pub fn horde_mode_row(state: &Match) -> Result<Value, SnapshotError> {
+    let mode = state.horde_projection().map_err(|_| SnapshotError::Rules)?;
+    let horde = state.horde.as_ref().ok_or(SnapshotError::Rules)?;
+    let mut row = json!({
+        "kind": "horde", "defenderTeam": 0, "attackerTeam": 1,
+        "timeLeft": mode.time_left, "suddenDeath": false,
+        "profile": mode.profile.as_str(), "wave": mode.wave,
+        "left": mode.left, "active": mode.active, "boss": mode.boss,
+        "slot": horde.slot
+    });
+    if let Some(profile) = mode.next_profile {
+        row["nextProfile"] = json!(profile.as_str());
+    }
+    Ok(row)
+}
+
 /// Capture immutable rows for one send pass after canonical state changes.
 /// The Rust borrow prevents state mutation until every recipient is projected.
 pub struct SnapshotCache<'a> {
@@ -130,14 +151,7 @@ impl<'a> SnapshotCache<'a> {
             finite(&[u.x, u.z])?;
         }
         engineering::validate(state)?;
-        if g.units
-            .values()
-            .any(|u| u.air.is_some() || state.rules.kinds[u.kind].air)
-        {
-            state
-                .validate_aviation()
-                .map_err(|_| SnapshotError::Rules)?;
-        }
+        aircraft::validate(state)?;
         let rows = state
             .world
             .game
@@ -193,7 +207,6 @@ impl<'a> SnapshotCache<'a> {
         Ok(RecipientProjection {
             fields,
             missing: vec![
-                SnapshotCapability::Air,
                 SnapshotCapability::WrecksAndFoundMines,
                 SnapshotCapability::Terrain,
                 SnapshotCapability::Fog,

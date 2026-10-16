@@ -219,14 +219,8 @@ fn net52_aircraft_ticks_and_recipient_delivery_preserve_room_admission_guard() {
             .unwrap()
     );
     let mut delivery = DeliveryState::new(&state).unwrap();
-    // Complete room snapshots still refuse aircraft, before attachment.
-    assert!(matches!(
-        state.preflight_ordinary_snapshot(),
-        Err(SnapshotError::Unsupported {
-            capability: SnapshotCapability::Air,
-            ..
-        })
-    ));
+    // Main now supports canonical aircraft state; pending aviation events remain guarded.
+    state.preflight_ordinary_snapshot().unwrap();
     let mut aircraft_states = [false; 5];
     let mut finish = None;
     let mut snapshots = 0;
@@ -266,7 +260,23 @@ fn net52_aircraft_ticks_and_recipient_delivery_preserve_room_admission_guard() {
             .unwrap();
         for slot in 0..3 {
             let projection = frame.recipient(slot).unwrap();
-            assert!(projection.missing.contains(&SnapshotCapability::Air));
+            assert!(!projection.missing.contains(&SnapshotCapability::Air));
+            let air_ids = projection.fields["air"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|row| row[0].as_u64().unwrap() as u32)
+                .collect::<Vec<_>>();
+            assert_eq!(
+                air_ids,
+                match slot {
+                    0 => vec![plane],
+                    1 => vec![],
+                    2 => vec![grounded_enemy],
+                    _ => unreachable!(),
+                },
+                "owner-only aircraft rows, seat {slot}, tick {tick}"
+            );
             if slot < 2 {
                 assert!(ids(&projection).contains(&plane));
             }
@@ -312,13 +322,7 @@ fn net52_aircraft_ticks_and_recipient_delivery_preserve_room_admission_guard() {
         "NET-52: finish tick {}, total ticks {}, recipient snapshots {snapshots}, winner {}, reason {:?}, real reveal",
         finish.end_tick, state.world.game.tick, finish.winner, finish.reason
     );
-    assert!(matches!(
-        state.preflight_ordinary_snapshot(),
-        Err(SnapshotError::Unsupported {
-            capability: SnapshotCapability::Air,
-            ..
-        })
-    ));
+    state.preflight_ordinary_snapshot().unwrap();
     state.aviation.planes.remove(&plane);
     assert!(matches!(
         SnapshotCache::new(&state),
