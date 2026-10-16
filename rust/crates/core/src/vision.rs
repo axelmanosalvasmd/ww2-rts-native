@@ -3,9 +3,8 @@
 //! `aimPoint`, `inStrip`, the camouflage and trench rules). Its answers match the JavaScript exactly
 //! (`harness/vision-check.mjs`).
 //!
-//! Not ported yet, because Conquest does not use them: the Horde stragglers and boss shown through the fog,
-//! the remembered enemy buildings of Classic and World Conquest (`g.ghosts`), and World Conquest's neutral
-//! guards. A game in those modes gets everything else right and lacks those three.
+//! Construction-mode building memory is refreshed separately after this pass. Horde and World have
+//! explicit Match adapters for their mode-specific observers and visibility exceptions.
 
 use std::collections::HashMap;
 
@@ -32,6 +31,91 @@ const HULL_MAX: f64 = 55.0;
 const NEAR_BUCKET: f64 = 16.0;
 /// `-1e9`: a missing `shotAt` or `dust` tick.
 const LONG_AGO: f64 = -1e9;
+
+/// Last observed building facts, without current health or other hidden live state.
+#[derive(Clone, Debug, PartialEq)]
+pub struct KnownBuilding {
+    pub id: u32,
+    pub kind: usize,
+    pub owner: usize,
+    pub at: Point,
+    pub built: Option<f64>,
+}
+pub type BuildingMemory = Vec<(Team, Vec<KnownBuilding>)>;
+
+/// Refresh construction-mode memories once per team after the ordinary vision pass.
+/// Destruction under fog keeps the last observed facts until a unit sees the empty spot.
+pub fn refresh_building_memory(g: &Game, rules: &Rules, memory: &mut BuildingMemory) {
+    let mut teams = Vec::new();
+    for player in &g.players {
+        if teams.contains(&player.team) {
+            continue;
+        }
+        teams.push(player.team);
+        let index = memory
+            .iter()
+            .position(|(team, _)| *team == player.team)
+            .unwrap_or_else(|| {
+                memory.push((player.team, Vec::new()));
+                memory.len() - 1
+            });
+        let rows = &mut memory[index].1;
+        for id in &player.visible {
+            let Some(u) = g.units.get(id).filter(|u| rules.kinds[u.kind].building) else {
+                continue;
+            };
+            let row = KnownBuilding {
+                id: u.id,
+                kind: u.kind,
+                owner: u.owner,
+                at: u.at(),
+                built: u.built,
+            };
+            if let Some(old) = rows.iter_mut().find(|row| row.id == *id) {
+                *old = row;
+            } else {
+                rows.push(row);
+            }
+        }
+        rows.retain(|row| {
+            player.visible.contains(&row.id)
+                || g.units.contains_key(&row.id)
+                || !g
+                    .units
+                    .values()
+                    .filter(|u| g.team_of(u) == player.team)
+                    .any(|u| {
+                        let d = math::hypot(u.x - row.at.x, u.z - row.at.z);
+                        (u.air.is_none() || airborne(u))
+                            && d <= vision_of(g, rules, u)
+                            && (u.air.is_some()
+                                || rules.kinds[u.kind].building
+                                || los(g, rules, (u.x, u.z), (row.at.x, row.at.z))
+                                || d < 8.0)
+                    })
+        });
+    }
+}
+
+impl crate::match_runtime::Match {
+    /// Explicit Classic core phase. Full Classic ticking and recipient snapshots stay guarded.
+    pub fn refresh_classic_visibility(&mut self) -> Result<(), String> {
+        if self.options.mode != crate::economy::Mode::Classic
+            || self.world.game.mode != Some(ModeKind::Classic)
+            || self.world_runtime.is_some()
+            || self.horde.is_some()
+        {
+            return Err("Classic visibility requires Classic mode".into());
+        }
+        update_vision(&mut self.world.game, &self.rules, &self.grid);
+        refresh_building_memory(
+            &self.world.game,
+            &self.rules,
+            &mut self.classic_known_buildings,
+        );
+        Ok(())
+    }
+}
 
 /// How far a unit sees before height and houses (`visionOf`): weather shortens it for everything on the
 /// ground, and an unfinished lookout sees only a few metres.
@@ -539,3 +623,7 @@ fn key_bits(v: f64) -> u64 {
         v.to_bits()
     }
 }
+
+#[cfg(test)]
+#[path = "cmb5_visibility_tests.rs"]
+mod cmb5_visibility_tests;

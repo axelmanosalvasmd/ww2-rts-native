@@ -368,3 +368,50 @@ dec676ba59ff042bda2ab6846b7261859fd49d3c25a62007ce78d88b9f9806fa  final-suite.lo
 2ec40c02d2cdf3e1547cade1f771c6a3a7de0bcd12a6600325a93b2a08089054  final-suite-caps.json
 9275b87e1e920069696048b0bacc07dbfd06c371aca9092be3d9f5168fea1d5a  final-suite-counts.json
 ```
+
+
+## M6: current-main refresh from `c8d208cd`
+
+- PR #301 side, parent 1: `c8d208cd2842469d2f27ad9be4313ed34c354a9e`.
+- Main side, parent 2: `788d911ff00f5a01c1ebc6527166bb51e445f77b`.
+- Reconstructed conflict-marker tree: `4bcbae01c5f3d6892db68d7a88f7e60df0cf8936`.
+- Exact reconstruction: `git merge-tree --write-tree c8d208cd2842469d2f27ad9be4313ed34c354a9e 788d911ff00f5a01c1ebc6527166bb51e445f77b` (exit 1).
+- The six conflict blocks resolve in five unified-3 source hunks. Two further hunks restore a convoy Retreat boundary in an automatically merged file and extend its existing regression. The table records all seven hand-edited source hunks relative to that synthetic tree. The module ordering in M6-05 includes the formatter's required order. The only additional authored paths are this M6 record and its changelog fragment.
+
+Acknowledged receipt of `julio-301-ack-c8d208cd` and the earlier `axel-301-runtime-ack-20261016` conditions. This merge preserves the reviewed 14-row scope and the Tutorial repair correction. The prior head's acknowledgment and test receipts do not qualify this successor. The coordinator retains the new exact-head re-ack and hosted-check gates; no GitHub issue post is made here.
+
+| Hunk | Resolved file:line | Main side | PR #301 side | Resolution | Effect on mode admission |
+| --- | --- | --- | --- | --- | --- |
+| M6-01 | `rust/crates/core/src/match_abilities.rs:156` | Default, Conquest, Classic, Tutorial and World, followed by actor validation; diagnostic enumerates those families. | Also admits Assault and Annihilation, followed by actor validation; diagnostic says represented ordinary or World state. | Keep #301's complete allowlist and diagnostic, and the shared actor/runtime validation. Both neighboring conflict blocks form one unified-3 hunk. | Retains exactly #301's mode set with canonical pairing and runtime checks; Horde stays refused. No mode refused by both parents is admitted. |
+| M6-02 | `rust/crates/core/src/match_abilities/tests.rs:536` | Malformed Classic-options/Conquest-Game fixture checks that the error contains `actor mode does not match`, then asserts snapshot equality. | Same refusal and snapshot equality, with an exact canonical mismatch error assertion and fixture explanation. | Keep #301's stricter exact-error assertion, explanation and all existing snapshot/phase assertions. The parent module keeps its `#[cfg(test)]` gate. | Test-only. Malformed mode pairing stays refused before mutation; no runtime admission change. |
+| M6-03 | `rust/crates/core/src/match_actor.rs:37` | Explicit matching Default/Conquest, Classic, Tutorial and World arms, plus the guarded canonical Horde roster branch. | `ordinary_ground_mode` includes matching Assault and Annihilation as well; explicit World and the same guarded Horde branch. | Keep #301's ordinary predicate and World arm, followed by the complete shared Horde roster checks and existing mode-specific runtime validation. | Retains #301's actor set. Horde still needs 2-6 canonical seats, defender/enemy teams and initialized state; Tutorial and World keep their state guards. No new mode pair. |
+| M6-04 | `rust/crates/core/src/match_firing.rs:356` | Explicit matching Default/Conquest, Classic, Tutorial, World and Horde preflight, then actor/runtime validation. | Shared `checked_game_mode` preflight, including Assault and Annihilation, then actor/runtime validation. | Keep #301's canonical preflight and error behavior, followed by `validate_actor_mode`; preserve all incoming firing code outside this block. | Retains #301's firing set, canonical mismatch refusal and guarded Horde/Tutorial/World state checks. No mode refused by both parents is admitted. |
+| M6-05 | `rust/crates/core/tests/it/main.rs:88` | Registers `mode_runtime_batch4`. | Registers `mode_runtime_world`. | Keep both path/module pairs, ordered batch4 then World as required by rustfmt. | Test-only integration registration. Both suites remain discoverable; no runtime admission change. |
+| M6-06 | `rust/crates/core/src/match_ground_orders.rs:266` | Convoy Retreat routes to the nearest active allied source; its ordinary-mode helper admits only Default, Conquest and Tutorial. | The ordinary helper also admits Assault, Annihilation and Classic, but Retreat explicitly refuses any selected owned convoy before writes. | Restore that complete owned-convoy scan when the mode is outside Default, Conquest and Tutorial, before ordinary selection or incoming convoy routing. Keep main's supported convoy routing and all later checks. | Prevents the automatic union from admitting convoy Retreat in Assault, Annihilation or Classic, which both parents refused. Ordinary non-convoy Retreat and main's three supported convoy modes keep their parent behavior. |
+| M6-07 | `rust/crates/core/src/match_ground_orders.rs:708` | Existing regression checks a Conquest convoy beyond the troop selection cap with no source: exact Blocked and unchanged units, controls, requests, routing fog and convoys. | Its predecessor `convoy_retreat_outside_troop_cap_refuses_before_follow_or_routing` requires Unsupported for a Conquest convoy beyond the cap and the same unchanged-state assertion, matching that parent's unconditional convoy refusal. | Retain every original assertion and extend the same test with canonical Assault, Annihilation and Classic pairs. Each requires exact Unsupported and the same complete state equality with the convoy beyond the cap. The enclosing `#[cfg(test)]` is unchanged. | Test-only coverage of M6-06. Protects all three preserved refusals before follow, routing or convoy mutation; no admission change. |
+
+The automatically merged `match_recovery.rs` retains explicit Default, Conquest, Assault, Annihilation and Classic allowlists in both `preflight_building_repair` and `repair_building_sections`, plus actor/runtime checks. Tutorial, Horde and World repair stay refused. `match_construction.rs` retains `ordinary_ground_mode` and actor/runtime checks, so Horde and World construction stay refused. Public server admission and all existing test-only module gates are preserved.
+
+Validation for this M6 source follows. Historical full-workspace receipts above remain attributed to their original producers; this refresh runs the requested focused `ww2-core` test families and the affected ground-order and logistics batch-5 tests, plus workspace formatting and strict workspace/all-target Clippy.
+
+### M6 validation
+
+Validated Rust tree: `89e711911215eb5f5143bb039c451d29564aea41`. Only this record and its changelog fragment changed after the passing run. Machine: Vostro, Rust 1.99.0, commands from `rust/`, slot S2 and target `/tmp/ww2-native-target-S2-0e8d6d9b`. The active nextest scope reported `memory.max=6442450944` and `memory.swap.max=0`; the wrapper released its slot immediately after Cargo exited.
+
+- `cargo fmt --all --check`: PASS.
+- `cargo clippy --locked --workspace --all-targets -j4 -- -D warnings`: PASS.
+- `CARGO_BUILD_JOBS=4 cargo nextest run --locked -j4 -p ww2-core --cargo-profile ci-test --retries 0 -E 'test(match_abilities::) | test(match_recovery::) | test(match_construction::) | test(elimination_modes::) | test(match_tutorial::) | test(match_horde::) | test(match_ground_orders::) | test(match_logistics::batch5_tests::)'`: 115 passed, 0 failed, 838 skipped across two binaries; run ID `7295aeb0-cfaa-448f-bd2b-a96fef322eb3`.
+- Counts: 4 abilities, 16 recovery, 39 construction, 14 elimination, 15 Tutorial (including MODE-59 through MODE-70 and the unchanged building-repair refusal regression), 19 Horde, 3 ground orders and 5 logistics batch-5 tests.
+- Independent source review found the cross-parent convoy Retreat expansion and confirmed that M6-06/M6-07 close it. The review also checked canonical mode pairing, the five-mode repair allowlist, retained module registrations and test-only gates. Its review itself ran no tests.
+
+The initial fmt checks diagnosed only module order and new tuple layout; both were corrected. An initial nextest invocation supplied both `-j4` and `--test-threads 4`, which are equivalent options; it exited before compilation with a duplicate-option error. Removing the duplicate produced the passing invocation above. The earlier Clippy pass preceded the convoy guard, so strict workspace Clippy was rerun and passed on the final Rust tree. No full-workspace test run, hosted-check invocation, issue post or force-push was performed.
+
+Raw logs and the seven-hunk synthetic-tree diff are under `/tmp/fix301d-validation/`. SHA256:
+
+```text
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  fmt.log
+444d867dd6466247a728780098f4b7e267aad868409a00177b58df8739c56c73  clippy.log
+ed129fd522236053f365fdd102272de304493957a6672cf56dca31a2d769639b  nextest.log
+0d3e3c8c931d64638e320bb50a6a7cb7009688e0a38438cedca63828e7e3bbbf  caps.json
+dd9f3d6ba1391e96be1927f7593b8590b72c1591e2a62c3a422054e048c6927d  m6-resolution.patch
+```
