@@ -160,10 +160,9 @@ impl Room {
             .iter()
             .enumerate()
             .map(|(slot, player)| {
-                self.players.get(slot).map_or_else(
-                    || player.config.name.clone(),
-                    |person| person.name.clone(),
-                )
+                self.players
+                    .get(slot)
+                    .map_or_else(|| player.config.name.clone(), |person| person.name.clone())
             })
             .collect::<Vec<_>>();
         let envelope = native.startup.envelope(state, &names, native.epoch)?;

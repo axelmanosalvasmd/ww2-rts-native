@@ -53,6 +53,9 @@ fn messages(receiver: &mut mpsc::Receiver<Output>) -> Vec<Value> {
     while let Ok(output) = receiver.try_recv() {
         match output {
             Output::Json(value) => result.push(value),
+            Output::Watcher(_) => {
+                panic!("commander and operative sockets cannot receive watcher frames")
+            }
             Output::Snapshot(_) => panic!("operative delivery uses its own JSON stream"),
             Output::Close(_, reason) => panic!("unexpected close: {reason}"),
         }
@@ -70,6 +73,9 @@ fn drain_commanders(
         while let Ok(output) = receiver.try_recv() {
             match output {
                 Output::Json(value) => result.push(value),
+                Output::Watcher(_) => {
+                    panic!("commander and operative sockets cannot receive watcher frames")
+                }
                 Output::Snapshot(write) => {
                     result.push(serde_json::from_str(&write.json).unwrap());
                     hub.complete_snapshot(&write, true, now);

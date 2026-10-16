@@ -1116,12 +1116,27 @@ impl Hub {
         }
         if !room.spectators.is_empty() {
             let native = room.native.as_mut().unwrap();
-            let names = native.runtime.state().start.players.iter().enumerate()
-                .map(|(slot, p)| room.players.get(slot).map_or_else(|| p.config.name.clone(), |p| p.name.clone()))
+            let names = native
+                .runtime
+                .state()
+                .start
+                .players
+                .iter()
+                .enumerate()
+                .map(|(slot, p)| {
+                    room.players
+                        .get(slot)
+                        .map_or_else(|| p.config.name.clone(), |p| p.name.clone())
+                })
                 .collect::<Vec<_>>();
-            match native.runtime.collect_watcher_start(&native.startup, &names, epoch) {
+            match native
+                .runtime
+                .collect_watcher_start(&native.startup, &names, epoch)
+            {
                 Ok(start) => {
-                    if native.watch_started { native.watch_delivery.request_full(); }
+                    if native.watch_started {
+                        native.watch_delivery.request_full();
+                    }
                     for person in &room.spectators {
                         if let Some(connection) = &person.connection {
                             connection.send(start.clone());
@@ -1871,7 +1886,10 @@ impl Hub {
                 .start_trusted(code, connection_id, command == "restart", now)
                 .map(|_| ()),
             "sit"
-                if self.rooms.get(code).is_some_and(|room| room.players.len() >= 2) =>
+                if self
+                    .rooms
+                    .get(code)
+                    .is_some_and(|room| room.players.len() >= 2) =>
             {
                 return true;
             }
@@ -1920,7 +1938,9 @@ impl Hub {
             .collect::<Vec<_>>();
         if msg["role"] == "operative"
             || self.rooms.get(code).is_some_and(|room| {
-                room.operatives.iter().any(|op| !token.is_empty() && op.person.token == token)
+                room.operatives
+                    .iter()
+                    .any(|op| !token.is_empty() && op.person.token == token)
             })
         {
             return Ok(());
@@ -2171,8 +2191,18 @@ impl Hub {
                     slot,
                 );
             } else {
-                let names = native.runtime.state().start.players.iter().enumerate()
-                    .map(|(slot, p)| room.players.get(slot).map_or_else(|| p.config.name.clone(), |p| p.name.clone()))
+                let names = native
+                    .runtime
+                    .state()
+                    .start
+                    .players
+                    .iter()
+                    .enumerate()
+                    .map(|(slot, p)| {
+                        room.players
+                            .get(slot)
+                            .map_or_else(|| p.config.name.clone(), |p| p.name.clone())
+                    })
                     .collect::<Vec<_>>();
                 match native
                     .runtime
@@ -2750,3 +2780,7 @@ mod horde_host;
 #[cfg(test)]
 #[path = "room_ai_combat_tests.rs"]
 mod room_ai_combat_tests;
+
+#[cfg(test)]
+#[path = "room_ai3_tests.rs"]
+mod room_ai3_tests;

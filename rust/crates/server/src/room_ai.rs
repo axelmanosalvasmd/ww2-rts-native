@@ -98,6 +98,14 @@ impl RoomAi {
     }
 
     #[cfg(test)]
+    pub fn level(&self, slot: usize) -> Option<Level> {
+        self.delivered
+            .iter()
+            .find(|entry| entry.seat.slot == slot)
+            .map(|entry| entry.seat.level)
+    }
+
+    #[cfg(test)]
     pub fn commander(&self, slot: usize) -> Option<&SeatCommander> {
         self.consumers.get(&slot).map(|c| &c.commander)
     }

@@ -15,6 +15,9 @@ fn outputs(hub: &mut Hub, rx: &mut mpsc::Receiver<Output>, now: u64) -> Vec<Valu
     while let Ok(output) = rx.try_recv() {
         match output {
             Output::Json(value) => result.push(value),
+            Output::Watcher(_) => {
+                panic!("commander and operative sockets cannot receive watcher frames")
+            }
             Output::Snapshot(frame) => {
                 result.push(serde_json::from_str(&frame.json).unwrap());
                 hub.complete_snapshot(&frame, true, now);

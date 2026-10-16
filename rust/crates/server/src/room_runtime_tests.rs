@@ -999,12 +999,12 @@ fn paused_scheduled_event_clear_resets_ai_alert_cursor_before_resume() {
         let game = &runtime.state().world.game;
         let map = json!({"rows": vec![".".repeat(game.w); game.h]});
         runtime.activate_ai(&map, 0, "normal").unwrap();
-        runtime.collect_frame(&selected, FrameKind::Scheduled).unwrap();
+        runtime
+            .collect_frame(&selected, FrameKind::Scheduled)
+            .unwrap();
         runtime.tick_ai(false).unwrap();
         let cursor = |runtime: &RoomRuntime| {
-            let Brain::Human { state, .. } =
-                runtime.ai_commander(0).unwrap().brain()
-            else {
+            let Brain::Human { state, .. } = runtime.ai_commander(0).unwrap().brain() else {
                 panic!("expected the human commander");
             };
             let snapshot = state.snapshot().unwrap();
@@ -1036,7 +1036,9 @@ fn paused_scheduled_event_clear_resets_ai_alert_cursor_before_resume() {
             runtime.pending_events.is_empty(),
             "the replacement batch is shorter than the old cursor"
         );
-        runtime.collect_frame(&selected, FrameKind::Scheduled).unwrap();
+        runtime
+            .collect_frame(&selected, FrameKind::Scheduled)
+            .unwrap();
         runtime
             .tick_ai(false)
             .expect("resume must reset the alert cursor instead of refusing a shorter batch");

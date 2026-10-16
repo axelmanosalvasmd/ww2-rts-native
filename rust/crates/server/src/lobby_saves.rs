@@ -83,7 +83,6 @@ impl Hub {
             || state.options.logistics
             || state.options.sandbox
             || state.world_runtime.is_some()
-            || !room.spectators.is_empty()
         {
             return Err("save needs an unavailable room capability".into());
         }
@@ -198,10 +197,16 @@ impl Hub {
                 used.insert(index);
             }
         }
-        if present.iter().enumerate().any(|(index, p)| {
-            !used.contains(&index) && p.connection.as_ref().is_some_and(Connection::ready)
-        }) {
-            return Err("spectator runtime admission unavailable".into());
+        let spectators = present
+            .iter()
+            .enumerate()
+            .filter(|(index, person)| {
+                !used.contains(index) && person.connection.as_ref().is_some_and(Connection::ready)
+            })
+            .map(|(_, person)| (*person).clone())
+            .collect::<Vec<_>>();
+        if spectators.len() > MAX_SPECTATORS {
+            return Err("saved room exceeds spectator capacity".into());
         }
         let mut players = Vec::new();
         for (slot, seat) in seats.iter().enumerate() {
@@ -284,7 +289,7 @@ impl Hub {
             listed: room.listed,
             title: room.title.clone(),
             players,
-            spectators: Vec::new(),
+            spectators,
             operatives: Vec::new(),
             mode: text("mode")?,
             map: text("mapName")?,

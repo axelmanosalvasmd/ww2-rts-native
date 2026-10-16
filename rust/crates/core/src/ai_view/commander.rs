@@ -278,8 +278,7 @@ impl CommanderViewMemory {
             } else {
                 sight
             },
-            horde: mode == Mode::Horde
-                && view.mode["slot"].as_u64() == Some(self.slot as u64),
+            horde: mode == Mode::Horde && view.mode["slot"].as_u64() == Some(self.slot as u64),
             defender: mode == Mode::Horde
                 && view.mode["defenderTeam"].as_i64() == Some(i64::from(team)),
             ..Context::default()
@@ -847,7 +846,8 @@ mod delivered {
         /// Validation and sighting updates commit together after the full packet succeeds.
         /// This accepts no authority handle, visibility oracle or other seat's economy.
         pub fn observe(&mut self, view: &SeatView) -> Result<HumanView<Observation>> {
-            if !(0..=SAFE_TICK).contains(&view.tick) || self.tick.is_some_and(|old| view.tick < old) {
+            if !(0..=SAFE_TICK).contains(&view.tick) || self.tick.is_some_and(|old| view.tick < old)
+            {
                 return Err("delivered commander clock went backwards or is invalid".into());
             }
             let me = view
@@ -1218,7 +1218,9 @@ mod delivered {
         let owner = unsigned(&me["slot"])? as usize;
         let own_structures = units
             .iter()
-            .filter(|u| u.owner == owner && catalog.unit(&u.kind).is_ok_and(|d| flag(d, "structure")))
+            .filter(|u| {
+                u.owner == owner && catalog.unit(&u.kind).is_ok_and(|d| flag(d, "structure"))
+            })
             .collect::<Vec<_>>();
         let ready = |kind: &str| {
             own_structures

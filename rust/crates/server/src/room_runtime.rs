@@ -139,6 +139,9 @@ impl RoomRuntime {
     }
     pub fn new(mut state: Match, now_ms: u64) -> Result<Self, String> {
         state.validate_tick_state()?;
+        if state.options.mode == ww2_core::economy::Mode::Horde {
+            state.tick_state.restrict_aircraft_weapons_for_delivery();
+        }
         state
             .restrict_to_ordinary_snapshots()
             .map_err(|e| format!("snapshot admission: {e:?}"))?;
@@ -173,6 +176,10 @@ impl RoomRuntime {
         slot: usize,
     ) -> Option<&ww2_core::human_commander::HumanView<ww2_core::commander_ai::Observation>> {
         self.ai.delivered_view(slot)
+    }
+    #[cfg(test)]
+    pub(crate) fn ai_level(&self, slot: usize) -> Option<ww2_core::commander_ai::Level> {
+        self.ai.level(slot)
     }
     #[cfg(test)]
     pub(crate) fn ai_decoded_view(&self, slot: usize) -> Option<&ww2_core::ai_view::SeatView> {
@@ -383,7 +390,8 @@ impl RoomRuntime {
                 .recipient(seat.slot)
                 .map_err(|e| format!("native recipient: {e:?}"))?
                 .into_json();
-            self.ai.observe(seat.slot, &message, kind == FrameKind::Scheduled)?;
+            self.ai
+                .observe(seat.slot, &message, kind == FrameKind::Scheduled)?;
             captured.push(CapturedSeat {
                 slot: seat.slot,
                 batch,
