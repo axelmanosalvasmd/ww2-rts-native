@@ -30,7 +30,7 @@ pub fn point_supply_due(mode: Mode, enabled: bool, tick: i64) -> Result<bool, Er
     Ok(tick % every as i64 == 1)
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Objective {
     pub id: serde_json::Value,
     pub at: Point,

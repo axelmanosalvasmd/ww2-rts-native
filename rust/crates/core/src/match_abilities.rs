@@ -2,7 +2,7 @@
 use crate::grid::UnitId;
 use std::collections::BTreeMap;
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct AbilityUnit {
     /// Source `cd`, allowed to expire below zero.
     pub cooldown: f64,
@@ -13,7 +13,7 @@ pub struct AbilityUnit {
     pub aimed_walked: bool,
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct AbilityState {
     units: BTreeMap<UnitId, AbilityUnit>,
 }

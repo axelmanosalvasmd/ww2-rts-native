@@ -17,7 +17,7 @@ use std::collections::BTreeMap;
 
 /// One owner's remembered rows and routing projection. Refresh through Match;
 /// consumers borrow this state separately from mutable units or path scratch.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct RecipientRouting {
     memory: ObservedMemory,
     routes: RouteKnowledge,
@@ -37,6 +37,14 @@ impl RecipientRouting {
         let _ = result.memory.take_changes();
         result
     }
+    fn save_storage_pointers(&self) -> [usize; 2] {
+        self.routes.storage_pointers()
+    }
+
+    fn relocate_save_storage(&mut self, bindings: &BTreeMap<usize, usize>) {
+        self.memory.relocate_save_storage(bindings);
+    }
+
     pub fn knowledge(&self) -> &RouteKnowledge {
         &self.routes
     }
@@ -74,7 +82,47 @@ impl RecipientRouting {
         self.memory.full_rows()
     }
 }
-#[derive(Clone, Copy, Debug)]
+
+impl Match {
+    /// Storage identities in a stable order. The save envelope records these
+    /// as small IDs and uses the same order to bind newly allocated arrays.
+    pub(crate) fn save_storage_pointers(&self) -> Vec<usize> {
+        let mut pointers = vec![
+            self.world.game.flags.as_ptr() as usize,
+            self.world.initial().chars.as_ptr() as usize,
+        ];
+        if let Some(heights) = &self.world.game.height {
+            pointers.push(heights.as_ptr() as usize);
+        }
+        for recipient in &self.recipients {
+            pointers.extend(recipient.save_storage_pointers());
+        }
+        pointers.extend(self.commands.paths.storage_pointers());
+        pointers
+    }
+
+    /// Replace saved storage IDs in routing guards with the new allocations.
+    pub(crate) fn relocate_save_storage(&mut self, old: &[usize]) -> Result<(), String> {
+        let new = self.save_storage_pointers();
+        if old.len() != new.len() {
+            return Err("saved routing storage count mismatch".into());
+        }
+        let mut bindings = BTreeMap::new();
+        for (&from, &to) in old.iter().zip(&new) {
+            if let Some(previous) = bindings.insert(from, to)
+                && previous != to
+            {
+                return Err("ambiguous saved routing storage identity".into());
+            }
+        }
+        self.commands.paths.relocate_save_storage(&bindings);
+        for recipient in &mut self.recipients {
+            recipient.relocate_save_storage(&bindings);
+        }
+        Ok(())
+    }
+}
+#[derive(Clone, Copy, Debug, serde::Serialize, serde::Deserialize)]
 struct BoundUnit {
     id: u32,
     kind: usize,

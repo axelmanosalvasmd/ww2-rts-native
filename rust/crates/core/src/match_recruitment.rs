@@ -29,7 +29,7 @@ impl From<production::Error> for RecruitError {
     }
 }
 /// Immutable facts from the recruitment transaction, separate from live control.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct RecruitMetadata {
     pub building: u32,
     pub initial_rally: Option<RallyKind>,

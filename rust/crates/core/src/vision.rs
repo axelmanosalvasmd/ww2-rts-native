@@ -33,7 +33,7 @@ const NEAR_BUCKET: f64 = 16.0;
 const LONG_AGO: f64 = -1e9;
 
 /// Last observed building facts, without current health or other hidden live state.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct KnownBuilding {
     pub id: u32,
     pub kind: usize,

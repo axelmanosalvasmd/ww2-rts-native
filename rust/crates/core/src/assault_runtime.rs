@@ -10,7 +10,7 @@ use crate::{
     unit_spawn::SpawnPlacer,
 };
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct AssaultState {
     pub defender_team: i32,
     /// Source uses -1 when the roster has no attacking player.

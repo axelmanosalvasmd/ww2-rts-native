@@ -14,7 +14,7 @@ use crate::{
     unit_publication::StagedUnit,
 };
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum HordeProfile {
     Mixed,
     Infantry,
@@ -54,7 +54,7 @@ pub struct HordePoolUnit {
     pub cost: f64,
     pub weight: f64,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct HordeState {
     pub slot: usize,
     pub defenders: usize,
