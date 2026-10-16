@@ -158,4 +158,5 @@ mod combat_feature_tests;
 #[cfg(test)]
 mod mov_audit_test_support;
 
+#[cfg(test)]
 mod mov_intent_batch;
