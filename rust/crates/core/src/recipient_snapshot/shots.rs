@@ -459,6 +459,55 @@ fn project_shots(
     Ok(projections)
 }
 
+/// Existing `flightsFor` rows. Ground flights retain the shot visibility and identity policy.
+pub(super) fn live_flights(state: &Match, slot: usize) -> Result<Value, SnapshotError> {
+    state.validate_firing_tick_state().map_err(|_| refused())?;
+    let g = &state.world.game;
+    let time = g.tick as f64 * state.rules.movement.tick;
+    let mut fog = state.routing_fog.clone();
+    fog.validate_shape(g).map_err(|_| SnapshotError::Rules)?;
+    let visible = &fog.team(g, &state.rules, g.players[slot].team).vis;
+    let mut rows = Vec::new();
+    for p in state.firing.flights.values() {
+        if state.rules.kinds[p.source_kind].air {
+            return Err(refused());
+        }
+        if p.launched > time {
+            continue;
+        }
+        let at = projectiles::flight_at(p.solution, time).map_err(|_| SnapshotError::Rules)?;
+        if !flight_visible(state, visible, Point { x: at.x, z: at.z }) {
+            continue;
+        }
+        let velocity =
+            projectiles::velocity_at(p.solution, time).map_err(|_| SnapshotError::Rules)?;
+        let mut row = json!({"flight":p.id,"kind":state.rules.kinds[p.source_kind].name,"seq":p.sequence,
+            "x":at.x,"y":at.y,"z":at.z,"v":[velocity.x,velocity.y,velocity.z],"gravity":p.solution.gravity,
+            "time":time,"launched":p.launched,"expires":p.expires});
+        if let Some(effect) = p.effect {
+            row["effect"] = json!(effect);
+        }
+        let mut end = until(state, visible, &row)?;
+        if end > time {
+            let b = projectiles::flight_at(p.solution, end).map_err(|_| SnapshotError::Rules)?;
+            if let Some(contact) = state
+                .visible_flight_contact(p, at, b, &|id| super::seen_by(state, slot, id))
+                .map_err(|_| SnapshotError::Rules)?
+            {
+                end = time + (end - time) * contact.hit.fraction;
+            }
+        }
+        row["until"] = json!(end);
+        if super::seen_by(state, slot, p.shooter) {
+            row["f"] = json!(p.shooter);
+            row["fo"] = json!(p.owner);
+        }
+        crate::match_firing::normalize_json_zero(&mut row);
+        rows.push(row);
+    }
+    Ok(Value::Array(rows))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -677,53 +726,4 @@ mod tests {
         assert_eq!(state.routing_fog, fog);
         assert_eq!(delivery, acknowledgments);
     }
-}
-
-/// Existing `flightsFor` rows. Ground flights retain the shot visibility and identity policy.
-pub(super) fn live_flights(state: &Match, slot: usize) -> Result<Value, SnapshotError> {
-    state.validate_firing_tick_state().map_err(|_| refused())?;
-    let g = &state.world.game;
-    let time = g.tick as f64 * state.rules.movement.tick;
-    let mut fog = state.routing_fog.clone();
-    fog.validate_shape(g).map_err(|_| SnapshotError::Rules)?;
-    let visible = &fog.team(g, &state.rules, g.players[slot].team).vis;
-    let mut rows = Vec::new();
-    for p in state.firing.flights.values() {
-        if state.rules.kinds[p.source_kind].air {
-            return Err(refused());
-        }
-        if p.launched > time {
-            continue;
-        }
-        let at = projectiles::flight_at(p.solution, time).map_err(|_| SnapshotError::Rules)?;
-        if !flight_visible(state, visible, Point { x: at.x, z: at.z }) {
-            continue;
-        }
-        let velocity =
-            projectiles::velocity_at(p.solution, time).map_err(|_| SnapshotError::Rules)?;
-        let mut row = json!({"flight":p.id,"kind":state.rules.kinds[p.source_kind].name,"seq":p.sequence,
-            "x":at.x,"y":at.y,"z":at.z,"v":[velocity.x,velocity.y,velocity.z],"gravity":p.solution.gravity,
-            "time":time,"launched":p.launched,"expires":p.expires});
-        if let Some(effect) = p.effect {
-            row["effect"] = json!(effect);
-        }
-        let mut end = until(state, visible, &row)?;
-        if end > time {
-            let b = projectiles::flight_at(p.solution, end).map_err(|_| SnapshotError::Rules)?;
-            if let Some(contact) = state
-                .visible_flight_contact(p, at, b, &|id| super::seen_by(state, slot, id))
-                .map_err(|_| SnapshotError::Rules)?
-            {
-                end = time + (end - time) * contact.hit.fraction;
-            }
-        }
-        row["until"] = json!(end);
-        if super::seen_by(state, slot, p.shooter) {
-            row["f"] = json!(p.shooter);
-            row["fo"] = json!(p.owner);
-        }
-        crate::match_firing::normalize_json_zero(&mut row);
-        rows.push(row);
-    }
-    Ok(Value::Array(rows))
 }

@@ -400,13 +400,19 @@ mod tests {
             json!({"t":"fireat","ids":[1],"x":10,"z":10}),
             json!({"t":"orders","commands":[{"t":"fireat","ids":[1],"x":10,"z":10}]}),
         ] {
-            let before = format!("{:?}", (&state.world.game.units, &state.commands.units, &ingress));
+            let before = format!(
+                "{:?}",
+                (&state.world.game.units, &state.commands.units, &ingress)
+            );
             assert_eq!(state.commands.pending_commands(), 0);
             assert!(!CommanderIngress::recognizes(raw["t"].as_str().unwrap()));
             assert_eq!(ingress.enqueue(&mut state, 0, &raw), Err(Denial::Blocked));
             assert_eq!(state.commands.pending_commands(), 0);
             assert_eq!(
-                format!("{:?}", (&state.world.game.units, &state.commands.units, &ingress)),
+                format!(
+                    "{:?}",
+                    (&state.world.game.units, &state.commands.units, &ingress)
+                ),
                 before
             );
         }

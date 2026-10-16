@@ -51,7 +51,8 @@ fn scene(kind: &str) -> (Match, UnitId) {
     let index = m.rules.kinds.iter().position(|k| k.name == kind).unwrap();
     let u = m.world.game.units.get_mut(&id).unwrap();
     u.kind = index;
-    u.hp = 100.;
+    let definition = Catalog::compiled().unwrap().unit(kind).unwrap();
+    u.hp = n(definition, "models", 1.) * n(definition, "hpPer", 1.);
     u.x = 31.;
     u.z = 41.;
     u.path.clear();
@@ -118,7 +119,7 @@ fn fire_at_admission_refusals_and_compound_queue_projection() {
         cache.recipient(0).unwrap().fields["orders"]
             .as_array()
             .unwrap()
-            .contains(&json!([id, 1, 5, 43, 41]))
+            .contains(&json!([id, 1, 5, 43., 41.]))
     );
     assert!(
         !cache.recipient(1).unwrap().fields["orders"]
@@ -161,10 +162,13 @@ fn fire_at_direct_shells_same_structure_and_finishes_when_cell_is_gone() {
     let before: f64 = m.world.game.cell_hp.iter().map(|v| f64::from(*v)).sum();
     let mut delivery = crate::recipient_snapshot::DeliveryState::new(&m).unwrap();
     let mut launched = false;
-    for _ in 0..280 {
+    for _ in 0..3600 {
         let report = m.advance_tick().unwrap();
         launched |= report.events.iter().any(|e| matches!(e,crate::match_tick::TickEvent::Firing(LaunchEvent::Flight{shooter,..}) if *shooter == id));
         delivered(&mut m, &mut delivery, &report);
+        if m.world.game.cell_hp[cell] <= 0. && m.commands.units[&id].fire_at.is_none() {
+            break;
+        }
     }
     assert!(launched);
     assert!(
@@ -176,15 +180,7 @@ fn fire_at_direct_shells_same_structure_and_finishes_when_cell_is_gone() {
             .sum::<f64>()
             < before
     );
-    let order = m.world.game.units.keys().copied().collect::<Vec<_>>();
-    let skip = std::collections::BTreeSet::new();
-    let hit = crate::environment::DamageContext::plain(&skip);
-    m.firing_damage_view(&order)
-        .0
-        .section_hit(cell, 1e9, &hit)
-        .unwrap();
-    m.advance_tick().unwrap();
-    snapshots(&m);
+    assert!(m.world.game.cell_hp[cell] <= 0., "shells must destroy the interior target");
     assert_eq!(m.commands.units[&id].fire_at, None);
 }
 #[test]
