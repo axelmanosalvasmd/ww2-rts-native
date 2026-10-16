@@ -1,5 +1,15 @@
 # Three Crossroads Native: design decisions
 
+## BASE13 authentic five-control capture (2026-10-16)
+
+At producing `d81312fd521a69cb8f249352da578e9995ec4af2`, Rust tree `cbe8a656644037f95ee29e1ce71a9ef2f78397f8`, Root's new exact S2 SourceMirror grant ran the maintained optional `--controls` generation once and its conditional byte check once. Both exited 0 against clean pinned `e4e579a`, including untracked files, with x64 Node 24.21.0. Each exercised five independent authored production inputs, 18 original Buy calls, 13 paid jobs, five refusals, ten direct availability and ten buyCount queries (20 underlying availability calls), zero ticks and zero draws. These inputs do not claim constructor history.
+
+The authentic external `base13-controls.json` is 19,822 bytes, SHA256 `8b76559cfd3c20698bfeab16da07c282155e9177b10ad1e741b8c54b97bc5f26`, frozen mode 0444 at `/tmp/logistics271-rebase-f7-9add/base13-controls-source-20261015/`. Queue-room counts are [5, 2, 0]; no-Barracks [0]; full-selected [5, 5, 0]; independent tank controls [0] and [1, 0]. Paid jobs come only from original Buy calls. Every refusal preserves the recorded component; the tank pays 200 MP and 60 Fuel before its subsequent 40-Fuel refusal. Raw field absence and numeric bits remain intact, with no comparison mapping.
+
+Both jobs enforced CPUs 4-7, 6 GiB memory, zero scope swap, 400% CPU, jobs 4/threads 1, the approved mirror of current guard a007, the same inherited exclusive S2 flock and external S2 target. Per-job free-g showed 11 GiB available; disk receipts were 114,947,534,848 and 114,947,272,704 bytes, above 20 GiB. All processes were terminal and the inherited lock closed before Root notification and this note. Raw grants, logs and receipts are in `/tmp/logistics271-rebase-f7-9add/base13-controls-proof-d813-20261015/`.
+
+This authorized child changes only this note and one changelog fragment. Source, consumers, inputs, runtime and the complete Rust tree remain exact. The old 1,938-byte paid-rifle fixture and its producing970/1b1a evidence stay separate and unchanged. All four new native selectors remain held and unrun pending a separate exact-child grant. No native, Cargo, fmt, lint, discovery or CI ran here. BASE13 remains todo: ordinary Conquest population-two, actual HQ/depot income and the other original branches remain held. BASE05/09/12/19 stay separate; neither BASE09 failure was retried. No row, interface, privacy, client, publication or quota-five claim follows.
+
 ## BASE13 remaining paid controls (2026-10-15, source only)
 
 Extend only the owned recorder and production consumer from clean `1b1a0bb36e202b36dfb59cff4bd2c7e15d339083`. Its single native component pass, fmt0 and strict Clippy0 belong to Rust tree `963b2414352e86c51e39ad3841e3991b3afcad97`; no result transfers to this child. Keep its authentic 1,938-byte fixture and complete paid-rifle test exact. All original recorder trace statements remain intact in the default branch.

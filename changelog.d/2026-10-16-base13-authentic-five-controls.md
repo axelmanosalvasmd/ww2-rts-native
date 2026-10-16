@@ -1,0 +1,1 @@
+- Recorded and byte-checked five authentic BASE13 production controls once each at d81312fd: 18 Buy calls, 13 paid jobs, five refusals and ten card queries and ten count queries per run. Preserved the external 19,822-byte capture; four native controls, Conquest population and income proof remain held. No parity row changed.
