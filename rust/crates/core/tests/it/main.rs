@@ -61,6 +61,8 @@ mod logistics_features;
 mod match_combat;
 #[path = "../match_routing.rs"]
 mod match_routing;
+#[path = "../match_seed_intent.rs"]
+mod match_seed_intent;
 #[path = "../math.rs"]
 mod math;
 #[path = "../mode_intent_batch1.rs"]
