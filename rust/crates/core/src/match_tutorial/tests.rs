@@ -545,6 +545,71 @@ fn tutorial_guards_reject_missing_runtime_and_preserve_no_defeat_rule() {
 }
 
 #[test]
+fn base19_tutorial_buy_faces_personal_rally_or_centre_and_walks_without_a_producer() {
+    // Prototype e4e579a shared/sim.js:3798-3803: immediate spawn, facing, personal rally.
+    for rally in [
+        None,
+        Some(Point { x: 21.0, z: 57.0 }),
+        Some(Point { x: 21.0, z: 29.0 }),
+    ] {
+        let mut m = tutorial();
+        assert!(m.building_cells.is_empty());
+        assert!(
+            !m.world
+                .game
+                .units
+                .values()
+                .any(|u| m.rules.kinds[u.kind].building)
+        );
+        if let Some(at) = rally {
+            command(
+                &mut m,
+                0,
+                Command::Rally {
+                    ids: vec![],
+                    id: None,
+                    at: Some(at),
+                },
+            );
+        }
+        let home = m.start.players[0].spawn;
+        let facing = rally.unwrap_or(Point {
+            x: m.world.game.w as f64 * CELL / 2.0,
+            z: m.world.game.h as f64 * CELL / 2.0,
+        });
+        let id = m.next_unit_id;
+        command(
+            &mut m,
+            0,
+            Command::Buy {
+                kind: "rifle".into(),
+                from: None,
+            },
+        );
+        let u = &m.world.game.units[&id];
+        assert_eq!(u.owner, 0);
+        assert_eq!(m.rules.kinds[u.kind].name, "rifle");
+        assert!(math::hypot(u.x - home.x, u.z - home.z) < 12.0);
+        assert_eq!(u.rot, math::atan2(facing.z - home.z, facing.x - home.x));
+        assert_eq!(u.world_goal, rally);
+        if let Some(at) = rally {
+            assert!(m.commands.units[&id].rally_drift);
+            assert!(!u.path.is_empty());
+            let before = math::hypot(u.x - at.x, u.z - at.z);
+            for _ in 0..40 {
+                m.advance_tick().unwrap();
+            }
+            let u = &m.world.game.units[&id];
+            assert!(math::hypot(u.x - at.x, u.z - at.z) < before - 1.0);
+            assert_eq!(m.tick_state.fault(), None);
+        } else {
+            assert!(u.path.is_empty());
+            assert!(!m.commands.units[&id].rally_drift);
+        }
+    }
+}
+
+#[test]
 fn tutorial_building_repair_rejects_before_any_mutation() {
     let mut m = tutorial();
     let rifle = m

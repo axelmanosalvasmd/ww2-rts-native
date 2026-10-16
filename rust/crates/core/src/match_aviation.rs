@@ -676,9 +676,7 @@ impl Match {
         self.aviation.planes.insert(id, next.runtime);
         self.firing.units.insert(id, next.firing);
         self.grid.update(id, &self.world.game.units[&id]);
-        if self.tick_state.aircraft_weapons_allowed() {
-            self.step_aircraft_weapons(id)?;
-        }
+        self.step_aircraft_weapons(id)?;
         Ok(())
     }
     fn prepare_aircraft_anti_air(
