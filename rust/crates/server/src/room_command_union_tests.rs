@@ -339,7 +339,7 @@ fn net43_ability_autocast_and_waiting_kind_six_survive_room_delivery() {
         Some(Command::Ability { .. })
     ));
     let cache = SnapshotCache::new(room.state()).unwrap();
-    let owner = cache.recipient(1).unwrap().into_json();
+    let owner = Value::Object(cache.recipient(1).unwrap().fields);
     assert!(
         owner["orders"]
             .as_array()
@@ -348,7 +348,7 @@ fn net43_ability_autocast_and_waiting_kind_six_survive_room_delivery() {
             .any(|row| row == &json!([actor, 1, 6, aim.x, aim.z]))
     );
     assert!(
-        !cache.recipient(0).unwrap().into_json()["orders"]
+        !Value::Object(cache.recipient(0).unwrap().fields)["orders"]
             .as_array()
             .unwrap()
             .iter()
@@ -516,7 +516,7 @@ fn net43_classic_waiting_production_cancels_refunds_and_delivers_every_seat() {
         vec![&json!({"t":"deny","cmd":"cancelProduction","reason":"notWaiting"})]
     );
     let cache = SnapshotCache::new(room.state()).unwrap();
-    let owner = cache.recipient(1).unwrap().into_json();
+    let owner = Value::Object(cache.recipient(1).unwrap().fields);
     assert!(owner["mun"].is_number() && owner["fuel"].is_number());
     assert_eq!(owner["mode"]["kind"], "classic");
     assert_eq!(
@@ -532,7 +532,7 @@ fn net43_classic_waiting_production_cancels_refunds_and_delivers_every_seat() {
         1
     );
     assert!(
-        !cache.recipient(0).unwrap().into_json()["productionJobs"]
+        !Value::Object(cache.recipient(0).unwrap().fields)["productionJobs"]
             .as_array()
             .unwrap()
             .iter()
@@ -692,16 +692,20 @@ fn net43_classic_attachment_keeps_mode_map_binding_and_refuses_node_rounding_ove
     wrong_mode.mode = "conquest";
     assert!(crate::native_startup::NativeStartup::prepare(&state, wrong_mode).is_err());
     state.elimination.as_mut().unwrap().nodes[0].at.x = f64::MAX;
-    let before = format!(
-        "{:?}",
-        (&state.elimination, &state.production, &state.commands)
+    let before = (
+        state.elimination.clone(),
+        state.production.clone(),
+        state.commands.units.clone(),
+        state.commands.pending_commands(),
     );
     assert!(state.preflight_ordinary_snapshot().is_err());
     assert!(state.ordinary_snapshot_raw_lists().is_err());
     assert_eq!(
-        format!(
-            "{:?}",
-            (&state.elimination, &state.production, &state.commands)
+        (
+            state.elimination.clone(),
+            state.production.clone(),
+            state.commands.units.clone(),
+            state.commands.pending_commands(),
         ),
         before
     );

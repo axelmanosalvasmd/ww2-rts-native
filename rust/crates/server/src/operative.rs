@@ -105,6 +105,7 @@ impl Room {
                     disconnected: None,
                     denies: Vec::new(),
                     rtt: None,
+                    map_pings: Vec::new(),
                     diagnostics: crate::diagnostics::PlayerDiagnostics::default(),
                     last_match: None,
                 },
