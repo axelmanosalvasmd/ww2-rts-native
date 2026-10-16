@@ -4,7 +4,7 @@ use super::*;
 fn connection(id: u64) -> (Connection, mpsc::Receiver<Output>) {
     let (tx, rx) = mpsc::channel(64);
     let (cancel, _) = watch::channel(false);
-    (Connection { id, tx, cancel }, rx)
+    (Connection::new(id, tx, cancel), rx)
 }
 fn join(h: &mut Hub, c: &Connection, now: u64) {
     h.message("ABC",c,&mut false,json!({"t":"hello","token":"cmb152","name":"cmb152","spectate":false,"listing":{"public":true}}),now);
