@@ -87,19 +87,16 @@ fn if21_same_seed_replays_constructed_units_and_recorded_commands() {
     };
     let mut first = Match::new(&map, options.clone()).unwrap();
     let mut repeated = Match::new(&map, options.clone()).unwrap();
-    let mut different = Match::new(
-        &map,
-        MatchOptions {
-            seed: 7,
-            ..options
-        },
-    )
-    .unwrap();
+    let mut different = Match::new(&map, MatchOptions { seed: 7, ..options }).unwrap();
     assert_same_seed_state(&first, &repeated);
     assert!(first.start.living.is_some());
     let initial = units(&first);
     assert!(!initial.is_empty());
-    assert_ne!(initial, units(&different), "different seed must change units");
+    assert_ne!(
+        initial,
+        units(&different),
+        "different seed must change units"
+    );
     let environment_seed = first.start.environment_seed;
     let mover = first
         .world
@@ -120,10 +117,7 @@ fn if21_same_seed_replays_constructed_units_and_recorded_commands() {
             Command::Move {
                 orders: vec![MoveOrder {
                     unit: i64::from(mover),
-                    at: Point {
-                        x: 256.0,
-                        z: 160.0,
-                    },
+                    at: Point { x: 256.0, z: 160.0 },
                 }],
                 control_ids: None,
                 attack_move: false,
@@ -183,6 +177,14 @@ fn if21_same_seed_replays_constructed_units_and_recorded_commands() {
     assert_eq!(repeated.commands.pending_commands(), 0);
     assert_eq!(different.commands.pending_commands(), 0);
     assert_ne!(first.start.environment_seed, environment_seed);
-    assert_ne!(units(&first), initial, "ticks must change the unit projection");
-    assert_ne!(units(&first), units(&different), "different seeded match units");
+    assert_ne!(
+        units(&first),
+        initial,
+        "ticks must change the unit projection"
+    );
+    assert_ne!(
+        units(&first),
+        units(&different),
+        "different seeded match units"
+    );
 }
