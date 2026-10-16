@@ -268,6 +268,85 @@ fn cmb67_area_bomber_spends_one_sortie_round_for_each_physical_stick() {
 }
 
 #[test]
+fn aircraft_launch_events_detach_before_later_ground_queued_order() {
+    for name in ["attacker", "bomber"] {
+        let mut m = ordinary();
+        for control in m.commands.units.values_mut() {
+            control.hold_fire = true;
+            control.auto_cast = false;
+            control.auto_retreat = false;
+        }
+        let target = m
+            .world
+            .game
+            .units
+            .values()
+            .find(|unit| unit.owner == 1 && m.rules.kinds[unit.kind].name == "rifle")
+            .unwrap()
+            .id;
+        let enemy = m.world.game.units.get_mut(&target).unwrap();
+        enemy.x = 40.0;
+        enemy.z = 40.0;
+        let plane = add_plane(
+            &mut m,
+            name,
+            PlaneMission {
+                kind: if name == "bomber" {
+                    MissionKind::Area
+                } else {
+                    MissionKind::Attack
+                },
+                target: (name == "attacker").then_some(target),
+                at: Point { x: 40.0, z: 40.0 },
+            },
+        );
+        let ground = m.next_unit_id;
+        m.next_unit_id += 1;
+        let unit = unit_spawn::initial_unit(
+            &m.rules,
+            Catalog::compiled().unwrap(),
+            m.rules.kind("rifle").unwrap(),
+            ground,
+            0,
+            Point { x: 70.0, z: 70.0 },
+        )
+        .unwrap();
+        m.commands
+            .insert(ground, UnitControl::new(&unit, &m.rules).unwrap());
+        m.firing.initialize(ground);
+        m.combat.initialize(ground);
+        m.abilities.initialize(ground);
+        m.recovery.initialize(ground);
+        m.world.game.units.insert(ground, unit);
+        sight(&mut m);
+        m.initialize_tick_scene(100, Default::default()).unwrap();
+        let queued = crate::match_commands::Command::from_json(&serde_json::json!({
+            "t": "move", "orders": [[ground, 80.0, 70.0]],
+            "queue": true
+        }))
+        .unwrap();
+        assert_eq!(m.execute_command(0, &queued, false).unwrap(), None);
+        assert_eq!(m.commands.units[&ground].orders.len(), 1);
+        let report = m.advance_tick().unwrap();
+        assert!(report.events.iter().any(|event| matches!(
+            event,
+            crate::match_tick::TickEvent::Firing(crate::match_firing::LaunchEvent::Flight { shooter, .. })
+                if *shooter == plane
+        )));
+        assert!(m.commands.units[&ground].orders.is_empty());
+        assert!(
+            m.world.game.units[&ground]
+                .world_goal
+                .is_some_and(|goal| goal.x > 70.0)
+        );
+        for expected in 102..=104 {
+            assert_eq!(m.advance_tick().unwrap().tick, expected);
+        }
+        assert_eq!(m.tick_state.fault(), None);
+    }
+}
+
+#[test]
 fn cmb68_enemy_hit_on_a_tank_ejects_all_deck_riders_with_shock() {
     let mut m = scene(&[
         ("rifle", 1, 20.0, 20.0),

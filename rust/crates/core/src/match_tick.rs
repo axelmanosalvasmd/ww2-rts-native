@@ -555,10 +555,9 @@ impl crate::match_runtime::Match {
                 continue;
             }
             if self.options.mode != crate::economy::Mode::World {
-                if self
-                    .step_aircraft_turn(id, dt)
-                    .map_err(|error| format!("aircraft turn: {error}"))?
-                {
+                let result = self.step_aircraft_turn(id, dt);
+                self.take_firing_tick_events(events);
+                if result.map_err(|error| format!("aircraft turn: {error}"))? {
                     continue;
                 }
                 match self.apply_unit_riding(id, dt)? {

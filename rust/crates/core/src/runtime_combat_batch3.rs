@@ -599,6 +599,116 @@ fn cmb49_terrain_start_cell_and_moving_bodies_take_first_contact() {
 }
 
 #[test]
+fn cmb49_off_map_aircraft_rounds_hit_border_houses_on_the_true_segment() {
+    for distance in [20.0, 1000.0] {
+        for (from, target, border) in [
+            (
+                Point {
+                    x: -distance,
+                    z: 21.0,
+                },
+                Point { x: 4.0, z: 21.0 },
+                Point { x: 1.0, z: 21.0 },
+            ),
+            (
+                Point {
+                    x: 128.0 + distance,
+                    z: 21.0,
+                },
+                Point { x: 124.0, z: 21.0 },
+                Point { x: 127.0, z: 21.0 },
+            ),
+            (
+                Point {
+                    x: 21.0,
+                    z: -distance,
+                },
+                Point { x: 21.0, z: 4.0 },
+                Point { x: 21.0, z: 1.0 },
+            ),
+            (
+                Point {
+                    x: 21.0,
+                    z: 128.0 + distance,
+                },
+                Point { x: 21.0, z: 124.0 },
+                Point { x: 21.0, z: 127.0 },
+            ),
+        ] {
+            let mut m = scene(&[("rifle", 0, 20.0, 20.0), ("tank", 1, target.x, target.z)]);
+            let kind = m.rules.kind("attacker").unwrap();
+            let mut plane = unit_spawn::initial_aircraft(
+                &m.rules,
+                Catalog::compiled().unwrap(),
+                kind,
+                1,
+                0,
+                from,
+            )
+            .unwrap();
+            plane.air = Some(crate::game::PlaneState::Out);
+            m.world.game.units.insert(1, plane);
+            m.aviation.planes.insert(
+                1,
+                crate::match_aviation::AircraftRuntime {
+                    fuel: 50.0,
+                    ammo: 8.0,
+                    timer: 0.0,
+                    orbit: 0.0,
+                    mission: Some(crate::match_aviation::PlaneMission {
+                        kind: crate::match_aviation::MissionKind::Patrol,
+                        target: None,
+                        at: target,
+                    }),
+                    downed: false,
+                },
+            );
+            m.grid.rebuild(&m.world.game.units);
+            let cell = m.world.game.cell_of(border.x, border.z).unwrap();
+            m.world.set_cell(cell, b'B').unwrap();
+            m.fire_weapon(1, 2, false).unwrap();
+            m.validate_firing_tick_state().unwrap();
+            let p = m.firing.flights.values().next().unwrap();
+            assert_eq!(p.start_cell, usize::MAX);
+            let a = p.launch_origin;
+            close(a.x, from.x);
+            close(a.z, from.z);
+            close(a.y, 20.0);
+            // An explicit aim isolates terrain geometry from weapon dispersion.
+            let b = projectiles::Point3::new(target.x, 1.2, target.z);
+            let contact = m.flight_contact(p, a, b, 0.0, 1.0).unwrap().unwrap();
+            assert_eq!(contact.surface, FlightSurface::Cell(cell));
+            close(contact.hit.fraction, distance / (distance + 4.0));
+        }
+    }
+}
+
+#[test]
+fn cmb49_off_map_cell_traversal_rejects_stationary_and_parallel_misses() {
+    let m = scene(&[("rifle", 0, 20.0, 20.0)]);
+    for (a, b) in [
+        ((-1000.0, 21.0), (-1000.0, 21.0)),
+        ((-1000.0, 21.0), (-900.0, 21.0)),
+        ((-1000.0, -1.0), (1000.0, -1.0)),
+        ((128.0, -1000.0), (128.0, 1000.0)),
+    ] {
+        assert!(
+            m.flight_crossed_cells(
+                projectiles::Point3::new(a.0, 4.0, a.1),
+                projectiles::Point3::new(b.0, 4.0, b.1),
+            )
+            .unwrap()
+            .is_empty()
+        );
+    }
+    let at = projectiles::Point3::new(21.0, 4.0, 21.0);
+    assert_eq!(
+        m.flight_crossed_cells(at, at).unwrap(),
+        vec![m.world.game.cell_of(at.x, at.z).unwrap()]
+    );
+}
+
+#[test]
 fn cmb49_terrain_contact_respects_each_solid_height() {
     for (ch, height) in [
         (b'B', 5.0),

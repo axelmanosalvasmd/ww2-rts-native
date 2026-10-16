@@ -1,3 +1,4 @@
 - Connect on-map aircraft guns and bomber sticks to physical projectiles, including sortie ammunition, Hold Fire, ordered ground targets and airborne launch height.
 - Apply completed gun-pit range to targeting, eject passengers from wrecked carriers with damage or drowning, and let automatic retreat leave a garrison through the staged ground exit. Exclude convoys from automatic retreat.
 - Add native behavior checks for combat initialization, pillbox sections, firing, projectiles, damage, interception, shelter, retreat and recovery. Update the carrier and retreat tests that expected the replaced refusal paths. Horde and Tutorial startup, Kaiju breath, Annihilation scaling and FireAt command delivery remain outside this batch.
+- Detach aircraft launch events before later queued orders, and preserve border-house collisions for shots entering from off-map aircraft. Add both regressions and document aircraft ground fire and gun-pit range.

@@ -266,6 +266,7 @@ pub struct LiveFlight {
     pub sequence: u32,
     pub max_contacts: u32,
     pub near: f64,
+    /// Launch cell, or usize::MAX for an aircraft launched outside the map.
     pub start_cell: usize,
     pub intended: Option<UnitId>,
     pub damage_scale: f64,
@@ -763,7 +764,14 @@ impl Match {
                 || p.source_kind >= self.rules.kinds.len()
                 || crate::match_actor::checked_game_owner(&self.world.game, p.owner).is_err()
                 || self.combat.get(p.shooter).is_none()
-                || p.start_cell >= self.world.game.flags.len()
+                || (p.start_cell >= self.world.game.flags.len()
+                    && (p.start_cell != usize::MAX
+                        || !self.rules.kinds[p.source_kind].air
+                        || self
+                            .world
+                            .game
+                            .cell_of(p.launch_origin.x, p.launch_origin.z)
+                            .is_some()))
                 || p.max_contacts > 16
                 || p.sequence > p.max_contacts
                 || ![
@@ -946,17 +954,10 @@ impl Match {
         let g = &self.world.game;
         let level_height = n(self.firing_config()?, "levelHeight", 2.5);
         let mut best: Option<FlightContact> = None;
-        for c in projectiles::crossed_cells(
-            projectiles::BodyPosition { x: a.x, z: a.z },
-            projectiles::BodyPosition { x: b.x, z: b.z },
-            CELL,
-            g.w,
-            g.h,
-        )
-        .map_err(|e| format!("flight cell traversal: {e:?}"))?
-        {
+        for c in self.flight_crossed_cells(a, b)? {
             let ch = g.physical(c);
             if p.sequence == 0
+                && p.start_cell < g.flags.len()
                 && (c == p.start_cell
                     || (ch == b'#'
                         && (c % g.w).abs_diff(p.start_cell % g.w) <= 1
