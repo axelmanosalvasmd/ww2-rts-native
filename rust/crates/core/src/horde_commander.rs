@@ -117,13 +117,16 @@ pub struct HordeCommander {
     budget_tick: Option<i64>,
     issued: usize,
     last_think: Option<i64>,
+    #[serde(default)]
     policy: Box<crate::horde_policy::HordePolicy>,
+    #[serde(default)]
     policy_facts: Option<Box<crate::horde_policy::Facts>>,
 }
 
 impl HordeCommander {
     pub(crate) fn reset_saved_delivery(&mut self) {
         self.delivered = None;
+        self.policy_facts = None;
     }
 
     pub(crate) fn save_owner(&self) -> usize {

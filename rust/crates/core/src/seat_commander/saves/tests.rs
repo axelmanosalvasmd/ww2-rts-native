@@ -271,7 +271,55 @@ fn if27_horde_pending_memory_round_trips_order_budget_and_supersession() {
         wave: Some(view.wave),
     };
     let mut state = HordeCommander::new(1);
-    state.observe(live, view.clone()).unwrap();
+    let facts = crate::horde_policy::Facts {
+        tick: view.tick,
+        slot: 1,
+        spawn: Point { x: 40.0, z: 40.0 },
+        teams: vec![0, 1],
+        manpower: 150.0,
+        support: Default::default(),
+        units: view
+            .units
+            .iter()
+            .map(|(&id, own)| {
+                (
+                    id,
+                    crate::horde_policy::Unit {
+                        id,
+                        owner: own.owner,
+                        kind: "rifle".into(),
+                        at: Point { x: 40.0, z: 40.0 },
+                        hp: own.hp,
+                        suppression: 0.0,
+                        plane: None,
+                        cooldown: 0.0,
+                        auto_retreat: false,
+                        garrisoned: false,
+                        in_cover: false,
+                        riding: false,
+                    },
+                )
+            })
+            .collect(),
+        points: vec![],
+        strikes: vec![],
+    };
+    state.observe_policy(live, view.clone(), facts).unwrap();
+    let encoded = crate::save_codec::to_value(&state).unwrap();
+    let decoded: HordeCommander = crate::save_codec::from_value(encoded).unwrap();
+    assert_eq!(decoded, state);
+    let mut legacy = serde_json::to_value(&state).unwrap();
+    assert!(!legacy["policy"]["still"].as_object().unwrap().is_empty());
+    assert!(legacy["policy_facts"].is_object());
+    legacy.as_object_mut().unwrap().remove("policy");
+    legacy.as_object_mut().unwrap().remove("policy_facts");
+    let legacy: HordeCommander = serde_json::from_value(legacy).unwrap();
+    let legacy = serde_json::to_value(legacy).unwrap();
+    assert_eq!(
+        legacy["policy"],
+        serde_json::to_value(crate::horde_policy::HordePolicy::default()).unwrap()
+    );
+    assert!(legacy["policy_facts"].is_null());
     let command = Command::from_json(&serde_json::json!({
         "t":"move", "orders":(1..=7).map(|id| serde_json::json!([id, 90.0, 90.0])).collect::<Vec<_>>()
     })).unwrap();
@@ -410,4 +458,48 @@ fn if27_checkpoint_continues_nonempty_path_fifo_retries_grid_and_navigation_cach
     }
     assert_eq!(loaded.commands.path_requests().pending_len(), 0);
     assert_eq!(loaded.tick_state.fault(), None);
+}
+
+#[test]
+fn if27_field_and_world_policy_memory_round_trip_and_legacy_defaults() {
+    let game = ordinary();
+    let mut seat = game.create_seat_commander(0, Level::Hard).unwrap();
+    let Brain::Human { policy, .. } = &mut seat.brain else {
+        panic!("ordinary seat must use the human brain");
+    };
+    let mut encoded = serde_json::to_value(&**policy).unwrap();
+    encoded["tactics"]["field"] = serde_json::json!({
+        "bridges":[12], "bridge_crew":{"4":{"tick":9,"dug":true}},
+        "fill_crew":{"5":{"tick":10,"dug":false}},
+        "demine_crew":{"6":{"tick":11,"dug":true}}, "armor_seen":true
+    });
+    encoded["tactics"]["world"] = serde_json::json!({
+        "rail_at":{"7":23}, "fort_steps":{"8":3},
+        "field": encoded["tactics"]["field"].clone()
+    });
+    **policy = serde_json::from_value(encoded.clone()).unwrap();
+    let expected = policy.clone();
+    let memory = HumanObservationMemory::new(0);
+    let saved = game.save_ai_memories_json(&[(&seat, &memory)]).unwrap();
+    let saved = serde_json::from_slice(&serde_json::to_vec(&saved).unwrap()).unwrap();
+    let restored = game
+        .restore_ai_memories_json(&saved, &[(0, Level::Hard)])
+        .unwrap();
+    let Brain::Human { policy, .. } = &restored[0].0.brain else {
+        panic!("restored seat must use the human brain");
+    };
+    assert_eq!(policy, &expected);
+    let tactics = encoded["tactics"].as_object_mut().unwrap();
+    tactics.remove("field");
+    tactics.remove("world");
+    let legacy: HumanPolicy = serde_json::from_value(encoded).unwrap();
+    let legacy = serde_json::to_value(legacy).unwrap();
+    assert_eq!(
+        legacy["tactics"]["field"],
+        serde_json::to_value(crate::commander_field_policy::State::default()).unwrap()
+    );
+    assert_eq!(
+        legacy["tactics"]["world"],
+        serde_json::to_value(crate::commander_world_policy::State::default()).unwrap()
+    );
 }

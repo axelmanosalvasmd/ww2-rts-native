@@ -201,7 +201,9 @@ pub struct State {
     pub called: Option<f64>,
     pub cleared_sightings: BTreeMap<u32, f64>,
     pub(crate) fort_steps: BTreeMap<u32, u8>,
+    #[serde(default)]
     pub field: crate::commander_field_policy::State,
+    #[serde(default)]
     pub world: crate::commander_world_policy::State,
 }
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
