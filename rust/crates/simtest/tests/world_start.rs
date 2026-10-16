@@ -459,3 +459,116 @@ fn incomplete_world_inputs_are_explicit_and_do_not_mutate_the_map() {
     assert!(instance.world_economy_regions().is_err());
     assert_eq!(m.source(), &before);
 }
+
+#[test]
+fn map95_map96_world_installations_nodes_and_guard_fort_positions() {
+    use ww2_core::{game::Point, math};
+    let fixture: Value = serde_json::from_str(include_str!("fixtures/world-start.json")).unwrap();
+    let mut guarded_count = 0;
+    let mut boxes = 0;
+    let mut towers = 0;
+    for c in fixture["cases"].as_array().unwrap() {
+        let source = map(c);
+        let opts = options(c);
+        let m = Match::new_world(&source, opts.clone(), MatchRandom::new(opts.seed)).unwrap();
+        let g = &m.world.game;
+        let runtime = m.world_runtime.as_ref().unwrap();
+        let geography = m.world.geography().unwrap();
+        assert_eq!(runtime.nodes.len(), geography.regions.len());
+        for (region, node) in geography.regions.iter().zip(&runtime.nodes) {
+            assert_eq!(node.cell, (region.y + 4) * g.w + region.x + 4);
+            assert_eq!(node.fuel, region.kind.as_deref() == Some("industrial"));
+            assert_eq!(
+                (node.at.x, node.at.z),
+                ((region.x + 5) as f64 * 2.0, (region.y + 5) as f64 * 2.0)
+            );
+        }
+        for (slot, player) in m.start.players.iter().enumerate() {
+            let headquarters: Vec<_> = g
+                .units
+                .values()
+                .filter(|u| u.owner == slot && m.rules.kinds[u.kind].name == "hq")
+                .collect();
+            assert_eq!(headquarters.len(), 1);
+            assert_eq!(headquarters[0].at(), player.spawn);
+            assert_eq!(headquarters[0].cells.as_ref().unwrap().len(), 9);
+        }
+        for (&id, &region) in &runtime.guard_bases {
+            let base = &g.units[&id];
+            let r = &geography.regions[region];
+            assert_eq!(base.owner, LOCAL_DEFENDER_OWNER);
+            assert_eq!(
+                (base.x, base.z),
+                (
+                    (r.x as f64 + 0.5) * 2.0 - 6.0,
+                    (r.y as f64 + 0.5) * 2.0 - 6.0
+                )
+            );
+            for &cell in base.cells.as_ref().unwrap() {
+                assert_eq!(g.physical(cell as usize), b'K');
+                assert_eq!(g.height.as_ref().unwrap()[cell as usize], 0);
+            }
+            guarded_count += 1;
+        }
+        // All fort candidates are measured from their nearest actual home.
+        let mut ranked: Vec<_> = geography
+            .regions
+            .iter()
+            .filter(|r| r.home.is_none())
+            .map(|r| {
+                let at = Point {
+                    x: (r.x as f64 + 0.5) * 2.0,
+                    z: (r.y as f64 + 0.5) * 2.0,
+                };
+                let nearest = m
+                    .start
+                    .players
+                    .iter()
+                    .map(|p| p.spawn)
+                    .min_by(|a, b| {
+                        math::hypot(a.x - at.x, a.z - at.z)
+                            .total_cmp(&math::hypot(b.x - at.x, b.z - at.z))
+                    })
+                    .unwrap();
+                (at, nearest, math::hypot(nearest.x - at.x, nearest.z - at.z))
+            })
+            .collect();
+        ranked.sort_by(|a, b| b.2.total_cmp(&a.2));
+        for fort in g.units.values().filter(|u| {
+            u.owner == LOCAL_DEFENDER_OWNER
+                && matches!(m.rules.kinds[u.kind].name.as_str(), "pillbox" | "tower")
+        }) {
+            let kind = m.rules.kinds[fort.kind].name.as_str();
+            let limit = if kind == "pillbox" { 0.4 } else { 0.15 };
+            let relevant = ranked
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| (*i as f64) < ranked.len() as f64 * limit);
+            assert!(
+                relevant.into_iter().any(|(_, (at, home, _))| {
+                    let angle = math::atan2(home.z - at.z, home.x - at.x);
+                    let (fx, fz) = (math::cos(angle), math::sin(angle));
+                    let desired = if kind == "pillbox" {
+                        Point {
+                            x: at.x + fx * 14.0,
+                            z: at.z + fz * 14.0,
+                        }
+                    } else {
+                        Point {
+                            x: at.x - fx * 6.0 + fz * 8.0,
+                            z: at.z - fz * 6.0 - fx * 8.0,
+                        }
+                    };
+                    math::hypot(fort.x - desired.x, fort.z - desired.z) < 20.0
+                }),
+                "fort must belong to the selected distance-ranked guard group"
+            );
+            if kind == "pillbox" {
+                boxes += 1
+            } else {
+                towers += 1
+            }
+        }
+    }
+    assert!(guarded_count > 0 && boxes > 0 && towers > 0);
+}

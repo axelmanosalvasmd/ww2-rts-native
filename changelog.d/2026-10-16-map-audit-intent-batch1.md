@@ -1,0 +1,3 @@
+- Add native test coverage for 17 MAP row candidates, preserving the 14 previously accepted intents and closing spawn-centre, directional-cover and floor-boundary test gaps.
+- Exclude 25 incomplete rows from this batch, including the earlier bridge setup failure. Keep parity status updates separate.
+- Validate all 29 selected tests, formatting and strict workspace Clippy after forcing current-checkout test binaries in the shared Cargo slot.
