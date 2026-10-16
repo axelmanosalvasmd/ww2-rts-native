@@ -64,7 +64,7 @@ groups with objectiveActivate/objectiveComplete/Say actions, through the same
 validated authored state, scheduling, snapshot, checkpoint and normal ending
 owners as Conquest. The actuator preflight independently refuses other Classic
 actions. Public Classic network startup and World room admission remain closed.
-No field or message shape is added. The recipient contract update names this
+The ordinary raw-list cache now accepts the same Classic mode pair as the recipient adapter, fixing the assembled RoomRuntime and checkpoint guard. No field or message shape is added. The recipient contract update names this
 additional composition and the unchanged prototype fields.
 
 ## Merge record
@@ -81,6 +81,12 @@ These are separate from the automatic merge results.
 
 ## Validation
 
-Pending root execution on the composed tree. Slot receipts and final producing
-head will be recorded before publication; inherited PR receipts alone do not
-qualify the composed branch.
+At `74986341f62a650758905423a233fdd6f73b872d`, 203 focused tests compiled
+and ran: 199 passed and four failed. The complete log is
+`/tmp/corememory-qualified-v2.log`. MAP-100, all six BASE-54 constructor/capture
+checks, positive detached MODE-74 checks and restored World refusal tests passed.
+Failures exposed Classic raw-list admission, rush engineer assignment, the AI
+witness's unsupported events, and a Classic production fixture using the wrong
+producer. Repairs and renewed qualification follow; this partial run alone does
+not qualify the final tree. The preceding `400ce57d` attempt failed compilation
+on two new test assertions; both were corrected before this run.

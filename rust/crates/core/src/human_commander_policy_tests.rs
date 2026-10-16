@@ -462,6 +462,10 @@ fn runtime_match() -> crate::match_runtime::Match {
 }
 
 fn runtime_match_with_mode(mode: crate::economy::Mode) -> crate::match_runtime::Match {
+    runtime_match_scene(mode, false)
+}
+
+fn runtime_match_scene(mode: crate::economy::Mode, quiet: bool) -> crate::match_runtime::Match {
     use crate::{
         economy::Faction,
         economy_state::ArmySize,
@@ -469,8 +473,22 @@ fn runtime_match_with_mode(mode: crate::economy::Mode) -> crate::match_runtime::
         match_runtime::{Match, MatchOptions, PlayerConfig},
         weather::WeatherChoice,
     };
-    let map=AuthoritativeMap::from_json(&serde_json::to_vec(&json!({"name":"AI runtime intent","w":64,"h":64,
-        "rows":vec![".".repeat(64);64],"spawns":[{"x":4,"y":4},{"x":59,"y":59}],"points":[{"x":32,"y":32}]})).unwrap()).unwrap();
+    let rows: Vec<_> = (0..64)
+        .map(|y| {
+            if quiet && (16..48).contains(&y) {
+                "W".repeat(64)
+            } else {
+                ".".repeat(64)
+            }
+        })
+        .collect();
+    let point = if quiet { 11 } else { 32 };
+    let map = AuthoritativeMap::from_json(
+        &serde_json::to_vec(&json!({"name":"AI runtime intent","w":64,"h":64,
+        "rows":rows,"spawns":[{"x":4,"y":4},{"x":59,"y":59}],"points":[{"x":point,"y":point}]}))
+        .unwrap(),
+    )
+    .unwrap();
     let options = MatchOptions {
         seed: 771,
         mode,
@@ -1037,7 +1055,14 @@ fn intent_ai66_private_streams_drive_ordinary_ai_ticks_and_every_seat_snapshot()
         seat_commander::{Advance, Brain, Delivered},
     };
     for mode in [Mode::Conquest, Mode::Classic] {
-        let mut game = runtime_match_with_mode(mode);
+        // Authored water separates opposing ground armies. This row exercises
+        // planner/motor randomness and buildings, without depending on combat effects.
+        let mut game = runtime_match_scene(mode, true);
+        for player in &mut game.start.players {
+            for (_, cooldown) in &mut player.support {
+                *cooldown = 10_000.0;
+            }
+        }
         if mode == Mode::Conquest {
             game.start.win_vp = 1.0;
         } else {
@@ -1132,7 +1157,12 @@ fn intent_ai66_private_streams_drive_ordinary_ai_ticks_and_every_seat_snapshot()
             });
             let frame = delivery
                 .capture_selected_with_tick_events(&mut game, &selected, &report.events)
-                .unwrap()
+                .unwrap_or_else(|error| {
+                    panic!(
+                        "{mode:?} tick {}: {error:?}; events={:?}",
+                        report.tick, report.events
+                    )
+                })
                 .unwrap();
             for slot in 0..2 {
                 let packet = frame.recipient(slot).unwrap().into_json();

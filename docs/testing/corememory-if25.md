@@ -105,6 +105,8 @@ All prototype lines in this table are in `shared/supply-convoys.js`; all native 
 
 Eight new tests are added in existing registered files. No test registration change is needed. The focused selection is `test(if25_)` in `ww2-core`'s library and `it` binaries. Parent-owned Cargo qualification must record the producing head and results; this subagent has run no Cargo, formatter or Source recorder.
 
+The parent's first focused run in `/tmp/corememory-qualified-v2.log` compiled the tests and passed the seven other new consumer tests. The production test failed with `Denied(Needs)`: its Classic fixture incorrectly asked Barracks to train rifles. Both prototype `sim.js:350-352` and the native compiled catalog assign Classic rifles to HQs; the Barracks rifle override belongs to skirmish recruitment. The corrected fixture uses two HQs and retains both producer permutations and all three shortest-queue assertions. That correction still needs the parent's rerun.
+
 The test set protects ordering already used by the runtime and does not add runtime fields or commands. The existing ordinary garrison lifecycle supplies tick/snapshot delivery evidence for that consumer. Provider tests do not substitute for the missing planners or their later full-match proof.
 
 NEXT: implement the nine ordinary AI sites above and Depot placement; add the remaining simulation and AI consumer witnesses. IF-25 is neither PROVEN nor DROPPED by this pass. World expressions stay outside this batch.

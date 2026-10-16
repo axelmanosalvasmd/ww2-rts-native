@@ -396,10 +396,12 @@ fn if25_production_shortest_queue_keeps_producer_input_order_on_ties() {
                 ..Default::default()
             }],
         };
+        // Classic rifles train at HQs. The Barracks rifle override belongs
+        // only to the separate skirmish recruitment path.
         let units = ids.map(|id| UnitView {
             id,
             owner: Some(0),
-            kind: "barracks",
+            kind: "hq",
             hp: 100.0,
             built: 1.0,
         });
