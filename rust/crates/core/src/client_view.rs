@@ -105,11 +105,92 @@ impl UnitRow {
     }
 }
 
+/// The browser stores received cell state in a byte, including any unrecognized bits.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct CellState(u8);
+impl CellState {
+    pub const fn from_packed(packed: u32) -> Self {
+        Self(packed as u8)
+    }
+    pub const fn packed(self) -> u8 {
+        self.0
+    }
+    pub const fn wear(self) -> u8 {
+        self.0 & 3
+    }
+    pub const fn burnt(self) -> bool {
+        self.0 & 4 != 0
+    }
+    pub const fn damage(self) -> u8 {
+        self.0 >> 3 & 3
+    }
+    pub const fn scar(self) -> u8 {
+        self.0 >> 5 & 3
+    }
+    /// `packState`, followed by the client's Uint8Array conversion.
+    pub fn pack(wear: f64, burnt: bool, hp: f64, max: f64, scar: f64) -> Self {
+        let worn = (crate::math::min(3.0, (wear * 4.0).floor()) % 256.0) as i16 as u8;
+        Self(
+            worn | if burnt { 4 } else { 0 }
+                | if max > 1.0 && hp < max * 0.67 {
+                    if hp < max * 0.34 { 16 } else { 8 }
+                } else {
+                    0
+                }
+                | if scar > 0.6 {
+                    96
+                } else if scar > 0.3 {
+                    64
+                } else if scar > 0.02 {
+                    32
+                } else {
+                    0
+                },
+        )
+    }
+}
+
+/// `startState` packs double-precision wear, before the server's f32 terrain storage.
+pub fn start_state(terrain: char, cell: u32) -> CellState {
+    let mut h = cell.wrapping_add(1).wrapping_mul(0x9e37_79b1);
+    h ^= h >> 15;
+    h = h.wrapping_mul(0x85eb_ca6b);
+    let noise = f64::from(h ^ (h >> 13)) / 4_294_967_296.0;
+    let wear = match terrain {
+        'M' | 'F' => 0.2 + 0.6 * noise,
+        '+' => 0.3 + 0.3 * noise,
+        _ => 0.0,
+    };
+    CellState::pack(wear, false, 1.0, 1.0, 0.0)
+}
+
+/// A cell composed only from the received map and subsequent cell rows.
+/// Layers are unavailable when the start supplied no usable baseline or cell data.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ClientCell<'a> {
+    pub terrain: char,
+    pub ground: Option<char>,
+    pub object: Option<char>,
+    pub mine: bool,
+    pub physical: Option<char>,
+    pub level: f64,
+    pub state: CellState,
+    /// Last non-null received data object, not an authoritative map record.
+    pub data: Option<&'a Value>,
+}
+
+#[derive(Debug, Default, Clone, PartialEq)]
+struct CellMemory {
+    level: Option<f64>,
+    data: Option<Value>,
+}
+
 /// Units are sorted by id; terrain is sorted by cell index. Raw fields retain wire values.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ClientView {
     units: BTreeMap<u32, UnitRow>,
     cells: BTreeMap<u32, Value>,
+    cell_memory: BTreeMap<u32, CellMemory>,
     changed: Vec<u32>,
     seen: Vec<u8>,
     explored: Vec<u8>,
@@ -127,6 +208,7 @@ impl Default for ClientView {
         Self {
             units: BTreeMap::new(),
             cells: BTreeMap::new(),
+            cell_memory: BTreeMap::new(),
             changed: Vec::new(),
             seen: Vec::new(),
             explored: Vec::new(),
@@ -171,6 +253,87 @@ impl ClientView {
     }
     pub fn cells(&self) -> &BTreeMap<u32, Value> {
         &self.cells
+    }
+    /// Compose current recipient terrain without changing the raw received-row cache.
+    /// A dimensions-only start remains valid, but cannot supply an unmentioned cell.
+    pub fn cell(&self, index: u32) -> Option<ClientCell<'_>> {
+        if u64::from(index) >= u64::from(self.width) * u64::from(self.height) {
+            return None;
+        }
+        let map = self.start.as_ref()?.get("map")?;
+        let original = map_character(map.get("rows"), self.width, index);
+        let row = self.cells.get(&index).and_then(Value::as_array);
+        let terrain = row.and_then(|row| character(row.get(1))).or(original)?;
+        let layered = map.get("worldVersion").and_then(Value::as_f64) == Some(2.0)
+            && map.get("layers").is_some_and(json_truthy);
+        let (mut ground, mut object, mut mine) = if layered {
+            let layers = &map["layers"];
+            let authored = map_character(layers.get("objects"), self.width, index);
+            (
+                map_character(layers.get("ground"), self.width, index),
+                authored.map(|ch| if ch == 'N' { '.' } else { ch }),
+                authored == Some('N')
+                    || map_character(layers.get("mines"), self.width, index) == Some('N'),
+            )
+        } else {
+            (
+                original.map(|ch| match ch {
+                    '.' | 'D' | '+' | 'M' | 'W' | 'F' => ch,
+                    '=' => 'W',
+                    _ => '.',
+                }),
+                original.map(|ch| match ch {
+                    '.' | 'D' | '+' | 'M' | 'W' | 'F' | 'N' => '.',
+                    _ => ch,
+                }),
+                original == Some('N'),
+            )
+        };
+        let memory = self.cell_memory.get(&index);
+        let data = memory.and_then(|memory| memory.data.as_ref());
+        if let Some(data) = data {
+            ground = character(data.get("ground"));
+            object = character(data.get("object"));
+        }
+        if row.is_some() {
+            mine = terrain == 'N';
+        }
+        let physical = if row.is_some() && !mine {
+            Some(terrain)
+        } else {
+            object.filter(|ch| *ch != '.').or(ground)
+        };
+        let level = memory.and_then(|memory| memory.level).unwrap_or_else(|| {
+            map_character(map.get("heights"), self.width, index)
+                .map(|ch| {
+                    if ch >= 'a' {
+                        96.0 - f64::from(ch as u32)
+                    } else {
+                        ch.to_digit(10).map_or(0.0, f64::from)
+                    }
+                })
+                .unwrap_or(0.0)
+        });
+        let state = row.map_or_else(
+            || start_state(terrain, index),
+            |row| {
+                row.get(3)
+                    .and_then(Value::as_f64)
+                    .map_or(CellState::default(), |state| {
+                        CellState::from_packed(state as u32)
+                    })
+            },
+        );
+        Some(ClientCell {
+            terrain,
+            ground,
+            object,
+            mine,
+            physical,
+            level,
+            state,
+            data,
+        })
     }
     /// Sorted, unique cells received since the last drain, including the start's full memory.
     pub fn changed_cells(&self) -> &[u32] {
@@ -276,7 +439,7 @@ impl ClientView {
                         self.explored[c] |= self.seen[c];
                     }
                 }
-                self.merge_cells(patch.cells);
+                self.merge_cells(patch.cells, value.get("cells"));
                 let object = value.as_object_mut().expect("validated object");
                 for key in ["wrecks", "nodes"] {
                     if object.get(key).is_none_or(Value::is_null)
@@ -345,7 +508,7 @@ impl ClientView {
                 }
             }
         }
-        next.merge_cells(cells);
+        next.merge_cells(cells, value.get("cells"));
         next.lobby = self.lobby.take();
         next.pause = self.pause.take();
         next.last_denial = self.last_denial.take();
@@ -353,12 +516,45 @@ impl ClientView {
         *self = next;
         Ok(Applied::Start)
     }
-    fn merge_cells(&mut self, cells: BTreeMap<u32, Value>) {
+    fn merge_cells(&mut self, cells: BTreeMap<u32, Value>, received: Option<&Value>) {
+        // Optional height and layers survive short rows, including duplicates in one update.
+        // Raw rows still replace the cache exactly as received.
+        if let Some(rows) = received.and_then(Value::as_array) {
+            for raw in rows {
+                let row = raw.as_array().expect("validated cell row");
+                let level = row.get(2).and_then(Value::as_f64);
+                let data = row.get(4).filter(|v| !v.is_null());
+                if level.is_none() && data.is_none() {
+                    continue;
+                }
+                let index = row[0].as_f64().expect("validated cell index") as u32;
+                let memory = self.cell_memory.entry(index).or_default();
+                if let Some(level) = level {
+                    memory.level = Some(level);
+                }
+                if let Some(data) = data {
+                    memory.data = Some(data.clone());
+                }
+            }
+        }
         self.changed.extend(cells.keys());
         self.changed.sort_unstable();
         self.changed.dedup();
         self.cells.extend(cells);
     }
+}
+
+fn character(value: Option<&Value>) -> Option<char> {
+    let mut chars = value?.as_str()?.chars();
+    let ch = chars.next()?;
+    chars.next().is_none().then_some(ch)
+}
+fn map_character(rows: Option<&Value>, width: u32, index: u32) -> Option<char> {
+    rows?
+        .get((index / width) as usize)?
+        .as_str()?
+        .chars()
+        .nth((index % width) as usize)
 }
 
 struct Snapshot {

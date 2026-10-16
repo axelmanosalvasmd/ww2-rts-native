@@ -546,6 +546,49 @@ mod tests {
             before
         );
     }
+
+    #[test]
+    fn base_commands_reserve_input_without_immediate_world_mutation() {
+        let mut state = crate::lobby::native_tests::native_match();
+        let mut ingress = CommanderIngress::default();
+        let hq = state
+            .world
+            .game
+            .units
+            .values()
+            .find(|unit| unit.owner == 0 && state.rules.kinds[unit.kind].name == "hq")
+            .unwrap()
+            .id;
+        let before = format!(
+            "{:?}",
+            (
+                &state.world,
+                &state.start.economy,
+                &state.building_rallies,
+                &state.player_rallies
+            )
+        );
+        for (index, raw) in [
+            json!({"t":"cancel", "id":hq}),
+            json!({"t":"rally", "id":hq, "x":30, "z":30}),
+            json!({"t":"rally", "x":30, "z":30}),
+        ].into_iter().enumerate() {
+            assert_eq!(ingress.enqueue(&mut state, 0, &raw), Ok(()));
+            assert_eq!(state.commands.pending_commands(), index + 1);
+            assert_eq!(
+                format!(
+                    "{:?}",
+                    (
+                        &state.world,
+                        &state.start.economy,
+                        &state.building_rallies,
+                        &state.player_rallies
+                    )
+                ),
+                before
+            );
+        }
+    }
 }
 
 #[cfg(test)]

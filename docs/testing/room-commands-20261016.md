@@ -121,3 +121,17 @@ Recomputed `git merge-tree --write-tree` for merges d123277b, 8d394557,
 c2d4798a and d95c5013. Comparing each automatic tree with its committed merge
 finds exactly the conflict paths listed above plus this additive merge record.
 No additional hand-edited source path was found.
+
+## Publication main refresh
+
+Merged fetched main `09340ac993ac594d1702229912fd00dac7073b00`. Seven conflict regions:
+
+- `docs/contracts/README.md`: keep main's protocol clarification and the stream's R1 contract row.
+- `elimination_modes/tests.rs`: keep the physical-logistics refusal witness and make `ids` visible to its new sibling tests as main requires.
+- `recipient_snapshot.rs`: register flights, logistics and main's modes module.
+- `commander_ingress.rs`: keep all stream tests and main's base-command command list. Rewrite that obsolete refusal witness to require canonical reservation with no immediate world/economy/rally mutation, because #366 already admits those commands.
+- `lobby.rs`: keep main's nonseated-command guard before host controls, then retain host pause/resume/end and paused gameplay rejection. This also prevents a former host spectator from reaching a seated-slot unwrap.
+- `server/src/main.rs`: retain static-root/MAX_ROOMS help, named armies, and enabled logistics.
+- `trusted_room_lobby_tests.rs`: retain both logistics witnesses and the complete incoming named-army lifecycle witness.
+
+All other refreshed-main changes are automatic.
