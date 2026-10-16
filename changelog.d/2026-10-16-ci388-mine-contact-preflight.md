@@ -1,0 +1,1 @@
+- Validate hostile mine combat and environment inputs before publishing contact dust, preserving the entire World state on refusal. Successful contact still raises dust before the mine blast, including lethal blasts. Keep `world_contact_refusals_preserve_state_and_restore_precontact_dust` unchanged.
