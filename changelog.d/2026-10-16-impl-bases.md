@@ -1,0 +1,1 @@
+- Add 18 native BASE tests using existing production and Match APIs. Strengthen Classic/World queue selection, payment and refusal checks, and cover owned scuttling without refund or bounty. Keep 16 partial row witnesses and nine missing-runtime rows explicitly incomplete.
