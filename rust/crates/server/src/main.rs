@@ -1,5 +1,6 @@
 use std::{env, net::IpAddr};
 use tokio::net::TcpListener;
+use ww2_server::shards::{serve_sharded, shard_count};
 use ww2_server::{Config, TrustedRoomConfig, serve, serve_trusted_room};
 
 #[tokio::main]
@@ -17,7 +18,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "--seed" if seed.is_none() => seed = Some(args.next().ok_or("--seed requires U64")?),
             "--help" | "-h" => {
                 println!(
-                    "ww2-server [--bind HOST:PORT] [--trusted-room CODE --seed U64]\nAddress priority: --bind, WW2_BIND, HOST/PORT, 127.0.0.1:3000. Port 0 selects a free port.\nTrusted mode: one private two-human Conquest room, standard army, sandbox off, logistics off (temporary). Seeds/receipts stay host-private."
+                    "ww2-server [--bind HOST:PORT] [--trusted-room CODE --seed U64]\nAddress priority: --bind, WW2_BIND, HOST/PORT, 127.0.0.1:3000. Port 0 selects a free port.\nWW2_SHARDS: 1-64 isolated game threads (default 1).\nTrusted mode: one private two-human Conquest room, standard army, sandbox off, logistics off (temporary). Seeds/receipts stay host-private."
                 );
                 return Ok(());
             }
@@ -46,7 +47,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let shutdown = async {
         let _ = tokio::signal::ctrl_c().await;
     };
-    if let Some(trusted) = trusted {
+    let shards = shard_count(env::var("WW2_SHARDS").ok().as_deref());
+    if shards > 1 {
+        serve_sharded(listener, config, shutdown, trusted, shards).await?;
+    } else if let Some(trusted) = trusted {
         serve_trusted_room(listener, config, shutdown, trusted).await?;
     } else {
         serve(listener, config, shutdown).await?;

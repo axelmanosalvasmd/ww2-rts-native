@@ -223,6 +223,20 @@ impl Match {
                 {
                     return Err(AviationError::Invalid("invalid sortie metadata"));
                 }
+                if a.mission
+                    .is_some_and(|mission| mission.kind == MissionKind::Area)
+                    && !catalog()?
+                        .unit(&self.rules.kinds[u.kind].name)
+                        .map_err(|e| AviationError::Actuation(e.to_string()))?
+                        .get("w")
+                        .and_then(|w| w.get("salvo"))
+                        .and_then(Value::boolean)
+                        .unwrap_or(false)
+                {
+                    return Err(AviationError::Invalid(
+                        "area mission requires a bomber salvo",
+                    ));
+                }
             } else if self.rules.kinds[u.kind].air {
                 return Err(AviationError::Invalid("missing aircraft physical state"));
             }
@@ -408,8 +422,20 @@ impl Match {
         if u.air == Some(PlaneState::Rearm) || a.fuel <= 0.0 || a.ammo <= 0.0 {
             return Ok(false);
         }
-        if mission.kind == MissionKind::Area && self.rules.kinds[u.kind].name != "bomber" {
-            return Ok(false);
+        if mission.kind == MissionKind::Area {
+            let def = catalog()?
+                .unit(&self.rules.kinds[u.kind].name)
+                .map_err(|e| AviationError::Actuation(e.to_string()))?;
+            if !def
+                .get("w")
+                .and_then(|w| w.get("salvo"))
+                .and_then(Value::boolean)
+                .unwrap_or(false)
+            {
+                return Err(AviationError::Invalid(
+                    "area mission requires a bomber salvo",
+                ));
+            }
         }
         if mission.kind == MissionKind::Attack {
             let target = mission
@@ -420,7 +446,7 @@ impl Match {
                     || self.world.game.allied(owner, t.owner)
                     || !self.world.game.players[owner].sees(t.id)
             }) {
-                return Ok(false);
+                return Err(AviationError::Invalid("invalid aircraft attack target"));
             }
         }
         if mission.kind == MissionKind::Escort {
@@ -651,81 +677,8 @@ impl Match {
         self.aviation.planes.insert(id, next.runtime);
         self.firing.units.insert(id, next.firing);
         self.grid.update(id, &self.world.game.units[&id]);
-        self.act_aircraft_weapon(id)?;
-        Ok(())
-    }
-    fn act_aircraft_weapon(&mut self, id: UnitId) -> Result<(), AviationError> {
-        let u = &self.world.game.units[&id];
-        if u.hp <= 0.0
-            || u.air == Some(PlaneState::Home)
-            || matches!(u.air, Some(PlaneState::Base | PlaneState::Rearm))
-            || self.aviation.planes[&id].ammo <= 0.0
-        {
-            return Ok(());
-        }
-        let mission = self.aviation.planes[&id].mission;
-        let def = catalog()?
-            .unit(&self.rules.kinds[u.kind].name)
-            .map_err(|e| AviationError::Actuation(e.to_string()))?;
-        let weapon = def
-            .get("w")
-            .ok_or(AviationError::Invalid("aircraft has no weapon"))?;
-        if mission.is_some_and(|m| m.kind == MissionKind::Area)
-            && weapon.get("salvo").and_then(Value::boolean) == Some(true)
-        {
-            if u.air == Some(PlaneState::Station) && self.firing.get(id).unwrap().cooldown <= 0.0 {
-                let at = mission.unwrap().at;
-                self.launch_weapon_salvo(id, at, None)
-                    .map_err(AviationError::Actuation)?;
-                self.firing.get_mut(id).unwrap().cooldown = number(weapon, "interval")?;
-                self.aviation.planes.get_mut(&id).unwrap().ammo -= 1.0;
-            }
-            return Ok(());
-        }
-        let explicit = mission
-            .filter(|m| m.kind == MissionKind::Attack)
-            .and_then(|m| m.target);
-        let explicit = match explicit {
-            Some(target)
-                if self
-                    .can_shoot_target(id, target)
-                    .map_err(AviationError::Actuation)? =>
-            {
-                Some(target)
-            }
-            _ => None,
-        };
-        if self.commands.units[&id].hold_fire && explicit.is_none() {
-            return Ok(());
-        }
-        let target = if let Some(target) = explicit {
-            target
-        } else if self.firing.get(id).unwrap().retarget <= 0.0 {
-            let target = self
-                .pick_firing_target(id)
-                .map_err(AviationError::Actuation)?;
-            self.aviation.planes.get_mut(&id).unwrap().attack_pick = target;
-            self.firing.get_mut(id).unwrap().retarget = 0.5;
-            target
-        } else {
-            self.aviation.planes[&id].attack_pick
-        };
-        if target != 0
-            && self
-                .can_shoot_target(id, target)
-                .map_err(AviationError::Actuation)?
-        {
-            let t = &self.world.game.units[&target];
-            let aim = math::atan2(t.z - u.z, t.x - u.x);
-            self.firing.get_mut(id).unwrap().target_id = target;
-            self.commands.units.get_mut(&id).unwrap().aim = aim;
-            if self.firing.get(id).unwrap().cooldown <= 0.0 {
-                self.fire_weapon(id, target, true)
-                    .map_err(AviationError::Actuation)?;
-                self.aviation.planes.get_mut(&id).unwrap().ammo -= 1.0;
-            }
-        } else {
-            self.firing.get_mut(id).unwrap().target_id = 0;
+        if self.tick_state.aircraft_weapons_allowed() {
+            self.step_aircraft_weapons(id)?;
         }
         Ok(())
     }

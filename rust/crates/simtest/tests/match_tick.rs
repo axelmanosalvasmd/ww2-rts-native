@@ -663,7 +663,13 @@ fn garrison_retreat_ticks_and_unsupported_reaction_actors_reject_before_writes()
         "mode mismatch",
         "unsupported mode",
     ] {
-        let mut m = make(&fixture["cases"][0]);
+        let mut case = fixture["cases"][0].clone();
+        if actor == "garrison" {
+            let mut row = case["map"]["rows"][12].as_str().unwrap().to_owned();
+            row.replace_range(12..13, "B");
+            case["map"]["rows"][12] = json!(row);
+        }
+        let mut m = make(&case);
         let id = *m.world.game.units.keys().next().unwrap();
         let rail_kind = m.rules.kinds.iter().position(|kind| kind.rail).unwrap();
         let unit = m.world.game.units.get_mut(&id).unwrap();
@@ -673,7 +679,7 @@ fn garrison_retreat_ticks_and_unsupported_reaction_actors_reject_before_writes()
         unit.sprint = 0.25;
         match actor {
             "garrison" => {
-                unit.garrison = Some(166);
+                unit.garrison = Some(252);
                 unit.hp = 34.0;
             }
             "rail" => unit.kind = rail_kind,
@@ -740,22 +746,44 @@ fn garrison_retreat_ticks_and_unsupported_reaction_actors_reject_before_writes()
             .map(|player| player.support.clone())
             .collect::<Vec<_>>();
         if actor == "garrison" {
+            m.grid.rebuild(&m.world.game.units);
             m.validate_tick_state().unwrap();
-            let report = m.advance_tick().unwrap();
-            assert_eq!(report.tick, 1);
-            assert_eq!(report.commands.len(), 1);
-            assert_eq!(report.commands[0].denial, None);
-            assert_eq!(m.world.game.units[&id].garrison, None);
-            assert!(m.world.game.units[&id].retreating);
-            assert!(m.firing.get(id).unwrap().cooldown < firing.get(id).unwrap().cooldown);
-            assert!(m.abilities.get(id).unwrap().cooldown < abilities.get(id).unwrap().cooldown);
-            assert_eq!(m.commands.next_tick(), Some(2));
-            assert_eq!(m.commands.pending_commands(), 1);
-            assert!(m.tick_state.fault().is_none());
-            for _ in 0..2 {
-                m.advance_tick().unwrap();
+            assert!(m.automatic_retreat_candidate(id).unwrap());
+            let home = m.reaction_home(id).unwrap();
+            let path_gen = m.world.game.units[&id].path_gen;
+            for tick in 1..=3 {
+                let report = m.advance_tick().unwrap();
+                assert_eq!(report.tick, tick);
+                assert_eq!(m.world.game.tick, tick);
+                assert_eq!(report.commands.len(), usize::from(tick <= 2));
+                assert!(report.commands.iter().all(|result| result.denial.is_none()));
+                let unit = &m.world.game.units[&id];
+                assert_eq!(unit.garrison, None);
+                assert!(unit.retreating);
+                assert_eq!(unit.world_goal, Some(home));
+                assert!(unit.path_gen > path_gen);
+                assert!(!unit.path.is_empty());
+                assert!(unit.sprint < 0.25);
+                assert!(m.commands.units[&id].react < 0.75);
+                assert!(m.firing.get(id).unwrap().cooldown < firing.get(id).unwrap().cooldown);
+                assert!(
+                    m.abilities.get(id).unwrap().cooldown < abilities.get(id).unwrap().cooldown
+                );
+                assert_eq!(m.commands.next_tick(), Some(tick as u64 + 1));
+                assert_eq!(m.commands.pending_commands(), usize::from(tick == 1));
+                assert!(m.tick_state.fault().is_none());
+                let recipient = ww2_core::recipient_snapshot::SnapshotCache::new(&m)
+                    .unwrap()
+                    .recipient(0)
+                    .unwrap();
+                assert!(
+                    recipient.fields["units"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .any(|row| row[0].as_u64() == Some(u64::from(id)))
+                );
             }
-            assert!(m.tick_state.fault().is_none());
             continue;
         }
         let error = m.advance_tick().unwrap_err();

@@ -84,9 +84,18 @@ impl TickPathConfig {
 pub struct TickState {
     pub(crate) fault: Option<String>,
     started: bool,
+    aircraft_weapons_restricted: bool,
     paths: TickPathConfig,
 }
 impl TickState {
+    /// Recipient rooms cannot publish aircraft projectile flights until owner decision E.
+    /// This restriction does not change command admission or the standalone combat provider.
+    pub fn restrict_aircraft_weapons_for_delivery(&mut self) {
+        self.aircraft_weapons_restricted = true;
+    }
+    pub(crate) fn aircraft_weapons_allowed(&self) -> bool {
+        !self.aircraft_weapons_restricted
+    }
     pub fn fault(&self) -> Option<&str> {
         self.fault.as_deref()
     }
@@ -393,6 +402,9 @@ impl crate::match_runtime::Match {
                 continue;
             }
             if unit.garrison.is_some() && self.automatic_retreat_candidate(id)? {
+                if unit.build {
+                    return Err("automatic garrison retreat has unsupported construction".into());
+                }
                 crate::existing_observers::PreparedGroundExit::prepare(
                     &self.world.game,
                     &self.rules,
@@ -591,13 +603,24 @@ impl crate::match_runtime::Match {
                 continue;
             }
             if self.options.mode != crate::economy::Mode::World {
-                if self
-                    .step_aircraft_turn(id, dt)
-                    .map_err(|error| format!("aircraft turn: {error}"))?
-                {
+                let result = self.step_aircraft_turn(id, dt);
+                self.take_firing_tick_events(events);
+                if result.map_err(|error| format!("aircraft turn: {error}"))? {
                     continue;
                 }
-                match self.apply_unit_riding(id, dt)? {
+                let riding = self.apply_unit_riding(id, dt);
+                events.extend(
+                    self.firing
+                        .take_events()
+                        .into_iter()
+                        .map(|event| match event {
+                            crate::match_firing::LaunchEvent::Environment(effect) => {
+                                TickEvent::Environment(effect)
+                            }
+                            event => TickEvent::Firing(event),
+                        }),
+                );
+                match riding? {
                     crate::match_carriers::RidingOutcome::Riding => continue,
                     crate::match_carriers::RidingOutcome::OnFoot => {}
                     crate::match_carriers::RidingOutcome::Ejected(hurt) => {

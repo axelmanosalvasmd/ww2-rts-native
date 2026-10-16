@@ -670,10 +670,13 @@ pub fn entrench_plan(
         .enumerate()
         .map(|(i, j)| (math::hypot(j.at.x - cx, j.at.z - cz), i, j))
         .collect();
-    keyed.sort_by(|a, b| {
-        a.0.partial_cmp(&b.0)
-            .expect("finite pattern distance")
-            .then(a.1.cmp(&b.1))
+    crate::sort::sort_by_ref(&mut keyed, |a, b| {
+        let difference = a.0 - b.0;
+        if difference == 0.0 || difference.is_nan() {
+            a.1 as f64 - b.1 as f64
+        } else {
+            difference
+        }
     });
     Ok(keyed.into_iter().map(|(_, _, j)| j).collect())
 }

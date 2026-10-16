@@ -1124,7 +1124,7 @@ impl crate::match_runtime::Match {
             }
             self.preflight_ability_selection(&selected, *at, *queue, *automatic)?;
         }
-        // Validate shared targets before preparing aircraft orders.
+        // Validate shared targets before preparing either command branch.
         match command {
             Command::Attack { target, .. } => {
                 let target = u32::try_from(*target)
@@ -1241,6 +1241,75 @@ impl crate::match_runtime::Match {
             }
             Err(e) => return Err(e.to_string()),
         };
+        if let Command::Attack {
+            ids, target, queue, ..
+        } = command
+        {
+            // Aircraft preparation is read-only. The ground transaction prepares
+            // every ground row before writing, then aircraft application cannot fail.
+            // Keep raw rows so missing ground controls still fail canonical preflight.
+            let ground: Vec<_> = ids
+                .iter()
+                .take(limit)
+                .copied()
+                .filter(|raw| {
+                    u32::try_from(*raw)
+                        .ok()
+                        .and_then(|id| self.world.game.units.get(&id))
+                        .is_none_or(|u| !self.is_aircraft_command_unit(u.id))
+                })
+                .collect();
+            let ground_denial = if ground.is_empty() {
+                Some(if *queue {
+                    Denial::QueueFull
+                } else {
+                    Denial::Needs
+                })
+            } else {
+                self.ground_attack_command(owner, &ground, *target, *queue)?
+            };
+            if let Some(denial) = ground_denial
+                && !matches!(denial, Denial::Needs | Denial::QueueFull)
+            {
+                return Ok(Some(denial));
+            }
+            if *queue {
+                let target = u32::try_from(*target).expect("validated aircraft attack target");
+                let at = self.world.game.units[&target].at();
+                let mut queued = false;
+                for id in selected
+                    .into_iter()
+                    .filter(|id| self.is_aircraft_command_unit(*id))
+                    .collect::<Vec<_>>()
+                {
+                    let c = self
+                        .commands
+                        .units
+                        .get_mut(&id)
+                        .expect("aircraft queue control");
+                    c.follow = 0;
+                    if c.orders.len() < 8 {
+                        c.orders.push_back(Command::Attack {
+                            ids: vec![i64::from(id)],
+                            target: i64::from(target),
+                            queue: false,
+                            at: Some(at),
+                        });
+                        queued = true;
+                    }
+                }
+                return Ok(if queued { None } else { ground_denial });
+            }
+            let ordered_aircraft = !aircraft.is_empty();
+            for prepared in aircraft {
+                self.apply_aircraft_order(prepared);
+            }
+            return Ok(if ordered_aircraft {
+                None
+            } else {
+                ground_denial
+            });
+        }
         if matches!(
             command,
             Command::Stop { .. } | Command::Move { queue: false, .. }
@@ -1440,79 +1509,6 @@ impl crate::match_runtime::Match {
                     None
                 });
             }
-            Command::Attack {
-                target,
-                queue: true,
-                ..
-            } => {
-                let target_is_air = self.world.game.units
-                    [&u32::try_from(*target).expect("validated attack target")]
-                    .air
-                    .is_some();
-                let ground = selected
-                    .iter()
-                    .copied()
-                    .filter(|id| !target_is_air && !self.is_aircraft_command_unit(*id))
-                    .map(i64::from)
-                    .collect::<Vec<_>>();
-                let ground_denial = if ground.is_empty() {
-                    Some(Denial::QueueFull)
-                } else {
-                    self.ground_attack_command(owner, &ground, *target, true)?
-                };
-                if ground_denial == Some(Denial::Unsupported) {
-                    return Ok(ground_denial);
-                }
-                let target = u32::try_from(*target).expect("validated aircraft attack target");
-                let at = self.world.game.units[&target].at();
-                let mut queued = false;
-                for id in selected
-                    .into_iter()
-                    .filter(|id| self.is_aircraft_command_unit(*id))
-                    .collect::<Vec<_>>()
-                {
-                    let c = self
-                        .commands
-                        .units
-                        .get_mut(&id)
-                        .expect("aircraft queue control");
-                    if c.orders.len() < 8 {
-                        c.orders.push_back(Command::Attack {
-                            ids: vec![i64::from(id)],
-                            target: i64::from(target),
-                            queue: false,
-                            at: Some(at),
-                        });
-                        queued = true;
-                    }
-                }
-                return Ok(if queued { None } else { ground_denial });
-            }
-            Command::Attack { target, .. } => {
-                let target_is_air = self.world.game.units
-                    [&u32::try_from(*target).expect("validated attack target")]
-                    .air
-                    .is_some();
-                let ground = selected
-                    .iter()
-                    .copied()
-                    .filter(|id| !target_is_air && !self.is_aircraft_command_unit(*id))
-                    .map(i64::from)
-                    .collect::<Vec<_>>();
-                let denial = if ground.is_empty() {
-                    Some(Denial::Needs)
-                } else {
-                    self.ground_attack_command(owner, &ground, *target, false)?
-                };
-                if denial == Some(Denial::Unsupported) {
-                    return Ok(denial);
-                }
-                let ordered_aircraft = !aircraft.is_empty();
-                for prepared in aircraft {
-                    self.apply_aircraft_order(prepared);
-                }
-                return Ok(if ordered_aircraft { None } else { denial });
-            }
             Command::Escort { .. } | Command::Retreat { .. } => {
                 if aircraft.is_empty() {
                     return Ok(Some(Denial::Needs));
@@ -1549,7 +1545,8 @@ impl crate::match_runtime::Match {
                     self.commands.units.get_mut(&id).unwrap().auto_cast = *on;
                 }
             }
-            Command::Build { .. }
+            Command::Attack { .. }
+            | Command::Build { .. }
             | Command::Assist { .. }
             | Command::Cancel { .. }
             | Command::CancelProduction { .. }

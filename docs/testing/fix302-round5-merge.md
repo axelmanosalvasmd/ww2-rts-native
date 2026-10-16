@@ -147,3 +147,104 @@ includes all twelve core Tutorial MODE-59 through MODE-70 checks, 52 tests with
 counts overlap the total. All Cargo commands used S1; the wrapper released the
 lock after successful completion. No check failed or needed a retry. Only this
 record and the changelog fragment changed after validation.
+
+## Round 7
+
+Merge PR head `82b6b66d78109390c59c27d732da45ed87f6896f` with main
+`1bb4601679d94c9bff2c5f953dea04d9bf91cf1e`, retaining both parents.
+The clean round-6 worktree and local branch `fix/302-round6-merge` are reused;
+the resulting head pushes normally to `runtime/mov-batch2-20261016`.
+Main includes #299's aircraft weapons, mixed Attack repair, canonical launch
+geometry and single weapon-range helper. Both batches' intended behaviors
+remain in the merge.
+
+Acknowledged locally: `axel-302-ack-82b6b66d` covers the previous exact head.
+Its content acknowledgment is not reused as qualification of this merge.
+The recipient-room aircraft-weapon delivery restriction remains active before
+tick and snapshot admission. No pending capability group, public ingress,
+World startup, logistics, ABI, header, wire, contract or privacy policy changes.
+The 28 claimed rows and 21 excluded rows remain unchanged. No GitHub issue post
+is made.
+
+Each hand-edited hunk, including semantic repairs outside conflict markers:
+
+- R7-01: `DESIGN.md:13`: retain main's room-worker supervision section followed by #302's queued-house snapshot compatibility section, with both texts unchanged.
+- R7-02: `match_aviation.rs:425`: retain main's catalog-based bomber-salvo validation for Area missions.
+- R7-03: `match_aviation.rs:449`: retain main's invalid Attack-target error before mutation.
+- R7-04: `match_aviation.rs:575`: retain #302's deterministic visible-enemy fighter pursuit around the mission center.
+- R7-05: `match_firing.rs:1384`: reuse main's `weapon_launch_height` helper for ordinary launches.
+- R7-06: `match_firing.rs:2385`: retain both the aircraft kind/state consistency guard and main's airborne-only launch guard.
+- R7-07: `match_firing.rs:2449`: reuse main's `weapon_launch_height` helper for salvo launches.
+- R7-08: `match_tick.rs:405`: retain main's construction refusal before automatic garrison retreat.
+- R7-09: `commander_ingress.rs:338`: retain main's complete comment describing the unchanged host stance restriction.
+- R7-10: `room_runtime.rs:104`: restrict aircraft weapons before tick validation, retaining #302's ordinary-snapshot restriction call.
+- R7-11: `match_aviation.rs:73`: remove main's redundant automatic-target map and removal hook; #302's `AircraftRuntime.attack_pick` remains the sole automatic-selection cache.
+- R7-12: `match_aviation.rs:680`: replace #302's duplicate weapon implementation with main's `step_aircraft_weapons`, gated by the recipient-room restriction after movement; preserve per-step visible-target clearing.
+- R7-13: `match_aircraft_ticks.rs:138`: remove the second weapon call from the turn wrapper so each aircraft step can emit at most one volley.
+- R7-14: `match_aircraft_ticks.rs:206`: use `AircraftRuntime.attack_pick` in main's canonical weapon helper and clear the visible target when the cached choice becomes invalid.
+- R7-15: `match_aircraft_ticks/tests.rs:158`: initialize `attack_pick` in main's new fixture and inspect the canonical cache in the existing test; add assertions that an out-of-range target clears while the cached choice remains unchanged.
+- R7-16: `match_firing.rs:976`: remove duplicate inline launch-cell and clipped-cell traversal functions, retaining main's identical extracted geometry implementations and existing tests. The first Clippy run exposed E0592/E0034 from this automatic-merge overlap; no tests ran before the repair.
+
+
+Commands:
+
+- R7-17: Original conflict at lines 1127-1131, shared-target preflight comment. Resolved at line 1127 using main's wording: targets are validated before either command branch. Kept the existing target visibility, alliance and health guards.
+- R7-18: Original conflict at lines 1476-1551, late Attack command match arms. Removed HEAD's two late Attack arms. Main already dispatches Attack before this match, so retaining those arms would make the aircraft queue append unreachable and duplicate the ground dispatch. The final match retains main's unreachable Attack classification; Escort and Retreat remain at resolved line 1508.
+- R7-19: Semantic collision in the automatically merged early Attack transaction, resolved lines 1240-1310. Retained main's raw ground IDs, selection limit, aircraft classification and canonical `ground_attack_command` call so missing controls, field-work consistency, repeated path capacity and physical ground exits retain canonical preflight. Moved HEAD's aircraft queue append here, after the ground helper accepts the transaction. Queued attacks clear aircraft follow, retain the eight-order cap and store singleton normalized Attack commands with `queue: false` and the validated target coordinates. Retained Needs/QueueFull as nonfatal ground results while rejecting all other ground denials before aircraft writes. Return success when either group accepts; preserve the ground denial when no aircraft queue can accept. Immediate aircraft orders continue through prepared `apply_aircraft_order` only after canonical ground preflight. No second aircraft command implementation or ground helper was added.
+
+Carriers and reactions:
+
+- R7-20: `rust/crates/core/src/match_carrier_tick.rs:52` (original conflict line 52): retain movement's validation and boundary/operative rejection for every existing carrier row, including dead rows. Then retain main's live-parent split, reciprocal cargo checks, cargo-wide `prepare_carrier_ejections(carrier)` when metadata exists, and singleton `prepare_carrier_ejection(id)` only when carrier metadata is absent. The existing-parent validation runs before this split; the redundant later live-parent validation is removed.
+- R7-21: `rust/crates/core/src/match_carriers.rs:477` (original conflict line 477): retain movement's existing-carrier validation, boundary guard and live reciprocal relation guard. Keep main's automatically merged cargo-wide `eject_carrier_riders` path, publication of all environment effects and `OnFoot` return. Keep the singleton `Ejected(Hurt)` path when carrier metadata is absent. Naval boarding, shore/cliff checks and explicit manual naval unload rejection remain from movement; main's cargo-wide ejection functions remain intact.
+- R7-22: `rust/crates/core/src/match_carriers/tests.rs:627` (original conflict line 627): retain main's metadata-present `OnFoot`, cleared riding/carrier/cargo and 30 percent damage assertions. Preserve movement's `Ejected(Hurt { killed: false, .. })` and cleared-riding assertion in a second setup where the carrier row and metadata have both disappeared; also assert the rider carrier link clears. Both behaviors remain asserted within the existing test.
+- R7-23: `rust/crates/core/src/match_reactions.rs:88` (original conflict line 88): retain main's comment describing the shared staged house exit.
+- R7-24: `rust/crates/core/src/match_reactions.rs:99` (original conflict line 103): retain main's garrison branch calling the canonical `ground_retreat_command`, propagating errors and denials before returning. Remove the now-unreachable independently implemented garrison exit branch at the original lines 127-185; ordinary retreat uses `reaction_home`, `command_route` and `apply_retreat_route`, matching main. Ground-order identity/capacity checks and staged exit publication remain owned by `match_ground_orders.rs`; air/riding rejection and ordinary field-work/build/path guards remain here.
+- R7-25: `rust/crates/core/src/match_reactions/tests.rs:305` (original conflict line 305): keep movement's assertion that rejected retreat preserves `riding`. All test bodies from both parents remain, including movement's wounded-garrison automatic-retreat test. Keep the existing movement test name `reaction_timer_and_unsupported_retreat_preserve_canonical_state`; main names the same test `reaction_timer_and_unsupported_exit_preserve_canonical_state`.
+
+Simtest:
+
+- R7-26: `rust/crates/simtest/tests/match_aircraft_runner.rs:169`, fixture loop and case setup: preserve six original cases, add case 6 using a genuinely published bomber and valid Area mission. Keep case 3's malformed fighter Area rejection from main. This retains both valid Area admission intent and salvo eligibility protection.
+- R7-27: `rust/crates/simtest/tests/match_aircraft_runner.rs:218`, original conflict at HEAD lines 214-222: stance enables weapons for the positive patrol and valid bomber Area cases (2 and 6). Malformed fighter Area case 3 keeps main's pre-write refusal.
+- R7-28: `rust/crates/simtest/tests/match_aircraft_runner.rs:235`, original conflict at HEAD lines 236-265: combine main's four-tick advancement, unchanged preflight clock/pending queue, no command denials, firing-event drain and fault checks with PR302's exact first command count, next queue tick and persistent mission assertions. All malformed-case no-write assertions remain below.
+- R7-29: `rust/crates/simtest/tests/match_aviation.rs:200`, original conflict at HEAD lines 200-227: retain main's invalid fighter Area direct-admission refusal and unchanged snapshot, followed by valid unheld patrol, sortie, ammunition and firing-event assertions. Keep original later malformed AA tests.
+- R7-30: `rust/crates/simtest/tests/match_aviation.rs:393`, original conflict at HEAD lines 396-505: retain main's entire mixed Attack canonical-project cancellation and all-selection preflight test, including both selection permutations, every failure case and full no-write comparisons.
+- R7-31: `rust/crates/simtest/tests/match_aviation.rs:498`, original conflict at HEAD lines 526-623 and adjacent setup: restore main's full six-command matrix and malformed project/aircraft guard loops. This also retains PR302's mixed Retreat refusal and no-write assertions. Rename combined test to reflect admission plus protection. Main Move/Stop/Attack/Stance and Retreat assertions remain. Case 3 now positively checks admitted mixed queued Move, normalized singleton orders with queue false, unchanged existing orders, complete snapshot equality apart from appended order rows, unchanged reserves and supply state, retained project and no path requests. At line 672 replace main's obsolete start_queued_orders refusal with successful normalized patrol activation, empty consumed queue, exact goal and Out sortie; preserve subsequent empty-queue and prepare calls.
+- R7-32: `rust/crates/simtest/tests/match_aviation.rs:883`, original conflict at HEAD lines 847-851: use main's more precise read-only automatic weapon admission label. PR302's positive weapon and queue preflight coverage and all malformed/dead checks remain.
+- R7-33: `rust/crates/simtest/tests/match_tick.rs:748`, original conflict at HEAD lines 749-800: retain main's automatic-retreat candidate, reaction home, path generation/path, timers, every tick's snapshot, commands, queue count and fault assertions. Add PR302's explicit validate_tick_state admission, report tick and next_tick assertions. Compare firing/ability cooldowns with the captured pre-tick state (same values as main's literals). Every unsupported actor guard and no-write assertion remains.
+
+- R7-34: `runtime_combat_batch3.rs:653`: initialize `attack_pick: 0` in main's new off-map aircraft fixture; all assertions remain unchanged.
+- R7-35: `simtest/tests/match_aviation.rs:198,500`: restore mission-type imports needed by the retained Area-admission and queued-sortie assertions. The second Clippy run reported these missing imports and the fixture initializer; no tests ran before these repairs.
+
+- R7-36: `match_carriers/tests.rs:145,173`: preserve MOV-76's survivor damage, cleared relations and deep-water death assertions through main's canonical cargo-wide producer. Require `OnFoot` plus exactly one published Hurt event with the same survivor/death result. The singleton `Ejected(Hurt)` return remains asserted separately in R7-22. The first focused run stopped here: 52 passed, 1 failed, 334 selected tests unrun. This repairs the event-observation mismatch without changing runtime behavior or reducing coverage.
+
+- R7-37: `match_carriers.rs:631`: dispatch dead cargo preflight for an exact World mode pair and registered rail run to the existing `validate_rail_tick_actor`; all other cargo retains main's `prepare_carrier_ejections`. The existing rail phase ejects train passengers before generic retirement. No global carrier guard or World hosting admission changes. The second focused run stopped at the unchanged MOV-82 wrecked-train regression: 180 passed, 1 failed, 206 selected tests unrun. This repairs the automatic merge's ordinary-carrier preflight crossing the World rail ownership boundary.
+
+- R7-38: `simtest/tests/match_aviation.rs:550`: assert both queued destinations and canonical follow clearing for mixed queued Move before comparing every other snapshot field. The third focused run stopped here: 354 passed, 1 failed, 32 selected tests unrun. Runtime behavior is unchanged; the merged positive queue case now checks the dispatcher's existing follow-clearing contract explicitly.
+
+- R7-39: `simtest/tests/match_aviation.rs:576`: explicitly require forced-supply hold clearing when a mixed queued Move is admitted; keep reserves, supply-escape, project and path-request assertions intact. Current native `match_commands.rs:1363` and pinned prototype `e4e579a` `shared/sim.js:3414` clear this hold for Move regardless of queue. The one-test diagnostic exposed the stale hold expectation before the full selection ran. No runtime change.
+
+Round 7 final validation passed on Rust tree
+`b14272e32e1fce153c49f7a9a72c784bfe18bfeb`:
+
+```text
+cargo fmt --all --check
+cargo clippy --workspace --all-targets -j4 -- -D warnings
+cargo nextest run --locked --cargo-profile ci-test -p ww2-simtest -j4 -E 'test(mixed_aircraft_selections_preserve_canonical_supply_and_control_boundaries)'
+cargo nextest run --no-fail-fast --locked --cargo-profile ci-test -p ww2-core -p ww2-simtest -p ww2-server -j4 -E 'test(aviation) | test(aircraft) | test(firing) | test(movement) | test(mov) | test(traffic) | test(rail) | test(carrier) | test(garrison) | test(recipient_snapshot) | test(recipient_effects) | test(room_runtime)'
+Summary [111.587s] 387 tests run: 387 passed (1 slow), 1068 skipped
+```
+
+The selected run passed 326 core, 49 simtest and 12 server tests. The preceding
+queue diagnostic passed 1/1 and overlaps the selection. Formatting and strict
+workspace all-target Clippy passed. All final commands ran from `rust/` under
+S1, with four Cargo jobs, MemoryMax=6G, MemorySwapMax=0 and the matching slot
+target directory. The wrapper released S1 after success. No full workspace
+test suite ran. The failed compile and test attempts are recorded above,
+with raw local logs in `/tmp/fix302-r7-clippy-initial-failure.log`,
+`/tmp/fix302-r7-clippy-second-failure.log`,
+`/tmp/fix302-r7-test-first-failure.log`,
+`/tmp/fix302-r7-test-second-failure.log`,
+`/tmp/fix302-r7-test-third-failure.log` and
+`/tmp/fix302-r7-queue-diagnostic-failure.log`. The passing receipt is
+`/tmp/fix302-r7-checks.log`. No prototype execution, Unreal run or hosted
+CI qualification is claimed.

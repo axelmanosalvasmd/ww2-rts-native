@@ -10,6 +10,8 @@ mod world_components;
 #[path = "../world_home_components.rs"]
 mod world_home_components;
 
+#[path = "../ai_if_if25.rs"]
+mod ai_if_if25;
 #[path = "../authoritative_maps.rs"]
 mod authoritative_maps;
 #[path = "../base_audit_features.rs"]

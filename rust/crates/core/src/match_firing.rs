@@ -397,8 +397,7 @@ impl Match {
         self.firing.prior_tick = Some(self.world.game.tick + 1);
         Ok(())
     }
-    /// Admit aircraft as observed context only. Their canonical sortie owner
-    /// validates physical state and metadata; this does not admit air weapons.
+    /// Validate aircraft through their canonical sortie owner before ground or air firing.
     pub(crate) fn validate_aircraft_firing_context(&self) -> Result<(), String> {
         if self
             .world
@@ -974,62 +973,6 @@ impl Match {
         }
         Ok(())
     }
-    fn weapon_start_cell(&self, unit: &Unit) -> Result<usize, String> {
-        let g = &self.world.game;
-        if unit.air.is_some() && g.w > 0 && g.h > 0 {
-            Ok(g.cell_of(unit.x, unit.z).unwrap_or(usize::MAX))
-        } else {
-            g.cell_of(unit.x, unit.z)
-                .ok_or_else(|| "shooter outside battlefield".into())
-        }
-    }
-
-    fn flight_crossed_cells(
-        &self,
-        a: projectiles::Point3,
-        b: projectiles::Point3,
-    ) -> Result<Vec<usize>, String> {
-        let g = &self.world.game;
-        let dx = b.x - a.x;
-        let dz = b.z - a.z;
-        if ![a.x, a.z, b.x, b.z, dx, dz].iter().all(|v| v.is_finite()) {
-            return Err("non-finite flight cell traversal".into());
-        }
-        let mut enter: f64 = 0.0;
-        let mut exit: f64 = 1.0;
-        for (origin, delta, extent) in [(a.x, dx, g.w as f64 * CELL), (a.z, dz, g.h as f64 * CELL)]
-        {
-            if delta == 0.0 {
-                if origin < 0.0 || origin >= extent {
-                    return Ok(Vec::new());
-                }
-            } else {
-                let first = -origin / delta;
-                let last = (extent - origin) / delta;
-                enter = math::max(enter, math::min(first, last));
-                exit = math::min(exit, math::max(first, last));
-                if enter > exit {
-                    return Ok(Vec::new());
-                }
-            }
-        }
-        // Clip only cell enumeration. Sweeps retain the original segment and fractions.
-        projectiles::crossed_cells(
-            projectiles::BodyPosition {
-                x: if enter == 0.0 { a.x } else { a.x + dx * enter },
-                z: if enter == 0.0 { a.z } else { a.z + dz * enter },
-            },
-            projectiles::BodyPosition {
-                x: if exit == 1.0 { b.x } else { a.x + dx * exit },
-                z: if exit == 1.0 { b.z } else { a.z + dz * exit },
-            },
-            CELL,
-            g.w,
-            g.h,
-        )
-        .map_err(|e| format!("flight cell traversal: {e:?}"))
-    }
-
     fn flight_contact(
         &self,
         p: &LiveFlight,
@@ -1382,14 +1325,7 @@ impl Match {
         let bearing = math::atan2(aim.z - u.z, aim.x - u.x);
         let from = projectiles::Point3::new(
             u.x,
-            f64::from(g.level_at(u.x, u.z)) * level_height
-                + if u.air.is_some() {
-                    20.0
-                } else if u.garrison.is_some() {
-                    3.5
-                } else {
-                    1.2
-                },
+            f64::from(g.level_at(u.x, u.z)) * level_height + self.weapon_launch_height(u),
             u.z,
         );
         let profile = projectiles::projectile_profile(
@@ -2018,10 +1954,12 @@ impl Match {
         let team = actor.team;
         let salvo = flag(w, "salvo");
         let pool = if salvo {
-            self.grid
-                .unordered(&g.units, (u.x, u.z), n(w, "range", 0.0) + 6.0, |_, t| {
-                    !t.riding && !g.allied(t.owner, u.owner) && actor.sees(t.id)
-                })
+            self.grid.unordered(
+                &g.units,
+                (u.x, u.z),
+                self.weapon_range(u, w)? + 6.0,
+                |_, t| !t.riding && !g.allied(t.owner, u.owner) && actor.sees(t.id),
+            )
         } else {
             vec![]
         };
@@ -2162,7 +2100,7 @@ impl Match {
     fn weapon(&self, u: &Unit) -> Result<Option<&'static Value>, String> {
         Ok(self.definition(u)?.get("w"))
     }
-    fn weapon_range(&self, unit: &Unit, weapon: &Value) -> Result<f64, String> {
+    pub(crate) fn weapon_range(&self, unit: &Unit, weapon: &Value) -> Result<f64, String> {
         let range = n(weapon, "range", 0.0);
         let name = &self.rules.kinds[unit.kind].name;
         let in_pit = matches!(name.as_str(), "mg" | "at" | "mortar" | "flak" | "howitzer")
@@ -2396,6 +2334,7 @@ impl Match {
             || self.firing.get(id).is_none()
             || self.logistics.get(id).is_some_and(|r| !r.ammo.is_finite())
             || (u.air.is_some() != flag(self.definition(u)?, "air"))
+            || (self.rules.kinds[u.kind].air && !vision::airborne(u))
             || u.riding
             || ![at.x, at.z].iter().all(|v| v.is_finite())
             || !(0.0..=self.world.game.w as f64 * CELL).contains(&at.x)
@@ -2453,14 +2392,7 @@ impl Match {
         let height = n(self.firing_config()?, "levelHeight", 2.5);
         let from = projectiles::Point3::new(
             u.x,
-            f64::from(g.level_at(u.x, u.z)) * height
-                + if u.air.is_some() {
-                    20.0
-                } else if u.garrison.is_some() {
-                    3.5
-                } else {
-                    1.2
-                },
+            f64::from(g.level_at(u.x, u.z)) * height + self.weapon_launch_height(u),
             u.z,
         );
         let end = projectiles::Point3::new(
@@ -2706,6 +2638,16 @@ mod world_ground_actor_tests;
 #[path = "mov_audit_reaction_tests.rs"]
 mod mov_audit;
 
+#[path = "match_firing_geometry.rs"]
+mod geometry;
+
+#[cfg(test)]
+#[path = "runtime_combat_batch3.rs"]
+mod runtime_batch3;
+
+#[cfg(test)]
+#[path = "audit_combat_damage.rs"]
+mod audit_damage;
 #[cfg(test)]
 #[path = "audit_combat_native.rs"]
 mod audit_native;

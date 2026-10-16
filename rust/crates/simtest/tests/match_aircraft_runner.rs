@@ -166,8 +166,12 @@ fn actual_aircraft_runner_matches_original_whole_steps_without_output_injection(
 fn aircraft_runner_admits_weapons_and_refuses_malformed_phases_before_writes() {
     let f = fixture();
     let trace = &f["traces"][0];
-    for kind in 0..6 {
-        let mut m = make(trace);
+    for kind in 0..7 {
+        let mut trace = trace.clone();
+        if kind == 6 {
+            trace["specs"][0]["kind"] = json!("bomber");
+        }
+        let mut m = make(&trace);
         let id = 1000;
         match kind {
             0 => {
@@ -187,7 +191,7 @@ fn aircraft_runner_admits_weapons_and_refuses_malformed_phases_before_writes() {
                         at: ww2_core::game::Point { x: 40., z: 40. },
                     });
             }
-            3 => {
+            3 | 6 => {
                 m.world.game.units.get_mut(&id).unwrap().air =
                     Some(ww2_core::game::PlaneState::Station);
                 m.aviation.planes.get_mut(&id).unwrap().mission =
@@ -212,7 +216,7 @@ fn aircraft_runner_admits_weapons_and_refuses_malformed_phases_before_writes() {
                 sequence: 1,
             },
             Command::from_json(
-                &json!({"t":"stance","ids":[id],"key":"holdFire","on":!matches!(kind, 2 | 3)}),
+                &json!({"t":"stance","ids":[id],"key":"holdFire","on":!matches!(kind, 2 | 6)}),
             )
             .unwrap(),
         )
@@ -228,20 +232,22 @@ fn aircraft_runner_admits_weapons_and_refuses_malformed_phases_before_writes() {
             m.story,
             m.world.game.tick
         );
-        if matches!(kind, 2 | 3) {
+        if matches!(kind, 2 | 6) {
             m.validate_aircraft_runner_boundary(1).unwrap();
-            let report = m.advance_tick().unwrap();
-            assert_eq!(report.tick, 1);
-            assert_eq!(report.commands.len(), 1);
-            assert_eq!(report.commands[0].denial, None);
-            assert!(!m.commands.units[&id].hold_fire);
-            assert_eq!(m.commands.pending_commands(), 0);
-            assert_eq!(m.commands.next_tick(), Some(2));
-            assert!(m.aviation.planes[&id].mission.is_some());
-            for _ in 0..2 {
-                m.advance_tick().unwrap();
+            assert_eq!(m.world.game.tick, 0);
+            assert_eq!(m.commands.pending_commands(), 1);
+            for tick in 1..=4 {
+                let report = m.advance_tick().unwrap();
+                assert_eq!(report.tick, tick);
+                assert_eq!(report.commands.len(), usize::from(tick == 1));
+                assert!(report.commands.iter().all(|result| result.denial.is_none()));
+                assert!(!m.commands.units[&id].hold_fire);
+                assert!(m.aviation.planes[&id].mission.is_some());
+                assert_eq!(m.commands.next_tick(), Some(tick as u64 + 1));
+                assert!(m.tick_state.fault().is_none());
+                assert!(m.firing.events.is_empty());
             }
-            assert!(m.tick_state.fault().is_none());
+            assert_eq!(m.commands.pending_commands(), 0);
             continue;
         }
         assert!(

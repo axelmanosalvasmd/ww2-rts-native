@@ -299,9 +299,9 @@ impl Match {
                             || self.world.game.flags_at(e.x, e.z) & (COVER | TRENCH) != 0)
                         && self.ability_clear(id, e.at(), n(ab, "radius", 0.) + 1.)
                 });
-                foes.sort_by(|a, b| {
-                    dist(u.at(), self.world.game.units[a].at())
-                        .total_cmp(&dist(u.at(), self.world.game.units[b].at()))
+                crate::sort::sort_by(&mut foes, |a, b| {
+                    dist(u.at(), self.world.game.units[&a].at())
+                        - dist(u.at(), self.world.game.units[&b].at())
                 });
                 foes.first()
                     .map(|e| AutocastTarget::At(self.world.game.units[e].at()))

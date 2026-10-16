@@ -142,9 +142,19 @@ fn intent_mov76_wreck_throws_rider_out_hurts_it_and_deep_water_drowns_it() {
     landed.combat.get_mut(2).unwrap().cargo.push(1);
     let before = landed.world.game.units[&1].hp;
     landed.world.game.units.get_mut(&2).unwrap().hp = 0.;
-    assert!(matches!(
+    assert_eq!(
         landed.apply_unit_riding(1, 0.05).unwrap(),
-        RidingOutcome::Ejected(crate::environment::Hurt { killed: false, .. })
+        RidingOutcome::OnFoot
+    );
+    assert!(matches!(
+        landed.firing.events.as_slice(),
+        [crate::match_firing::LaunchEvent::Environment(
+            crate::environment::Effect::Hurt(crate::environment::Hurt {
+                unit: 1,
+                killed: false,
+                ..
+            })
+        )]
     ));
     let rifle = Catalog::compiled().unwrap().unit("rifle").unwrap();
     let full = rifle.get("models").unwrap().number().unwrap()
@@ -162,9 +172,19 @@ fn intent_mov76_wreck_throws_rider_out_hurts_it_and_deep_water_drowns_it() {
     drowned.world.game.flags.fill(block);
     let far = drowned.world.game.flags.len() - 1;
     drowned.world.game.flags[far] = 0;
-    assert!(matches!(
+    assert_eq!(
         drowned.apply_unit_riding(1, 0.05).unwrap(),
-        RidingOutcome::Ejected(crate::environment::Hurt { killed: true, .. })
+        RidingOutcome::OnFoot
+    );
+    assert!(matches!(
+        drowned.firing.events.as_slice(),
+        [crate::match_firing::LaunchEvent::Environment(
+            crate::environment::Effect::Hurt(crate::environment::Hurt {
+                unit: 1,
+                killed: true,
+                ..
+            })
+        )]
     ));
     assert_eq!(drowned.world.game.units[&1].hp, 0.);
     assert!(!drowned.world.game.units[&1].riding);
@@ -624,12 +644,24 @@ fn invalid_or_unavailable_carrier_work_preserves_canonical_state() {
     m.carrier_board_command(0, &[1], Some(2), false).unwrap();
     m.apply_unit_boarding(1).unwrap();
     m.world.game.units.get_mut(&2).unwrap().hp = 0.;
+    let before = m.world.game.units[&1].hp;
+    assert_eq!(m.apply_unit_riding(1, 0.05).unwrap(), RidingOutcome::OnFoot);
+    assert!(!m.world.game.units[&1].riding);
+    assert!((m.world.game.units[&1].hp - before * 0.7).abs() < 1e-9);
+    assert_eq!(m.combat.get(1).unwrap().carrier, None);
+    assert!(m.combat.get(2).unwrap().cargo.is_empty());
+
+    let mut m = make(c);
+    m.carrier_board_command(0, &[1], Some(2), false).unwrap();
+    m.apply_unit_boarding(1).unwrap();
+    m.world.game.units.remove(&2);
+    m.combat.remove(2);
     assert!(matches!(
         m.apply_unit_riding(1, 0.05).unwrap(),
         RidingOutcome::Ejected(crate::environment::Hurt { killed: false, .. })
     ));
     assert!(!m.world.game.units[&1].riding);
-    assert!(m.combat.get(2).unwrap().cargo.is_empty());
+    assert_eq!(m.combat.get(1).unwrap().carrier, None);
 }
 
 #[test]

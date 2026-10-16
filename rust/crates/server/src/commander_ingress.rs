@@ -335,7 +335,8 @@ mod tests {
             state.validate_tick_state().unwrap();
             state.commands.units.get_mut(&actor).unwrap().auto_retreat = true;
             assert!(state.automatic_retreat_candidate(actor).unwrap());
-            // Core garrison and construction retreat are supported; this host slice refuses both.
+            // Core construction and garrison retreat are supported. This host
+            // slice still refuses enabling the prospective stance in either.
             state.validate_tick_state().unwrap();
             state.commands.units.get_mut(&actor).unwrap().auto_retreat = false;
             let before = format!(
