@@ -108,19 +108,7 @@ fn intent_ai29_wait_keeps_safe_point_until_invalid_then_releases_expired_threat(
             ..UnitFacts::default()
         },
     );
-    // Keep this threat-memory scene at a completed base, so the scout is not its builder.
-    for (id, kind) in [(3, "hq"), (4, "barracks"), (5, "airfield")] {
-        input
-            .units
-            .insert(input.units.len() - 1, unit(id, kind, 10.0));
-        input.runtime.as_mut().unwrap().units.insert(
-            id,
-            UnitFacts {
-                built: 1.0,
-                ..UnitFacts::default()
-            },
-        );
-    }
+    complete_base(&mut input);
     let mut state = State::default();
     let commands = look(input.clone(), &seen, &mut state, Level::Normal);
     assert_eq!(state.situation.as_ref().unwrap().kind, SituationKind::Wait);
@@ -244,17 +232,8 @@ fn intent_ai32_loss_changes_actual_purchase_after_enemy_leaves_view() {
             ..UnitFacts::default()
         },
     );
-    for (id, kind) in [(5, "hq"), (6, "airfield")] {
-        input.units.push(unit(id, kind, 10.0));
-        input.runtime.as_mut().unwrap().units.insert(
-            id,
-            UnitFacts {
-                built: 1.0,
-                ..UnitFacts::default()
-            },
-        );
-    }
     input.manpower = 200.0;
+    complete_base(&mut input);
     // The old position has left sight, so the loss remains attributable to the tank.
     let commands = look(
         input.clone(),
@@ -486,24 +465,9 @@ fn intent_ai30_paradrop_waits_for_enemy_point_notice_and_delivered_visibility() 
             .map(|id| unit(id, "rifle", 25.0 + f64::from(id)))
             .collect(),
     );
-    // Six fighters remain available when the base has no construction job.
-    for (id, kind) in [
-        (10, "hq"),
-        (11, "barracks"),
-        (12, "motorpool"),
-        (13, "airfield"),
-    ] {
-        input.units.push(unit(id, kind, 10.0));
-        input.runtime.as_mut().unwrap().units.insert(
-            id,
-            UnitFacts {
-                built: 1.0,
-                ..UnitFacts::default()
-            },
-        );
-    }
     input.points = vec![point(60.0, Some(1))];
     input.manpower = 1000.0;
+    complete_base(&mut input);
     input
         .runtime
         .as_mut()
@@ -706,4 +670,23 @@ fn runtime_repeats_seeded_decisions_and_keeps_other_random_purposes_independent(
         different |= left != other;
     }
     assert!(different);
+}
+
+fn complete_base(input: &mut Input) {
+    for (id, kind) in [
+        (60000, "hq"),
+        (60001, "barracks"),
+        (60002, "motorpool"),
+        (60003, "airfield"),
+    ] {
+        input.units.push(unit(id, kind, 10.0));
+        input.runtime.as_mut().unwrap().units.insert(
+            id,
+            UnitFacts {
+                built: 1.0,
+                ..UnitFacts::default()
+            },
+        );
+    }
+    input.units.sort_by_key(|u| u.id);
 }

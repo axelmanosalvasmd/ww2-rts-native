@@ -240,9 +240,34 @@ impl Observation {
             .ok_or(PolicyError::Catalog)?;
         if let Some(context) = &input.runtime {
             let finite_point = |p: Point| p.x.is_finite() && p.z.is_finite();
-            if ![context.munitions, context.fuel, context.sight]
-                .iter()
-                .all(|v| v.is_finite())
+            if ![
+                context.munitions,
+                context.fuel,
+                context.sight,
+                context.caution,
+                context.build_reserve,
+                context.fort_reserve,
+            ]
+            .iter()
+            .all(|v| v.is_finite())
+                || context
+                    .hidden_spawns
+                    .iter()
+                    .any(|i| *i >= input.players.len())
+                || context.site_nodes.iter().any(|p| !within(*p))
+                || context.caution <= 0.0
+                || context.known_buildings.iter().any(|b| {
+                    b.id == 0
+                        || b.owner >= input.players.len()
+                        || !within(b.at)
+                        || !catalog
+                            .unit(&b.kind)
+                            .is_ok_and(|d| d.get("building").and_then(Value::boolean) == Some(true))
+                })
+                || context
+                    .known_buildings
+                    .windows(2)
+                    .any(|w| w[0].id >= w[1].id)
                 || context
                     .owned_nodes
                     .iter()
