@@ -17,6 +17,7 @@
 //!
 //! JavaScript has a single NaN, so a NaN result here may carry any payload; compare it as NaN.
 //! `tests/math.rs` checks the original functions against `harness/math-fixture.mjs`.
+//! `tests/interface_math_intent.rs` checks JavaScript's wrapping 32-bit conversions and `imul`.
 
 // The following is adapted from fdlibm (http://www.netlib.org/fdlibm).
 //
@@ -1439,4 +1440,37 @@ pub fn sign(x: f64) -> f64 {
     } else {
         x
     }
+}
+
+/// JavaScript's ToUint32 (`x >>> 0`): truncate toward zero, then wrap modulo 2^32.
+/// NaN, infinities and both zeros become 0.
+pub fn to_uint32(x: f64) -> u32 {
+    let bits = x.to_bits();
+    let exponent = ((bits >> 52) & 0x7FF) as i32 - 1023;
+    // For |x| < 1 the integer part is zero. From 2^84 onward every finite f64 is a
+    // multiple of 2^32. That upper cutoff also covers NaN and infinities.
+    if !(0..84).contains(&exponent) {
+        return 0;
+    }
+    let significand = (bits & 0x000F_FFFF_FFFF_FFFF) | 0x0010_0000_0000_0000;
+    let magnitude = if exponent <= 52 {
+        (significand >> (52 - exponent)) as u32
+    } else {
+        (significand as u32) << (exponent - 52)
+    };
+    if bits >> 63 != 0 {
+        magnitude.wrapping_neg()
+    } else {
+        magnitude
+    }
+}
+
+/// JavaScript's ToInt32 (`x | 0`): the same low 32 bits as ToUint32, interpreted as signed.
+pub fn to_int32(x: f64) -> i32 {
+    to_uint32(x) as i32
+}
+
+/// `Math.imul(a, b)`: convert both numbers to u32, multiply modulo 2^32, then interpret as signed.
+pub fn imul(a: f64, b: f64) -> i32 {
+    to_uint32(a).wrapping_mul(to_uint32(b)) as i32
 }

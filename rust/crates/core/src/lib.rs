@@ -59,6 +59,7 @@ pub mod formation;
 pub mod game;
 pub mod grid;
 pub mod horde_commander;
+pub mod horde_policy;
 pub mod human_commander;
 pub mod human_commander_inputs;
 pub mod human_commander_policy;
@@ -92,6 +93,8 @@ pub mod match_actor;
 pub mod match_aircraft_commands;
 pub mod match_aircraft_ticks;
 pub mod match_aviation;
+#[cfg(test)]
+mod match_base_commands;
 mod match_carrier_tick;
 pub mod match_carriers;
 pub mod match_combat;
@@ -218,6 +221,9 @@ mod logistics_network_depot_tests;
 mod logistics_runtime_tests;
 
 #[cfg(test)]
+mod bases_runtime_construction_tests;
+
+#[cfg(test)]
 mod misc_bridge_tests;
 
 #[cfg(test)]
@@ -241,3 +247,6 @@ mod mov_followup_garrison_tests;
 
 mod save_codec;
 mod save_state;
+
+pub mod commander_field_policy;
+pub mod commander_world_policy;

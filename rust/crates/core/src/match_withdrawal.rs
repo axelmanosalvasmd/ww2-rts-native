@@ -1,4 +1,8 @@
 //! The ordered forced-supply withdrawal turn from the pinned simulation.
+#[cfg(test)]
+#[path = "withdrawal_guard_intent_tests.rs"]
+mod intent_tests;
+
 use crate::{
     game::{MOVE, Point, Unit},
     match_runtime::Match,
@@ -13,6 +17,23 @@ fn distance(a: Point, b: Point) -> f64 {
 }
 
 impl Match {
+    /// Movement can stall or resume an existing forced withdrawal before firing.
+    pub(crate) fn sync_supply_withdrawal_progress(&mut self, id: u32) {
+        let Some(reserves) = self.logistics.get_mut(id) else {
+            return;
+        };
+        let unit = self
+            .world
+            .game
+            .units
+            .get_mut(&id)
+            .expect("current withdrawal unit");
+        if reserves.forced && !unit.path.is_empty() && !self.commands.units[&id].supply_hold {
+            reserves.stranded = unit.stuck > 1.0;
+            unit.retreating = !reserves.stranded;
+        }
+    }
+
     /// Call after this live unit's reserves advance and before its movement turn.
     /// Construction, digging and projects cancel through their canonical owners.
     pub fn advance_supply_withdrawal(&mut self, id: u32) -> Result<(), String> {
