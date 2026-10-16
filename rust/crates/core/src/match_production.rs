@@ -203,7 +203,7 @@ impl Match {
                         "nonempty skirmish training queue",
                     ));
                 }
-                if self.options.logistics
+                if (self.options.logistics && self.options.mode == Mode::World)
                     || unit.owner >= count
                     || !self.building_rallies.contains_key(&id)
                 {
@@ -453,9 +453,9 @@ impl Match {
             .building(building)
             .is_some_and(|b| !b.jobs().is_empty())
         {
-            if self.options.logistics {
+            if self.options.logistics && self.options.mode == Mode::World {
                 return Err(ProductionStepError::InvalidState(
-                    "training reserves initialization unsupported",
+                    "World training reserves initialization unsupported",
                 ));
             }
             if !self.building_rallies.contains_key(&building) {
@@ -617,6 +617,12 @@ impl Match {
         control.aim = placed.aim;
         control.rally_drift = placed.rally.is_some();
         control.route_end = route_end;
+        let mut reserves = if self.options.mode == Mode::World {
+            None
+        } else {
+            self.prepare_new_unit_reserves(&placed.unit)
+                .map_err(ProductionStepError::Control)?
+        };
         let units = units(&self.world.game, &self.rules, count)?;
         let context = context(
             &self.options,
@@ -652,6 +658,9 @@ impl Match {
             self.firing.initialize(unit.id);
             self.abilities.initialize(unit.id);
             self.recovery.initialize(unit.id);
+            if let Some(reserves) = reserves.take() {
+                self.logistics.insert(unit.id, reserves);
+            }
         });
         Ok(Some(CompletedTrainingUnit {
             unit: id,

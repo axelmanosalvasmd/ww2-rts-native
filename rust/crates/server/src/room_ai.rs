@@ -20,6 +20,8 @@ pub(crate) struct RoomAi {
     human: BTreeMap<usize, CommanderMemory>,
     commanders: BTreeMap<usize, SeatCommander>,
     consumed: BTreeMap<usize, i64>,
+    #[cfg(test)]
+    inputs: Vec<(usize, ww2_core::human_commander_state::InputReceipt)>,
 }
 impl RoomAi {
     pub(crate) fn new(
@@ -34,6 +36,8 @@ impl RoomAi {
             human: BTreeMap::new(),
             commanders: BTreeMap::new(),
             consumed: BTreeMap::new(),
+            #[cfg(test)]
+            inputs: Vec::new(),
         };
         let mut configured = configured.to_vec();
         if let Some(horde) = &state.horde {
@@ -148,6 +152,12 @@ impl RoomAi {
                 None
             };
             let advance = state.advance_seat_commander(commander, packet, generation, &shots)?;
+            #[cfg(test)]
+            if let Advance::Human(ref advance) = advance
+                && let Some(input) = &advance.input
+            {
+                self.inputs.push((slot, input.clone()));
+            }
             let commands = match advance {
                 Advance::Horde(commands) => commands,
                 Advance::Human(advance) => advance
@@ -207,3 +217,7 @@ mod tests;
 #[cfg(test)]
 #[path = "room_ai_combat_tests.rs"]
 mod combat_tests;
+
+#[cfg(test)]
+#[path = "room_ai_seeded_tests.rs"]
+mod seeded_tests;

@@ -1,0 +1,15 @@
+## Ordinary owner lists and physical logistics (2026-10-16)
+
+Connect existing logistics components at their prototype phase boundaries: reserves and forced withdrawal before unit orders, network refresh before reinforcement, convoys after point capture and income, and convoy retirement before unit removal. The option and convoy state must agree before either ticks or recipient publication. World retains its separate admission boundary.
+
+Recipient logistics follows `shared/supply-convoys.js:646-661`. Own reserves, trucks and alerts are private even from teammates. Active allied stores expose only the receiving seat's available stock and relief donations. Snapshot reads clone individual store records before the existing lazy availability calculation, preserving canonical inventory and recipient-order independence. The serializer uses prototype field names and omissions, including alert `type`, optional unrounded `x` and `z`, absent event owner/time, and absent ordinary region rates.
+
+General ordinary snapshot admission uses the canonical mode/actor predicate. Mode rows already have their own typed producers. Tests exercise every seat in every ordinary mode, with populated movement, orders, aircraft, support and wallets, plus Classic paid jobs/research/refunds and enabled physical logistics. Tests also continue through ordinary retirement and finish. No C ABI, header, reference pin or Unreal consumer changes belong to this work.
+
+Automatic convoy routes remain with the convoy scheduler. Ordinary world-goal retry and movement recovery/immediate searches apply to manual trucks only, matching `shared/sim.js:5350,5497`. All convoy trucks bypass generic combat reactions (`shared/sim.js:5474`). Tick reports name each connected logistics phase and no longer mark those phases unavailable when physical logistics is enabled.
+
+Before mutation, runtime validation requires a reserve for every eligible live roster member, excludes reserves on ineligible or missing actors, and rejects non-finite or negative reserve quantities. Constructor and production publication own that eligibility; snapshot reads never fill missing records.
+
+Capped healing and building repair can spend an entire fractional provision balance. Division after multiplication can leave a negative floating-point residual (`0.007 - (0.007 * 5) / 5`). Both spending owners clamp the resulting balance at zero. This keeps valid depletion inside the nonnegative reserve invariant without weakening snapshot or tick validation.
+
+Ordinary AI keeps the existing selected-recipient producer and decoded SeatView as its only planning input. Classic resource nodes use their existing public rows, including integer fuel flags. Assault defender identity comes from the delivered mode row. Canonical mode checks retain the World boundary. The seeded replay tests compare native command inputs, real admission results, retained commander state and saved match state. They do not align the native random streams with JavaScript or introduce new save fields.

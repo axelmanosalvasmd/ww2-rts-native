@@ -83,6 +83,7 @@ struct RecruitParts<'a> {
     firing: &'a mut crate::match_firing::FiringState,
     abilities: &'a mut crate::match_abilities::AbilityState,
     recovery: &'a mut crate::match_recovery::RecoveryState,
+    logistics: &'a mut crate::logistics::LogisticsState,
     story: &'a mut [crate::match_story::PlayerStory],
     grid: &'a mut crate::grid::SpatialGrid,
     recruit_metadata: &'a mut std::collections::BTreeMap<u32, RecruitMetadata>,
@@ -130,7 +131,6 @@ fn admission_facts<'a>(
         || game.tick < 0
         || (!crate::match_actor::ordinary_ground_mode(game, options.mode) && !horde)
         || options.mode.is_construction()
-        || options.logistics
     {
         return Err(RecruitError::InvalidState("Conquest recruitment state"));
     }
@@ -196,6 +196,7 @@ struct StagedRecruit {
     placed: crate::produced_units::ProducedPlacement,
     route_end: Option<crate::game::Point>,
     route_status: Option<PathStatus>,
+    reserves: Option<crate::logistics::Reserves>,
 }
 macro_rules! recruit_parts {
     ($m:expr) => {
@@ -227,6 +228,7 @@ macro_rules! recruit_parts {
             firing: &mut $m.firing,
             abilities: &mut $m.abilities,
             recovery: &mut $m.recovery,
+            logistics: &mut $m.logistics,
             story: &mut $m.story,
             grid: &mut $m.grid,
             recruit_metadata: &mut $m.recruit_metadata,
@@ -304,6 +306,7 @@ impl Match {
             || self.firing.get(id).is_some()
             || self.abilities.get(id).is_some()
             || self.recovery.get(id).is_some()
+            || self.logistics.get(id).is_some()
         {
             return Err(RecruitError::InvalidState("occupied aircraft identity"));
         }
@@ -654,6 +657,29 @@ impl RecruitParts<'_> {
             )
             .map_err(RecruitError::Publication)?,
         );
+        if self.logistics.get(placed.unit.id).is_some() {
+            return Err(RecruitError::InvalidState("occupied recruit reserves"));
+        }
+        let definition = crate::logistics::Definition::from_catalog(kind)
+            .map_err(|e| RecruitError::Admission(e.into()))?;
+        let mut reserves = crate::logistics::LogisticsState::default();
+        reserves.initialize_unit(
+            crate::logistics::Context {
+                enabled_override: Some(self.options.logistics),
+                scenario: false,
+                mode: crate::logistics::Mode::Conquest,
+            },
+            crate::logistics::UnitFacts {
+                id: placed.unit.id,
+                kind,
+                owner: Some(slot),
+                owner_exists: slot < count,
+                guard_home: false,
+                riding: placed.unit.riding,
+            },
+            Some(&definition),
+        );
+        let reserves = reserves.remove(placed.unit.id);
         Ok(StagedRecruit {
             slot,
             kind: kind.into(),
@@ -664,6 +690,7 @@ impl RecruitParts<'_> {
             placed,
             route_end: None,
             route_status: None,
+            reserves,
         })
     }
     fn finish(&mut self, staged: StagedRecruit) -> Result<CompletedRecruitUnit, RecruitError> {
@@ -676,6 +703,7 @@ impl RecruitParts<'_> {
             placed,
             route_end,
             route_status,
+            mut reserves,
             ..
         } = staged;
         let game = &*self.game;
@@ -756,6 +784,9 @@ impl RecruitParts<'_> {
             self.abilities.initialize(unit.id);
             self.recovery.initialize(unit.id);
             self.firing.initialize(unit.id);
+            if let Some(reserves) = reserves.take() {
+                self.logistics.insert(unit.id, reserves);
+            }
         });
         story.commit();
         Ok(CompletedRecruitUnit {

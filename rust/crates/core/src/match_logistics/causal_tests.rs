@@ -1,4 +1,4 @@
-//! Composed network-to-recipient witness. This does not admit physical logistics to advance_tick.
+//! Composed network-to-recipient witness with an explicit component clock.
 use serde_json::{Value, json};
 
 use super::*;

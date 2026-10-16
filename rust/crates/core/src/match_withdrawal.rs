@@ -93,8 +93,9 @@ impl Match {
         {
             return Err("invalid withdrawal metadata".into());
         }
-        if unit.build || unit.entrench || unit.dig != self.field_works.is_active(id) {
-            return Err("unrepresented withdrawal construction or project job".into());
+        crate::match_construction::validate_build_activity(&unit, control)?;
+        if unit.dig != self.field_works.is_active(id) {
+            return Err("inconsistent withdrawal field-work activity".into());
         }
         let stores = self.convoys.as_ref().map(|c| &c.stores);
         if stores.is_some_and(|stores| {
@@ -156,9 +157,11 @@ impl Match {
                     unit.garrison = None;
                 });
             }
-            crate::match_runtime::cancel_field_work_state(&mut self.field_works, &mut unit)?;
-            unit.build = false;
-            unit.entrench = false;
+            crate::match_runtime::cancel_owned_work_state(
+                &mut self.field_works,
+                &mut unit,
+                self.commands.units.get_mut(&id).unwrap(),
+            )?;
             unit.board = 0;
             unit.attack = false;
             let c = self.commands.units.get_mut(&id).unwrap();

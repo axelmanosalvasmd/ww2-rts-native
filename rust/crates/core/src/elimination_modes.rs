@@ -162,16 +162,11 @@ impl Match {
 
     fn new_elimination_shell(
         map: &crate::map::AuthoritativeMap,
-        mut options: MatchOptions,
+        options: MatchOptions,
     ) -> Result<Self, String> {
         if map.source().get("scenario").is_some() {
             return Err("elimination startup does not apply authored scenarios".into());
         }
-        // These bounded modes have no reserves/convoy publication adapter yet.
-        if options.logistics {
-            return Err("elimination startup does not support logistics".into());
-        }
-        options.logistics = false;
         let rules = crate::rules::Rules::compiled().map_err(|e| e.to_string())?;
         let start = StartPlan::prepare_elimination(map, &options, &rules)?;
         let teams = options
@@ -706,6 +701,12 @@ impl Match {
             self.building_rallies.remove(&unit.id);
             self.recruit_metadata.remove(&unit.id);
             self.logistics.remove(unit.id);
+            if let Some(convoys) = self.convoys.as_mut() {
+                // Administrative elimination deletes source units directly. Drop
+                // their attached state without charging a combat truck loss.
+                convoys.trucks.remove(&unit.id);
+                convoys.stores.retain(|store| store.entity != Some(unit.id));
+            }
             self.aviation.remove(unit.id);
             for node in &mut self.elimination.as_mut().unwrap().nodes {
                 if node.depot == Some(unit.id) {

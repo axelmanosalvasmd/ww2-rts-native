@@ -164,6 +164,32 @@ pub struct RecipientLists {
 }
 
 impl crate::match_runtime::Match {
+    /// Public resource nodes in prototype sim.js:5932,6019. World discovery stays separate.
+    pub(crate) fn ordinary_snapshot_nodes(&self) -> Result<Option<Vec<[f64; 4]>>, String> {
+        if !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode) {
+            return Err("ordinary nodes require a canonical ordinary match".into());
+        }
+        if self.options.mode != crate::economy::Mode::Classic {
+            return Ok(None);
+        }
+        self.validate_elimination_state()?;
+        Ok(Some(
+            self.elimination
+                .as_ref()
+                .ok_or("missing Classic nodes")?
+                .nodes
+                .iter()
+                .map(|node| {
+                    [
+                        rounded(node.at.x),
+                        rounded(node.at.z),
+                        node.rate,
+                        f64::from(u8::from(node.fuel)),
+                    ]
+                })
+                .collect(),
+        ))
+    }
     /// Capture list facts after current canonical state changes. No delivery cursor is drained.
     /// Ordinary wreck memory is per seat; World wreck memory is shared by team.
     pub fn recipient_snapshot_lists(&mut self, owner: usize) -> Result<RecipientLists, String> {
@@ -302,23 +328,13 @@ pub struct OrdinaryRawLists {
 impl crate::match_runtime::Match {
     pub fn ordinary_snapshot_raw_lists(&self) -> Result<OrdinaryRawLists, String> {
         let game = &self.world.game;
-        let classic = match (self.options.mode, game.mode) {
-            (crate::economy::Mode::Default | crate::economy::Mode::Conquest, None) => false,
-            (crate::economy::Mode::Classic, Some(ModeKind::Classic)) => {
-                self.validate_elimination_state()?;
-                true
-            }
-            (crate::economy::Mode::Horde, Some(ModeKind::Horde)) => {
-                self.validate_actor_mode()?;
-                self.validate_horde_economy()?;
-                false
-            }
-            _ => {
-                return Err(
-                    "global lists require matching Conquest, Classic or canonical Horde".into(),
-                );
-            }
-        };
+        if !crate::match_actor::ordinary_ground_mode(game, self.options.mode) {
+            return Err("global lists require a canonical ordinary match".into());
+        }
+        self.validate_actor_mode()?;
+        if self.options.mode == crate::economy::Mode::Horde {
+            self.validate_horde_economy()?;
+        }
         let mut ids = std::collections::BTreeSet::new();
         let mut rows = Vec::with_capacity(game.wrecks.len());
         for hull in &game.wrecks {
@@ -336,18 +352,14 @@ impl crate::match_runtime::Match {
             .ok_or("missing global wreck display facts")?;
             rows.push(row.to_json());
         }
-        let nodes = if classic {
-            let classic = self.elimination.as_ref().expect("validated Classic state");
-            let nodes = &classic.nodes;
-            Some(Value::Array(
+        let nodes = self.ordinary_snapshot_nodes()?.map(|nodes| {
+            json!(
                 nodes
                     .iter()
-                    .map(|n| json!([rounded(n.at.x), rounded(n.at.z), n.rate, u8::from(n.fuel)]))
-                    .collect(),
-            ))
-        } else {
-            None
-        };
+                    .map(|row| json!([row[0], row[1], row[2], u8::from(row[3] != 0.0)]))
+                    .collect::<Vec<_>>()
+            )
+        });
         Ok(OrdinaryRawLists {
             wrecks: Value::Array(rows),
             nodes,

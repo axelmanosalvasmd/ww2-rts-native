@@ -560,7 +560,7 @@ impl Match {
                         break;
                     };
                     let paid = math::min(repaired, reserve.provisions * 5.0);
-                    reserve.provisions -= paid / 5.0;
+                    reserve.provisions = math::max(0.0, reserve.provisions - paid / 5.0);
                     repaired -= paid;
                 }
             }

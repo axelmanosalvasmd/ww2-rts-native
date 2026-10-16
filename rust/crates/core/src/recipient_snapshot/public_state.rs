@@ -93,7 +93,6 @@ pub(super) fn capture_perspective(
                 .collect::<Result<Vec<_>, SnapshotError>>()?;
             fields.insert("nodes".into(), json!(nodes));
             fields.insert("ghosts".into(), json!([]));
-
         }
         // Reuse Source's six-field ghost rows. Never consult a hidden live building here.
         if matches!(state.options.mode, Mode::Classic | Mode::World)

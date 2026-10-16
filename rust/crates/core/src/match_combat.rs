@@ -1547,6 +1547,8 @@ impl crate::match_runtime::Match {
                 }
             }
             let bounty = self.retirement_bounty(&u, metadata.last_hit)?;
+            self.record_convoy_death(&u)
+                .map_err(|_| CombatError::InvalidInput("convoy death"))?;
             self.retire_unit_sidecars(&mut u)?;
             self.world.game.units.remove(&u.id);
             self.grid.remove_unit(u.id);

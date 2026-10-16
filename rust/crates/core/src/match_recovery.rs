@@ -632,7 +632,7 @@ impl Match {
                         ),
                     );
                     if let Some(reserves) = self.logistics.get_mut(id) {
-                        reserves.provisions -= amount / 5.;
+                        reserves.provisions = math::max(0., reserves.provisions - amount / 5.);
                     }
                     let u = self.world.game.units.get_mut(&best).unwrap();
                     u.hp += amount;

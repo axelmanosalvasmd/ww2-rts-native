@@ -113,8 +113,17 @@ impl CommanderMemory {
             .get(self.slot)
             .ok_or("missing delivered commander seat")?;
         let mode = Mode::from_kind(view.mode["kind"].as_str());
-        if !matches!(mode, Mode::Default | Mode::Conquest | Mode::Horde) {
-            return Err("delivered commander requires Conquest or Horde".into());
+        if !matches!(
+            mode,
+            Mode::Default
+                | Mode::Conquest
+                | Mode::Classic
+                | Mode::Assault
+                | Mode::Annihilation
+                | Mode::Horde
+                | Mode::Tutorial
+        ) {
+            return Err("delivered commander requires an ordinary mode".into());
         }
         let faction = Faction::try_from(byte(&me["faction"])?).map_err(|e| e.to_string())?;
         let players = view
@@ -168,7 +177,7 @@ impl CommanderMemory {
                 rule_number(weather_rule, "sight")?
             },
             horde: mode == Mode::Horde && view.mode["slot"].as_u64() == Some(self.slot as u64),
-            defender: mode == Mode::Horde
+            defender: matches!(mode, Mode::Horde | Mode::Assault)
                 && view.mode["defenderTeam"].as_i64() == Some(i64::from(team)),
             height: view.height.clone(),
             ..Context::default()

@@ -51,7 +51,7 @@ impl DeliveryState {
             return Err(SnapshotError::InvalidRecipient);
         }
         for (slot, (owner, list)) in prepared.results().iter().enumerate() {
-            if slot != *owner || list.nodes.is_some() {
+            if slot != *owner {
                 return Err(SnapshotError::UnsupportedMode);
             }
             lists.push(list.clone());
@@ -103,6 +103,17 @@ pub(super) fn complete(
     lists: Option<&RecipientLists>,
 ) -> SupportedSeatSnapshot {
     projection.fields.insert("t".into(), json!("s"));
+    if let Some(nodes) = lists.and_then(|lists| lists.nodes.as_ref()) {
+        projection.fields.insert(
+            "nodes".into(),
+            json!(
+                nodes
+                    .iter()
+                    .map(|row| json!([row[0], row[1], row[2], u8::from(row[3] != 0.0)]))
+                    .collect::<Vec<_>>()
+            ),
+        );
+    }
     // Admission inspected each actual canonical actor/list owner. Their
     // absent output is a represented source result for this bounded frame.
     projection.fields.insert("shots".into(), json!([]));
@@ -189,10 +200,7 @@ pub(super) fn admit_actors(state: &Match, outside_events: &[Effect]) -> Result<(
     state
         .preflight_legacy_scenario()
         .map_err(|_| refused(SnapshotCapability::Scenario))?;
-    if state.options.logistics || state.logistics.iter().next().is_some() || state.convoys.is_some()
-    {
-        return Err(refused(SnapshotCapability::Logistics));
-    }
+    super::logistics::validate(state)?;
     Ok(())
 }
 

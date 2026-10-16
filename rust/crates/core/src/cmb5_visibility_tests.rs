@@ -273,16 +273,19 @@ fn cmb127_horde_reveals_only_active_final_ground_enemies_and_bosses_to_defenders
         }
         assert!(!m.world.game.players[slot].sees(enemy));
     }
-    assert!(
-        m.advance_tick()
-            .unwrap_err()
-            .reason
-            .contains("requires represented ordinary or World mode")
+    // This visibility fixture deliberately creates a plane without sortie metadata
+    // and a rider without a carrier. Canonical Horde admission reaches the plane
+    // metadata check before either tick mutation or snapshot publication.
+    let tick = m.world.game.tick;
+    assert_eq!(
+        m.advance_tick().unwrap_err().reason,
+        "aircraft admission: query aircraft has no sortie runtime metadata"
     );
+    assert_eq!(m.world.game.tick, tick);
     assert!(m.tick_state.fault().is_none());
     assert!(matches!(
         SnapshotCache::new(&m),
-        Err(SnapshotError::UnsupportedMode)
+        Err(SnapshotError::Rules)
     ));
 }
 

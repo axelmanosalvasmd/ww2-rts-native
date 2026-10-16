@@ -368,10 +368,8 @@ fn base45_paid_cache_requires_logistics_and_serves_only_when_finished() {
     assert_eq!(m.world.game.units[&truck].path, unit.path);
     assert_eq!(m.world.game.units[&truck].world_goal, unit.world_goal);
     assert_eq!(m.start.economy, wallets);
-    assert_eq!(
-        m.advance_tick().unwrap_err().reason,
-        "reserve and convoy tick phases are not connected"
-    );
+    m.validate_logistics_runtime().unwrap();
+    m.preflight_ordinary_snapshot().unwrap();
     for _ in 0..241 {
         m.world.game.tick += 1;
         let mut frame = m.begin_construction_tick().unwrap();

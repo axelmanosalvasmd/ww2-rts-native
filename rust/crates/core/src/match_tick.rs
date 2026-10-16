@@ -3,6 +3,8 @@
 //! This integration grows by attaching the independently verified phase adapters.
 //! Reports identify phases still absent; a clock advance is not playable-match proof.
 #[cfg(test)]
+mod phase_additional_tests;
+#[cfg(test)]
 mod phase_dependency_tests;
 
 use std::collections::BTreeMap;
@@ -309,9 +311,7 @@ impl crate::match_runtime::Match {
         if self.options.mode == crate::economy::Mode::Horde {
             self.validate_horde_economy()?;
         }
-        if self.options.logistics || self.convoys.is_some() {
-            return Err("reserve and convoy tick phases are not connected".into());
-        }
+        self.validate_logistics_runtime()?;
         self.preflight_legacy_scenario()?;
         self.tick_state.paths.validate()?;
         let boundary = game.tick as u64 + 1;
@@ -524,6 +524,9 @@ impl crate::match_runtime::Match {
             Some(self.begin_construction_tick()?)
         };
         let mut moved = Vec::new();
+        if self.convoys.is_some() {
+            phases.push(TickPhase::UnitReserves);
+        }
         let mut last_id = None;
         loop {
             // The source iterates its live Map. Monotonic IDs let births made
@@ -582,7 +585,10 @@ impl crate::match_runtime::Match {
             }
             let unit = &self.world.game.units[&id];
             let factor = movement::supp_speed(unit.supp);
-            // Reserve adapters attach before this pre-timer order phase.
+            if self.convoys.is_some() {
+                self.advance_unit_reserves(id)?;
+                self.advance_supply_withdrawal(id)?;
+            }
             if self.options.mode == crate::economy::Mode::World {
                 self.apply_world_guard_home(id)?;
             }
@@ -829,7 +835,7 @@ impl crate::match_runtime::Match {
         .map_err(|e| format!("living weather: {e:?}"))?;
         drop(smokes);
         phases.push(TickPhase::LivingWeather);
-        // Expiring smoke still blocks ignition during the source fire phase.
+        // Expiring smoke still suppresses replacement smoke during the source fire phase.
         self.tick_environment_phase(EnvironmentPhase::FireFlood(&unit_order), events)?;
         self.world
             .game
@@ -843,7 +849,13 @@ impl crate::match_runtime::Match {
             self.apply_point_supply(&unit_order)?;
             phases.push(TickPhase::PointSupply);
         }
-        // Network refresh attaches between point supply and prepared reinforcement.
+        if self.convoys.is_some() {
+            let beat = crate::supply_network::SupplyRules::compiled()?.network_ticks;
+            if beat != 0 && (tick as u64).is_multiple_of(beat) {
+                self.refresh_supply_network(&unit_order)?;
+                phases.push(TickPhase::SupplyNetwork);
+            }
+        }
         self.reinforce(&recovery, dt)?;
         phases.push(TickPhase::Reinforcement);
         self.tick_retirement(&unit_order, retirement, events)?;
@@ -868,6 +880,10 @@ impl crate::match_runtime::Match {
             }
             self.apply_point_capture_income(&unit_order)?;
             phases.push(TickPhase::PointCaptureIncome);
+            if self.convoys.is_some() {
+                self.step_supply_convoys(winner_decided)?;
+                phases.push(TickPhase::Convoys);
+            }
             match self.options.mode {
                 crate::economy::Mode::Assault => {
                     self.apply_assault_victory(dt)?;
@@ -935,6 +951,15 @@ impl crate::match_runtime::Match {
                     TickPhase::SupplyNetwork,
                     TickPhase::Convoys,
                 ]
+                .into_iter()
+                .filter(|phase| {
+                    self.convoys.is_none()
+                        || !matches!(
+                            phase,
+                            TickPhase::UnitReserves | TickPhase::SupplyNetwork | TickPhase::Convoys
+                        )
+                })
+                .collect()
             },
         })
     }

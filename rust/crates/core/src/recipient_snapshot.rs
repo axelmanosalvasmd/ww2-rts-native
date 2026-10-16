@@ -22,6 +22,8 @@ mod engineering;
 mod falling;
 #[path = "recipient_snapshot/flights.rs"]
 mod flights;
+#[path = "recipient_snapshot/logistics.rs"]
+mod logistics;
 #[path = "recipient_snapshot/modes.rs"]
 mod modes;
 #[path = "recipient_snapshot/owners.rs"]
@@ -123,18 +125,15 @@ pub struct SnapshotCache<'a> {
 }
 impl<'a> SnapshotCache<'a> {
     pub fn new(state: &'a Match) -> Result<Self, SnapshotError> {
-        if !matches!(
-            (state.options.mode, state.world.game.mode),
-            (Mode::Default | Mode::Conquest, None)
-                | (Mode::Classic, Some(crate::game::ModeKind::Classic))
-                | (Mode::Horde, Some(crate::game::ModeKind::Horde))
-        ) || state.world.geography().is_some()
-            || state.assault.is_some()
+        if !crate::match_actor::ordinary_ground_mode(&state.world.game, state.options.mode)
+            || state.world.geography().is_some()
             || state.world_runtime.is_some()
+            || state.assault.is_some() != (state.options.mode == Mode::Assault)
         {
             return Err(SnapshotError::UnsupportedMode);
         }
-        if state.options.mode == Mode::Classic {
+        logistics::validate(state)?;
+        if matches!(state.options.mode, Mode::Classic | Mode::Annihilation) {
             state
                 .validate_elimination_state()
                 .map_err(|_| SnapshotError::Rules)?;
@@ -232,6 +231,9 @@ impl<'a> SnapshotCache<'a> {
         fields.extend(self.public[slot].clone());
         fields.insert("falling".into(), falling::project(self.state, slot)?);
         fields.insert("flights".into(), flights::project(self.state, slot)?);
+        if let Some(logistics) = logistics::project(self.state, slot)? {
+            fields.insert("logistics".into(), logistics);
+        }
         Ok(RecipientProjection {
             fields,
             missing: vec![
@@ -240,7 +242,6 @@ impl<'a> SnapshotCache<'a> {
                 SnapshotCapability::Fog,
                 SnapshotCapability::ShotsAndFlights,
                 SnapshotCapability::TeamEffects,
-                SnapshotCapability::Logistics,
             ],
         })
     }
@@ -1076,6 +1077,7 @@ pub(crate) mod tests {
                 let projection = cache.recipient(slot).unwrap();
                 let mut expected = expected.clone();
                 expected["flights"] = case["fullOutputs"][slot]["flights"].clone();
+                expected["air"] = case["fullOutputs"][slot]["air"].clone();
                 equal(
                     &Value::Object(projection.fields),
                     &expected,

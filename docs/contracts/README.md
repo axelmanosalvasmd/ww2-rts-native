@@ -17,3 +17,5 @@ These files reserve contract topics; no protocol or ABI is approved by their cre
 Contract PRs must state native/reference baseline, version/status, fields and semantics, ownership/privacy, error/recovery behavior, compatibility transition, fixtures and verification evidence. Both owners must explicitly approve breaking changes before adoption. Mark a contract agreed only after approvals and merge. Do not put credentials or private sessions in fixtures.
 
 The ABI 2 approval is limited to the six recipient-view calls in `rust-unreal-abi.md` and their staged Unreal consumer update. It does not approve additional interfaces or the pending protocol/privacy proposals. The broader drafts remain drafts; merged jointly approved scope is authoritative.
+
+[Ordinary owner lists](owner-lists-v0.md) records the existing prototype snapshot shapes for private economy, production, aircraft and physical logistics. It adds no ABI or command interface and does not change the protocol draft's approval status.
