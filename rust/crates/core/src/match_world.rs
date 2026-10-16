@@ -830,6 +830,10 @@ fn world_find_site(
 }
 
 #[cfg(test)]
+#[path = "bases_batch4_fort_tests.rs"]
+mod bases_batch4_fort_tests;
+
+#[cfg(test)]
 mod region_lookup_tests {
     use super::*;
     use crate::world_map::{WorldDefinition, WorldRegion, WorldSize};
