@@ -495,6 +495,7 @@ fn mov_21_hull_escape_is_bounded_and_cancels_on_stop() {
             ids: vec![id.into()],
         },
     );
+    walk(&mut m, id);
     assert!(m.world.game.units[&id].clearance.is_none());
 }
 #[test]
@@ -652,7 +653,7 @@ fn mov_57_yield_preserves_route_and_remembers_bounded_trail() {
 #[test]
 fn mov_58_pass_stopped_unit_and_retain_destination() {
     let mut m = scene();
-    let holder = add(&mut m, "tank", 0, p(60.0, 70.0));
+    let holder = add(&mut m, "tank", 0, p(60.0, 67.0));
     let mover = add(&mut m, "tank", 0, p(60.0, 60.0));
     m.world.game.units.get_mut(&holder).unwrap().hold_pos = true;
     route(&mut m, mover, p(60.0, 100.0));

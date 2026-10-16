@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Correct two unrun MOV native witness inputs: observe clearance cancellation at the next mover and place the stationary passing obstacle within the conflict horizon.
+
 - Add 50 native MOV intent tests and literal row mappings under Axel decision 6206861267. Seven unavailable behavior actuators have explicit ignored tests; native execution and prototype review remain pending. Preserve existing Source failures and artifacts without new behavior captures.
 
 - Prepare a private MOV41/46/47/52/54 source successor above LOG271 while preserving PR268 separately. Tighten ordinary retry and idle causal controls, bind complete original checks and bridge inputs, and preserve the full old 78-case corpus. New Source captures and native qualification remain pending.

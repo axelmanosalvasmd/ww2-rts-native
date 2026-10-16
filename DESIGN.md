@@ -2,6 +2,8 @@
 
 ## Native MOV intent tests, first 50 owned rows (2026-10-16)
 
+Before the first native attempt, source review corrects two authored witness inputs: the clearance-stop check now runs the next mover, where both implementations invalidate stale clearance, and the parked-holder scene starts 7 m ahead so it enters the 0.7 s conflict horizon without an unperformed advance. This is unexecuted test setup correction, not a repaired or repeated native result.
+
 Apply Axel decision 6206861267 exactly: native behavior tests and prototype intent review qualify behavior rows; cheap exact tables, pure functions and existing component comparisons retain their exact checks. Add `mov_intent_batch` as a test-only core module for the first 50 rows assigned in MOV_IMPL.json, through MOV-90. Each row names its test in movement.md. Native authored scenes select canonical `Command::Stance { stance: HoldPosition }`, Move, Board, Unload, purchase, movement, traffic, separation, recovery and aircraft APIs. No Source output or new behavior capture supplies expected state. Runtime owners, admission guards, the reference pin and interfaces are unchanged.
 
 Seven tests explicitly ignore unavailable house entry, carrier ejection/shock, train operation, fighter seeking and aircraft ground weapons. Tests with narrower coverage retain their limitations in movement.md. No test has run and no row is promoted. The previous Source failure at cfcda299 remains failed; its `t: holdPos` proposal is not applied or rerun. Root must grant one focused nextest job with `--no-fail-fast` for this frozen batch. Failed or incomplete rows stay in progress while independent rows continue.
