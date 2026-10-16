@@ -30,7 +30,9 @@ pub use projects::{
     ProjectRequest, Segment, SegmentPreparation, entrench_plan, line_fort, segment_cost,
 };
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
 pub enum FortKind {
     Trench,
     Sandbags,
@@ -43,6 +45,7 @@ pub enum FortKind {
     Bridge,
     Fill,
     Wall,
+    Gate,
 }
 impl FortKind {
     pub fn as_str(self) -> &'static str {
@@ -58,6 +61,7 @@ impl FortKind {
             Self::Bridge => "bridge",
             Self::Fill => "fill",
             Self::Wall => "wall",
+            Self::Gate => "gate",
         }
     }
     pub fn parse(name: &str) -> Result<Self, Error> {
@@ -73,7 +77,7 @@ impl FortKind {
             "bridge" => Ok(Self::Bridge),
             "fill" => Ok(Self::Fill),
             "wall" => Ok(Self::Wall),
-            "gate" => Err(Error::UnsupportedKind),
+            "gate" => Ok(Self::Gate),
             _ => Err(Error::Refused(Reason::Blocked)),
         }
     }
@@ -118,12 +122,12 @@ impl std::fmt::Display for Error {
     }
 }
 impl std::error::Error for Error {}
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct WorkCell {
     pub cell: usize,
     pub ch: u8,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Dig {
     pub project: Option<ProjectId>,
     pub kind: FortKind,
@@ -152,7 +156,7 @@ pub struct StartRequest {
     pub at: Point,
     pub direction: Option<f64>,
 }
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FieldWorksRuntime {
     jobs: BTreeMap<u32, Dig>,
     pits: BTreeSet<usize>,
@@ -185,7 +189,7 @@ pub struct StepResult {
     /// Scheduler must add real Dig eligibility before acting on this request.
     pub route: Option<Point>,
     /// The Match publishes the finished building and its canonical metadata.
-    pub wall: Option<(usize, f64)>,
+    pub concrete: Option<(FortKind, usize, f64)>,
 }
 struct Definition {
     cost: f64,
@@ -233,6 +237,7 @@ fn definitions() -> Result<&'static Definitions, Error> {
             FortKind::Bridge,
             FortKind::Fill,
             FortKind::Wall,
+            FortKind::Gate,
         ] {
             let source = table.get(kind.as_str()).ok_or(Error::Rules)?;
             let count = if kind == FortKind::Nest {
@@ -244,7 +249,7 @@ fn definitions() -> Result<&'static Definitions, Error> {
                 }
                 n as usize
             };
-            let ch = if kind == FortKind::Wall {
+            let ch = if matches!(kind, FortKind::Wall | FortKind::Gate) {
                 0
             } else if kind == FortKind::Nest {
                 b'T'
@@ -304,6 +309,9 @@ fn center(w: &World, c: usize) -> Point {
         z: (c / w.game.w) as f64 * 2. + 1.,
     }
 }
+pub(crate) fn square_direction(direction: f64) -> f64 {
+    math::round(direction / std::f64::consts::FRAC_PI_2) * std::f64::consts::FRAC_PI_2
+}
 fn offsets(kind: FortKind, count: usize) -> Vec<(f64, f64, u8)> {
     if kind == FortKind::Nest {
         vec![
@@ -342,6 +350,11 @@ pub fn placement(
         return Err(Error::Refused(Reason::Blocked));
     }
     let d = &definitions()?.forts[&kind];
+    let direction = if kind == FortKind::Gate {
+        square_direction(direction)
+    } else {
+        direction
+    };
     let sx = math::cos(direction);
     let sz = math::sin(direction);
     let plan = offsets(kind, d.count);
@@ -448,7 +461,7 @@ impl FieldWorksRuntime {
             .filter(|u| u.owner == request.owner)
             .ok_or(Error::Refused(Reason::NoBuilders))?;
         let kind = defs.rules.kinds.get(unit.kind).ok_or(Error::InvalidInput)?;
-        let builder = if request.kind == FortKind::Wall
+        let builder = if matches!(request.kind, FortKind::Wall | FortKind::Gate)
             && matches!(
                 w.game.mode,
                 Some(crate::game::ModeKind::Classic | crate::game::ModeKind::World)
@@ -628,7 +641,7 @@ impl FieldWorksRuntime {
         let mut result = StepResult::default();
         job.elapsed = 0.;
         job.cells.remove(0);
-        if job.kind == FortKind::Wall {
+        if matches!(job.kind, FortKind::Wall | FortKind::Gate) {
             if b".+RDM".contains(&w.game.chars[cell.cell]) {
                 let occupied = w.game.flags[cell.cell] & crate::game::MOVE != 0
                     || w.game.units.values().any(|v| {
@@ -639,7 +652,15 @@ impl FieldWorksRuntime {
                             && w.game.cell_of(v.x, v.z) == Some(cell.cell)
                     });
                 if !occupied {
-                    result.wall = Some((cell.cell, job.direction));
+                    result.concrete = Some((
+                        job.kind,
+                        cell.cell,
+                        if job.kind == FortKind::Gate {
+                            square_direction(job.direction)
+                        } else {
+                            job.direction
+                        },
+                    ));
                 } else {
                     job.waits += 1;
                     if job.waits < 20 {

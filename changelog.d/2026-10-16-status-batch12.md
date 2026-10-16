@@ -1,0 +1,1 @@
+- Mark 22 parity rows ported from merged native intent tests: MODE-03, 29, 31, 33, 34, 35, 36, 37, 38, 39, 40, 71, 74, 77 (#301); ENG-33 and CMB-142 (#363); MAP-57 and ENG-58 (#339); BASE-48 and ENG-12 (#355); NET-47 and NET-50 (#340).

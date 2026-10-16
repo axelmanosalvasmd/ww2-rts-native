@@ -139,6 +139,7 @@ fn make_mode(case: &Value, mode: Mode) -> Match {
     m
 }
 fn snapshot(m: &Match) -> Value {
+    crate::unit_placement::tests::assert_current(&m.world.game, &m.grid);
     encode(json!({
         "units":m.world.game.units.values().map(|u| {
             let c=&m.commands.units[&u.id];
@@ -240,12 +241,14 @@ fn admission_guards_reject_before_payment_or_cancellation() {
     )
     .unwrap();
     let before = snapshot(&m);
+    m.options.tech = true;
     let command =
         Command::from_json(&json!({"t":"dig","ids":[1],"kind":"gate","x":20,"z":20})).unwrap();
     assert_eq!(
         m.execute_command(0, &command, false).unwrap(),
-        Some(Denial::Unsupported)
+        Some(Denial::Tier)
     );
+    m.options.tech = false;
     assert_eq!(snapshot(&m), before);
     assert_eq!(
         Command::from_json(&json!({"t":"dig","ids":[1],"kind":"unknown","x":20,"z":20})),

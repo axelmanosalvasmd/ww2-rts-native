@@ -1,7 +1,6 @@
 //! Ground Attack/Retreat over the existing recorded queue and canonical owners.
 use crate::{
     catalog::Catalog,
-    economy::Mode,
     existing_observers::{ExistingObservers, PreparedGroundExit},
     game::{Point, Unit},
     grid::UnitId,
@@ -15,10 +14,8 @@ use std::collections::BTreeMap;
 
 impl Match {
     fn ground_orders_open(&self) -> Result<(), String> {
-        if !matches!(self.options.mode, Mode::Default | Mode::Conquest)
-            || self.world.game.mode.is_some()
-        {
-            return Err("ground orders require ordinary Default or Conquest".into());
+        if !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode) {
+            return Err("ground orders require a matching ordinary mode".into());
         }
         Ok(())
     }
@@ -372,7 +369,12 @@ impl Match {
         if self.ground_orders_open().is_err() {
             return Ok(Some(Denial::Unsupported));
         }
-        if ids
+        if !matches!(
+            self.options.mode,
+            crate::economy::Mode::Default
+                | crate::economy::Mode::Conquest
+                | crate::economy::Mode::Tutorial
+        ) && ids
             .iter()
             .filter_map(|raw| u32::try_from(*raw).ok())
             .any(|id| {
@@ -390,7 +392,18 @@ impl Match {
             return Ok(Some(Denial::Unsupported));
         }
         let command = Command::Retreat { ids: ids.to_vec() };
-        let selected = self.ground_order_rows(owner, ids, &command)?;
+        let mut selected = self.ground_order_rows(owner, ids, &command)?;
+        // Convoy commands inspect every truck before the ordinary troop selection cap.
+        if let Some(state) = &self.convoys {
+            for &raw in ids {
+                if let Some(id) = self.eligible_command_unit(raw, owner, &command)
+                    && state.trucks.contains_key(&id)
+                    && !selected.contains(&id)
+                {
+                    selected.push(id);
+                }
+            }
+        }
         for &id in &selected {
             self.ground_order_identity(id)?;
             if self.world.game.units[&id].build {
@@ -434,12 +447,27 @@ impl Match {
             }
             prefixes.push(exits.len());
         }
-        let homes = selected
-            .iter()
-            .map(|id| {
-                self.reaction_home_for(exits.iter().find(|exit| exit.id() == *id).unwrap().unit())
-            })
-            .collect::<Result<Vec<_>, _>>()?;
+        let mut homes = Vec::with_capacity(selected.len());
+        for id in &selected {
+            let unit = exits.iter().find(|exit| exit.id() == *id).unwrap().unit();
+            if let Some(state) = self.convoys.as_ref().filter(|s| s.trucks.contains_key(id)) {
+                let home = state
+                    .stores
+                    .iter()
+                    .filter(|s| s.active && s.source && self.world.game.allied(owner, s.owner))
+                    .min_by(|a, b| {
+                        crate::math::hypot(a.at.x - unit.x, a.at.z - unit.z)
+                            .total_cmp(&crate::math::hypot(b.at.x - unit.x, b.at.z - unit.z))
+                    })
+                    .map(|s| s.at);
+                let Some(home) = home else {
+                    return Ok(Some(Denial::Blocked));
+                };
+                homes.push(home);
+            } else {
+                homes.push(self.reaction_home_for(unit)?);
+            }
+        }
         let context = RecipientContext {
             world: &self.world,
             rules: &self.rules,
@@ -483,6 +511,20 @@ impl Match {
                 .result,
             );
         }
+        for ((&id, &home), route) in selected.iter().zip(&homes).zip(&routes) {
+            if self
+                .convoys
+                .as_ref()
+                .is_some_and(|s| s.trucks.contains_key(&id))
+                && route.waypoints.is_empty()
+                && crate::math::hypot(
+                    self.world.game.units[&id].x - home.x,
+                    self.world.game.units[&id].z - home.z,
+                ) > 1.0
+            {
+                return Ok(Some(Denial::Blocked));
+            }
+        }
         let drafts = exits
             .into_iter()
             .map(|exit| (exit.id(), exit.into_unit()))
@@ -497,12 +539,19 @@ impl Match {
             self.commands.units.get_mut(id).unwrap().follow = 0;
         }
         for ((id, home), route) in selected.into_iter().zip(homes).zip(routes) {
+            if let Some(truck) = self.convoys.as_mut().and_then(|s| s.trucks.get_mut(&id)) {
+                truck.manual = true;
+                truck.hold = false;
+                truck.target = None;
+                truck.state = crate::supply_convoys::TruckState::Manual;
+            }
             let mut u = self.world.game.units[&id].clone();
             let draft = &drafts[&id];
-            u.x = draft.x;
-            u.z = draft.z;
-            u.garrison = draft.garrison;
-            self.grid.update(id, &u);
+            crate::unit_placement::place_unit(&mut self.grid, &mut u, |u| {
+                u.x = draft.x;
+                u.z = draft.z;
+                u.garrison = draft.garrison;
+            });
             self.apply_retreat_route(u, home, route)
                 .expect("complete retreat batch admitted");
             let ability = self.abilities.get_mut(id).unwrap();
@@ -634,6 +683,46 @@ mod tests {
     }
 
     #[test]
+    fn mixed_ground_air_attack_orders_both_groups_immediately() {
+        mixed_ground_air_attack(false);
+    }
+
+    #[test]
+    fn mixed_ground_air_attack_queues_both_groups() {
+        mixed_ground_air_attack(true);
+    }
+
+    fn mixed_ground_air_attack(queue: bool) {
+        let mut m = scene();
+        let plane = m.spawn_aircraft(0, "attacker").unwrap();
+        let command = Command::Attack {
+            ids: vec![1, i64::from(plane)],
+            target: 3,
+            queue,
+            at: None,
+        };
+        assert_eq!(m.execute_command(0, &command, false), Ok(None));
+        if queue {
+            for id in [1, plane] {
+                assert!(
+                    matches!(
+                        m.commands.units[&id].orders.front(),
+                        Some(Command::Attack {
+                            target: 3,
+                            queue: false,
+                            ..
+                        })
+                    ),
+                    "selected actor {id} must retain its attack order"
+                );
+            }
+        } else {
+            assert_eq!(m.commands.units[&1].attack_id, 3);
+            assert_eq!(m.aviation.planes[&plane].mission.unwrap().target, Some(3));
+        }
+    }
+
+    #[test]
     fn attack_batch_preflights_metadata_and_repeated_path_capacity_before_follow() {
         let mut m = scene();
         let mut second = m.world.game.units[&1].clone();
@@ -693,7 +782,7 @@ mod tests {
         assert_eq!(m.firing.target_claims().collect::<Vec<_>>(), claims);
     }
     #[test]
-    fn convoy_retreat_outside_troop_cap_refuses_before_follow_or_routing() {
+    fn convoy_retreat_outside_troop_cap_without_source_refuses_before_follow_or_routing() {
         use crate::supply_convoys::{ConvoyState, StoreId, Truck, TruckState};
         let mut m = scene();
         let truck = crate::unit_spawn::initial_unit(
@@ -748,7 +837,7 @@ mod tests {
         assert_eq!(
             m.execute_command(0, &Command::Retreat { ids }, false)
                 .unwrap(),
-            Some(crate::match_commands::Denial::Unsupported)
+            Some(crate::match_commands::Denial::Blocked)
         );
         assert_eq!(
             format!(
@@ -763,5 +852,45 @@ mod tests {
             ),
             before
         );
+        // These modes admit ordinary Retreat, but neither merge parent admitted convoys.
+        for (mode, kind) in [
+            (
+                crate::economy::Mode::Assault,
+                crate::game::ModeKind::Assault,
+            ),
+            (
+                crate::economy::Mode::Annihilation,
+                crate::game::ModeKind::Annihilation,
+            ),
+            (
+                crate::economy::Mode::Classic,
+                crate::game::ModeKind::Classic,
+            ),
+        ] {
+            m.options.mode = mode;
+            m.world.game.mode = Some(kind);
+            let mut ids = vec![1; 50];
+            ids.push(4);
+            assert_eq!(
+                m.execute_command(0, &Command::Retreat { ids }, false)
+                    .unwrap(),
+                Some(crate::match_commands::Denial::Unsupported),
+                "{mode:?} convoy Retreat must remain refused"
+            );
+            assert_eq!(
+                format!(
+                    "{:?}",
+                    (
+                        &m.world.game.units,
+                        &m.commands.units,
+                        &m.commands.requests,
+                        &m.routing_fog,
+                        &m.convoys
+                    )
+                ),
+                before,
+                "{mode:?} refusal must precede follow, routing and convoy writes"
+            );
+        }
     }
 }

@@ -731,3 +731,6 @@ pub fn remember_position(u: &mut Unit) {
         u.traffic_trail.remove(0);
     }
 }
+
+#[cfg(test)]
+mod tests;

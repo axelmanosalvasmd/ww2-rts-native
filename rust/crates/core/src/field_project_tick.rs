@@ -1,8 +1,6 @@
 //! Read-only admission for the shared-project phases in the caller's real tick.
 use super::{FieldWorksRuntime, FortKind, ProjectOrder, definitions, line_fort, position};
-use crate::{
-    economy::Mode, game::Game, grid::UnitId, match_commands::Command, match_runtime::Match,
-};
+use crate::{game::Game, grid::UnitId, match_commands::Command, match_runtime::Match};
 use std::collections::{BTreeMap, BTreeSet};
 
 const SAFE_INTEGER: i64 = 9_007_199_254_740_991;
@@ -131,10 +129,8 @@ impl Match {
     /// This reads only project-owned facts. It does not refresh sight, spend, recount or sort turns.
     /// Common terrain, combat and runner admission remain the caller's responsibility.
     pub fn validate_field_project_tick(&self, current_order: &[UnitId]) -> Result<(), String> {
-        if !matches!(self.options.mode, Mode::Default | Mode::Conquest)
-            || self.world.game.mode.is_some()
-        {
-            return Err("field-project tick supports ordinary Conquest only".into());
+        if !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode) {
+            return Err("field-project tick requires a matching ordinary mode".into());
         }
         let game = &self.world.game;
         if !(0..SAFE_INTEGER).contains(&game.tick) {
