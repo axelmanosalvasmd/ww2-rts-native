@@ -103,11 +103,16 @@ fn assert_start(messages: &[Value], role: usize, count: usize, loaded: bool) -> 
     }
     assert!(message["cells"].is_array());
     match role {
-        0 => assert!(message["fog"].is_array()),
+        0 => {
+            assert!(message["fog"]["v"].is_string());
+            assert!(message["fog"]["e"].is_string());
+        },
         1 => {
             assert_eq!(message["role"], "operative");
             assert_eq!(message["you"], 0);
             assert!(message["operative"].is_object());
+            assert!(message["fog"]["v"].is_string());
+            assert!(message["fog"]["e"].is_string());
         }
         2 => {
             assert_eq!(message["you"], 0);
