@@ -151,6 +151,21 @@ impl Match {
         }
         self.recompute_supply_network(unit_order)
     }
+    /// A zero beat freezes the existing network, as in the prototype test hook.
+    pub(crate) fn refresh_supply_network_on_beat(
+        &mut self,
+        unit_order: &[u32],
+        beat: u64,
+    ) -> Result<bool, String> {
+        if self.convoys.is_none()
+            || beat == 0
+            || !(self.world.game.tick as u64).is_multiple_of(beat)
+        {
+            return Ok(false);
+        }
+        self.refresh_supply_network(unit_order)?;
+        Ok(true)
+    }
     fn recompute_supply_network(&mut self, unit_order: &[u32]) -> Result<(), String> {
         self.validate_supply()?;
         let mut seen = std::collections::BTreeSet::new();
@@ -1114,3 +1129,7 @@ fn physical_handoff(
         )
         .expect("validated physical handoff")
 }
+
+#[cfg(test)]
+#[path = "movement_tick_network_tests.rs"]
+mod movement_tick_network_tests;

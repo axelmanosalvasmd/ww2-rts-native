@@ -232,3 +232,10 @@ mod mov_followup_garrison_tests;
 
 mod save_codec;
 mod save_state;
+
+#[cfg(test)]
+mod movement_tick_ground_tests;
+#[cfg(test)]
+mod movement_tick_privacy_tests;
+#[cfg(test)]
+mod movement_tick_speed_tests;

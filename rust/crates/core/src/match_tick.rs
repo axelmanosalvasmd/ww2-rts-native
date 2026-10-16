@@ -734,8 +734,11 @@ impl crate::match_runtime::Match {
             TickPhase::Reactions,
             TickPhase::TrafficKnowledge,
             TickPhase::Movement,
-            TickPhase::Firing,
         ]);
+        if self.options.mode != crate::economy::Mode::World {
+            phases.push(TickPhase::GroundEffects);
+        }
+        phases.push(TickPhase::Firing);
         if self.options.mode == crate::economy::Mode::World {
             phases.push(TickPhase::Production);
         }
@@ -859,12 +862,9 @@ impl crate::match_runtime::Match {
             self.apply_point_supply(&unit_order)?;
             phases.push(TickPhase::PointSupply);
         }
-        if self.convoys.is_some() {
-            let beat = crate::supply_network::SupplyRules::compiled()?.network_ticks;
-            if beat != 0 && (tick as u64).is_multiple_of(beat) {
-                self.refresh_supply_network(&unit_order)?;
-                phases.push(TickPhase::SupplyNetwork);
-            }
+        let beat = crate::supply_network::SupplyRules::compiled()?.network_ticks;
+        if self.refresh_supply_network_on_beat(&unit_order, beat)? {
+            phases.push(TickPhase::SupplyNetwork);
         }
         self.reinforce(&recovery, dt)?;
         phases.push(TickPhase::Reinforcement);
@@ -949,11 +949,7 @@ impl crate::match_runtime::Match {
                     TickPhase::SupplyNetwork,
                 ]
             } else {
-                vec![
-                    TickPhase::Production,
-                    TickPhase::Rail,
-                    TickPhase::GroundEffects,
-                ]
+                vec![TickPhase::Production, TickPhase::Rail]
             },
         })
     }

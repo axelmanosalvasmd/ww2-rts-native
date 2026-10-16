@@ -684,8 +684,8 @@ fn canonical_carriers_match_original_full_steps_and_arrival_order() {
                             "{name}: missing actual Riding receipt"
                         );
                         assert!(
-                            report.unavailable.contains(&TickPhase::GroundEffects),
-                            "{name}: excluded ground effects scope changed"
+                            !report.unavailable.contains(&TickPhase::GroundEffects),
+                            "{name}: ground-effects phase must be available"
                         );
                         assert_eq!(
                             report.commands.len(),
