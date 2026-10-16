@@ -40,6 +40,7 @@ mod commander_construction;
 mod commander_fortification;
 mod commander_forward_hq;
 pub mod commander_mind;
+mod commander_mirror;
 mod commander_shopping;
 pub mod commander_tactics;
 pub mod companion_ray;

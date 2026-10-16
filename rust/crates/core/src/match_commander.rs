@@ -1185,6 +1185,15 @@ impl Match {
                             crate::commander_tactics::UnitFacts {
                                 built: u.built.unwrap_or(1.0),
                                 hold_position: u.owner == owner && u.hold_pos,
+                                hold_fire: u.owner == owner && self.commands.units[&u.id].hold_fire,
+                                auto_cast: u.owner == owner && self.commands.units[&u.id].auto_cast,
+                                cooldown: if u.owner == owner {
+                                    self.abilities
+                                        .get(u.id)
+                                        .map_or(0.0, |a| math::max(0.0, a.cooldown.ceil()))
+                                } else {
+                                    0.0
+                                },
                                 queued_orders: if u.owner == owner {
                                     self.commands.units.get(&u.id).map_or(0, |c| c.orders.len())
                                 } else {

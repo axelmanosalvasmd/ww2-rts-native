@@ -286,6 +286,7 @@ impl Observation {
                 || context.units.iter().any(|(id, f)| {
                     *id == 0
                         || !f.built.is_finite()
+                        || !f.cooldown.is_finite()
                         || f.amove.is_some_and(|p| !finite_point(p))
                         || f.stock.as_ref().is_some_and(|r| {
                             !r.provisions.is_finite()
