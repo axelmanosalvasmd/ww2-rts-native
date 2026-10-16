@@ -1,0 +1,1 @@
+- Add 22 native FPS and table-consumer tests, with ownership triage for all 40 FPS rows and 28 pending interface rows. Keep the 10 client-only rows and incomplete room/interface behavior explicit, and withhold IF-05's non-trench pattern restriction for owner review. No runtime, parity status, wire, ABI or privacy rule changes.
