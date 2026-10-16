@@ -655,6 +655,7 @@ fn unsupported_reaction_actors_reject_before_clock_commands_or_timers() {
     for actor in [
         "garrison",
         "rail",
+        "noninfantry riding",
         "reverse riding",
         "idle suppression",
         "logistics",
@@ -676,6 +677,11 @@ fn unsupported_reaction_actors_reject_before_clock_commands_or_timers() {
                 unit.hp = 34.0;
             }
             "rail" => unit.kind = rail_kind,
+            "noninfantry riding" => {
+                unit.kind = m.rules.kind("tank").unwrap();
+                unit.riding = true;
+                m.combat.get_mut(id).unwrap().carrier = Some(900);
+            }
             "reverse riding" => m.combat.get_mut(id).unwrap().carrier = Some(900),
             "idle suppression" => unit.supp = -1.0,
             "logistics" => m.options.logistics = true,
@@ -741,6 +747,7 @@ fn unsupported_reaction_actors_reject_before_clock_commands_or_timers() {
                 "mode mismatch" | "unsupported mode" => {
                     "tick execution requires represented ordinary or World mode"
                 }
+                "noninfantry riding" => "unsupported riding tick actor",
                 "reverse riding" | "idle suppression" => "invalid canonical carrier unit",
                 _ => "unregistered World train",
             }),

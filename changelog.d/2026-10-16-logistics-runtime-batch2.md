@@ -1,0 +1,2 @@
+- Limit powered ground movement by carried fuel and debit actual travel. Add reviewed checks for five logistics rows, covering shortage recovery rates, upstream supply origins, allied relief accounting and cargo loss with delayed truck replacement. Terrain-targeted firing remains unimplemented, so LOG-05 and LOG-08 stay for a later batch.
+- Follow-up: measure the existing full-roster supply validation before enabling full-tick logistics.

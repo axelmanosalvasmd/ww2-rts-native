@@ -733,6 +733,136 @@ fn represented_recovery_phases_match_original_source() {
     assert_eq!(paid_halftrack_cases, 1);
 }
 
+fn log09_scene(units: Value) -> (Match, Vec<u32>) {
+    let (mut m, order) = make(&json!({
+        "map": {
+            "name":"Recovery rates", "w":30, "h":20,
+            "rows":vec![".".repeat(30);20],
+            "spawns":[{"x":0,"y":0},{"x":29,"y":19}],
+            "points":[{"x":15,"y":10}]
+        },
+        "logistics":true,
+        "units":units
+    }));
+    // A reachable unlimited source isolates base recovery from support affordability.
+    m.convoys.as_mut().unwrap().stores.push(Store {
+        id: StoreId::Source(0),
+        owner: 0,
+        at: Point { x: 15., z: 15. },
+        source: true,
+        entity: None,
+        capacity: Stock::default(),
+        buckets: Vec::new(),
+        donations: Vec::new(),
+        active: true,
+        support: false,
+        point: None,
+    });
+    (m, order)
+}
+
+#[test]
+fn log09_reinforcement_timer_scales_with_provisions_and_exhaustion() {
+    for (provisions, exhausted, rate) in [
+        (120., false, 1.),
+        (30., false, 1.),
+        (29., false, 0.5),
+        (0., false, 0.),
+        (120., true, 0.),
+    ] {
+        let (mut m, order) = log09_scene(json!([
+            {"id":1,"type":"hq","x":15,"z":15},
+            {"id":2,"type":"rifle","x":17,"z":15,"hp":20,
+             "logistics":{"ammo":285,"ammoMax":285,"provisions":provisions,"exhausted":exhausted}}
+        ]));
+        assert!(m.spend_support_provisions(2, 0, 5.).unwrap());
+        assert_eq!(m.logistics.get(2).unwrap().provisions, provisions);
+        let frame = m.prepare_recovery(&order).unwrap();
+        assert_eq!(frame.bases, [1]);
+        m.reinforce(&frame, 1.).unwrap();
+        assert_eq!(
+            m.recovery.get(2).unwrap().reinforcement,
+            rate,
+            "provisions={provisions}, exhausted={exhausted}"
+        );
+        assert_eq!(m.world.game.units[&2].hp, 20.);
+        assert_eq!(m.start.economy.players[0].mp, 100.);
+        if rate > 0. {
+            m.reinforce(&frame, 2. / rate - 1.).unwrap();
+            assert_eq!(m.world.game.units[&2].hp, 40.);
+            assert_eq!(m.recovery.get(2).unwrap().reinforcement, 0.);
+            assert_eq!(m.start.economy.players[0].mp, 90.);
+            assert_eq!(m.story[0].mp_spent, 10.);
+        }
+        assert_eq!(m.logistics.get(2).unwrap().provisions, provisions);
+    }
+}
+
+#[test]
+fn log09_base_vehicle_repair_scales_with_provisions_and_exhaustion() {
+    for (provisions, exhausted, repaired) in [
+        (120., false, 18.),
+        (30., false, 18.),
+        (29., false, 9.),
+        (0., false, 0.),
+        (120., true, 0.),
+    ] {
+        let (mut m, order) = log09_scene(json!([
+            {"id":1,"type":"hq","x":15,"z":15},
+            {"id":2,"type":"tank","x":17,"z":15,"hp":180,
+             "logistics":{"ammo":30,"ammoMax":30,"provisions":provisions,
+                          "fuel":180,"emergency":60,"exhausted":exhausted}}
+        ]));
+        assert!(m.spend_support_provisions(2, 0, 5.).unwrap());
+        assert_eq!(m.logistics.get(2).unwrap().provisions, provisions);
+        let frame = m.prepare_recovery(&order).unwrap();
+        assert_eq!(frame.bases, [1]);
+        m.reinforce(&frame, 1.).unwrap();
+        assert_eq!(
+            m.world.game.units[&2].hp,
+            180. + repaired,
+            "provisions={provisions}, exhausted={exhausted}"
+        );
+        assert_eq!(m.start.economy.players[0].mp, 100. - repaired * 0.5);
+        assert_eq!(m.story[0].mp_spent, repaired * 0.5);
+        assert_eq!(m.logistics.get(2).unwrap().provisions, provisions);
+    }
+}
+
+#[test]
+fn log09_medic_healing_multiplies_patient_and_medic_recovery_rates() {
+    for (patient, patient_exhausted, medic, medic_exhausted, healed) in [
+        (120., false, 120., false, 5.),
+        (30., false, 30., false, 5.),
+        (29., false, 120., false, 2.5),
+        (120., false, 29., false, 2.5),
+        (29., false, 29., false, 1.25),
+        (0., false, 120., false, 0.),
+        (120., false, 0., false, 0.),
+        (120., true, 120., false, 0.),
+        (120., false, 120., true, 0.),
+    ] {
+        let (mut m, order) = log09_scene(json!([
+            {"id":1,"type":"medic","x":15,"z":15,
+             "logistics":{"ammo":0,"ammoMax":0,"provisions":medic,"exhausted":medic_exhausted}},
+            {"id":2,"type":"rifle","x":17,"z":15,"hp":20,
+             "logistics":{"ammo":285,"ammoMax":285,"provisions":patient,"exhausted":patient_exhausted}}
+        ]));
+        // No recent wound, 80 missing HP, and positive medic stocks can fund more than 5 HP.
+        // In particular, the two 29-second reserves must multiply to quarter-rate healing.
+        assert_eq!(m.recovery.get(2).unwrap().wound_at, None);
+        assert!(medic == 0. || medic * 5. > 5.);
+        assert!(m.heal_wounded(&order, 1.).unwrap().is_empty());
+        assert_eq!(
+            m.world.game.units[&2].hp,
+            20. + healed,
+            "patient=({patient}, {patient_exhausted}), medic=({medic}, {medic_exhausted})"
+        );
+        assert_eq!(m.logistics.get(2).unwrap().provisions, patient);
+        assert_eq!(m.logistics.get(1).unwrap().provisions, medic - healed / 5.);
+    }
+}
+
 #[test]
 fn intent_mov78_halted_halftrack_reinforces_nearby_infantry_at_half_pace_and_charges() {
     let fixture: Value =
@@ -1087,4 +1217,55 @@ fn invalid_world_recovery_actor_rejects_before_health_wallet_or_metadata() {
         wallets
     );
     assert_eq!(m.recovery, metadata);
+}
+
+#[test]
+fn mode91_recovery_spending_tracks_actual_charges_and_freezes_after_finish() {
+    let fixture: Value =
+        serde_json::from_str(include_str!("../../tests/fixtures/match-recovery.json")).unwrap();
+    for name in [
+        "infantry-timer-modelheal-wallet-and-reset",
+        "vehicle-rate-wallet-provisions-and-insufficient-wallet",
+    ] {
+        let case = fixture["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|case| case["name"] == name)
+            .unwrap();
+        let (mut m, order) = make(case);
+        m.options.logistics = false;
+        m.convoys = None;
+        m.start.economy.players[0].mp = 500.0;
+        m.recovery.get_mut(2).unwrap().reinforcement = 10.0;
+        let wallet = m.start.economy.players[0].mp;
+        let hp = m.world.game.units[&2].hp;
+        let frame = m.prepare_recovery(&order).unwrap();
+        m.reinforce(&frame, 0.05).unwrap();
+        let spent = wallet - m.start.economy.players[0].mp;
+        assert!(spent > 0.0 && m.world.game.units[&2].hp > hp, "{name}");
+        assert!((m.story[0].mp_spent - spent).abs() < 1e-10, "{name}");
+        assert_eq!(m.story[1], PlayerStory::default());
+        assert_eq!(m.story[2], PlayerStory::default());
+        m.world.game.units.get_mut(&2).unwrap().hp = hp;
+        m.start.economy.players[0].mp = 0.0;
+        m.recovery.get_mut(2).unwrap().reinforcement = 10.0;
+        m.reinforce(&frame, 0.05).unwrap();
+        assert_eq!(m.world.game.units[&2].hp, hp);
+        assert_eq!(m.start.economy.players[0].mp, 0.0);
+        let story = m.story.clone();
+        m.finish = Some(crate::match_end::MatchFinish {
+            winner: 0,
+            reason: crate::match_end::EndReason::Headquarters,
+            end_at: Point { x: 15.0, z: 15.0 },
+            end_tick: m.world.game.tick,
+        });
+        m.start.economy.players[0].mp = 500.0;
+        m.reinforce(&frame, 0.05).unwrap();
+        assert!(m.start.economy.players[0].mp < 500.0, "{name}");
+        assert_eq!(
+            m.story, story,
+            "decided recovery leaves report counters frozen"
+        );
+    }
 }

@@ -142,10 +142,10 @@ fn intent_mov76_wreck_throws_rider_out_hurts_it_and_deep_water_drowns_it() {
     landed.combat.get_mut(2).unwrap().cargo.push(1);
     let before = landed.world.game.units[&1].hp;
     landed.world.game.units.get_mut(&2).unwrap().hp = 0.;
-    assert_eq!(
+    assert!(matches!(
         landed.apply_unit_riding(1, 0.05).unwrap(),
-        RidingOutcome::Ejected { killed: false }
-    );
+        RidingOutcome::Ejected(crate::environment::Hurt { killed: false, .. })
+    ));
     let rifle = Catalog::compiled().unwrap().unit("rifle").unwrap();
     let full = rifle.get("models").unwrap().number().unwrap()
         * rifle.get("hpPer").unwrap().number().unwrap();
@@ -162,10 +162,10 @@ fn intent_mov76_wreck_throws_rider_out_hurts_it_and_deep_water_drowns_it() {
     drowned.world.game.flags.fill(block);
     let far = drowned.world.game.flags.len() - 1;
     drowned.world.game.flags[far] = 0;
-    assert_eq!(
+    assert!(matches!(
         drowned.apply_unit_riding(1, 0.05).unwrap(),
-        RidingOutcome::Ejected { killed: true }
-    );
+        RidingOutcome::Ejected(crate::environment::Hurt { killed: true, .. })
+    ));
     assert_eq!(drowned.world.game.units[&1].hp, 0.);
     assert!(!drowned.world.game.units[&1].riding);
 }
@@ -624,10 +624,10 @@ fn invalid_or_unavailable_carrier_work_preserves_canonical_state() {
     m.carrier_board_command(0, &[1], Some(2), false).unwrap();
     m.apply_unit_boarding(1).unwrap();
     m.world.game.units.get_mut(&2).unwrap().hp = 0.;
-    assert_eq!(
+    assert!(matches!(
         m.apply_unit_riding(1, 0.05).unwrap(),
-        RidingOutcome::Ejected { killed: false }
-    );
+        RidingOutcome::Ejected(crate::environment::Hurt { killed: false, .. })
+        ));
     assert!(!m.world.game.units[&1].riding);
     assert!(m.combat.get(2).unwrap().cargo.is_empty());
 }

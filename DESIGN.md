@@ -10,6 +10,12 @@ Read current main before integration: it lacks ai_receipt_input and ai_delivered
 
 # Three Crossroads Native: design decisions
 
+## Typed scenario conditions and core refunds (2026-10-16)
+
+Scenario condition evaluation borrows typed authored state while reading current units, point owners and World region teams from Match. A caller supplies the context and shares an explicit work budget across evaluations. This keeps condition reads separate from scenario admission, trigger scheduling, actions and recipient projection. The evaluator follows the pinned condition semantics, including historical captures, pending arrivals, context fallback and short-circuit work charges. A 64-level guard protects callers that construct trees directly; validated authored trees remain below it.
+
+Waiting-job refunds prepare small production and wallet drafts before publishing the negative MP-spent tally. Site cancellation uses the existing World transaction before the wallet, story and metadata cleanup commit. These core operations add no network admission. Full MODE-91 remains held beyond the selected refund and recovery checks. MODE-83 proves the condition component, not an admitted authored-scenario match.
+
 
 ## Movement actors and review repairs (2026-10-16)
 

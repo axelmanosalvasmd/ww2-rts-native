@@ -590,17 +590,10 @@ impl crate::match_runtime::Match {
                 match self.apply_unit_riding(id, dt)? {
                     crate::match_carriers::RidingOutcome::Riding => continue,
                     crate::match_carriers::RidingOutcome::OnFoot => {}
-                    crate::match_carriers::RidingOutcome::Ejected { killed } => {
-                        let u = &self.world.game.units[&id];
+                    crate::match_carriers::RidingOutcome::Ejected(hurt) => {
+                        let killed = hurt.killed;
                         events.push(TickEvent::Environment(crate::environment::Effect::Hurt(
-                            crate::environment::Hurt {
-                                unit: id,
-                                owner: u.owner,
-                                at: u.at(),
-                                killed,
-                                from: None,
-                                local: false,
-                            },
+                            hurt,
                         )));
                         if killed {
                             continue;

@@ -58,6 +58,9 @@ impl Match {
                         return Err("inconsistent reciprocal riding tick relation".into());
                     }
                 }
+                // A command or an earlier combat phase may wreck a currently live
+                // carrier. Admit its passenger's eventual physical exit as well.
+                self.prepare_carrier_ejection(id)?;
                 let cd = self
                     .abilities
                     .get(id)
