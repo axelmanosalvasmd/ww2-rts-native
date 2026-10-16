@@ -632,7 +632,7 @@ fn mixed_aircraft_selections_preserve_canonical_supply_and_control_boundaries() 
             assert_eq!(m.aviation.planes[&1000].mission, None);
             assert_eq!(m.logistics.get(1002).unwrap(), &reserves);
             assert!(!m.commands.units[&1002].supply_hold);
-            assert!(m.commands.units[&1002].supply_escape);
+            assert!(!m.commands.units[&1002].supply_escape);
             assert!(!m.world.game.units[&1002].entrench);
             assert_eq!(m.field_works.membership(1002), None);
             assert!(!m.world.game.units[&1002].path.is_empty());
