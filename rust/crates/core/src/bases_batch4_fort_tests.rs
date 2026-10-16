@@ -174,14 +174,22 @@ fn base54_world_fort_ranks_are_confined_to_source_shares() {
             x: (definition.x as f64 + 0.5) * CELL,
             z: (definition.y as f64 + 0.5) * CELL,
         };
-        let home = m.start.players.iter().map(|p| p.spawn).min_by(|a, b| {
-            math::hypot(a.x - at.x, a.z - at.z)
-                .total_cmp(&math::hypot(b.x - at.x, b.z - at.z))
-        }).unwrap();
+        let home = m
+            .start
+            .players
+            .iter()
+            .map(|p| p.spawn)
+            .min_by(|a, b| {
+                math::hypot(a.x - at.x, a.z - at.z)
+                    .total_cmp(&math::hypot(b.x - at.x, b.z - at.z))
+            })
+            .unwrap();
         let face = math::atan2(home.z - at.z, home.x - at.x);
         let (fx, fz) = (math::cos(face), math::sin(face));
         let forts = fort_ids(&m, region);
-        let pillbox = forts.iter().map(|id| &m.world.game.units[id])
+        let pillbox = forts
+            .iter()
+            .map(|id| &m.world.game.units[id])
             .find(|u| m.rules.kinds[u.kind].name == "pillbox");
         let mut wall_sides = [0; 2];
         for id in forts {
@@ -193,9 +201,14 @@ fn base54_world_fort_ranks_are_confined_to_source_shares() {
                     has_box = true;
                     counts[0] += 1;
                     assert_eq!(fort.rot.to_bits(), face.to_bits());
-                    let target = Point { x: at.x + fx * 14.0, z: at.z + fz * 14.0 };
-                    assert!(math::hypot(fort.x - target.x, fort.z - target.z) < 2.0 * CELL,
-                        "Pillbox must be near the 14 m target toward its nearest home");
+                    let target = Point {
+                        x: at.x + fx * 14.0,
+                        z: at.z + fz * 14.0,
+                    };
+                    assert!(
+                        math::hypot(fort.x - target.x, fort.z - target.z) < 2.0 * CELL,
+                        "Pillbox must be near the 14 m target toward its nearest home"
+                    );
                 }
                 "tower" => {
                     assert!(rank < strong_limit);
@@ -210,7 +223,10 @@ fn base54_world_fort_ranks_are_confined_to_source_shares() {
                     let side = (fort.x - box_at.x) * -fz + (fort.z - box_at.z) * fx;
                     assert!(side.abs() > CELL);
                     wall_sides[usize::from(side > 0.0)] += 1;
-                    assert_eq!(fort.rot.to_bits(), (face + std::f64::consts::FRAC_PI_2).to_bits());
+                    assert_eq!(
+                        fort.rot.to_bits(),
+                        (face + std::f64::consts::FRAC_PI_2).to_bits()
+                    );
                 }
                 _ => unreachable!(),
             }
@@ -224,7 +240,10 @@ fn base54_world_fort_ranks_are_confined_to_source_shares() {
             ],
             "fort population at rank {rank}"
         );
-        assert_eq!(wall_sides, if rank < strong_limit { [4, 4] } else { [0, 0] });
+        assert_eq!(
+            wall_sides,
+            if rank < strong_limit { [4, 4] } else { [0, 0] }
+        );
         if has_box {
             pillbox_sites.push(rank);
         }
@@ -257,7 +276,12 @@ fn base54_capture_transfers_live_fort_owner_and_footprint_without_healing() {
     m.refresh_world_memory(0).unwrap();
     let remembered = &m.world_runtime.as_ref().unwrap().known_buildings;
     let our_team = remembered.iter().find(|(team, _)| *team == 0).unwrap();
-    assert!(our_team.1.iter().any(|row| forts.contains(&row.id) && row.owner == LOCAL_DEFENDER_OWNER));
+    assert!(
+        our_team
+            .1
+            .iter()
+            .any(|row| forts.contains(&row.id) && row.owner == LOCAL_DEFENDER_OWNER)
+    );
     let first = forts[0];
     m.world.game.units.get_mut(&first).unwrap().hp *= 0.5;
     let before = forts
@@ -403,6 +427,10 @@ fn base54_capture_saves_fort_before_the_previous_owner_is_eliminated() {
     assert!(m.start.economy.players[1].out);
     assert_eq!(m.world.game.units[&id].owner, 0);
     assert!(!result.removed.iter().any(|unit| unit.id == id));
+    assert_eq!(
+        m.finish.map(|finish| (finish.winner, finish.reason)),
+        Some((0, crate::match_end::EndReason::Nations))
+    );
 }
 
 #[test]

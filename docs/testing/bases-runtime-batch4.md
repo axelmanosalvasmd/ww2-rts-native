@@ -12,7 +12,8 @@ Capture stages a validated fort-owner map before army elimination and finish
 preparation. The transaction updates units and the spatial grid. Publication
 updates only matching retained footprint entries and currently visible remembered
 building owners. Missing footprint entries and replacement buildings are preserved.
-A fort captured from a player losing their last region survives that elimination.
+A fort captured from a player losing their last region survives that elimination
+and the resulting last-nation match finish.
 
 The six `base54_` tests cover ranks, current HP and sections, footprint/grid/memory
 owners, capture followed by ordinary World ticks, canonical Gate transfer,
@@ -26,3 +27,10 @@ reached an obstructed source: the route endpoint was 4 m from the source centre,
 and the existing convoy preflight returned `Unreachable`. Accepting a route to
 the source's accessible service edge is a differs candidate, not part of this PR.
 The exploratory home-selector code and tests were removed.
+
+Qualification is blocked by shared Cargo slot availability. The initial focused
+run passed two tests, failed two witness assertions (NaN structural equality and
+unprimed visible building memory), and left 20 tests unrun. Those witnesses are
+corrected here, but successor qualification ran no Cargo command after exhausting
+its slot retries. Focused tests, format check and Clippy remain pending on this
+candidate. No row is claimed proven and no PR was opened.
