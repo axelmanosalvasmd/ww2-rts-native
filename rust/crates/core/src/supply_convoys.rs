@@ -3,6 +3,11 @@
 //! Store positions are the reference's 40-tick synchronization cache, not authoritative unit
 //! positions. World supplies current unit facts and applies typed movement/spawn operations.
 //! This module does not own wallets, units, terrain, pathfinding or a network contract.
+#[cfg(test)]
+mod alert_tests;
+#[cfg(test)]
+mod manual_tests;
+
 use crate::{
     game::Point,
     grid::UnitId,
@@ -68,7 +73,7 @@ fn moved(from: &mut Stock, to: &mut Stock, limits: Stock) -> f64 {
     total
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
 pub enum StoreId {
     Source(u32),
     Cache(UnitId),
@@ -87,7 +92,7 @@ impl StoreId {
         }
     }
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Store {
     pub id: StoreId,
     pub owner: usize,
@@ -307,7 +312,7 @@ fn friendly(ctx: Context<'_>, a: usize, b: usize) -> bool {
         .zip(ctx.players.get(b))
         .is_some_and(|(a, b)| a.team == b.team)
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum TruckState {
     Idle,
     Collecting,
@@ -338,12 +343,12 @@ impl TruckState {
         }
     }
 }
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
 pub enum TargetId {
     Unit(UnitId),
     Store(StoreId),
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Target {
     pub id: TargetId,
     pub unit: Option<UnitId>,
@@ -355,13 +360,13 @@ pub struct Target {
     pub priority: Option<f64>,
     pub relief: Option<bool>,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Retry {
     pub key: (i64, i64),
     pub wait: f64,
     pub at: u64,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Truck {
     pub state: TruckState,
     pub cargo: Stock,
@@ -375,7 +380,7 @@ pub struct Truck {
     pub route_failure: Option<RouteFailure>,
     pub retry: Option<Retry>,
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum RouteFailure {
     Dangerous,
     Blocked,
@@ -419,7 +424,7 @@ pub trait World {
     fn retire(&mut self, id: UnitId);
     fn apply(&mut self, id: UnitId, operation: UnitOperation);
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Event {
     pub id: u64,
     pub owner: usize,
@@ -429,7 +434,7 @@ pub struct Event {
     pub message: String,
     pub seconds: f64,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Assignment {
     pub targets: Vec<TargetId>,
     pub target: usize,
@@ -438,7 +443,7 @@ pub struct Assignment {
     pub blocked: bool,
     pub no_stock: bool,
 }
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ConvoyState {
     pub stores: Vec<Store>,
     pub next_spawn: BTreeMap<usize, f64>,
@@ -761,7 +766,7 @@ impl ConvoyState {
                         .map(|s| (s.id.clone(), distance(s.at, host.at)))
                 })
                 .collect();
-            nearby.sort_by(|a, b| a.1.total_cmp(&b.1));
+            crate::sort::sort_by_ref(&mut nearby, |a, b| a.1 - b.1);
             for (id, _) in nearby {
                 let s = self.store_mut(&id).unwrap();
                 if s.source {
@@ -973,12 +978,8 @@ impl ConvoyState {
             .filter(|u| u.owner == Some(owner) && u.hp > 0.0 && reserves.get(u.id).is_some())
             .collect();
         let mut assigned = BTreeSet::new();
-        troops.sort_by(|a, b| {
-            reserves
-                .get(a.id)
-                .unwrap()
-                .provisions
-                .total_cmp(&reserves.get(b.id).unwrap().provisions)
+        crate::sort::sort_by(&mut troops, |a, b| {
+            reserves.get(a.id).unwrap().provisions - reserves.get(b.id).unwrap().provisions
         });
         let mut targets = vec![];
         for u in troops.clone() {
@@ -1057,10 +1058,8 @@ impl ConvoyState {
                 });
             }
         }
-        targets.sort_by(|a, b| {
-            a.priority
-                .unwrap_or(0.0)
-                .total_cmp(&b.priority.unwrap_or(0.0))
+        crate::sort::sort_by_ref(&mut targets, |a, b| {
+            a.priority.unwrap_or(f64::NAN) - b.priority.unwrap_or(f64::NAN)
         });
         troops.clear();
         targets
@@ -1095,7 +1094,7 @@ impl ConvoyState {
             }
             out.push((s.id.clone(), distance(s.at, target.at)));
         }
-        out.sort_by(|a, b| a.1.total_cmp(&b.1));
+        crate::sort::sort_by_ref(&mut out, |a, b| a.1 - b.1);
         out.into_iter().map(|r| r.0).collect()
     }
     #[allow(clippy::too_many_arguments)]
@@ -1205,7 +1204,9 @@ impl ConvoyState {
                     .iter()
                     .filter_map(|id| self.store(id).cloned())
                     .collect();
-                s.sort_by(|a, b| distance(a.at, u.at).total_cmp(&distance(b.at, u.at)));
+                crate::sort::sort_by_ref(&mut s, |a, b| {
+                    distance(a.at, u.at) - distance(b.at, u.at)
+                });
                 s.into_iter().next()
             });
         let Some(origin) = origin else {
@@ -1284,12 +1285,8 @@ impl ConvoyState {
                         && u.owner.is_some_and(|o| friendly(ctx, o, truck_owner))
                 })
                 .collect();
-            members.sort_by(|a, b| {
-                reserves
-                    .get(a.id)
-                    .unwrap()
-                    .provisions
-                    .total_cmp(&reserves.get(b.id).unwrap().provisions)
+            crate::sort::sort_by_ref(&mut members, |a, b| {
+                reserves.get(a.id).unwrap().provisions - reserves.get(b.id).unwrap().provisions
             });
             let mut served = false;
             for troop in &members {
@@ -1662,7 +1659,9 @@ impl ConvoyState {
                     .iter()
                     .filter_map(|id| self.store(id).cloned())
                     .collect();
-                sources.sort_by(|a, b| distance(a.at, u.at).total_cmp(&distance(b.at, u.at)));
+                crate::sort::sort_by_ref(&mut sources, |a, b| {
+                    distance(a.at, u.at) - distance(b.at, u.at)
+                });
                 if let Some(source) = sources.first() {
                     target = Some(source.at);
                     c.origin = source.id.clone();
@@ -2165,7 +2164,9 @@ impl ConvoyState {
                         .iter()
                         .filter_map(|id| self.store(id))
                         .collect();
-                    sources.sort_by(|a, b| distance(a.at, u.at).total_cmp(&distance(b.at, u.at)));
+                    crate::sort::sort_by_ref(&mut sources, |a, b| {
+                        distance(a.at, u.at) - distance(b.at, u.at)
+                    });
                     sources.first().map(|s| s.at)
                 } else {
                     rows.iter()
@@ -2362,3 +2363,6 @@ impl ConvoyState {
         })
     }
 }
+
+#[cfg(test)]
+mod if25_tests;

@@ -13,13 +13,14 @@ use crate::{
 use std::collections::{BTreeSet, VecDeque};
 
 /// Public dialogue and its map ping, returned by the tick that emits it.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct TutorialLine {
-    pub text: &'static str,
+    #[serde(deserialize_with = "crate::save_state::static_string")]
+    pub text: crate::save_state::StaticStr,
     pub at: Point,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct TutorialRuntime {
     enemy: usize,
     index: usize,
@@ -40,7 +41,7 @@ impl TutorialRuntime {
         &self.spawned
     }
 }
-const LINES: [[&str; 2]; 9] = [
+pub(crate) const LINES: [[&str; 2]; 9] = [
     [
         "Sgt. Hollis: Morning, Lieutenant. The glider pilot missed the field by two miles, so we walk.",
         "Drag a box over the boys to select them, then right-click to move. Hedgerow first.",
@@ -271,11 +272,10 @@ impl Match {
             }
         }
         let from = game.units[&id].at();
-        edges.sort_by(|&a, &b| {
+        crate::sort::sort_by(&mut edges, |a, b| {
             let a = tutorial_cell(game.w, a);
             let b = tutorial_cell(game.w, b);
-            math::hypot(a.x - from.x, a.z - from.z)
-                .total_cmp(&math::hypot(b.x - from.x, b.z - from.z))
+            math::hypot(a.x - from.x, a.z - from.z) - math::hypot(b.x - from.x, b.z - from.z)
         });
         let cell = *edges.first().ok_or("Tutorial house has no free edge")?;
         self.tutorial_order(id, tutorial_cell(game.w, cell), false)?;

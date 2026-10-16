@@ -433,11 +433,14 @@ impl Match {
             .map_err(|e| e.to_string())?;
         for row in staged {
             let id = row.unit.id;
-            self.world.game.units.insert(id, row.unit);
+            crate::unit_placement::place_unit(
+                &mut self.grid,
+                self.world.game.units.get_mut(&id).unwrap(),
+                |current| *current = row.unit,
+            );
             self.commands.units.insert(id, row.control);
             self.firing.units.insert(id, row.firing);
             *self.abilities.get_mut(id).unwrap() = row.ability;
-            self.grid.update(id, &self.world.game.units[&id]);
         }
         Ok(self.finish_project_selection(&mine, None))
     }

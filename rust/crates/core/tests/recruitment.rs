@@ -172,7 +172,7 @@ fn aborted_placement_and_invalid_inputs_never_charge() {
     }
     assert_eq!(w, original);
     let mut bad = c;
-    bad.mode.kind = Mode::Assault;
+    bad.mode.kind = Mode::Horde;
     assert!(matches!(
         state.prepare_recruit(&bad, &mut w, 0, Faction::Usa, "rifle", None),
         Err(Error::InvalidInput(_))

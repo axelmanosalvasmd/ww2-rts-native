@@ -12,7 +12,7 @@ use std::f64::consts::PI;
 pub type ProjectId = u64;
 const SAFE_INTEGER: u64 = 9_007_199_254_740_991;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ProjectMaterial {
     Fort(FortKind),
     Fill,
@@ -29,7 +29,7 @@ impl ProjectMaterial {
     }
 }
 /// Normalized recorded intent. Invalid fields survive parsing so source selection effects occur in order.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum ProjectOrder {
     New {
         pattern: Option<Pattern>,
@@ -43,7 +43,7 @@ pub enum ProjectOrder {
     },
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Project {
     pub id: ProjectId,
     pub owner: usize,
@@ -53,7 +53,7 @@ pub struct Project {
     pub active: i64,
     listed: bool,
 }
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub(super) struct ProjectState {
     pub(super) sequence: ProjectId,
     pub(super) records: BTreeMap<ProjectId, Project>,
@@ -429,7 +429,7 @@ impl FieldWorksRuntime {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Pattern {
     Line,
     Zigzag,
@@ -465,7 +465,7 @@ impl Pattern {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Segment {
     pub kind: FortKind,
     pub at: Point,
@@ -670,10 +670,13 @@ pub fn entrench_plan(
         .enumerate()
         .map(|(i, j)| (math::hypot(j.at.x - cx, j.at.z - cz), i, j))
         .collect();
-    keyed.sort_by(|a, b| {
-        a.0.partial_cmp(&b.0)
-            .expect("finite pattern distance")
-            .then(a.1.cmp(&b.1))
+    crate::sort::sort_by_ref(&mut keyed, |a, b| {
+        let difference = a.0 - b.0;
+        if difference == 0.0 || difference.is_nan() {
+            a.1 as f64 - b.1 as f64
+        } else {
+            difference
+        }
     });
     Ok(keyed.into_iter().map(|(_, _, j)| j).collect())
 }

@@ -6,7 +6,7 @@ use crate::{
     math,
 };
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum EndReason {
     VictoryPoints,
     Headquarters,
@@ -33,7 +33,7 @@ impl EndReason {
         }
     }
 }
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct MatchFinish {
     pub winner: i32,
     pub reason: EndReason,
@@ -42,7 +42,7 @@ pub struct MatchFinish {
 }
 /// Source `story.sample`: Conquest scores differ from other modes' objective/building counts.
 /// Team ID indexes each array, including zero-filled gaps. No transport tag is defined here.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum MatchSample {
     Conquest {
         t: f64,

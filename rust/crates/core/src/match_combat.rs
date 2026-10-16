@@ -4,7 +4,7 @@ use crate::{combat::DeathImpulse, grid::UnitId};
 use std::collections::BTreeMap;
 
 /// Metadata absent from Game's movement/query state. No health or position is stored here.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct UnitCombat {
     pub xp: f64,
     pub last_hit: Option<i32>,
@@ -32,7 +32,7 @@ impl Default for UnitCombat {
 }
 /// Dead shooter metadata can remain while a projectile still refers to its source XP.
 /// The firing producer explicitly releases retained IDs after its last flight expires.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct CombatState {
     units: BTreeMap<UnitId, UnitCombat>,
 }
@@ -243,7 +243,11 @@ impl DamageWorld<'_> {
         CombatContext {
             tick: self.world.game.tick as f64,
             mode: self.mode,
-            horde_defenders: 0,
+            horde_defenders: if self.mode == Mode::Horde {
+                self.world.game.players.len().saturating_sub(1) as u32
+            } else {
+                0
+            },
             allied: self.alliance(owner, target),
             tech_enabled: self.tech_enabled,
             attacker_tech: usize::try_from(owner)
@@ -400,11 +404,12 @@ impl DamageWorld<'_> {
                             .retain(|id| *id != rider);
                         self.combat.get_mut(rider).unwrap().carrier = None;
                         let u = self.world.game.units.get_mut(&rider).unwrap();
-                        u.riding = false;
-                        u.x = at.x;
-                        u.z = at.z;
-                        u.supp = math::max(u.supp, minimum_suppression);
-                        self.grid.update(rider, u);
+                        crate::unit_placement::place_unit(self.grid, u, |u| {
+                            u.riding = false;
+                            u.x = at.x;
+                            u.z = at.z;
+                            u.supp = math::max(u.supp, minimum_suppression);
+                        });
                     }
                 }
                 CombatEvent::LastHit { unit, owner } => {
@@ -605,7 +610,7 @@ pub(crate) fn absorb_environment_effect(
 }
 
 /// Source explosion values from a catalog weapon/support entry. No dynamic action JSON is accepted.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ExplosionSource {
     pub infantry: f64,
     pub vehicle: f64,
@@ -964,6 +969,17 @@ impl DamageWorld<'_> {
         } else {
             1.
         };
+        let shrug = shrug
+            * if self.mode == Mode::Annihilation
+                && self.rules.kinds[u.kind].name == "bunker"
+                && profile
+                    .weapon_kind
+                    .is_some_and(|kind| self.rules.kinds[kind].name == "howitzer")
+            {
+                number(cfg.get("assault").ok_or(CombatError::Rules)?, "howitzerMul")?
+            } else {
+                1.0
+            };
         let cover = if u.garrison.is_some() {
             profile
                 .anti_garrison
@@ -989,6 +1005,7 @@ impl DamageWorld<'_> {
         };
         let damage = base
             * shrug
+            * combat::bunker_mul(target.kind, context.mode, context.horde_defenders)?
             * fall
             * if combat::retreat_protected(target.retreat)? {
                 number(cfg, "retreatDamage")?
@@ -1212,15 +1229,14 @@ impl DamageWorld<'_> {
                             .map(|_| *c)
                     })
                     .collect::<Vec<_>>();
-                cells.sort_by(|a, b| {
+                crate::sort::sort_by(&mut cells, |a, b| {
                     let pos = |c: usize| Point {
                         x: (c % self.world.game.w) as f64 * 2. + 1.,
                         z: (c / self.world.game.w) as f64 * 2. + 1.,
                     };
-                    let a = pos(*a);
-                    let b = pos(*b);
-                    math::hypot(a.x - at.x, a.z - at.z)
-                        .total_cmp(&math::hypot(b.x - at.x, b.z - at.z))
+                    let a = pos(a);
+                    let b = pos(b);
+                    math::hypot(a.x - at.x, a.z - at.z) - math::hypot(b.x - at.x, b.z - at.z)
                 });
                 if let Some(&c) = cells.first() {
                     let skip_cells = BTreeSet::new();
@@ -1311,6 +1327,7 @@ impl crate::match_runtime::Match {
             .kill_bounty(
                 crate::economy_state::ModeContext {
                     kind: self.options.mode,
+                    income_excluded_slot: self.horde.as_ref().map(|h| h.slot),
                     ..Default::default()
                 },
                 self.actor_policy(unit.owner)
@@ -1392,6 +1409,8 @@ impl crate::match_runtime::Match {
             .filter(|id| self.world.game.units.contains_key(id))
             .collect::<Vec<_>>();
         self.validate_retirement_sidecars(&ordered)?;
+        self.validate_carrier_ejections(&ordered)
+            .map_err(|_| CombatError::InvalidInput("carrier ejection preflight"))?;
         for id in &ordered {
             let u = &self.world.game.units[id];
             if self.actor_policy(u.owner).is_err() || u.kind >= self.rules.kinds.len() {
@@ -1423,7 +1442,7 @@ impl crate::match_runtime::Match {
             || !self.aviation.planes.is_empty()
             || !self.aviation.anti_air.is_empty()
         {
-            self.validate_aviation()
+            self.validate_aviation_observation()
                 .map_err(|_| CombatError::InvalidInput("aircraft retirement registry"))?;
         }
         let mut wallets = self
@@ -1519,6 +1538,14 @@ impl crate::match_runtime::Match {
                 continue;
             };
             let metadata = self.combat.get(u.id).unwrap().clone();
+            if !metadata.cargo.is_empty() {
+                for effect in self
+                    .eject_carrier_riders(id)
+                    .map_err(|_| CombatError::InvalidInput("carrier ejection"))?
+                {
+                    emit(effect);
+                }
+            }
             let bounty = self.retirement_bounty(&u, metadata.last_hit)?;
             self.retire_unit_sidecars(&mut u)?;
             self.world.game.units.remove(&u.id);

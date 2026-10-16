@@ -10,6 +10,9 @@ use std::collections::BTreeMap;
 const BLOCKED: usize = usize::MAX;
 
 #[cfg(test)]
+#[path = "interface_navigation_order_tests.rs"]
+mod interface_navigation_order_tests;
+#[cfg(test)]
 #[path = "mov_audit_navigation_tests.rs"]
 mod mov_audit;
 const CARDINAL: [(isize, isize); 4] = [(-1, 0), (1, 0), (0, -1), (0, 1)];
@@ -26,7 +29,7 @@ const ALL: [(isize, isize); 8] = [
 ];
 
 /// The version selected by the movement mask, plus shared invalidation counters.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Versions {
     pub infantry: u64,
     pub vehicle: u64,
@@ -137,12 +140,25 @@ impl NavigationLeg<'_> {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct Navigation {
     graphs: BTreeMap<(u16, usize), Graph>,
 }
 
 impl Navigation {
+    /// Rebind cached graph identities after the owned terrain arrays move on load.
+    /// A graph for a detached terrain keeps an impossible identity and rebuilds
+    /// when it is next used.
+    pub(crate) fn relocate_save_storage(&mut self, bindings: &BTreeMap<usize, usize>) {
+        for graph in self.graphs.values_mut() {
+            let id = &mut graph.identity;
+            id.flags = bindings.get(&id.flags).copied().unwrap_or(0);
+            id.heights = id
+                .heights
+                .map(|old| bindings.get(&old).copied().unwrap_or(0));
+        }
+    }
+
     pub(crate) fn rebind_terrain(
         &mut self,
         source: TerrainView<'_>,
@@ -258,7 +274,7 @@ fn changes_since(view: TerrainView<'_>, from: u64) -> Option<Vec<usize>> {
     None
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 struct Identity {
     width: usize,
     height: usize,
@@ -293,14 +309,14 @@ impl Identity {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 struct Edge {
     region: usize,
     crossings: Vec<(usize, usize)>,
 }
 // Edges and incoming IDs preserve JavaScript Map/Set insertion order. Numeric
 // sorting here would change tied routes and incremental-update history.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 struct Region {
     x: f64,
     y: f64,
@@ -317,14 +333,14 @@ impl Region {
         }
     }
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 struct CachedRoute {
     start: usize,
     goal: usize,
     route: Option<Vec<usize>>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 struct Graph {
     identity: Identity,
     labels: Vec<usize>,

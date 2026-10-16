@@ -1,0 +1,4 @@
+- Keep socket pause and resume rejected through the existing UNAVAILABLE path, including for the host. Replace the NET-79 socket acceptance test with a rejection regression; retain the host-side pause APIs.
+- Publish AI seats as online with ping -1 through the existing roster fields. AI room admission remains closed.
+- Test core AI seat initialization and resets through ordinary ticks and recipient snapshots, and retain human drop expiry, reconnect and host API release coverage without an unused client binding.
+- Claim AI-19 and NET-66 only. Drop NET-79 because it needs owner approval to admit socket pause/resume ingress. NET-80 remains excluded pending live AI handover and the loaded-save contract.
