@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Record 15 passing MOV successor tests at 1a8abedc, including repaired MOV-57 and all 14 remaining row witnesses. Preserve the original failure and keep partial rows in progress pending prototype intent review.
+
 - Add the remaining 14 MOV native intent tests and mappings. Repair the MOV-57 test sequence through a new Move and real mover ticks, preserving its original failed result. The proposed 15-test successor remains unrun.
 
 - Record the first MOV native intent batch: 42 of 43 selected tests passed at 3a1728b5; the MOV-57 trail assertion failed. Keep all rows in progress pending complete intent review and preserve the failed result.

@@ -1,5 +1,9 @@
 # Three Crossroads Native: design decisions
 
+## Native MOV successor result at 1a8abedc (2026-10-16)
+
+One fresh Root-granted S2 nextest invocation selected repaired MOV-57 and the remaining fourteen tests on Rust tree `aeb64eb580740893592ef7ab610a317d06e1639a`: fifteen passed, zero failed, 195 tests skipped, exit 0. The forty-two first-window passing tests were excluded. Process and systemd terminal plus inherited S2 lock release were reported to Root before updating the row map. The normal log and result remain under `/tmp/native-feature-batches-0345-next/mov_impl/`; the first 42 PASS/one FAIL at `3a1728b5` remain intact. Across both distinct selections, 57 owned rows have a passing native witness and seven absent-actuator tests remain ignored. A passing partial witness still leaves the row in progress. Prototype intent review and Root's separate integration/status workflow remain pending.
+
 ## Native MOV remaining window and trail witness repair (2026-10-16)
 
 Preserve the first native batch at `3a1728b5` and its 42 PASS/one FAIL result. MOV-57's failed trail check kept the unit yielding, while both `traffic.rs:715` and pinned `shared/local-traffic.js:203` deliberately skip trail recording during a yield. The source repair first confirms that exclusion, issues a new ordinary Move through the canonical command API, then runs real mover ticks before checking the twenty-point trail cap. No production behavior changes. Overseer 03:23 permits this source repair; no new native result is claimed without a fresh exact-head grant.
