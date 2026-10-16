@@ -6,7 +6,7 @@ These files reserve contract topics; no protocol or ABI is approved by their cre
 
 | Document | Draft owner | Consumer reviewer | Status |
 | --- | --- | --- | --- |
-| protocol.md | Julio | Axel | v0 draft; technical answers recorded (#5); three security corrections pending |
+| protocol.md | Julio | Axel | v0 draft; technical answers recorded (#5); spectator reference behavior and cached flag mask clarified 2026-10-16 |
 | terrain.md | Julio | Axel | v0 draft; technical answers recorded (#5) |
 | [save-format.md](save-format.md) | Julio | Axel | Private JSON format v1; owner group I recorded in #5 comment 6217590741; implementation exact-head acknowledgement pending |
 | [sandbox.md](sandbox.md) | Julio | Axel | Prototype sandbox start, spawn and recipient rules under owner decisions M/N/P; implementation exact-head acknowledgement pending |

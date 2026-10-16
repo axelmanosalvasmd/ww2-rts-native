@@ -314,40 +314,48 @@ impl Match {
         Ok(true)
     }
 
-    /// Explicit core vision phase. This does not admit Horde to ordinary ticking or delivery.
+    /// Refresh the core vision component, including active-wave Horde markers.
+    /// Full Horde tick and recipient admission remain separate guarded paths.
     pub fn refresh_horde_visibility(&mut self) -> Result<(), String> {
         self.validate_horde_phase(0.0)?;
-        let horde = self.horde.as_ref().unwrap();
+        let h = self.horde.as_ref().ok_or("missing Horde state")?;
         let defender_team = self.world.game.players[0].team;
-        let few = horde.budget == 0.0 && horde.left <= number(cfg()?, "reveal")?;
+        let threshold = number(cfg()?, "reveal")?;
+        let few = h.budget == 0.0 && h.left <= threshold;
         let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
-        let mut revealed = Vec::new();
-        if horde.active {
-            for unit in self.world.game.units.values() {
-                if unit.owner == horde.slot
-                    && unit.air.is_none()
-                    && (few
-                        || catalog
-                            .unit(&self.rules.kinds[unit.kind].name)
-                            .map_err(|e| e.to_string())?
-                            .get("boss")
-                            .and_then(Value::boolean)
-                            .unwrap_or(false))
-                {
-                    revealed.push(unit.id);
-                }
+        let mut marked = Vec::new();
+        for u in self.world.game.units.values() {
+            let kind = self
+                .rules
+                .kinds
+                .get(u.kind)
+                .ok_or("invalid Horde vision unit kind")?;
+            let boss = catalog
+                .unit(&kind.name)
+                .map_err(|e| e.to_string())?
+                .get("boss")
+                .and_then(Value::boolean)
+                .unwrap_or(false);
+            if h.active && u.owner == h.slot && u.air.is_none() && (few || boss) {
+                marked.push(u.id);
             }
         }
         crate::vision::update_vision(&mut self.world.game, &self.rules, &self.grid);
         for player in &mut self.world.game.players {
             if player.team == defender_team {
-                player.visible.extend_from_slice(&revealed);
+                player.visible.extend_from_slice(&marked);
                 player.visible.sort_unstable();
                 player.visible.dedup();
             }
         }
         Ok(())
     }
+
+    /// Refresh the same guarded Horde vision phase used by combat visibility.
+    pub fn update_horde_vision(&mut self) -> Result<(), String> {
+        self.refresh_horde_visibility()
+    }
+
     pub(crate) fn validate_horde_economy(&self) -> Result<(), String> {
         self.validate_horde_phase(0.0)?;
         self.validate_match_finish_state()
@@ -391,8 +399,15 @@ impl Match {
     /// Explicit constructor for the Horde-owned wave phase. Generic `Match::new`
     /// and ordinary `advance_tick` retain their existing admission guards.
     pub fn new_horde(map: &AuthoritativeMap, mut options: MatchOptions) -> Result<Self, String> {
-        if options.mode != Mode::Horde || !(1..=5).contains(&options.players.len()) {
-            return Err("Horde needs Horde mode and one through five defenders".into());
+        if options.mode != Mode::Horde || !(1..=6).contains(&options.players.len()) {
+            return Err("Horde startup needs Horde mode and one through six players".into());
+        }
+        // createGame falls back before appending the Horde or changing teams/options.
+        if options.players.len() == 6 || map.defend().is_none_or(|d| d.is_empty()) {
+            options.mode = Mode::Conquest;
+            // createGame's logistics whitelist still uses the requested Horde mode.
+            options.logistics = false;
+            return Self::new(map, options);
         }
         let defend = map
             .defend()
@@ -481,6 +496,7 @@ impl Match {
         state.prepare_profile(1.0)?;
         result.horde = Some(state);
         result.complete_skirmish_start()?;
+        result.initialize_recipient_routing()?;
         Ok(result)
     }
     fn horde_income(&self) -> Result<f64, String> {
