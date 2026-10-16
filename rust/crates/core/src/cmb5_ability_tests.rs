@@ -270,6 +270,7 @@ fn cmb112_classic_and_world_charge_on_use_and_aimed_arrival() {
 #[test]
 fn cmb112_free_ordinary_abilities_survive_ticks_and_recipient_snapshots() {
     let mut m = scene(Mode::Conquest);
+    crate::cmb5_match_tests::prepare_finish(&mut m);
     let id = actor(&mut m, "mg");
     m.start.economy.players[0].mun = 0.;
     assert_eq!(
@@ -289,6 +290,7 @@ fn cmb112_free_ordinary_abilities_survive_ticks_and_recipient_snapshots() {
         assert_eq!(m.start.economy.players[0].mun, 0.);
         assert!(m.abilities.get(id).unwrap().buff > 0.);
     }
+    crate::cmb5_match_tests::through_finish(&mut m, |_, _| {});
 }
 
 #[test]

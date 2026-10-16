@@ -78,8 +78,13 @@ fn add(m: &mut Match, name: &str, owner: usize, at: Point) -> u32 {
     id
 }
 fn scene(teams: &[i32]) -> Match {
+    scene_mode(teams, Mode::Conquest)
+}
+fn scene_mode(teams: &[i32], mode: Mode) -> Match {
     let map = map();
-    let mut m = Match::new(&map, options(teams)).unwrap();
+    let mut opts = options(teams);
+    opts.mode = mode;
+    let mut m = Match::new(&map, opts).unwrap();
     let players = m.world.game.players.clone();
     m.world = World::from_map(&map).unwrap();
     m.world.game.players = players;
@@ -281,6 +286,7 @@ fn cmb127_bunkers_show_through_fog_and_survive_ordinary_ticks_and_recipient_snap
     let bunker = add(&mut m, "bunker", 1, at(175., 175.));
     let hidden = add(&mut m, "rifle", 1, at(170., 175.));
     rebuild(&mut m);
+    crate::cmb5_match_tests::prepare_finish(&mut m);
     m.initialize_recipient_routing().unwrap();
     m.initialize_tick_scene(200, Default::default()).unwrap();
     for _ in 0..6 {
@@ -288,7 +294,11 @@ fn cmb127_bunkers_show_through_fog_and_survive_ordinary_ticks_and_recipient_snap
         assert!(m.tick_state.fault().is_none());
         assert!(m.world.game.players[0].sees(bunker));
         assert!(!m.world.game.players[0].sees(hidden));
-        let projection = SnapshotCache::new(&m).unwrap().recipient(0).unwrap();
+        let cache = SnapshotCache::new(&m).unwrap();
+        for slot in 0..m.world.game.players.len() {
+            cache.recipient(slot).unwrap();
+        }
+        let projection = cache.recipient(0).unwrap();
         let ids: Vec<_> = projection.fields["units"]
             .as_array()
             .unwrap()
@@ -298,8 +308,110 @@ fn cmb127_bunkers_show_through_fog_and_survive_ordinary_ticks_and_recipient_snap
         assert!(ids.contains(&bunker));
         assert!(!ids.contains(&hidden));
     }
+    crate::cmb5_match_tests::through_finish(&mut m, |m, cache| {
+        let projection = cache.recipient(0).unwrap();
+        let units = projection.fields["units"].as_array().unwrap();
+        assert!(units.iter().any(|row| row[0] == bunker));
+        assert_eq!(
+            units.iter().any(|row| row[0] == hidden),
+            m.finish.is_some(),
+            "only the canonical match finish reveals the hidden enemy"
+        );
+        assert!(m.world.game.players[0].sees(bunker));
+    });
     // World bunkers need ordinary sight, just like buildings.
     m.world.game.mode = Some(ModeKind::World);
     update_vision(&mut m.world.game, &m.rules, &m.grid);
     assert!(!m.world.game.players[0].sees(bunker));
+}
+
+fn snapshots(m: &Match) -> Vec<serde_json::Value> {
+    let cache = SnapshotCache::new(m).unwrap();
+    (0..m.world.game.players.len())
+        .map(|slot| serde_json::Value::Object(cache.recipient(slot).unwrap().fields))
+        .collect()
+}
+
+#[test]
+fn cmb130_ordinary_building_memories_are_private_last_observed_facts_through_match_finish() {
+    for mode in [Mode::Default, Mode::Conquest] {
+        for teams in [[0, 1, 2], [0, 1, 0]] {
+            let mut m = scene_mode(&teams, mode);
+            let scout = add(&mut m, "rifle", 0, at(70., 70.));
+            add(&mut m, "rifle", 2, at(10., 170.));
+            let building = m.next_unit_id;
+            let cell = m.world.game.cell_of(80., 70.).unwrap();
+            let building_at = m.place_starting_building(1, "barracks", cell).unwrap();
+            let secret = m.next_unit_id;
+            let cell = m.world.game.cell_of(170., 170.).unwrap();
+            m.place_starting_building(1, "barracks", cell).unwrap();
+            m.world.game.units.get_mut(&building).unwrap().built = Some(0.25);
+            rebuild(&mut m);
+            m.initialize_recipient_routing().unwrap();
+            crate::cmb5_match_tests::prepare_finish(&mut m);
+            m.advance_tick().unwrap();
+            let observed = snapshots(&m);
+            assert!(
+                observed[0]["units"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|r| r[0] == building)
+            );
+            assert_eq!(observed[0]["ghosts"], json!([]));
+            assert!(
+                !observed[0]["units"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|r| r[0] == secret)
+            );
+            let expected = json!([[building, "barracks", 1, building_at.x, building_at.z, 0.3]]);
+            m.world.game.units.get_mut(&scout).unwrap().x = 5.;
+            m.world.game.units.get_mut(&scout).unwrap().z = 5.;
+            m.world.game.units.get_mut(&building).unwrap().built = Some(0.9);
+            rebuild(&mut m);
+            for _ in 0..4 {
+                m.advance_tick().unwrap();
+                snapshots(&m);
+                assert_eq!(m.tick_state.fault(), None);
+            }
+            let check = |m: &Match, cache: &SnapshotCache<'_>| {
+                for (slot, team) in teams.iter().enumerate() {
+                    let snap = cache.recipient(slot).unwrap();
+                    let ghosts = &snap.fields["ghosts"];
+                    if *team == 0 {
+                        assert_eq!(ghosts, &expected);
+                        let units = snap.fields["units"].as_array().unwrap();
+                        assert!(!units.iter().any(|r| r[0] == building));
+                        assert_eq!(
+                            units.iter().any(|r| r[0] == secret),
+                            m.finish.is_some(),
+                            "the unobserved building appears only after canonical match reveal"
+                        );
+                    } else {
+                        assert_eq!(ghosts, &json!([]));
+                    }
+                }
+                assert_eq!(m.tick_state.fault(), None);
+            };
+            check(&m, &SnapshotCache::new(&m).unwrap());
+            // Retirement happens under fog. No recipient learns the destruction until a revisit.
+            m.world.game.units.get_mut(&building).unwrap().hp = 0.;
+            crate::cmb5_match_tests::through_finish(&mut m, check);
+            assert!(!m.world.game.units.contains_key(&building));
+            assert_eq!(snapshots(&m)[0]["ghosts"], expected);
+            m.world.game.units.get_mut(&scout).unwrap().x = 70.;
+            m.world.game.units.get_mut(&scout).unwrap().z = 70.;
+            rebuild(&mut m);
+            for _ in 0..4 {
+                m.advance_tick().unwrap();
+                snapshots(&m);
+                assert_eq!(m.tick_state.fault(), None);
+            }
+            for snap in snapshots(&m) {
+                assert_eq!(snap["ghosts"], json!([]));
+            }
+        }
+    }
 }

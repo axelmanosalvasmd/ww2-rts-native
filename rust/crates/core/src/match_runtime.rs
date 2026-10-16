@@ -653,7 +653,7 @@ pub struct Match {
     pub environment: crate::environment::EnvironmentRuntime,
     pub companions: crate::companions::Companions,
     pub world_runtime: Option<crate::match_world::WorldRuntime>,
-    /// Team-shared last observed buildings, used only by the explicit Classic core phase.
+    /// Team-shared last observed buildings for ordinary rooms and the explicit Classic core phase.
     pub classic_known_buildings: crate::vision::BuildingMemory,
     pub world: World,
     pub start: StartPlan,

@@ -477,6 +477,16 @@ impl crate::match_runtime::Match {
                 self.refresh_world_visibility()?;
             } else {
                 vision::update_vision(&mut self.world.game, &self.rules, &self.grid);
+                if matches!(
+                    self.options.mode,
+                    crate::economy::Mode::Default | crate::economy::Mode::Conquest
+                ) {
+                    vision::refresh_building_memory(
+                        &self.world.game,
+                        &self.rules,
+                        &mut self.classic_known_buildings,
+                    );
+                }
             }
             phases.push(TickPhase::Vision);
         }

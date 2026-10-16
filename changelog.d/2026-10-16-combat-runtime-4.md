@@ -1,6 +1,6 @@
 - Add the prototype's 28 command-refusal sentences, including the wording for a full unit order queue.
-- Add Classic ability Munitions checks and shared remembered-building logic for Classic and World core components. Keep unsupported mode ticking and snapshot delivery guarded.
+- Add Classic ability Munitions checks and shared remembered-building logic for Classic and World core components. Use the existing six-field ghost snapshot rows to deliver last-observed team building facts in Default and Conquest. Keep unsupported mode ticking and snapshot delivery guarded.
 - Add the Horde core visibility override for final-wave enemies and Kaiju, while retaining the existing Horde runtime guard.
 - Dispatch core construction cancellation and waiting production refunds through their existing owners, and verify the existing rally, research and purchase paths. Add native checks for later ticks and recipient snapshots; public command admission stays unchanged.
-- Replace the old Classic ability rejection assertion with a check for mismatched mode tags. Complete combat scheduling, queued Build/Assist snapshots, house entry and transport dispatch remain for later work.
-- Verify five core combat rows with 14 focused native checks, formatting and strict workspace Clippy.
+- Replace the old Classic ability rejection assertion with a check for mismatched mode tags. Complete combat scheduling, house entry and transport dispatch remain for later work.
+- Extend the ability, base dispatch, research and bunker checks through an ordinary VP finish and ending hold, collecting every seat's snapshot on every tick. Add ordinary building-memory privacy checks through hidden changes, unseen destruction and a later revisit.

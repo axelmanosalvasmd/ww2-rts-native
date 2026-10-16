@@ -117,6 +117,7 @@ fn enqueue(m: &mut Match, tick: u64, sequence: u64, raw: Value) {
 #[test]
 fn cmb149_core_base_dispatch_survives_ticks_and_recipient_snapshots() {
     let mut m = scene(false);
+    crate::cmb5_match_tests::prepare_finish(&mut m);
     let crew = worker(&mut m);
     let maker = own(&m, 0, "barracks");
     let enemy = own(&m, 1, "hq");
@@ -184,6 +185,12 @@ fn cmb149_core_base_dispatch_survives_ticks_and_recipient_snapshots() {
     );
     enqueue(&mut m, 1, 2, json!({"t":"rally","x":44,"z":40}));
     let report = m.advance_tick().unwrap();
+    {
+        let cache = SnapshotCache::new(&m).unwrap();
+        for slot in 0..m.world.game.players.len() {
+            cache.recipient(slot).unwrap();
+        }
+    }
     assert!(report.commands.iter().all(|r| r.denial.is_none()));
     assert!(m.start.economy.players[0].mp >= 5000.0 - charged * 0.25);
     assert!(!m.world.game.units.contains_key(&site));
@@ -216,6 +223,7 @@ fn cmb149_core_base_dispatch_survives_ticks_and_recipient_snapshots() {
                 && r[2].as_f64() == Some(35.0)
                 && r[3].as_f64() == Some(40.0))
     );
+    crate::cmb5_match_tests::through_finish(&mut m, |_, _| {});
 }
 
 fn world() -> Match {
@@ -347,6 +355,7 @@ fn cmb149_world_waiting_job_cancellation_refunds_and_keeps_core_ticks_live() {
 #[test]
 fn cmb149_research_dispatch_charges_and_keeps_lab_visible_during_ticks() {
     let mut m = scene(true);
+    crate::cmb5_match_tests::prepare_finish(&mut m);
     m.start.economy.players[0].mp = 5000.0;
     let spending = m.story[0].mp_spent;
     assert_eq!(dispatch(&mut m, 0, json!({"t":"tech","kind":"tier"})), None);
@@ -370,4 +379,5 @@ fn cmb149_research_dispatch_charges_and_keeps_lab_visible_during_ticks() {
     }
     assert!(m.production.player(0).unwrap().jobs()[0].progress > 0.0);
     assert_eq!(m.tick_state.fault(), None);
+    crate::cmb5_match_tests::through_finish(&mut m, |_, _| {});
 }

@@ -177,6 +177,8 @@ mod cmb5_ability_tests;
 #[cfg(test)]
 mod cmb5_base_dispatch_tests;
 #[cfg(test)]
+mod cmb5_match_tests;
+#[cfg(test)]
 mod combat_feature_tests;
 
 #[cfg(test)]

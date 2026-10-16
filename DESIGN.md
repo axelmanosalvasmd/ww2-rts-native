@@ -4875,3 +4875,9 @@ prototype's `Object.hasOwn(unitTypes, v)` and `unitTypes[v]` coerce that array t
 the property name `"rifle"`. This stricter choice rejects malformed schema values
 instead of carrying JavaScript property-key coercion into the native validator.
 It does not admit or execute general authored scenarios.
+
+## Ordinary recipient building memory (CMB-130 and CMB-127, 2026-10-16)
+
+Default and Conquest matches refresh the shared team building memory after the ordinary vision pass. This carries the prototype's construction-mode memory intent into rooms with an admitted tick and recipient path. The existing Classic component and World memory phase stay separate; Classic and Horde ticks and non-ordinary recipient snapshots remain guarded.
+
+The recipient adapter reuses the prototype's existing `ghosts` encoding: `[id, type, owner, x, z, built]`. It selects only the recipient team's remembered facts and omits currently seen buildings. Hidden health, production and construction updates are never read into these rows. Unseen destruction retains the last observation until the team revisits the empty location. No ABI, wire shape, contract or public command admission changes. Native tests cover independent teams and allied sharing in both ordinary modes, including retirement, VP finish and later revisit. Ability, base dispatch, research and bunker checks also continue through VP finish and the ending hold, with every seat's snapshot collected on every tick.
