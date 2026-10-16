@@ -2485,3 +2485,10 @@ mod runtime_batch3;
 #[cfg(test)]
 #[path = "audit_combat_damage.rs"]
 mod audit_damage;
+#[cfg(test)]
+#[path = "audit_combat_native.rs"]
+mod audit_native;
+
+#[cfg(test)]
+#[path = "map_feature_tests.rs"]
+mod map_feature_tests;
