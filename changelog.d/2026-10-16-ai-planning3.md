@@ -3,3 +3,4 @@
 - Remove the obsolete queued-aircraft attachment refusal after integrating aviation delivery. The Horde projectile lifecycle keeps all assertions and drops its call to the removed aircraft weapon restriction method. Replace the queued-aircraft binding refusal test with successful binding and every-seat tick delivery.
 - Keep ordinary firing valid while an aimed ability is approaching its target, matching the prototype, instead of faulting the match on the pending ability flag.
 - Let bound Classic rooms queue and complete aircraft after aviation receiver integration. Replace the aircraft purchase/training refusal test with paid-once publication and recipient ticks, while retaining placement and future-birth validation.
+- Give the retained-flight refusal fixture a valid ground launch cell before injecting malformed velocity; preserve its exact wire and atomic-refusal assertions.
