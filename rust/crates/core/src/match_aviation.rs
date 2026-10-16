@@ -218,6 +218,20 @@ impl Match {
                 {
                     return Err(AviationError::Invalid("invalid sortie metadata"));
                 }
+                if a.mission
+                    .is_some_and(|mission| mission.kind == MissionKind::Area)
+                    && !catalog()?
+                        .unit(&self.rules.kinds[u.kind].name)
+                        .map_err(|e| AviationError::Actuation(e.to_string()))?
+                        .get("w")
+                        .and_then(|w| w.get("salvo"))
+                        .and_then(Value::boolean)
+                        .unwrap_or(false)
+                {
+                    return Err(AviationError::Invalid(
+                        "area mission requires a bomber salvo",
+                    ));
+                }
             } else if self.rules.kinds[u.kind].air {
                 return Err(AviationError::Invalid("missing aircraft physical state"));
             }
