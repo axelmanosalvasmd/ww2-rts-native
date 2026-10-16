@@ -532,6 +532,7 @@ fn mixed_aircraft_selections_preserve_canonical_supply_and_control_boundaries() 
         }
         m.commands.units.get_mut(&1002).unwrap().supply_hold = true;
         let before = command_snapshot(&m);
+        let prior_mission = m.aviation.planes[&1000].mission;
         let reserves = m.logistics.get(1002).unwrap().clone();
         let command = Command::from_json(raw).unwrap();
         let denial = m.execute_command(0, &command, false).unwrap();
@@ -629,7 +630,7 @@ fn mixed_aircraft_selections_preserve_canonical_supply_and_control_boundaries() 
         } else if index == 4 {
             assert_eq!(denial, None, "mixed retreat");
             assert_eq!(m.world.game.units[&1000].air, Some(PlaneState::Home));
-            assert_eq!(m.aviation.planes[&1000].mission, None);
+            assert_eq!(m.aviation.planes[&1000].mission, prior_mission);
             assert_eq!(m.logistics.get(1002).unwrap(), &reserves);
             assert!(!m.commands.units[&1002].supply_hold);
             assert!(!m.commands.units[&1002].supply_escape);
