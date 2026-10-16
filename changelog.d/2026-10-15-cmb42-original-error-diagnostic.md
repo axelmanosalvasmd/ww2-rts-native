@@ -1,0 +1,1 @@
+- Add a bounded original-error diagnostic before the CMB42 recorder serializes its full failure packet. Keep full captures and scene expectations unchanged; the new diagnostic has not run. The 8484936e serialization failure still leaves the original scene error unknown.

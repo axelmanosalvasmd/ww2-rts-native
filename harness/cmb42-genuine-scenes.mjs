@@ -337,6 +337,22 @@ export async function recordCmb42Genuine({reference,pin,clean}){
    retained(stable,true);receipt('scene-complete',{bindings,totalTicks:g.tick});
    cases.push({name,sharedInput:{map:arena,names:['A','B'],teams:[0,1],factions:[0,1],layout:[0,1],shuffle:false,options,seed:701,inputs},observedLayout,bindings,records,random:{algorithm:'splitmix64-global-source-input',seed:701,draws:random.draws,environment:random.environment,finalState:random.state()}});
   }catch(error){
+   // Keep the original error if the full failure packet cannot be serialized.
+   try{
+    const bounded=(value,limit)=>typeof value==='string'?value.slice(0,limit):null;
+    const scalar=value=>typeof value==='number'&&Number.isFinite(value)?value:null;
+    const lastRecord=records.at(-1),lastInput=inputs.at(-1);
+    writeFileSync(resolve(output,'original-error-diagnostic.json'),JSON.stringify({
+     reference:bounded(pin,64),name:bounded(name,128),
+     lastRecordedPhase:bounded(lastRecord?.phase,128),lastRecordedTick:scalar(lastRecord?.tick),
+     lastRecordIndex:scalar(lastRecord?.index),lastInputTick:scalar(lastInput?.tick),
+     recordCount:records.length,inputCount:inputs.length,completedCaseCount:cases.length,
+     observationCount:observations.length,globalDrawCount:random.draws.length,environmentDrawCount:random.environment.length,
+     error:{name:bounded(error?.name,128),message:bounded(error?.message,2048),stack:bounded(error?.stack,8192)}
+    })+'\n',{flag:'wx'});
+   }catch{
+    // A diagnostic write failure must still reach the original full packet path.
+   }
    writeFileSync(failureFile,JSON.stringify({reference:pin,name,inputs,bindings,records,random:{draws:random.draws,environment:random.environment,state:random.state()},completedCases:cases,observations,error:{message:error.message,stack:error.stack}})+'\n',{flag:'wx'});
    throw error;
   }finally{Math.random=saved;sim.__cmb42SetEnvironmentObserver(undefined);sim.__cmb42SetLayoutObserver(undefined);sim.__cmb42SetGlobalObserver(undefined);}
