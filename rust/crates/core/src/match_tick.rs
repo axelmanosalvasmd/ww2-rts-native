@@ -58,7 +58,7 @@ pub enum TickPhase {
 
 /// Persistent simulation state, never wall-clock state. A phase failure poisons
 /// the runner because some earlier canonical phases may already have committed.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct TickPathConfig {
     pub budget: usize,
     pub retry_limit: u32,
@@ -80,7 +80,7 @@ impl TickPathConfig {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct TickState {
     pub(crate) fault: Option<String>,
     started: bool,
@@ -104,7 +104,7 @@ impl TickState {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum TickEvent {
     Firing(crate::match_firing::LaunchEvent),
     Support(crate::match_support::SupportEvent),

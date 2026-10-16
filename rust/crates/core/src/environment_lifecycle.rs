@@ -7,7 +7,7 @@ use crate::{
 };
 
 /// Wreck query position and obstruction cell stay in `Game::wrecks`.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct WreckMetadata {
     pub kind: usize,
     pub owner: usize,

@@ -27,7 +27,7 @@ const FOG_BLOCK: i64 = 3;
 const CLOSE: f64 = 6.0;
 
 /// Tables over the terrain for the fog pass, rebuilt when the terrain changes (`g.fogTerrain`).
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FogTerrain {
     /// The `Game::terrain_version` these tables describe.
     pub version: u32,
@@ -182,7 +182,7 @@ fn smokes_near<'g>(g: &'g Game, u: &Unit, reach: f64) -> Vec<&'g Smoke> {
 
 /// A ground source standing still keeps the cells it saw, until it moves, its range changes, sight changes
 /// in its box or the smoke clouds near it change (`g.fogSources`).
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct KeptSource {
     pub x: f64,
     pub z: f64,
@@ -191,7 +191,7 @@ pub struct KeptSource {
     pub seen: Option<KeptCells>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct KeptCells {
     /// The cells it saw, in row order.
     pub cells: Vec<u32>,
@@ -206,7 +206,7 @@ pub struct KeptCells {
 }
 
 /// One team's fog (`g.fog.get(team)`).
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct TeamFog {
     /// The vision pass this fog follows (`g.visionTick ?? -1`); `None` before the first.
     pub key: Option<i64>,
@@ -295,7 +295,7 @@ fn put_run(codes: &mut String, mut v: usize) {
 }
 
 /// The fog caches: terrain tables, kept sources and every team's fog.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Fog {
     pub terrain: Option<FogTerrain>,
     pub kept: BTreeMap<UnitId, KeptSource>,
