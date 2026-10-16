@@ -20,6 +20,8 @@ mod delivery;
 mod engineering;
 #[path = "recipient_snapshot/falling.rs"]
 mod falling;
+#[path = "recipient_snapshot/logistics.rs"]
+mod logistics;
 #[path = "recipient_snapshot/owners.rs"]
 mod owners;
 #[path = "recipient_snapshot/public_state.rs"]
@@ -204,6 +206,9 @@ impl<'a> SnapshotCache<'a> {
         fields.extend(self.owners[slot].clone());
         fields.extend(self.public[slot].clone());
         fields.insert("falling".into(), falling::project(self.state, slot)?);
+        if let Some(logistics) = logistics::project(self.state, slot)? {
+            fields.insert("logistics".into(), logistics);
+        }
         Ok(RecipientProjection {
             fields,
             missing: vec![
@@ -212,7 +217,6 @@ impl<'a> SnapshotCache<'a> {
                 SnapshotCapability::Fog,
                 SnapshotCapability::ShotsAndFlights,
                 SnapshotCapability::TeamEffects,
-                SnapshotCapability::Logistics,
             ],
         })
     }

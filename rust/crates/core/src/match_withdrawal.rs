@@ -14,7 +14,7 @@ fn distance(a: Point, b: Point) -> f64 {
 
 impl Match {
     /// Call after this live unit's reserves advance and before its movement turn.
-    /// Cancel work through its canonical owners before selecting an escape route.
+    /// Construction, digging and projects cancel through their canonical owners.
     pub fn advance_supply_withdrawal(&mut self, id: u32) -> Result<(), String> {
         let mut unit = self
             .world
@@ -73,10 +73,10 @@ impl Match {
             return Err("invalid withdrawal metadata".into());
         }
         crate::match_construction::validate_build_activity(&unit, control)?;
-        if unit.entrench != self.field_works.membership(id).is_some()
-            || unit.dig != self.field_works.is_active(id)
+        if unit.dig != self.field_works.is_active(id)
+            || unit.entrench != self.field_works.membership(id).is_some()
         {
-            return Err("inconsistent withdrawal field work".into());
+            return Err("inconsistent withdrawal work state".into());
         }
         let stores = self.convoys.as_ref().map(|c| &c.stores);
         if stores.is_some_and(|stores| {
@@ -143,8 +143,6 @@ impl Match {
                 &mut unit,
                 self.commands.units.get_mut(&id).unwrap(),
             )?;
-            unit.build = false;
-            unit.entrench = false;
             unit.board = 0;
             unit.attack = false;
             let c = self.commands.units.get_mut(&id).unwrap();

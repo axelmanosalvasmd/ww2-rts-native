@@ -310,8 +310,14 @@ impl crate::match_runtime::Match {
         if self.options.mode == crate::economy::Mode::Tutorial {
             self.validate_tutorial_state()?;
         }
-        if self.options.logistics || self.convoys.is_some() {
-            return Err("reserve and convoy tick phases are not connected".into());
+        if world && (self.options.logistics || self.convoys.is_some()) {
+            return Err("World logistics tick phases are not connected".into());
+        }
+        if !world && self.options.logistics != self.convoys.is_some() {
+            return Err("logistics requires initialized convoy state".into());
+        }
+        if !world && self.options.logistics {
+            self.validate_supply()?;
         }
         self.preflight_legacy_scenario()?;
         self.tick_state.paths.validate()?;
@@ -692,6 +698,13 @@ impl crate::match_runtime::Match {
             if let Some(result) = self.move_unit_with_command_routes(id, factor)? {
                 moved.push(result);
             }
+            if let Some(reserves) = self.logistics.get_mut(id).filter(|r| r.forced) {
+                let unit = self.world.game.units.get_mut(&id).expect("current unit");
+                if !unit.path.is_empty() && !self.commands.units[&id].supply_hold {
+                    reserves.stranded = unit.stuck > 1.0;
+                    unit.retreating = !reserves.stranded;
+                }
+            }
             self.apply_moved_ground_contact_emitting(id, before, before_dust, &mut |effect| {
                 events.push(TickEvent::Environment(effect));
             })?;
@@ -846,9 +859,9 @@ impl crate::match_runtime::Match {
             self.apply_point_supply(&unit_order)?;
             phases.push(TickPhase::PointSupply);
         }
-        if self.options.logistics {
+        if self.convoys.is_some() {
             let beat = crate::supply_network::SupplyRules::compiled()?.network_ticks;
-            if beat > 0 && (tick as u64).is_multiple_of(beat) {
+            if beat != 0 && (tick as u64).is_multiple_of(beat) {
                 self.refresh_supply_network(&unit_order)?;
                 phases.push(TickPhase::SupplyNetwork);
             }
@@ -877,7 +890,7 @@ impl crate::match_runtime::Match {
             }
             self.apply_point_capture_income(&unit_order)?;
             phases.push(TickPhase::PointCaptureIncome);
-            if self.options.logistics {
+            if self.convoys.is_some() {
                 self.step_supply_convoys(self.finish.is_some())?;
                 phases.push(TickPhase::Convoys);
             }
@@ -937,12 +950,9 @@ impl crate::match_runtime::Match {
                 ]
             } else {
                 vec![
-                    TickPhase::UnitReserves,
                     TickPhase::Production,
                     TickPhase::Rail,
                     TickPhase::GroundEffects,
-                    TickPhase::SupplyNetwork,
-                    TickPhase::Convoys,
                 ]
             },
         })
@@ -996,6 +1006,7 @@ impl crate::match_runtime::Match {
             .collect::<Vec<_>>();
         self.retire_rail_links(&removed_ids);
         for record in &progress.removed {
+            self.record_convoy_death(&record.unit)?;
             self.companion_died(record.unit.id)?;
             progress.companions_notified += 1;
             let kind = self.rules.kinds[record.unit.kind].name.clone();

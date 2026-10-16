@@ -4,6 +4,8 @@ mod batch5_tests;
 #[cfg(test)]
 mod causal_tests;
 #[cfg(test)]
+mod full_tick_tests;
+#[cfg(test)]
 mod runtime_tests;
 
 use crate::{
@@ -63,6 +65,22 @@ fn facts<'a>(u: &Unit, rules: &'a Rules) -> UnitFacts<'a> {
         riding: u.riding,
     }
 }
+pub(crate) fn initial_unit_reserves(
+    enabled: bool,
+    unit: &Unit,
+    rules: &Rules,
+) -> Result<Option<logistics::Reserves>, String> {
+    let definition =
+        Definition::from_catalog(&rules.kinds[unit.kind].name).map_err(|e| e.to_string())?;
+    let mut prepared = logistics::LogisticsState::default();
+    prepared.initialize_unit(
+        reserve_context(enabled),
+        facts(unit, rules),
+        Some(&definition),
+    );
+    Ok(prepared.remove(unit.id))
+}
+
 impl Match {
     #[cfg(test)]
     pub(crate) fn test_supply_truck(&mut self, owner: usize) -> u32 {
@@ -124,15 +142,7 @@ impl Match {
         {
             return Err("invalid new reserve identity".into());
         }
-        let definition = Definition::from_catalog(&self.rules.kinds[unit.kind].name)
-            .map_err(|e| e.to_string())?;
-        let mut prepared = logistics::LogisticsState::default();
-        prepared.initialize_unit(
-            reserve_context(self.options.logistics),
-            facts(unit, &self.rules),
-            Some(&definition),
-        );
-        Ok(prepared.remove(unit.id))
+        initial_unit_reserves(self.options.logistics, unit, &self.rules)
     }
     /// The source network runs on its own early-phase beat, using the tick's captured ordered list.
     pub fn refresh_supply_network(&mut self, unit_order: &[u32]) -> Result<(), String> {
@@ -185,27 +195,6 @@ impl Match {
             self.options.mode,
         )?;
         Ok(())
-    }
-    /// Read the same reserve transition before admitting a garrison's withdrawal exit.
-    pub(crate) fn unit_will_force_withdrawal(&self, id: u32) -> bool {
-        let Some(unit) = self.world.game.units.get(&id) else {
-            return false;
-        };
-        let Some(reserve) = self.logistics.get(id) else {
-            return false;
-        };
-        if !self.options.logistics || unit.riding {
-            return false;
-        }
-        let mut next = logistics::LogisticsState::default();
-        next.insert(id, reserve.clone());
-        next.tick_reserves(
-            reserve_context(true),
-            facts(unit, &self.rules),
-            self.rules.movement.tick,
-            0.0,
-        );
-        next.get(id).is_some_and(|r| r.forced)
     }
     /// Reserve time is charged before movement. Driving fuel is charged separately from actual powered travel.
     pub fn advance_unit_reserves(&mut self, id: u32) -> Result<(), String> {
@@ -392,7 +381,11 @@ impl Match {
         self.validate_supply_context()
     }
     fn validate_supply_context(&self) -> Result<(), String> {
-        if !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode) {
+        if !matches!(
+            self.options.mode,
+            crate::economy::Mode::Default | crate::economy::Mode::Conquest
+        ) || self.world.game.mode.is_some()
+        {
             return Err("supply adapter supports ordinary Conquest only".into());
         }
         let g = &self.world.game;
@@ -516,7 +509,7 @@ impl Match {
             queued_points(
                 &self.commands.units[&u.id],
                 u.id,
-                self.rules.kinds[u.kind].name == "truck",
+                self.rules.kinds[u.kind].name != "truck",
             )?;
             let c = self.combat.get(u.id).unwrap();
             if u.riding != c.carrier.is_some()
@@ -719,7 +712,7 @@ impl ConvoyWorld<'_> {
             riding: c.carrier,
             path: u.path.clone(),
             world_goal: u.world_goal,
-            orders: queued_points(&self.commands.units[&u.id], u.id, name == "truck")
+            orders: queued_points(&self.commands.units[&u.id], u.id, name != "truck")
                 .expect("validated queued convoy commands"),
             orders_pending: !self.commands.units[&u.id].orders.is_empty(),
             amove: u.amove,
@@ -850,7 +843,7 @@ impl supply_convoys::World for ConvoyWorld<'_> {
                 (
                     u.at(),
                     self.rules.kinds[u.kind].radius,
-                    self.rules.kinds[u.kind].name == "truck",
+                    self.rules.kinds[u.kind].name != "truck",
                 )
             })
             .collect::<Vec<_>>();
@@ -971,13 +964,20 @@ impl supply_convoys::World for ConvoyWorld<'_> {
     }
 }
 
-fn queued_points(control: &UnitControl, id: u32, truck: bool) -> Result<Vec<Point>, String> {
-    // Only trucks price queued movement. Troop jobs read orders_pending instead;
-    // their canonical queue can also contain construction, attack and field work.
-    if !truck {
+fn queued_points(control: &UnitControl, id: u32, non_truck: bool) -> Result<Vec<Point>, String> {
+    use crate::match_commands::Command;
+    // Only manual truck interception reads queued waypoint geometry. Other
+    // actors retain their own typed queues and need only orders_pending here.
+    if non_truck {
+        if control
+            .orders
+            .iter()
+            .any(|c| matches!(c, Command::Unsupported))
+        {
+            return Err("unsupported queued supply command".into());
+        }
         return Ok(Vec::new());
     }
-    use crate::match_commands::Command;
     let mut points = Vec::new();
     for command in &control.orders {
         match command {
