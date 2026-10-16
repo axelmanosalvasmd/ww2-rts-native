@@ -49,6 +49,12 @@ mod human_commander_state;
 mod human_commander_timing;
 #[path = "../interface_intent.rs"]
 mod interface_intent;
+#[path = "../interface_map_helpers.rs"]
+mod interface_map_helpers;
+#[path = "../interface_sort_intent.rs"]
+mod interface_sort_intent;
+#[path = "../recipient_availability.rs"]
+mod recipient_availability;
 #[path = "../legacy_scenario.rs"]
 mod legacy_scenario;
 #[path = "../logistics.rs"]

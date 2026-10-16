@@ -26,6 +26,7 @@ mod native_order_intent_tests;
 pub mod assault_runtime;
 pub mod catalog;
 pub mod client_view;
+pub mod recipient_availability;
 pub mod combat;
 pub mod command_destinations;
 pub mod commander_ai;

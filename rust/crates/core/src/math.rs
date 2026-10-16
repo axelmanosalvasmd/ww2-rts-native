@@ -16,7 +16,12 @@
 //! NaN, which Rust's methods do not.
 //!
 //! JavaScript has a single NaN, so a NaN result here may carry any payload; compare it as NaN.
-//! `tests/math.rs` checks every function against a fixture written by `harness/math-fixture.mjs`.
+//! `tests/math.rs` checks the original functions against `harness/math-fixture.mjs`.
+
+/// IEEE 754 ceiling uses Rust's rounding primitive, without a platform math-library call.
+pub fn ceil(x: f64) -> f64 {
+    x.ceil()
+}
 
 // The following is adapted from fdlibm (http://www.netlib.org/fdlibm).
 //
