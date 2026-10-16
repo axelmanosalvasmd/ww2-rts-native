@@ -65,8 +65,8 @@ impl DeliveryState {
 
     /// Project the complete supplied batch before any selected memory owner
     /// publishes. The host retains the scheduled global batch-reset policy.
-    /// Persistent flight/AIR/debris actors and undrained producer buffers still
-    /// refuse through the existing complete-frame admission.
+    /// Nonsandbox retained flights, unsupported AIR/debris actors and undrained
+    /// producer buffers refuse through complete-frame admission.
     pub fn capture_selected_with_shots<'a>(
         &mut self,
         state: &'a mut Match,

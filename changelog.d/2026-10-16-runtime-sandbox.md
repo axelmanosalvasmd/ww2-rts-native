@@ -1,4 +1,4 @@
 - Enable sandbox starts and free non-structure spawns for either side in private R1 Conquest rooms. Keep normal recipient fog and owner-field privacy, and allow idle sandbox trains to survive ticking without World rail state.
-- Cover sandbox start, restart, guest dispatch, refusals, the 2000/2001 boundary, all non-structure unit types, victory reveal and the internal Horde spawn component. World and hosted Horde remain guarded; sandbox saves remain unavailable.
+- Cover sandbox start, restart, guest dispatch in authoritative issuer order, refusals, the 2000/2001 boundary, all non-structure unit types, combat away from the starting bases, victory reveal and the internal Horde spawn component. World and hosted Horde remain guarded; sandbox saves remain unavailable.
 - Let sandbox Kaiju use the existing beam and recipient event path outside Horde, and omit competitive Horde results for sandbox runs.
 - Deliver sandbox live projectiles and grenade throws through the recipient view, with prototype fog, shooter-field privacy and visible-contact extrapolation limits.

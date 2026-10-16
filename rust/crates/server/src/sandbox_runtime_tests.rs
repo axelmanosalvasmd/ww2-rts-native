@@ -352,8 +352,11 @@ fn sandbox_spawn_refusals_and_pause_never_publish_partial_state() {
 fn sandbox_kaiju_beam_damages_enemy_and_delivers_events_without_horde_state() {
     let mut room = Sandbox::lobby();
     room.start(true);
-    let at = room.runtime().state().start.players[1].spawn;
-    let boss = room.runtime().state().next_unit_id;
+    // Use the open road away from the starting headquarters and their units.
+    let at = ww2_core::game::Point { x: 71.0, z: 21.0 };
+    // The recorded boundary sorts issuer 0 before issuer 1, independent of arrival.
+    let victim = room.runtime().state().next_unit_id;
+    let boss = victim + 1;
     room.send(1, json!({"t":"spawn","unit":"kaiju","x":at.x,"z":at.z}));
     room.send(
         0,
@@ -389,7 +392,7 @@ fn sandbox_kaiju_beam_damages_enemy_and_delivers_events_without_horde_state() {
             .world
             .game
             .units
-            .get(&(boss + 1))
+            .get(&victim)
             .is_none_or(|victim| victim.hp < full_hp)
     );
     assert!(state.horde.is_none());
