@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Record the first MOV native intent batch: 42 of 43 selected tests passed at 3a1728b5; the MOV-57 trail assertion failed. Keep all rows in progress pending complete intent review and preserve the failed result.
+
 - Correct two unrun MOV native witness inputs: observe clearance cancellation at the next mover and place the stationary passing obstacle within the conflict horizon.
 
 - Add 50 native MOV intent tests and literal row mappings under Axel decision 6206861267. Seven unavailable behavior actuators have explicit ignored tests; native execution and prototype review remain pending. Preserve existing Source failures and artifacts without new behavior captures.

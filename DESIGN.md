@@ -1,5 +1,9 @@
 # Three Crossroads Native: design decisions
 
+## Native MOV first-window result at 3a1728b5 (2026-10-16)
+
+One Root-granted S3 nextest invocation selected 43 enabled native intent tests on Rust tree `1acd5f3089f4d033a01940c4bbe6d7adb027f9ab`: 42 passed, MOV-57 failed, 153 tests were skipped, exit 100. Seven desired-behavior tests for missing actuators stayed ignored. MOV-57 reached its trail assertion after successful yield/route checks, but recorded zero trail points against twenty expected. Native execution continued through all selected tests with no fail-fast and no retries. The normal log and RESULT.json remain under `/tmp/native-feature-batches-0323/mov_impl/`. Root received terminal and inherited-lock release before this map update. No row is promoted before prototype intent review, and passing partial scopes retain their stated limits. No Source job, new behavior fixture or public action occurred.
+
 ## Native MOV intent tests, first 50 owned rows (2026-10-16)
 
 Before the first native attempt, source review corrects two authored witness inputs: the clearance-stop check now runs the next mover, where both implementations invalidate stale clearance, and the parked-holder scene starts 7 m ahead so it enters the 0.7 s conflict horizon without an unperformed advance. This is unexecuted test setup correction, not a repaired or repeated native result.
