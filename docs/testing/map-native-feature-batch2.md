@@ -2,7 +2,7 @@
 
 This batch starts from main, not PR #292's private history. It adds tests and test registrations only. It does not change runtime behavior, parity statuses, the reference pin, wire formats, FFI, contracts or privacy. Public World admission stays off.
 
-## Candidate row coverage
+## Proven row coverage
 
 The prototype paths below are relative to `reference/ww2-rts` at `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`. Behavior tests exercise native intent. Data and pure query assertions use the prototype's literal values.
 
@@ -20,6 +20,8 @@ The prototype paths below are relative to `reference/ww2-rts` at `e4e579a838aaba
 The Match tests retain starting buildings and their canonical metadata. Added actors use the existing publication owner. A stationary tick precedes each crush move, and no test installs an expected post-movement pose or terrain result.
 
 ## Rows left open
+
+These gaps are outside this batch's proof at integrated main base `09e03d07`.
 
 | Row | Remaining gap |
 | --- | --- |
@@ -43,4 +45,8 @@ MAP-59 and MAP-62 are excluded from this stream by owner decision, not failed ro
 
 ## Validation
 
-All ten selected checks pass after merging main: seven Match tests, the six-fingerprint test, the registration guard and the lobby matrix. Independent prototype-intent reviews accept all eight row mappings with the retained wire-cost and static-bridge witnesses named above. Strict Clippy rejected two constant-size `chunks_exact` calls in the test-only hash helper; its suggested `as_chunks` form replaces them without changing the algorithm. The final checks, including those two retained witnesses, are pending. The first shared-cache attempt selected zero tests and is not evidence. A clean rebuild then reached the new tests and exposed a test-authoring error: building tags used `type` instead of `kind`. The authored input was corrected without changing runtime code.
+At producer `5330b63c98ad3e3829fe07b9f396be65cd3099a8`, Rust tree `50cd6a364299c0e41e9b33753f914656c0dba6d0`, all 12 focused checks pass: seven Match tests, the six-fingerprint test, the lobby matrix, the two retained component witnesses and the integration-test registration guard. Formatting and strict locked workspace/all-targets Clippy also pass. The jobs ran on the Vostro in S1 with a 6 GiB memory cap, no swap and four build jobs; the slot was released after exit 0.
+
+The subsequent integration of main through `09e03d07` adds only tests and status documentation. Both owned core test files remain byte-identical to that producer. The lobby change since that producer is only an incoming `cfg(test)` NET module registration, outside the MAP-107 test. Final merged-tree formatting and strict locked workspace/all-targets Clippy pass on Rust tree `5eea2eb637c7de18b5d5d38eb980f75e6247829c`, after a fresh S1 package rebuild at `4f205f1bf6f129d8241b6e0fa0c4ddd684cb6754`. The slot was released after exit 0. The focused results remain attributed to the earlier producer, not relabeled as new executions.
+
+Independent prototype-intent reviews accept all eight row mappings, including the retained wire-cost and static-bridge witnesses named above. Strict Clippy's earlier rejection of two constant-size `chunks_exact` calls was fixed with its suggested `as_chunks` form; all six fingerprints then passed again. The first shared-cache attempt selected zero tests and is not evidence. A clean rebuild then reached the new tests and exposed a test-authoring error: building tags used `type` instead of `kind`. The authored input was corrected without changing runtime code.
