@@ -1,6 +1,7 @@
 //! Lobby transport and trusted native room attachment. Public match start remains unavailable.
 pub mod authoritative_maps;
 mod commander_ingress;
+mod diagnostics;
 mod lobby;
 mod maps;
 mod native_startup;
@@ -45,12 +46,17 @@ const MAX_MESSAGE: usize = 16 * 1024;
 pub struct Config {
     pub max_rooms: usize,
     pub public_url: String,
+    /// Opt-in host JSONL output. No diagnostic fields enter recipient messages.
+    pub diagnostic_dir: Option<std::path::PathBuf>,
+    pub tick_log: bool,
 }
 impl Default for Config {
     fn default() -> Self {
         Self {
             max_rooms: 32,
             public_url: String::new(),
+            diagnostic_dir: None,
+            tick_log: false,
         }
     }
 }
@@ -147,6 +153,7 @@ async fn serve_inner(
 ) -> std::io::Result<()> {
     let mut hub = Hub::new(config.max_rooms.clamp(1, 256), config.public_url);
     hub.configure_trusted_room(trusted);
+    hub.configure_diagnostics(config.diagnostic_dir, config.tick_log)?;
     // Dropping or aborting this future invalidates the same stopped authority
     // used under the Hub lock, even when graceful shutdown never runs.
     let _lifetime = ServeLifetime(hub.stop_authority());
@@ -282,7 +289,11 @@ async fn socket_loop(
         close(&mut socket, 1013, "connection identity exhausted").await;
         return;
     };
-    let connection = Connection { id, tx, cancel };
+    let mut connection = Connection::new(id, tx, cancel);
+    let diagnostics = server.hub.lock().await.diagnostics_enabled();
+    if diagnostics {
+        connection.enable_diagnostics();
+    }
     let mut joined = false;
     loop {
         tokio::select! {
@@ -290,6 +301,7 @@ async fn socket_loop(
             _ = stop.changed() => { close(&mut socket,1001,"server shutdown").await; break; }
             _ = cancelled.changed() => { close(&mut socket,1013,"too far behind").await; break; }
             Some(output) = rx.recv() => {
+                let diagnostic_bytes = if diagnostics { output.diagnostic_bytes() } else { 0 };
                 match output {
                     Output::Json(v) => if socket.send(Message::Text(v.to_string().into())).await.is_err() { break; },
                     Output::Snapshot(mut write) => {
@@ -308,6 +320,7 @@ async fn socket_loop(
                     }
                     Output::Close(c,r) => { close(&mut socket,c,r).await; break; }
                 }
+                connection.complete_bytes(diagnostic_bytes);
             }
             message = socket.recv() => {
                 let bytes = match message {
@@ -340,6 +353,7 @@ async fn socket_loop(
         }
     }
     hub.retire_connection(connection.id);
+    connection.clear_bytes();
 }
 
 #[cfg(test)]
