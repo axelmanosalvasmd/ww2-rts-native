@@ -364,9 +364,12 @@ fn recon_refuses_before_reservation_and_keeps_ordinary_r1_snapshots_flowing() {
         let actor = rifles(&hub, 0)[0];
         let at = state(&hub).world.game.units[&actor].at();
         let wallet = state(&hub).start.economy.players[0].mp;
-        for message in [json!({"t":"support","kind":"recon","x":at.x,"z":at.z})] {
-            send(&mut hub, &a, message, 0);
-        }
+        send(
+            &mut hub,
+            &a,
+            json!({"t":"support","kind":"recon","x":at.x,"z":at.z}),
+            0,
+        );
         assert_eq!(state(&hub).commands.pending_commands(), 0);
         assert_eq!(state(&hub).start.economy.players[0].mp, wallet);
         assert!(state(&hub).world.game.strikes.is_empty());
