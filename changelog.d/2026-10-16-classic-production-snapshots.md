@@ -1,0 +1,2 @@
+- Deliver Classic construction and production snapshots through the trusted room runtime, including public resource nodes, private paid jobs, research, rallies and initialized resource wallets. Waiting-job cancellation keeps the active job's progress and refunds its original charge.
+- Full logistics, hosted Horde production delivery and public Classic lobby start remain separate work.

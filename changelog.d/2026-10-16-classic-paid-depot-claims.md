@@ -1,0 +1,2 @@
+- Classic Engineers can pay for Depots on the nearest free resource node within eight metres. Other buildings preserve node footprints, hidden node claims keep the visibility refusal, and cancellation or destruction frees only the removed Depot's claim.
+- Add native construction checks for full payment, initial site health, builder routes, waiting Assist orders, full queues, prerequisites, tiers and Pillbox direction, with Classic ticks and every seat's snapshots.

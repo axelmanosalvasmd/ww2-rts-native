@@ -100,11 +100,6 @@ fn validate_training_birth(
     let kind = rules.kind(name).ok_or(ProductionStepError::InvalidState(
         "unknown queued birth kind",
     ))?;
-    if rules.kinds[kind].air {
-        return Err(ProductionStepError::Placement(
-            crate::produced_units::Error::UnsupportedAir,
-        ));
-    }
     if rules.kinds[kind].rail {
         return Err(ProductionStepError::InvalidState(
             "queued railway birth is unsupported",
@@ -213,6 +208,16 @@ impl Match {
                     return Err(ProductionStepError::InvalidState("training rally position"));
                 }
                 for job in row.jobs() {
+                    if self.ordinary_snapshot_only
+                        && self
+                            .rules
+                            .kind(&job.kind)
+                            .is_some_and(|kind| self.rules.kinds[kind].air)
+                    {
+                        return Err(ProductionStepError::Placement(
+                            crate::produced_units::Error::UnsupportedAir,
+                        ));
+                    }
                     validate_training_birth(self.options.mode, &self.rules, &job.kind)?;
                 }
             }
@@ -275,6 +280,16 @@ impl Match {
             from,
         )?;
         validate_training_birth(self.options.mode, &self.rules, kind)?;
+        if self.ordinary_snapshot_only
+            && self
+                .rules
+                .kind(kind)
+                .is_some_and(|index| self.rules.kinds[index].air)
+        {
+            return Err(ProductionStepError::Placement(
+                crate::produced_units::Error::UnsupportedAir,
+            ));
+        }
         let building = prepared.building();
         if !registered.contains(&building) {
             return Err(ProductionStepError::InvalidState(
@@ -458,6 +473,16 @@ impl Match {
                 ));
             }
             for job in self.production.building(building).unwrap().jobs() {
+                if self.ordinary_snapshot_only
+                    && self
+                        .rules
+                        .kind(&job.kind)
+                        .is_some_and(|kind| self.rules.kinds[kind].air)
+                {
+                    return Err(ProductionStepError::Placement(
+                        crate::produced_units::Error::UnsupportedAir,
+                    ));
+                }
                 validate_training_birth(self.options.mode, &self.rules, &job.kind)?;
             }
         }
@@ -522,31 +547,80 @@ impl Match {
             obstruction: self.world.versions.obstruction,
             knowledge: 0,
         };
-        let mut placed = self
-            .produced_placer
-            .produce(
+        let catalog = Catalog::compiled().map_err(|e| ProductionStepError::Production(e.into()))?;
+        let aircraft = if self.rules.kinds[kind].air {
+            let definition = catalog
+                .unit(&completion.kind)
+                .map_err(|e| ProductionStepError::Production(e.into()))?;
+            let fuel = catalog
+                .table("CFG")
+                .map_err(|e| ProductionStepError::Production(e.into()))?
+                .get("air")
+                .and_then(|v| v.get("station"))
+                .and_then(|v| v.number())
+                .ok_or(ProductionStepError::InvalidState(
+                    "training aircraft fuel rule",
+                ))?;
+            let ammo = definition.get("ammo").and_then(|v| v.number()).ok_or(
+                ProductionStepError::InvalidState("training aircraft ammo rule"),
+            )?;
+            Some(crate::match_aviation::AircraftRuntime {
+                fuel,
+                ammo,
+                timer: 0.0,
+                orbit: 0.0,
+                mission: None,
+                attack_pick: 0,
+                downed: false,
+            })
+        } else {
+            None
+        };
+        let mut placed = if aircraft.is_some() {
+            let draft = StagedUnit::aircraft(
+                game,
                 &self.rules,
-                Catalog::compiled().map_err(|e| ProductionStepError::Production(e.into()))?,
-                view,
-                &game.units,
-                ProduceInput {
-                    id,
-                    owner,
-                    kind,
-                    scatter_index: u32::try_from(game.units.len())
-                        .map_err(|_| ProductionStepError::InvalidState("training unit count"))?,
-                    player_spawn: self.start.players[owner].spawn,
-                    player_rally: self.player_rallies[owner],
-                    building: ProductionBuilding {
-                        at: maker.at(),
-                        kind: maker.kind,
-                        rally,
-                    },
-                    mode: self.options.mode,
-                    tick: game.tick as u64,
-                },
+                owner,
+                kind,
+                id,
+                u32::try_from(game.units.len())
+                    .map_err(|_| ProductionStepError::InvalidState("training unit count"))?,
+                self.start.players[owner].spawn,
+                maker.at(),
             )
-            .map_err(ProductionStepError::Placement)?;
+            .map_err(ProductionStepError::Publication)?;
+            crate::produced_units::ProducedPlacement {
+                unit: draft.unit,
+                aim: draft.control.aim,
+                rally: None,
+            }
+        } else {
+            self.produced_placer
+                .produce(
+                    &self.rules,
+                    catalog,
+                    view,
+                    &game.units,
+                    ProduceInput {
+                        id,
+                        owner,
+                        kind,
+                        scatter_index: u32::try_from(game.units.len()).map_err(|_| {
+                            ProductionStepError::InvalidState("training unit count")
+                        })?,
+                        player_spawn: self.start.players[owner].spawn,
+                        player_rally: self.player_rallies[owner],
+                        building: ProductionBuilding {
+                            at: maker.at(),
+                            kind: maker.kind,
+                            rally,
+                        },
+                        mode: self.options.mode,
+                        tick: game.tick as u64,
+                    },
+                )
+                .map_err(ProductionStepError::Placement)?
+        };
         if placed.rally.is_some() {
             if self.options.mode == Mode::World {
                 self.refresh_world_routing(owner)
@@ -639,7 +713,10 @@ impl Match {
         .map_err(ProductionStepError::Publication)?;
         let completion = prepared.commit().expect("staged training completion");
         publication.publish_with(|unit, _| {
-            self.combat.initialize(unit.id);
+            self.combat.initialize(unit.id).hit_by = aircraft.map(|_| 0);
+            if let Some(runtime) = aircraft {
+                self.aviation.planes.insert(unit.id, runtime);
+            }
             self.firing.initialize(unit.id);
             self.abilities.initialize(unit.id);
             self.recovery.initialize(unit.id);

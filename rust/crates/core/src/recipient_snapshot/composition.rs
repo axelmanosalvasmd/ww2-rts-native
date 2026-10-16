@@ -51,7 +51,7 @@ impl DeliveryState {
             return Err(SnapshotError::InvalidRecipient);
         }
         for (slot, (owner, list)) in prepared.results().iter().enumerate() {
-            if slot != *owner || list.nodes.is_some() {
+            if slot != *owner {
                 return Err(SnapshotError::UnsupportedMode);
             }
             lists.push(list.clone());
@@ -103,6 +103,9 @@ pub(super) fn complete(
     lists: Option<&RecipientLists>,
 ) -> SupportedSeatSnapshot {
     projection.fields.insert("t".into(), json!("s"));
+    if let Some(nodes) = lists.and_then(|lists| lists.nodes.as_ref()) {
+        projection.fields.insert("nodes".into(), json!(nodes));
+    }
     // Admission inspected each actual canonical actor/list owner. Their
     // absent output is a represented source result for this bounded frame.
     for name in ["flights", "shots"] {
