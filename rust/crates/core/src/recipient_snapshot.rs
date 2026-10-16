@@ -129,10 +129,13 @@ impl<'a> SnapshotCache<'a> {
             return Err(SnapshotError::UnsupportedMode);
         }
         if state.options.mode == Mode::Classic {
-            state.validate_elimination_state().map_err(|_| SnapshotError::Rules)?;
+            state
+                .validate_elimination_state()
+                .map_err(|_| SnapshotError::Rules)?;
         }
         if state.options.mode == Mode::Horde {
-            state.validate_horde_economy()
+            state
+                .validate_horde_economy()
                 .map_err(|_| SnapshotError::Rules)?;
         }
         let g = &state.world.game;

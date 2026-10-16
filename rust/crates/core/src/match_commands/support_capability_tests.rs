@@ -1,5 +1,5 @@
 //! Recorded support orders must remain deliverable before creating paid effects.
-use super::{Command, Denial};
+use super::Command;
 use crate::{
     economy::{self, Faction, Mode},
     economy_state::ArmySize,
@@ -80,48 +80,57 @@ fn record(state: &mut Match, kind: &str) {
 }
 
 #[test]
-fn hosted_recorded_support_rejects_undeliverable_effects_before_any_payment_or_publication() {
+fn hosted_recorded_plane_support_pays_once_and_keeps_every_seat_deliverable() {
     for kind in ["recon", "strafe", "bombing", "dive", "para"] {
         let mut state = scene();
+        state.world.game.reveal = true;
         state.restrict_to_ordinary_snapshots().unwrap();
+        state
+            .initialize_tick_scene(0, TickPathConfig::default())
+            .unwrap();
+        let cost = economy::sup_cost(Mode::Conquest, kind).unwrap().cost;
+        let spent = state.story[0].mp_spent;
+        let calls = state.story[0].support_calls;
         record(&mut state, kind);
-        let before = (
-            state.start.economy.clone(),
-            state.start.players[0].support.clone(),
-            state.world.game.strikes.clone(),
-            state.support.clone(),
-            state.story.clone(),
-            state.start.random.clone(),
-            state.next_unit_id,
-        );
-        let results = state.apply_commands(1, false).unwrap();
-        assert_eq!(results.len(), 1);
-        assert_eq!(results[0].denial, Some(Denial::Unsupported), "{kind}");
-        assert_eq!(
-            (
-                state.start.economy.clone(),
-                state.start.players[0].support.clone(),
-                state.world.game.strikes.clone(),
-                state.support.clone(),
-                state.story.clone(),
-                state.start.random.clone(),
-                state.next_unit_id,
-            ),
-            before,
-            "rejection must leave paid and published state unchanged: {kind}"
-        );
-        assert_eq!(state.commands.pending_commands(), 0);
-        state.preflight_ordinary_snapshot().unwrap();
+        let selected = (0..2)
+            .map(|slot| SelectedSeat {
+                slot,
+                full: false,
+                omit: false,
+            })
+            .collect::<Vec<_>>();
+        let mut delivery = DeliveryState::new(&state).unwrap();
+        for tick in 1..=8 {
+            let report = state.advance_tick().unwrap();
+            if tick == 1 {
+                assert_eq!(report.commands.len(), 1);
+                assert_eq!(report.commands[0].denial, None, "{kind}");
+                assert_eq!(state.world.game.strikes.len(), 1);
+                assert_eq!(
+                    state.world.game.strikes[0]
+                        .runtime
+                        .as_ref()
+                        .unwrap()
+                        .kind
+                        .name(),
+                    kind
+                );
+            }
+            assert_eq!(state.story[0].mp_spent, spent + cost);
+            assert_eq!(state.story[0].support_calls, calls + 1.0);
+            assert_eq!(state.commands.pending_commands(), 0);
+            let frame = delivery
+                .capture_selected_with_tick_events(&mut state, &selected, &report.events)
+                .unwrap()
+                .unwrap();
+            for slot in 0..2 {
+                let snapshot = frame.recipient(slot).unwrap().into_json();
+                assert_eq!(snapshot["t"], "s");
+                assert_eq!(snapshot["strikes"][0][0], kind);
+            }
+            assert!(state.tick_state.fault().is_none());
+        }
     }
-
-    let mut state = scene();
-    // The capability binding belongs to hosted matches, not the unrestricted component API.
-    record(&mut state, "recon");
-    assert_eq!(state.apply_commands(1, false).unwrap()[0].denial, None);
-    assert_eq!(
-        state.world.game.strikes[0].runtime.as_ref().unwrap().kind,
-        crate::match_support::SupportKind::Recon
-    );
 }
 
 #[test]

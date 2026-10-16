@@ -1138,6 +1138,8 @@ impl Match {
                     .map_err(|e| e.to_string())?
                     .ai_caution(Some(&self.start.weather)),
                 known_buildings: vec![],
+                strikes: Vec::new(),
+                stationary_since: std::collections::BTreeMap::new(),
                 hidden_spawns: BTreeSet::new(),
                 site_nodes: vec![],
                 horde: false,

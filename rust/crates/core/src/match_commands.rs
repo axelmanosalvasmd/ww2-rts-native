@@ -1072,7 +1072,7 @@ impl crate::match_runtime::Match {
         } = command
         {
             // Recorded AI orders share the hosted recipient capability boundary.
-            // Refuse plane-backed effects before payment, cooldown or story writes.
+            // Refuse unsupported effects before payment, cooldown or story writes.
             if self.ordinary_snapshot_only
                 && !crate::recipient_snapshot::SUPPORTED_SUPPORT_KINDS
                     .iter()

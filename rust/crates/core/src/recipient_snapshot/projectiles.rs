@@ -1,13 +1,14 @@
 //! Prototype retained flight rows. Internal grenade and salvo tickets have no wire row.
 use super::*;
 
-
 pub(super) fn validate(state: &Match) -> Result<(), SnapshotError> {
     if !state.firing.flights.is_empty() {
         state
             .routing_fog
             .validate_shape(&state.world.game)
             .map_err(|_| SnapshotError::Rules)?;
+    }
+    if !state.firing.flights.is_empty() || !state.firing.salvos.is_empty() {
         state
             .validate_firing_tick_state()
             .map_err(|_| SnapshotError::Rules)?;

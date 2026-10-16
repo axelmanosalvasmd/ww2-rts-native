@@ -313,7 +313,11 @@ impl crate::match_runtime::Match {
                 self.validate_horde_economy()?;
                 false
             }
-            _ => return Err("global lists require matching Conquest, Classic or canonical Horde".into()),
+            _ => {
+                return Err(
+                    "global lists require matching Conquest, Classic or canonical Horde".into(),
+                );
+            }
         };
         let mut ids = std::collections::BTreeSet::new();
         let mut rows = Vec::with_capacity(game.wrecks.len());

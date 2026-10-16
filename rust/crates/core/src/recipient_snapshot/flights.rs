@@ -42,7 +42,7 @@ pub(super) fn project(state: &Match, slot: usize) -> Result<Value, SnapshotError
             row["effect"] = json!(effect);
         }
         let mut until = shots::trajectory_until(state, visible, p.solution, time, p.expires)?;
-        if until > time {
+        if state.rules.kinds[p.source_kind].weapon && until > time {
             let end =
                 projectiles::flight_at(p.solution, until).map_err(|_| SnapshotError::Rules)?;
             if let Some(hit) = state

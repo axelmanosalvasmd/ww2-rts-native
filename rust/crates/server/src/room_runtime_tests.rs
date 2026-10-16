@@ -376,9 +376,10 @@ fn protected(runtime: &RoomRuntime) -> Vec<String> {
 }
 
 fn aircraft_purchase_ready(mut m: Match) -> (Match, u32) {
+    let players = m.start.players.len();
     m.production = ww2_core::production::ProductionState::new(vec![
         ww2_core::economy::TechState::new(3, 0, 0, 0).unwrap();
-        2
+        players
     ])
     .unwrap();
     for unit in m.world.game.units.values() {
@@ -446,7 +447,7 @@ fn aircraft_purchase_ready(mut m: Match) -> (Match, u32) {
             next_id: &mut m.next_unit_id,
         },
         &m.rules,
-        2,
+        players,
         vec![draft],
     )
     .unwrap()
@@ -1326,5 +1327,136 @@ fn paused_scheduled_event_clear_resets_ai_alert_cursor_before_resume() {
         assert_eq!(cursor(&runtime), (Some(1), 0, 1));
         assert!(runtime.fault().is_none());
         assert!(runtime.state().tick_state.fault().is_none());
+    }
+}
+
+#[test]
+fn base18_hosted_horde_aircraft_buy_uses_shared_field_and_keeps_every_seat_healthy() {
+    let map = AuthoritativeMap::from_json(
+        &serde_json::to_vec(&json!({
+            "name":"Hosted Horde aircraft purchase", "w":60,"h":60,"rows":vec![".".repeat(60);60],
+            "spawns":[{"x":30,"y":5},{"x":10,"y":54},{"x":50,"y":54}],
+            "defend":[0], "points":[{"x":30,"y":30}]
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let mut options = arena(&[]).options;
+    options.mode = Mode::Horde;
+    options.players[1].team = 0;
+    options.tech = false;
+    let mut state = Match::new_horde(&map, options).unwrap();
+    state.start.economy.players[1].mp = 10000.;
+    let (state, field) = aircraft_purchase_ready(state);
+    let field_at = state.world.game.units[&field].at();
+    let mut room = RoomRuntime::new(state, 0).unwrap();
+    let seats = (0..3)
+        .map(|slot| SelectedSeat {
+            slot,
+            full: true,
+            omit: false,
+        })
+        .collect::<Vec<_>>();
+    let mut ids = Vec::new();
+    for (tick, name, price) in [
+        (1, "fighter", 280.),
+        (2, "attacker", 340.),
+        (3, "bomber", 420.),
+    ] {
+        let before = room.state().start.economy.players[1].mp;
+        let owner_before = room.state().start.economy.players[0].mp;
+        let id = room.state().next_unit_id;
+        room.state_mut()
+            .enqueue_command(
+                OrderKey {
+                    tick,
+                    issuer: 1,
+                    sequence: tick,
+                },
+                Command::Buy {
+                    kind: name.into(),
+                    from: Some(field),
+                },
+            )
+            .unwrap();
+        let report = room.advance_tick(&[false; 3]).unwrap();
+        assert_eq!(report.commands.len(), 1);
+        assert_eq!(report.commands[0].denial, None);
+        assert_eq!(room.state().world.game.units[&id].owner, 1);
+        assert_eq!(room.state().world.game.units[&id].at(), field_at);
+        // Recruitment is paid before this tick's ordinary income.
+        assert!(
+            (room.state().start.economy.players[1].mp
+                - (before - price + room.state().start.economy.players[1].inc * 0.05))
+                .abs()
+                < 1e-8
+        );
+        assert!(
+            (room.state().start.economy.players[0].mp
+                - (owner_before + room.state().start.economy.players[0].inc * 0.05))
+                .abs()
+                < 1e-8
+        );
+        ids.push(id);
+        let frames = room.collect_frame(&seats, FrameKind::Scheduled).unwrap();
+        assert_eq!(frames.len(), 3);
+        for frame in frames {
+            let air = frame.message["air"].as_array().unwrap();
+            assert_eq!(air.len(), if frame.slot == 1 { ids.len() } else { 0 });
+            assert_eq!(frame.message["t"], "s");
+            if frame.slot < 2 {
+                assert_eq!(
+                    frame.message["queues"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .find(|row| row[0] == field),
+                    Some(&json!([field, 0., -1., -1.]))
+                );
+            }
+            if frame.slot != 0 {
+                assert!(
+                    !frame.message["productionJobs"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .any(|row| row[0] == field)
+                );
+            }
+        }
+    }
+    assert_eq!(
+        room.state_mut()
+            .execute_command(
+                1,
+                &Command::Move {
+                    orders: ids
+                        .iter()
+                        .map(|id| ww2_core::match_commands::MoveOrder {
+                            unit: i64::from(*id),
+                            at: field_at
+                        })
+                        .collect(),
+                    control_ids: None,
+                    attack_move: false,
+                    queue: false,
+                    together: false,
+                    face: None
+                },
+                false
+            )
+            .unwrap(),
+        None
+    );
+    for _ in 0..80 {
+        room.advance_tick(&[false; 3]).unwrap();
+        assert_eq!(
+            room.collect_frame(&seats, FrameKind::Scheduled)
+                .unwrap()
+                .len(),
+            3
+        );
+        assert!(room.fault().is_none());
+        assert!(room.state().tick_state.fault().is_none());
     }
 }

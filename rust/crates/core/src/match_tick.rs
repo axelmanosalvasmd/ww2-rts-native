@@ -2,6 +2,9 @@
 //!
 //! This integration grows by attaching the independently verified phase adapters.
 //! Reports identify phases still absent; a clock advance is not playable-match proof.
+#[cfg(test)]
+mod phase_dependency_tests;
+
 use std::collections::BTreeMap;
 
 use crate::{game::Pose, grid::UnitId, movement::RouteRequest};

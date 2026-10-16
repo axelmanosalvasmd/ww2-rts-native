@@ -192,6 +192,9 @@ pub fn human_screen_observation(
         return Err("human filtered visibility differs from delivered unit facts".into());
     }
     input.units.retain(|u| ids.contains(&u.id));
+    if let Some(context) = &mut input.runtime {
+        context.stationary_since.retain(|id, _| ids.contains(id));
+    }
     Observation::new(input).map_err(|e| format!("human filtered strategic observation: {e:?}"))
 }
 

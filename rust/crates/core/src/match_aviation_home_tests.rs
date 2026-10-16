@@ -187,8 +187,8 @@ fn mov84_horde_defenders_share_airfields_but_the_horde_and_other_modes_do_not() 
     let (_, enemy) = field(&mut state, horde, 45, 25);
     assert_eq!(state.aircraft_base(horde, enemy).unwrap(), enemy);
     assert_eq!(state.aircraft_base(1, enemy).unwrap(), shared);
-    // This existing component admission does not enable the separate Horde runner.
-    assert!(state.validate_aviation().is_err());
+    // Canonical Horde now uses the same admitted aviation lifecycle.
+    state.validate_aviation().unwrap();
 }
 
 fn delivered_tick(state: &mut Match, delivery: &mut DeliveryState) -> Vec<serde_json::Value> {
@@ -467,4 +467,228 @@ fn base18_aviation_purchase_rejects_invalid_makers_atomically_and_places_each_pl
         }
         assert!(state.tick_state.fault().is_none());
     }
+}
+
+#[test]
+fn base18_horde_shared_airfields_charge_only_buyer_spawn_all_aircraft_and_deliver_every_seat() {
+    use crate::match_commands::{Command, Denial};
+    let mut state = scene(Mode::Horde);
+    let horde = state.horde.as_ref().unwrap().slot;
+    state.start.economy.players[1].mp = 10000.;
+    let (shared, at) = field(&mut state, 0, 30, 25);
+    let (enemy, _) = field(&mut state, horde, 50, 25);
+    let (unfinished, _) = field(&mut state, 0, 40, 25);
+    state.world.game.units.get_mut(&unfinished).unwrap().built = Some(0.5);
+    for from in [enemy, unfinished, u32::MAX] {
+        let before = state.start.economy.players.clone();
+        let next = state.next_unit_id;
+        assert_eq!(
+            state
+                .execute_command(
+                    1,
+                    &Command::Buy {
+                        kind: "fighter".into(),
+                        from: Some(from)
+                    },
+                    false
+                )
+                .unwrap(),
+            Some(Denial::Needs)
+        );
+        assert_eq!(state.start.economy.players, before);
+        assert_eq!(state.next_unit_id, next);
+    }
+    state.world.game.units.get_mut(&unfinished).unwrap().built = Some(1.);
+    let original_owner_mp = state.start.economy.players[0].mp;
+    let mut ids = Vec::new();
+    for (kind, price, from) in [
+        ("fighter", 280., None),
+        ("attacker", 340., Some(shared)),
+        ("bomber", 420., Some(shared)),
+    ] {
+        let mp = state.start.economy.players[1].mp;
+        let id = state.next_unit_id;
+        assert_eq!(
+            state
+                .execute_command(
+                    1,
+                    &Command::Buy {
+                        kind: kind.into(),
+                        from
+                    },
+                    false
+                )
+                .unwrap(),
+            None
+        );
+        assert_eq!(state.start.economy.players[1].mp, mp - price);
+        assert_eq!(state.start.economy.players[0].mp, original_owner_mp);
+        assert_eq!(state.world.game.units[&id].owner, 1);
+        assert_eq!(state.world.game.units[&id].at(), at);
+        assert_eq!(state.world.game.units[&id].air, Some(PlaneState::Base));
+        assert!(state.world.game.units[&id].path.is_empty());
+        assert_eq!(state.recruit_metadata[&id].building, shared);
+        assert!(state.production.building(shared).unwrap().jobs().is_empty());
+        ids.push(id);
+    }
+    let mut delivery = DeliveryState::new(&state).unwrap();
+    for _ in 0..12 {
+        let snapshots = delivered_tick(&mut state, &mut delivery);
+        assert_eq!(
+            snapshots[1]["air"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|r| r[0].as_u64().unwrap() as u32)
+                .collect::<Vec<_>>(),
+            ids
+        );
+        for slot in [0, horde] {
+            assert_eq!(snapshots[slot]["air"], json!([]));
+        }
+        for slot in [0, 1] {
+            assert!(
+                snapshots[slot]["queues"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|r| r[0] == shared)
+            );
+        }
+        assert!(
+            !snapshots[horde]["queues"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|r| r[0] == shared)
+        );
+        assert!(
+            !snapshots[1]["productionJobs"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|r| r[0] == shared)
+        );
+    }
+    assert!(state.tick_state.fault().is_none());
+}
+
+#[test]
+fn base38_airfield_values_prerequisite_tier_and_paid_construction_match_prototype() {
+    use crate::{
+        catalog::{Catalog, Value},
+        economy::TechState,
+        match_commands::{Command, Denial},
+    };
+    let catalog = Catalog::compiled().unwrap();
+    let definition = catalog.unit("airfield").unwrap();
+    for (key, expected) in [
+        ("cost", 250.),
+        ("buildTime", 40.),
+        ("hpPer", 1800.),
+        ("size", 3.),
+        ("vision", 30.),
+    ] {
+        assert_eq!(
+            definition.get(key).and_then(Value::number),
+            Some(expected),
+            "{key}"
+        );
+    }
+    assert_eq!(
+        definition.get("needs").and_then(Value::string),
+        Some("motorpool")
+    );
+    assert_eq!(
+        definition
+            .get("makes")
+            .and_then(Value::array)
+            .unwrap()
+            .iter()
+            .map(|v| v.string().unwrap())
+            .collect::<Vec<_>>(),
+        vec!["fighter", "attacker", "bomber"]
+    );
+    assert_eq!(crate::economy::tier_of("airfield").unwrap(), 3);
+    let mut state = scene(Mode::Classic);
+    state.options.tech = true;
+    state.start.economy.players[0].mp = 10000.;
+    let engineer = state
+        .world
+        .game
+        .units
+        .values()
+        .find(|u| u.owner == 0 && state.rules.kinds[u.kind].name == "engineer")
+        .unwrap()
+        .id;
+    let at = Point { x: 63., z: 63. };
+    crate::unit_placement::place_unit(
+        &mut state.grid,
+        state.world.game.units.get_mut(&engineer).unwrap(),
+        |u| {
+            u.x = at.x;
+            u.z = at.z + 8.;
+            u.path.clear();
+            u.world_goal = None;
+        },
+    );
+    crate::vision::update_vision(&mut state.world.game, &state.rules, &state.grid);
+    let build = Command::Build {
+        ids: vec![i64::from(engineer)],
+        kind: "airfield".into(),
+        at: Some(at),
+        direction: None,
+        queue: false,
+    };
+    let mp = state.start.economy.players[0].mp;
+    let id = state.next_unit_id;
+    assert_eq!(
+        state.execute_command(0, &build, false).unwrap(),
+        Some(Denial::Needs)
+    );
+    let maker = state.next_unit_id;
+    state
+        .place_starting_building(0, "motorpool", 35 * state.world.game.w + 20)
+        .unwrap();
+    for (hp, built) in [(1900., 0.9), (0., 1.)] {
+        let u = state.world.game.units.get_mut(&maker).unwrap();
+        u.hp = hp;
+        u.built = Some(built);
+        assert_eq!(
+            state.execute_command(0, &build, false).unwrap(),
+            Some(Denial::Needs)
+        );
+    }
+    let u = state.world.game.units.get_mut(&maker).unwrap();
+    u.hp = 1900.;
+    u.built = Some(1.);
+    for tier in [1, 2, 3] {
+        let mut production = serde_json::to_value(&state.production).unwrap();
+        production["players"][0]["tech"] =
+            serde_json::to_value(TechState::new(tier, 0, 0, 0).unwrap()).unwrap();
+        state.production = serde_json::from_value(production).unwrap();
+        assert_eq!(
+            state.execute_command(0, &build, false).unwrap(),
+            if tier == 3 { None } else { Some(Denial::Tier) }
+        );
+        assert_eq!(
+            state.start.economy.players[0].mp,
+            mp - if tier == 3 { 250. } else { 0. }
+        );
+    }
+    let field = id + 1;
+    assert_eq!(
+        state.world.game.units[&field].cells.as_ref().unwrap().len(),
+        9
+    );
+    let mut delivery = DeliveryState::new(&state).unwrap();
+    for _ in 0..2000 {
+        delivered_tick(&mut state, &mut delivery);
+        if state.world.game.units[&field].built == Some(1.) {
+            break;
+        }
+    }
+    assert_eq!(state.world.game.units[&field].built, Some(1.));
+    assert_eq!(state.world.game.units[&field].hp, 1800.);
+    assert!(state.tick_state.fault().is_none());
 }
