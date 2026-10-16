@@ -578,13 +578,20 @@ mod tests {
         let p = state.firing.flights.get_mut(&id).unwrap();
         p.launched = time;
         p.solution.origin = Point3::new(35., 1., 25.);
-        // A visible terrain contact clips the preview at x=36, without stepping damage.
+        // Clear the fixture house under the start, then bound the preview at x=36.
+        state
+            .world
+            .set_cell(12 * state.world.game.w + 17, b'.')
+            .unwrap();
         state
             .world
             .set_cell(12 * state.world.game.w + 18, b'K')
             .unwrap();
         let rows = flights_for(&state, 0).unwrap();
-        assert!((rows[0]["until"].as_f64().unwrap() - (time + 0.1)).abs() < 1e-12);
+        assert!(
+            (rows[0]["until"].as_f64().unwrap() - (time + 0.1)).abs() < 1e-12,
+            "{rows}"
+        );
         assert_eq!(state.world.game.tick, 125);
         assert_eq!(state.firing.flights.len(), 1);
         state

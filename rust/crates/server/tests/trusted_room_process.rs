@@ -46,7 +46,7 @@ fn begin(host: &mut Client, guest: &mut Client) -> (Value, Value) {
 }
 
 #[test]
-fn ordinary_binary_opt_in_rejects_public_roles_and_retains_default_refusal() {
+fn ordinary_binary_opt_in_rejects_public_roles_and_default_allows_start() {
     for args in [
         vec!["--trusted-room", "ABC"],
         vec!["--seed", "1"],
@@ -64,7 +64,8 @@ fn ordinary_binary_opt_in_rejects_public_roles_and_retains_default_refusal() {
     let default = BinaryServer::start(false, SEED);
     let mut ordinary = Client::join(default.address, "a");
     ordinary.send(json!({"t":"start"}));
-    assert_eq!(ordinary.deny("start")["reason"], "scenario");
+    assert_eq!(ordinary.until(|m| m["t"] == "start")["you"], 0);
+    assert_eq!(ordinary.until(|m| m["t"] == "s")["online"], json!([true]));
     ordinary.send(json!({"t":"restart"}));
     assert_eq!(ordinary.deny("restart")["reason"], "scenario");
     assert!(default.receipts().is_empty());

@@ -381,17 +381,33 @@ fn tutorial_room_runs_all_steps_snapshots_dialogue_and_ending_hold() {
     reach(&mut hub, TutorialStep::Trench, &mut lines);
     // Keep a real grenade ticket and its linked flight through room delivery.
     let state = runtime(&mut hub).state_mut();
-    let blast = ww2_core::match_firing::AbilityBlast::from_unit(
-        state.world.game.units[&1].kind,
-        &state.rules,
-    )
-    .unwrap();
-    let target = state.tutorial_state().unwrap().spawned()[0];
-    let at = state.world.game.units[&target].at();
+    let mut at = state.world.game.units[&1].at();
+    at.x += 12.;
     state
-        .launch_ability_flight(1, at, blast, Some(1.), None)
+        .enqueue_command(
+            ww2_core::orders::OrderKey {
+                tick: state.world.game.tick as u64 + 1,
+                issuer: 0,
+                sequence: 1,
+            },
+            Command::Ability {
+                ids: vec![1],
+                at: Some(at),
+                queue: false,
+                automatic: false,
+            },
+        )
         .unwrap();
-    assert!(!state.firing.grenades.is_empty());
+    let frames = tick_all(&mut hub);
+    lines.extend(
+        frames[0]["shots"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|r| r["k"] == "say")
+            .cloned(),
+    );
+    assert!(!runtime(&mut hub).state().firing.grenades.is_empty());
     for _ in 0..25 {
         let frames = tick_all(&mut hub);
         lines.extend(
