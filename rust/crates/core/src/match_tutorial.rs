@@ -13,13 +13,14 @@ use crate::{
 use std::collections::{BTreeSet, VecDeque};
 
 /// Public dialogue and its map ping, returned by the tick that emits it.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct TutorialLine {
-    pub text: &'static str,
+    #[serde(deserialize_with = "crate::save_state::static_string")]
+    pub text: crate::save_state::StaticStr,
     pub at: Point,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct TutorialRuntime {
     enemy: usize,
     index: usize,
@@ -40,7 +41,7 @@ impl TutorialRuntime {
         &self.spawned
     }
 }
-const LINES: [[&str; 2]; 9] = [
+pub(crate) const LINES: [[&str; 2]; 9] = [
     [
         "Sgt. Hollis: Morning, Lieutenant. The glider pilot missed the field by two miles, so we walk.",
         "Drag a box over the boys to select them, then right-click to move. Hedgerow first.",

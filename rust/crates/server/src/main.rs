@@ -39,6 +39,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let listener = TcpListener::bind(&address).await?;
     println!("LISTENING http://{}", listener.local_addr()?);
     let config = Config {
+        saves_dir: env::var_os("SAVES_DIR")
+            .map(Into::into)
+            .unwrap_or_else(|| "saves".into()),
         public_url: env::var("PUBLIC_URL").unwrap_or_default(),
         diagnostic_dir: (env::var("WW2_DIAG").as_deref() == Ok("1")).then(|| "logs".into()),
         tick_log: env::var("WW2_TICKLOG").as_deref() == Ok("1"),

@@ -11,6 +11,7 @@ use std::sync::OnceLock;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(usize)]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub enum WeatherKind {
     Clear,
     Fog,
@@ -79,7 +80,7 @@ pub struct MapWeatherInfo<'a> {
 }
 
 /// Explicit weather holds all match. Every unknown reference choice falls back to Map.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum WeatherChoice {
     Map,
     Fixed(WeatherKind),
@@ -98,7 +99,7 @@ impl WeatherChoice {
 }
 
 /// `at` is a simulation tick, including zero when there is no planned change.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct WeatherPlan {
     pub now: WeatherKind,
     pub next: Option<WeatherKind>,
