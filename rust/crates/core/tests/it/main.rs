@@ -53,6 +53,10 @@ mod match_combat;
 mod match_routing;
 #[path = "../math.rs"]
 mod math;
+#[path = "../mode_intent_batch1.rs"]
+mod mode_intent_batch1;
+#[path = "../mode_point_services.rs"]
+mod mode_point_services;
 #[path = "../objectives.rs"]
 mod objectives;
 #[path = "../observed_memory.rs"]
