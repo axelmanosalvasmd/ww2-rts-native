@@ -83,6 +83,7 @@ struct RecruitParts<'a> {
     firing: &'a mut crate::match_firing::FiringState,
     abilities: &'a mut crate::match_abilities::AbilityState,
     recovery: &'a mut crate::match_recovery::RecoveryState,
+    logistics: &'a mut crate::logistics::LogisticsState,
     story: &'a mut [crate::match_story::PlayerStory],
     grid: &'a mut crate::grid::SpatialGrid,
     recruit_metadata: &'a mut std::collections::BTreeMap<u32, RecruitMetadata>,
@@ -130,7 +131,7 @@ fn admission_facts<'a>(
         || game.tick < 0
         || (!crate::match_actor::ordinary_ground_mode(game, options.mode) && !horde)
         || options.mode.is_construction()
-        || options.logistics
+        || (horde && options.logistics)
     {
         return Err(RecruitError::InvalidState("Conquest recruitment state"));
     }
@@ -196,6 +197,7 @@ struct StagedRecruit {
     placed: crate::produced_units::ProducedPlacement,
     route_end: Option<crate::game::Point>,
     route_status: Option<PathStatus>,
+    reserves: Option<crate::logistics::Reserves>,
 }
 macro_rules! recruit_parts {
     ($m:expr) => {
@@ -227,6 +229,7 @@ macro_rules! recruit_parts {
             firing: &mut $m.firing,
             abilities: &mut $m.abilities,
             recovery: &mut $m.recovery,
+            logistics: &mut $m.logistics,
             story: &mut $m.story,
             grid: &mut $m.grid,
             recruit_metadata: &mut $m.recruit_metadata,
@@ -580,6 +583,7 @@ impl RecruitParts<'_> {
             || self.firing.get(*self.next_unit_id).is_some()
             || self.abilities.get(*self.next_unit_id).is_some()
             || self.recovery.get(*self.next_unit_id).is_some()
+            || self.logistics.get(*self.next_unit_id).is_some()
         {
             return Err(RecruitError::InvalidState(
                 "recruit metadata ID already exists",
@@ -635,6 +639,12 @@ impl RecruitParts<'_> {
         };
         let request = prepared.request().clone();
         drop(prepared);
+        let reserves = crate::match_logistics::initial_unit_reserves(
+            self.options.logistics,
+            &placed.unit,
+            self.rules,
+        )
+        .map_err(RecruitError::Routing)?;
         // Preflight canonical unit/allocator/control publication before reading routing.
         let control = crate::match_commands::UnitControl::new(&placed.unit, self.rules)
             .map_err(|_| RecruitError::InvalidState("unit control metadata"))?;
@@ -667,6 +677,7 @@ impl RecruitParts<'_> {
             placed,
             route_end: None,
             route_status: None,
+            reserves,
         })
     }
     fn finish(&mut self, staged: StagedRecruit) -> Result<CompletedRecruitUnit, RecruitError> {
@@ -679,6 +690,7 @@ impl RecruitParts<'_> {
             placed,
             route_end,
             route_status,
+            mut reserves,
             ..
         } = staged;
         let game = &*self.game;
@@ -755,6 +767,9 @@ impl RecruitParts<'_> {
         .map_err(RecruitError::Story)?;
         let purchase = prepared.commit();
         let _published = publication.publish_with(|unit, _| {
+            if let Some(reserves) = reserves.take() {
+                self.logistics.insert(unit.id, reserves);
+            }
             self.combat.initialize(unit.id);
             self.abilities.initialize(unit.id);
             self.recovery.initialize(unit.id);
