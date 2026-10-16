@@ -93,6 +93,9 @@ impl Match {
         }
         let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
         let refund = number(catalog.unit(&kind.name).map_err(|e| e.to_string())?, "cost")? * 0.75;
+        if refund < 0.0 {
+            return Err("invalid cancellation cost".into());
+        }
         let wallet = self.start.economy.players[owner].mp + refund;
         if !wallet.is_finite() {
             return Err("construction refund overflow".into());
@@ -106,6 +109,16 @@ impl Match {
         let structure_id = structure.id.clone();
         let cells = structure.cells.clone();
         let sections: BTreeSet<_> = structure.section_ids.iter().cloned().collect();
+        self.world
+            .preflight_cell_rows(&cells)
+            .map_err(|e| e.to_string())?;
+        if cells.is_empty()
+            || sections
+                .iter()
+                .any(|id| self.world.section_by_id(id).is_none())
+        {
+            return Err("inconsistent cancellation structure".into());
+        }
         let mut physical = self.world.begin_transaction().map_err(|e| e.to_string())?;
         physical.world.game.units.remove(&id);
         for &cell in &cells {
@@ -125,10 +138,17 @@ impl Match {
             .detached_sections
             .retain(|key, _| !sections.contains(key));
         for &cell in &cells {
-            physical
+            let change = physical
                 .world
                 .set_cell(cell, b'.')
                 .map_err(|e| e.to_string())?;
+            if change.logged_index.is_none() {
+                // A failed corner may already be open. Publish its removed section metadata.
+                physical
+                    .world
+                    .log_cell(cell, false)
+                    .map_err(|e| e.to_string())?;
+            }
         }
         let physical = physical
             .prepare_publication(&mut self.world)
@@ -156,6 +176,7 @@ impl Match {
         self.production.remove_building(id);
         self.building_rallies.remove(&id);
         self.recruit_metadata.remove(&id);
+        self.aviation.remove(id);
         if let Some(world) = self.world_runtime.as_mut() {
             for node in &mut world.nodes {
                 if node.depot == Some(id) {
