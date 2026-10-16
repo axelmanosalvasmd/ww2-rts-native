@@ -81,7 +81,6 @@ pub mod match_cover;
 mod match_destroy;
 pub mod match_end;
 pub mod match_firing;
-mod match_garrison;
 pub mod match_ground_contact;
 pub mod match_ground_orders;
 pub mod match_ground_support;

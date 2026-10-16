@@ -88,11 +88,6 @@ pub enum Command {
         ids: Vec<i64>,
         target: Option<i64>,
     },
-    Garrison {
-        ids: Vec<i64>,
-        at: Option<Point>,
-        queue: bool,
-    },
     Unload {
         ids: Vec<i64>,
     },
@@ -466,21 +461,6 @@ impl Command {
                     .then(|| object.get("target").and_then(safe_id).unwrap_or(-1)),
             }),
             Some("unload") => Ok(Self::Unload { ids }),
-            Some("garrison") => Ok(Self::Garrison {
-                ids,
-                at: object
-                    .get("x")
-                    .and_then(|v| v.as_f64())
-                    .filter(|v| v.is_finite())
-                    .zip(
-                        object
-                            .get("z")
-                            .and_then(|v| v.as_f64())
-                            .filter(|v| v.is_finite()),
-                    )
-                    .map(|(x, z)| Point { x, z }),
-                queue: object.get("queue").and_then(|v| v.as_bool()) == Some(true),
-            }),
             Some("entrench") => {
                 use crate::field_works::{Pattern, ProjectMaterial, ProjectOrder};
                 let number = |key: &str| {
@@ -694,9 +674,7 @@ impl Command {
     }
     fn valid(&self) -> bool {
         match self {
-            Self::Attack { at, .. } | Self::Garrison { at, .. } => {
-                at.is_none_or(|p| p.x.is_finite() && p.z.is_finite())
-            }
+            Self::Attack { at, .. } => at.is_none_or(|p| p.x.is_finite() && p.z.is_finite()),
             Self::Dig {
                 ids, at, direction, ..
             } => {
@@ -897,9 +875,6 @@ impl crate::match_runtime::Match {
         if let Command::Unload { ids } = command {
             return self.carrier_unload_command(owner, ids, winner_decided);
         }
-        if let Command::Garrison { ids, at, queue } = command {
-            return self.execute_garrison(owner, ids, *at, *queue);
-        }
         if let Command::Entrench { ids, order, queue } = command {
             return self.execute_entrench(owner, ids, *order, *queue, winner_decided);
         }
@@ -1003,7 +978,6 @@ impl crate::match_runtime::Match {
             | Command::Assist { .. }
             | Command::Destroy { .. }
             | Command::Board { .. }
-            | Command::Garrison { .. }
             | Command::Unload { .. }
             | Command::Entrench { .. }
             | Command::Dig { .. }
@@ -1360,7 +1334,6 @@ impl crate::match_runtime::Match {
             | Command::Assist { .. }
             | Command::Destroy { .. }
             | Command::Board { .. }
-            | Command::Garrison { .. }
             | Command::Unload { .. }
             | Command::Entrench { .. }
             | Command::Dig { .. }
@@ -1746,15 +1719,6 @@ impl crate::path_requests::PathRequestContext for RequestContext<'_> {
                 }
             };
         }
-        if kind == RequestKind::Enter {
-            return match self.match_state.current_enter_goal(id) {
-                Ok(goal) => goal,
-                Err(error) => {
-                    self.error = Some(error);
-                    None
-                }
-            };
-        }
         let u = self.match_state.world.game.units.get(&id)?;
         if u.hp <= 0.0 {
             return None;
@@ -1848,14 +1812,6 @@ impl crate::path_requests::PathRequestContext for RequestContext<'_> {
                 crate::path_requests::RequestKind::World => u.world_goal = None,
                 crate::path_requests::RequestKind::Amove => u.amove = None,
                 crate::path_requests::RequestKind::Board => u.board = 0,
-                crate::path_requests::RequestKind::Enter => {
-                    self.match_state
-                        .commands
-                        .units
-                        .get_mut(&u.id)
-                        .unwrap()
-                        .enter = None;
-                }
                 crate::path_requests::RequestKind::AttackId => {
                     u.attack = false;
                     self.match_state
@@ -1929,9 +1885,6 @@ impl crate::match_runtime::Match {
             }
             if request.kind == crate::path_requests::RequestKind::Board {
                 self.current_board_goal(request.unit)?;
-            }
-            if request.kind == crate::path_requests::RequestKind::Enter {
-                self.current_enter_goal(request.unit)?;
             }
         }
         if !self.uses_world_routes() {
@@ -2201,7 +2154,6 @@ impl crate::match_runtime::Match {
                 | crate::path_requests::RequestKind::Dig
                 | crate::path_requests::RequestKind::Build
                 | crate::path_requests::RequestKind::Board
-                | crate::path_requests::RequestKind::Enter
                 | crate::path_requests::RequestKind::AttackId
         ) {
             return Err("unsupported command path request".into());
@@ -2223,9 +2175,6 @@ impl crate::match_runtime::Match {
         }
         if kind == crate::path_requests::RequestKind::Board {
             self.current_board_goal(id)?;
-        }
-        if kind == crate::path_requests::RequestKind::Enter {
-            self.current_enter_goal(id)?;
         }
         let shootable = self.command_shootable()?;
         let mut requests = std::mem::take(&mut self.commands.requests);
