@@ -4712,3 +4712,43 @@ fixture, provider, registry, guard, FFI, wire, contract or reference.
 Root owns fresh exact-child review, incoming-main preservation, any hosted
 gates and publication. Wider terrain features, World, recipient delivery
 and Unreal acceptance are not completed by these selected component rows.
+
+
+## MAP49 original cliff and depression consumers (2026-10-16, source only)
+
+The private child starts at literal 66a3c3c0, retaining the separate 25d4866e
+checkpoint and the complete incoming 939-row inventory. Read all 140 original
+MAP Acceptance cells before choosing MAP49. MAP06 still needs its complete
+Assault-only-spawn callback and the exact insufficient-universal-spawn message;
+the current native display yields `spawns: needs two non-assault spawns` instead
+of Source's `needs 2+ spawns that every mode can use`. MAP19's full original
+editor move, save, invalid-move atomicity, remove and prune operations have no
+current native editor provider. Neither gap authorizes a shipping change or an
+import from the unreviewed 9fde grid draft.
+
+Add one test to the existing registered map_terrain_components module. It
+executes the existing native pathfinding and LOS providers on the complete
+original test.js:646 and Depressions scenes: a two-level ridge detour below row
+15, a direct one-level crossing, both gully sight clauses and the two-level
+negative-height path refusal. Require a nonempty one-level control in addition
+to the original all-waypoints assertion, so an empty route cannot pass it.
+The untyped Source query and native rifle profile both use the infantry branch
+on these open, unmined scenes, with no owner-dependent routing or hazard input.
+Native admission adds only the established map name; all heights, terrain,
+spawns and objective positions retain the original helper inputs.
+
+The separate Source checker evaluates the two unchanged original callbacks and
+shared helpers directly from pinned e4e579a. It imports the original exported
+segmentCliffClear for eight additional exact diagonal corner controls. Native
+uses the existing segment_cliff_clear on the same corner inputs, including
+independent positive/negative two-level side cells and legal one-level controls.
+No recorded answer initializes native state. This supplements MAP49's corner
+predicate without changing any provider, smoothing rule or runtime interface.
+
+All five original predicates plus eight corner cases are authored, unrun
+consumers. Source, Node, Cargo, rustc, native, fmt, lint, discovery and CI counts
+are zero. The original MAP50 Depressions test and every old body remain intact;
+no old green result is transferred to this child. MAP49 stays todo. All other
+parity cells, fixtures, registries, World guards and incoming MAP5, MOV6, CMB6
+and NET5 rows remain unchanged. Root owns exact-head independent review, any
+new execution grant, publication and integration.

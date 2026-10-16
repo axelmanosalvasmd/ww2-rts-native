@@ -1,0 +1,1 @@
+- Add source-only MAP49 consumers for the complete original cliff and depression checks and eight diagonal corner cases, using the existing providers. Keep all parity statuses unchanged; the new checks have not run. MAP06 remains blocked on its exact validation message, and MAP19 still needs a native editor provider.

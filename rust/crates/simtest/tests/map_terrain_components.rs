@@ -451,3 +451,86 @@ fn map48_complete_original_slope_journey_uses_production_movement() {
         }
     }
 }
+
+#[test]
+fn map49_complete_original_cliff_and_depression_checks() {
+    let rules = Rules::compiled().unwrap();
+    let from = Point { x: 5.0, z: 5.0 };
+    let across = Point { x: 35.0, z: 5.0 };
+    let heights: Vec<String> = (0..20)
+        .map(|y| {
+            if y < 15 {
+                "00000000022000000000".into()
+            } else {
+                "0".repeat(20)
+            }
+        })
+        .collect();
+    let cliff = original_scene(empty(), Some(heights.clone())).game;
+    let detour = path(&cliff, &rules, "rifle", from, across);
+    assert!(
+        !detour.is_empty() && detour.iter().any(|p| p.z > 15.0 * 2.0),
+        "test.js:646: a two-level cliff forces the path below the raised wall"
+    );
+    let slope = original_scene(
+        empty(),
+        Some(heights.iter().map(|row| row.replace('2', "1")).collect()),
+    )
+    .game;
+    let direct = path(&slope, &rules, "rifle", from, across);
+    assert!(!direct.is_empty(), "the one-level control must find a route");
+    assert!(
+        direct.iter().all(|p| p.z < 15.0 * 2.0),
+        "test.js:646: a one-level slope may cross directly"
+    );
+
+    // The complete original Depressions body includes both sight predicates
+    // and its path refusal. The earlier MAP50 test remains unchanged.
+    let gully = original_scene(empty(), Some(vec!["00000000bbbb00000000".into(); 20])).game;
+    assert!(
+        !los(&gully, &rules, (5.0, 20.0), (21.0, 20.0)),
+        "Depressions: gully floor is out of sight from beside it"
+    );
+    assert!(
+        los(&gully, &rules, (18.0, 20.0), (22.0, 20.0)),
+        "Depressions: the floor is visible from inside"
+    );
+    assert!(
+        path(&gully, &rules, "rifle", from, Point { x: 21.0, z: 5.0 }).is_empty(),
+        "Depressions: a two-level drop is a cliff"
+    );
+
+    // Production noCliffs/segmentCliffClear: level-zero diagonal endpoints
+    // require both side cells to be within one level of the starting cell.
+    let mut corners = 0;
+    for (east, south, expected) in [
+        ('0', '0', true),
+        ('1', '1', true),
+        ('2', '0', false),
+        ('0', '2', false),
+        ('b', '0', false),
+        ('0', 'b', false),
+        ('1', 'a', true),
+        ('2', '2', false),
+    ] {
+        let mut heights = vec![vec!['0'; 20]; 20];
+        heights[9][10] = east;
+        heights[10][9] = south;
+        let heights = heights
+            .into_iter()
+            .map(|row| row.into_iter().collect::<String>())
+            .collect();
+        let corner = original_scene(empty(), Some(heights)).game;
+        assert_eq!(
+            ww2_core::terrain::segment_cliff_clear(
+                &corner,
+                Point { x: 19.0, z: 19.0 },
+                Point { x: 21.0, z: 21.0 },
+            ),
+            expected,
+            "diagonal corner levels {east}/{south}"
+        );
+        corners += 1;
+    }
+    assert_eq!(corners, 8);
+}
