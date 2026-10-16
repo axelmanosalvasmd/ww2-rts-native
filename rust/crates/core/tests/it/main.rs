@@ -9,6 +9,14 @@
 mod authoritative_maps;
 #[path = "../base_audit_features.rs"]
 mod base_audit_features;
+#[path = "../bases_batch3_economy.rs"]
+mod bases_batch3_economy;
+#[path = "../bases_batch3_rally.rs"]
+mod bases_batch3_rally;
+#[path = "../bases_batch3_runtime.rs"]
+mod bases_batch3_runtime;
+#[path = "../bases_batch3_training.rs"]
+mod bases_batch3_training;
 #[path = "../client_view.rs"]
 mod client_view;
 #[path = "../combat.rs"]

@@ -93,6 +93,7 @@ pub mod match_ground_orders;
 pub mod match_ground_support;
 pub mod match_human_observation;
 pub mod match_logistics;
+mod match_rally;
 pub mod match_reactions;
 pub mod match_recovery;
 pub mod match_routing;
@@ -159,6 +160,7 @@ pub mod match_world_tick;
 pub mod match_world_memory;
 pub mod world_memory;
 pub mod world_recipient_metadata;
+pub mod world_territories;
 
 pub mod staged_observer;
 

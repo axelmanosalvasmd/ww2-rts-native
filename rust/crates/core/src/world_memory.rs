@@ -54,6 +54,18 @@ pub struct KnownRegion {
     pub contested: bool,
 }
 
+impl KnownRegion {
+    /// Remembered irregular regions have runs and no bounds. Legacy rows have bounds.
+    pub fn contains(&self, at: Point) -> bool {
+        crate::world_territories::inside_known_region(
+            (self.bounds.is_none() || !self.runs.is_empty()).then_some(self.runs.as_slice()),
+            self.bounds.as_ref(),
+            at,
+            crate::game::CELL,
+        )
+    }
+}
+
 #[derive(Clone)]
 pub struct TeamMemory {
     rows: Vec<WorldRow>,
