@@ -12,13 +12,13 @@ use crate::{
 };
 use std::collections::{BTreeMap, VecDeque};
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Facing {
     pub angle: f64,
     pub at: Point,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum MoveOutcome {
     Interrupted,
     Moving,
@@ -37,7 +37,7 @@ impl MoveOutcome {
 }
 /// The optional source result tail survives later moving/interrupted intents.
 /// Only the actual terminal path/completion operations replace it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum MoveResult {
     Unreachable { tick: i64 },
     Completed { tick: i64 },
@@ -51,13 +51,13 @@ impl MoveResult {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct MoveOrder {
     pub unit: i64,
     pub at: Point,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Stance {
     HoldFire,
     HoldPosition,
@@ -65,7 +65,7 @@ pub enum Stance {
 }
 
 /// Internal recorded input. This is not a WebSocket or C interface.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Command {
     Build {
         ids: Vec<i64>,
@@ -199,7 +199,7 @@ pub enum Command {
 }
 
 /// Only fields absent from Unit live here. Routes, positions and hold_pos remain in Unit.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct UnitControl {
     /// Gate openness and its deterministic half-second check timer.
     pub gate: Option<crate::match_gates::GateControl>,
@@ -305,6 +305,7 @@ impl UnitControl {
     }
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct MatchCommands {
     pub units: BTreeMap<UnitId, UnitControl>,
     pub(crate) queue: OrderQueue<Command>,

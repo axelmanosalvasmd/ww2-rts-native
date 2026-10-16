@@ -76,7 +76,7 @@ impl std::fmt::Display for Error {
     }
 }
 impl std::error::Error for Error {}
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ProductionJob {
     pub id: u64,
     pub kind: String,
@@ -92,7 +92,7 @@ pub struct JobRow {
     pub job: ProductionJob,
     pub status: JobStatus,
 }
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct BuildingProduction {
     jobs: Vec<ProductionJob>,
     progress: f64,
@@ -122,13 +122,13 @@ impl BuildingProduction {
             .collect()
     }
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ResearchJob {
     pub kind: Technology,
     pub progress: f64,
     pub time: f64,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct PlayerResearch {
     tech: TechState,
     jobs: Vec<ResearchJob>,
@@ -141,7 +141,7 @@ impl PlayerResearch {
         &self.jobs
     }
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ProductionState {
     buildings: BTreeMap<u32, BuildingProduction>,
     players: Vec<PlayerResearch>,

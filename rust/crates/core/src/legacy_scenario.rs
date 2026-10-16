@@ -11,18 +11,18 @@ pub struct PointOwner<'a> {
     pub id: &'a str,
     pub owner: i32,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum ActionDefinition {
     Say { text: String },
     Destroy { bounds: [usize; 4] },
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct LegacyTrigger {
     pub id: String,
     pub at: f64,
     pub actions: Vec<ActionDefinition>,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct TriggerState {
     pub count: u32,
     pub next: f64,
@@ -41,14 +41,14 @@ impl Default for TriggerState {
 }
 /// The mutable subset of the original scenario state. All other legacy-only collections
 /// (objectives, groups, groupStarted, units and deferred) remain empty.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct LegacyState {
     pub triggers: BTreeMap<String, TriggerState>,
     pub owners: BTreeMap<String, Option<i32>>,
     pub captured: BTreeSet<String>,
     pub next_execution: u64,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SayAction {
     pub text: String,
     pub localized: BTreeMap<String, String>,
@@ -124,7 +124,7 @@ pub fn validate_public_say(action: &SayAction) -> Result<(), LegacyError> {
     Ok(())
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct LegacyScenario {
     triggers: Vec<LegacyTrigger>,
     state: LegacyState,

@@ -24,13 +24,13 @@ pub const RAIL_LOAD: f64 = 8.0;
 pub const RAIL_UNLOAD: f64 = 2.0;
 pub const RAIL_EVERY: f64 = 20.0;
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct RailPoint {
     pub cell: usize,
     pub at: Point,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct RailRun {
     pub path: Vec<RailPoint>,
     pub next: usize,

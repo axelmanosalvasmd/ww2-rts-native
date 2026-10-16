@@ -48,7 +48,7 @@ pub trait ObservationFacts {
     fn footprint(&mut self, cell: usize, slot: usize, team: i32) -> Option<FootprintFact>;
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ObservedRow {
     pub row: CellRow,
     /// Present only for a mine known to this recipient, including known enemy mines.
@@ -117,7 +117,7 @@ impl From<KnowledgeError> for ObservedError {
 
 /// Keep this producer with its player across snapshots and reconnects. Recreate
 /// it and the corresponding RouteKnowledge when a new initial map is installed.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct ObservedMemory {
     slot: usize,
     identity: u64,
@@ -137,6 +137,10 @@ struct PreparedRefresh {
     accepted: Vec<(CellRow, Option<bool>)>,
 }
 impl ObservedMemory {
+    pub(crate) fn relocate_save_storage(&mut self, bindings: &BTreeMap<usize, usize>) {
+        self.initial_ptr = bindings.get(&self.initial_ptr).copied().unwrap_or(0);
+    }
+
     pub fn new(world: &World, slot: usize, identity: u64) -> Result<Self, ObservedError> {
         validate_world(world)?;
         Ok(Self {
