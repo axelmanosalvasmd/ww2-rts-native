@@ -23,7 +23,12 @@ fn screen(view: &HumanView<SupportPacket>) -> ScreenView<'_, SupportPacket> {
     }
 }
 fn clock(m: &mut Match, tick: i64) {
-    m.world.game.tick = tick;
+    // Age the authored observation scene through empty canonical input boundaries.
+    while m.world.game.tick < tick {
+        let next = m.world.game.tick + 1;
+        assert!(m.apply_commands(next as u64, false).unwrap().is_empty());
+        m.world.game.tick = next;
+    }
     m.world.game.vision_tick = (tick > 0).then(|| tick - (tick - 1) % 4);
 }
 
