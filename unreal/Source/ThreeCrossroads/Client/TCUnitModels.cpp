@@ -20,6 +20,9 @@
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
+#if WITH_EDITOR
+#include "Materials/Material.h"
+#endif
 #include "Engine/StaticMesh.h"
 #include "Engine/Texture2D.h"
 #include "MeshDescription.h"
@@ -27,6 +30,8 @@
 #include "Misc/App.h"
 #include "Misc/CommandLine.h"
 #include "HAL/PlatformTime.h"
+#include "Client/TCSupportOrders.h"
+#include "StaticMeshResources.h"
 #include "Misc/Parse.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogTCUnitModels, Log, All);
@@ -186,6 +191,7 @@ void ATCUnitRenderer::EnsureModels()
 
 void ATCUnitRenderer::Reset()
 {
+	BuildingBreaches.Reset();
 	History.Reset();
 	TwinHistory.Reset();
 	Shown.Reset();
@@ -206,9 +212,9 @@ FString ATCUnitRenderer::ModelStatusLine() const
 	if (!Library.IsLoaded()) return FString::Printf(TEXT("models off (%s)"), *LibraryError);
 	TArray<FString> On;
 	for (int32 B = 0; B < BatchCount; B++) if (IsBatchEnabled(B)) On.Add(BatchName(B));
-	return FString::Printf(TEXT("models [%s]: units %d model, %d placeholder (%d without a model); instances %d parts, %d near men, %d far men (%d faded), %d bodies, %d rings; %d in motion (%d with turning wheels and running tracks); %d components, %d figures; motion vectors: %d instances with last frame's transform, %d of them moving"),
+	return FString::Printf(TEXT("models [%s]: units %d model, %d placeholder (%d without a model); instances %d parts, %d near men, %d far men (%d faded), %d bodies, %d rings, %d deck riders, %d aircraft shadows; %d in motion (%d with turning wheels and running tracks); %d components, %d figures; motion vectors: %d instances with last frame's transform, %d of them moving"),
 		On.IsEmpty() ? TEXT("none") : *FString::Join(On, TEXT(",")), Stats.ModelUnits, Stats.PlaceholderUnits, Stats.MissingModel,
-		Stats.PartInstances, Stats.CrowdMen, Stats.FarMen, Stats.FadedMen, Stats.Corpses, Stats.Rings, Stats.MovingHulls, Stats.WheelHulls, Stats.Components, Stats.Figures, Stats.Matched, Stats.Moving);
+		Stats.PartInstances, Stats.CrowdMen, Stats.FarMen, Stats.FadedMen, Stats.Corpses, Stats.Rings, Stats.Riders, Stats.AircraftShadows, Stats.MovingHulls, Stats.WheelHulls, Stats.Components, Stats.Figures, Stats.Matched, Stats.Moving);
 }
 
 UInstancedStaticMeshComponent* ATCUnitRenderer::PartComponent(const FTCModelPart& Part, bool bFaded)
@@ -321,6 +327,29 @@ namespace TCUnitModelsImpl
 		Mesh->BuildFromMeshDescriptions({ &Desc }, Params);
 		// a mesh built at run time has no texture-streaming UV data; the ring's material samples no texture, so a default
 		// density (a cooked game otherwise trips the engine's 'UVChannelData.bInitialized' ensure)
+		for (FStaticMaterial& M : Mesh->GetStaticMaterials()) M.UVChannelData = FMeshUVChannelInfo(1.f);
+		return Mesh;
+	}
+
+	UStaticMesh* BuildAircraftShadow(UObject* Outer, UMaterialInterface* Material)
+	{
+		// aircraft.js shadowGeo: PlaneGeometry(2*ext, 2*ext).rotateX(-PI/2), reflected into Unreal.
+		// The source CanvasTexture flips Y on upload; Unreal's image UV starts at the top of the PNG.
+		FMeshDescription Desc; FStaticMeshAttributes A(Desc); A.Register();
+		auto UV = A.GetVertexInstanceUVs(); UV.SetNumChannels(1);
+		const auto Group = Desc.CreatePolygonGroup(); A.GetPolygonGroupMaterialSlotNames()[Group] = TEXT("Shadow");
+		TArray<FVertexInstanceID> Corners;
+		for (const FVector2f P : {FVector2f(-50,-50), FVector2f(50,-50), FVector2f(-50,50), FVector2f(50,50)})
+		{
+			const auto V = Desc.CreateVertex(); A.GetVertexPositions()[V] = FVector3f(P.X, P.Y, 0);
+			const auto I = Desc.CreateVertexInstance(V); A.GetVertexInstanceNormals()[I] = FVector3f(0,0,1);
+			UV.Set(I, 0, (P + FVector2f(50,50)) / 100); Corners.Add(I);
+		}
+		// Preserve PlaneGeometry's 0,2,1 / 2,3,1 winding after the Y/Z reflection. Unreal's upper face is clockwise.
+		Desc.CreateTriangle(Group, {Corners[0], Corners[2], Corners[1]}); Desc.CreateTriangle(Group, {Corners[2], Corners[3], Corners[1]});
+		UStaticMesh* Mesh = NewObject<UStaticMesh>(Outer); Mesh->GetStaticMaterials().Add(FStaticMaterial(Material, TEXT("Shadow")));
+		UStaticMesh::FBuildMeshDescriptionsParams Params; Params.bBuildSimpleCollision = false; Params.bFastBuild = true;
+		Mesh->BuildFromMeshDescriptions({&Desc}, Params);
 		for (FStaticMaterial& M : Mesh->GetStaticMaterials()) M.UVChannelData = FMeshUVChannelInfo(1.f);
 		return Mesh;
 	}
@@ -503,9 +532,12 @@ bool ATCUnitRenderer::DrawModel(const FTCMatchState& State, const FTCUnit& U, co
 	for (int32 I = 0; I < Entry->Parts.Num(); I++)
 	{
 		if (!Visible[I]) continue;
-		UInstancedStaticMeshComponent* Ism = PartComponent(Entry->Parts[I], bFaded);
+		const FTransform PartTransform = FTCUnitMotion::PartTransform(*Entry, I, Root, Turns, Motion);
+		FTCModelPart Part = Entry->Parts[I];
+		if (Def && Def->bBuilding && !BuildingBreaches.PartFor(Part, U.Id, State, PartTransform, this, Part)) continue;
+		UInstancedStaticMeshComponent* Ism = PartComponent(Part, bFaded);
 		if (!Ism) return false;
-		Parts.Add({ Ism, FTCUnitMotion::PartTransform(*Entry, I, Root, Turns, Motion), I });
+		Parts.Add({ Ism, PartTransform, I });
 	}
 	// unit-models.js vehicleDamageAnchor for a ground vehicle (main.js runs vehicleDamageFrame for those): the engine
 	// deck point the damage smoke rises from, carried by the hull motion (Client/TCEffects.h VehicleDamageFrame)
@@ -520,6 +552,8 @@ bool ATCUnitRenderer::DrawModel(const FTCMatchState& State, const FTCUnit& U, co
 		Stats.PartInstances++;
 	}
 	if (bMen) DrawSquadMen(*Entry, U, Faction, S, FTransform(Facing, At), Men, Custom);
+	if (FTCUnitMotion::HasDeckRiders(U.Type)) DrawRiders(*Entry, U, Faction, Motion.Body * Root);
+	if (Def && Def->bAir) DrawAircraftShadow(U, Faction, S, At);
 	// main.js makeUnit: the owner ring (white while it retreats), and the selection ring; planes show neither ring
 	const float Radius = Def ? Def->Radius : 1.5f;
 	if (!(Def && Def->bAir))
@@ -529,6 +563,51 @@ bool ATCUnitRenderer::DrawModel(const FTCMatchState& State, const FTCUnit& U, co
 	}
 	if (bSelected) AddRing((Radius + 1.f) * 100.f, FLinearColor(FColor(0xf4, 0xf2, 0xea)), 0.95f, 100, Root.GetLocation() + FVector(0, 0, 14.f), FTCInstanceHistory::RingKey(U.Id, true));
 	return true;
+}
+
+void ATCUnitRenderer::DrawAircraftShadow(const FTCUnit& U, int32 Faction, const FShown& S, const FVector& Ground)
+{
+	const FTCAircraftSpec* Spec = FTCUnitMotion::AircraftSpec(U.Type, Faction);
+	if (!Spec) return;
+	const FString Key = U.Type + TEXT("_") + FString::FromInt(Faction);
+	TObjectPtr<UInstancedStaticMeshComponent>* Found = AircraftShadows.Find(Key);
+	if (!Found)
+	{
+		UMaterialInterface* Material = Cast<UMaterialInterface>(Spec->Shadow.TryLoad());
+		if (!Material) { AircraftShadows.Add(Key, nullptr); return; }
+#if WITH_EDITOR
+		Material->GetMaterial()->EnsureIsComplete();
+#endif
+		UInstancedStaticMeshComponent* Ism = NewObject<UInstancedStaticMeshComponent>(this);
+		Ism->SetStaticMesh(TCUnitModelsImpl::BuildAircraftShadow(this, Material)); Ism->SetMaterial(0, Material);
+		Ism->SetCollisionEnabled(ECollisionEnabled::NoCollision); Ism->SetCastShadow(false);
+		Ism->SetMobility(EComponentMobility::Movable); Ism->SetupAttachment(RootComponent);
+		Ism->SetTranslucentSortPriority(0); Ism->RegisterComponent();
+		ModelObjects.Add(Ism); Found = &AircraftShadows.Add(Key, Ism);
+	}
+	if (!*Found) return;
+	FFrameBatch& B = Frame.FindOrAdd(*Found);
+	// aircraft.js place: the source outline at ground + 0.3 m, heading only. A commanded plane has scale 1.
+	B.Transforms.Add(FTransform(FQuat(FVector::UpVector, S.Rot), Ground + FVector(0, 0, 30), FVector(Spec->Ext * 2, Spec->Ext * 2, 1)));
+	B.Keys.Add(FTCInstanceHistory::PartKey(U.Id, 1000)); Stats.AircraftShadows++;
+}
+
+void ATCUnitRenderer::DrawRiders(const FTCModelEntry& Entry, const FTCUnit& U, int32 Faction, const FTransform& Hull)
+{
+	const int32 Count = TCCargo::Count(U.Flags) * 3; // unit-models.js RIDERS
+	if (!Count || !Crowd) return;
+	const TArray<FTransform>& Seats = FTCUnitMotion::DeckFor(U.Type, Faction);
+	FTCInfantryMotion Kneel;
+	Kneel.PostureWeights = FVector4(0, 1, 0, 0);
+	const FTCInfantryBlend Blend = UTCInfantryRigLibrary::BlendFor(TEXT("rifle"), Kneel);
+	for (int32 I = 0; I < FMath::Min(Count, Seats.Num()); I++)
+	{
+		FTCSoldierDraw D;
+		D.FigureType = TEXT("rifle"); D.Faction = Faction; D.Slot = I % 3; D.bFar = true;
+		D.Blend = Blend; D.Man = Seats[I] * Hull; D.Owner = Library.SeatColor(U.Owner);
+		D.bDeckRider = true; D.UnitId = U.Id; D.ManIndex = 100 + I;
+		if (Crowd->AddMan(D)) { Stats.Riders++; Stats.FarMen++; }
+	}
 }
 
 bool ATCUnitRenderer::AnimateSquad(const FTCModelEntry& Entry, const FTCUnit& U, const FTCUnitDef* Def, int32 Faction, FShown& S, const FTransform& Root, const ATCTerrain* Terrain, float Dt, const FVector& Eye, FSquadMen& Out)
@@ -545,7 +624,7 @@ bool ATCUnitRenderer::AnimateSquad(const FTCModelEntry& Entry, const FTCUnit& U,
 	}
 	// main.js: alive = ceil(hp * men / (models * hpPer)), one for an operative
 	const int32 Total = Def ? Def->Models * Def->HpPer : 0;
-	Out.Alive = U.Flags & TCFlags::Operative ? 1 : Total > 0 ? FMath::Clamp((int32)FMath::CeilToDouble((double)U.Hp * Out.Men / Total), 0, Out.Men) : Out.Men;
+	Out.Alive = UTCInfantryRigLibrary::MenDrawn(U.Hp, Out.Men, Total, (U.Flags & TCFlags::Operative) != 0);
 	Out.FigureType = FTCModelLibrary::FigureType(U.Type);
 
 	FSquad& Sq = Squads.FindOrAdd(U.Id);
@@ -585,6 +664,7 @@ void ATCUnitRenderer::DrawSquadMen(const FTCModelEntry& Entry, const FTCUnit& U,
 	const FTCInfantrySquadAnimation& Anim = Sq->Anim;
 	const bool bFaded = Camouflages(U.Type) && (U.Flags & 256);
 	const TArray<FTCInfantryManPose>& Posed = Anim.Men();
+	int32 Drawn = 0;
 	for (int32 K = 0; K < Men.Men && K < Posed.Num(); K++)
 	{
 		if (!Posed[K].bVisible) continue;
@@ -598,6 +678,7 @@ void ATCUnitRenderer::DrawSquadMen(const FTCModelEntry& Entry, const FTCUnit& U,
 		D.UnitId = U.Id; D.ManIndex = K;
 		if (Crowd && Crowd->AddMan(D))
 		{
+			Drawn++;
 			(S.bFar ? Stats.FarMen : Stats.CrowdMen)++;
 			if (bFaded) Stats.FadedMen++;
 			continue;
@@ -607,6 +688,7 @@ void ATCUnitRenderer::DrawSquadMen(const FTCModelEntry& Entry, const FTCUnit& U,
 		if (PartIndex == INDEX_NONE) continue;
 		if (UInstancedStaticMeshComponent* Ism = PartComponent(Entry.Parts[PartIndex], bFaded))
 		{
+			Drawn++;
 			FFrameBatch& B = Frame.FindOrAdd(Ism);
 			B.Floats = TCModelData::Count;
 			B.Transforms.Add(D.Man);
@@ -617,6 +699,9 @@ void ATCUnitRenderer::DrawSquadMen(const FTCModelEntry& Entry, const FTCUnit& U,
 	}
 	// main.js: the men past the new alive count fall where they stood
 	if (Crowd) Crowd->SquadAlive(U.Id, Men.Alive);
+	if (FParse::Param(FCommandLine::Get(), TEXT("TCUnitAudit")))
+		DrawnMenList += FString::Printf(TEXT("%s%d:%s owner=%d hp=%d slots=%d alive=%d drawn=%d %s"),
+			DrawnMenList.IsEmpty() ? TEXT("") : TEXT("; "), U.Id, *U.Type, U.Owner, U.Hp, Men.Men, Men.Alive, Drawn, S.bFar ? TEXT("far") : TEXT("near"));
 }
 
 void ATCUnitRenderer::FlushModelFrame()
@@ -624,6 +709,7 @@ void ATCUnitRenderer::FlushModelFrame()
 	TArray<UInstancedStaticMeshComponent*, TInlineAllocator<256>> All;
 	for (const auto& P : PartBatches) if (P.Value) All.Add(P.Value);
 	for (const auto& P : RingBatches) if (P.Value) All.Add(P.Value);
+	for (const auto& P : AircraftShadows) if (P.Value) All.Add(P.Value);
 	for (UInstancedStaticMeshComponent* Ism : All)
 	{
 		const FFrameBatch* B = Frame.Find(Ism);
@@ -665,5 +751,37 @@ void ATCUnitRenderer::ReportFrame()
 	UE_LOG(LogTCUnitModels, Log, TEXT("unit models: %s | frame %.2f ms mean, %.2f ms worst over %d frames"), *ModelStatusLine(), FrameSum / FMath::Max(1, FrameCount) * 1000.0, FrameMax * 1000.0, FrameCount);
 	// round 17: where each drawn unit is (reference metres), for reading a side by side against the browser's units
 	if (!DrawnList.IsEmpty()) UE_LOG(LogTCUnitModels, Log, TEXT("unit models: drawn at [%s]"), *DrawnList);
+	if (!DrawnMenList.IsEmpty()) UE_LOG(LogTCUnitModels, Log, TEXT("unit members: [%s]; deck riders %d"), *DrawnMenList, Stats.Riders);
 	ReportAt = Now; FrameSum = FrameMax = 0; FrameCount = 0;
 }
+
+#if WITH_DEV_AUTOMATION_TESTS
+#include "Misc/AutomationTest.h"
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCAircraftShadowMeshTest, "ThreeCrossroads.Motion.AircraftShadowMesh", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FTCAircraftShadowMeshTest::RunTest(const FString&)
+{
+	UMaterialInterface* Material = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Models/Motion/Aircraft/MI_Shadow_fighter_0.MI_Shadow_fighter_0"));
+	if (!TestNotNull(TEXT("converted original shadow canvas"), Material)) return false;
+	TestEqual(TEXT("silhouette uses source alpha, without an opaque fallback"), Material->GetBlendMode(), BLEND_Translucent);
+	TestTrue(TEXT("silhouette saves support for the renderer's instanced mesh"), Material->GetUsageByFlag(MATUSAGE_InstancedStaticMeshes));
+	UStaticMesh* Mesh = TCUnitModelsImpl::BuildAircraftShadow(GetTransientPackage(), Material);
+	if (!TestNotNull(TEXT("runtime shadow mesh"), Mesh)) return false;
+	const FStaticMeshLODResources& Lod = Mesh->GetRenderData()->LODResources[0];
+	TestEqual(TEXT("original PlaneGeometry has two triangles"), Lod.IndexBuffer.GetNumIndices(), 6);
+	for (uint32 I = 0; I + 2 < Lod.IndexBuffer.GetNumIndices(); I += 3)
+	{
+		const FVector3f A = Lod.VertexBuffers.PositionVertexBuffer.VertexPosition(Lod.IndexBuffer.GetIndex(I));
+		const FVector3f B = Lod.VertexBuffers.PositionVertexBuffer.VertexPosition(Lod.IndexBuffer.GetIndex(I + 1));
+		const FVector3f C = Lod.VertexBuffers.PositionVertexBuffer.VertexPosition(Lod.IndexBuffer.GetIndex(I + 2));
+		TestTrue(TEXT("single-sided silhouette faces the camera above ground after reflection"), FVector3f::CrossProduct(B - A, C - A).Z < 0);
+	}
+	for (uint32 I = 0; I < Lod.VertexBuffers.PositionVertexBuffer.GetNumVertices(); I++)
+	{
+		const FVector3f P = Lod.VertexBuffers.PositionVertexBuffer.VertexPosition(I);
+		const FVector2f UV = Lod.VertexBuffers.StaticMeshVertexBuffer.GetVertexUV(I, 0);
+		TestTrue(TEXT("source canvas top is source negative Z, with matching horizontal orientation"), UV.Equals(FVector2f((P.X + 50) / 100, (P.Y + 50) / 100), 1e-6f));
+	}
+	return true;
+}
+#endif

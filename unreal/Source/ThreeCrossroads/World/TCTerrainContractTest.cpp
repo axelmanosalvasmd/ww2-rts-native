@@ -293,10 +293,54 @@ namespace TCTerrainFormulas
 		return T;
 	}
 
+	FChecks BreachRules()
+	{
+		FChecks T;
+		// Recorded from unmodified unit-models.js breachGeometry at e4e579a. Includes attribute interpolation,
+		// wall cuts, adjacent holes, complete removal, indexed topology and a translated/rotated model.
+		using namespace TCStructures;
+		struct FCase { std::vector<float> In; std::vector<FColumn> Holes; double Matrix[16]; std::vector<float> Expected; };
+		const FCase Cases[] = {
+			// none
+			{ { -1.f,1.f,-1.f,0.f,1.f,0.f,0.f,0.f,3.f,1.f,-1.f,0.f,1.f,0.f,1.f,0.f,3.f,1.f,3.f,0.f,1.f,0.f,1.f,1.f,-1.f,1.f,3.f,0.f,1.f,0.f,0.f,1.f }, {  }, { 1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1 },
+			  { -1.f,1.f,-1.f,0.f,1.f,0.f,0.f,0.f,3.f,1.f,-1.f,0.f,1.f,0.f,1.f,0.f,3.f,1.f,3.f,0.f,1.f,0.f,1.f,1.f,-1.f,1.f,-1.f,0.f,1.f,0.f,0.f,0.f,3.f,1.f,3.f,0.f,1.f,0.f,1.f,1.f,-1.f,1.f,3.f,0.f,1.f,0.f,0.f,1.f } },
+			// hole
+			{ { -1.f,1.f,-1.f,0.f,1.f,0.f,0.f,0.f,3.f,1.f,-1.f,0.f,1.f,0.f,1.f,0.f,3.f,1.f,3.f,0.f,1.f,0.f,1.f,1.f,-1.f,1.f,3.f,0.f,1.f,0.f,0.f,1.f }, { {0,2,0,2} }, { 1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1 },
+			  { -1.f,1.f,-1.f,0.f,1.f,0.f,0.f,0.f,0.f,1.f,-1.f,0.f,1.f,0.f,0.25f,0.f,0.f,1.f,0.f,0.f,1.f,0.f,0.25f,0.25f,2.f,1.f,-1.f,0.f,1.f,0.f,0.75f,0.f,3.f,1.f,-1.f,0.f,1.f,0.f,1.f,0.f,3.f,1.f,3.f,0.f,1.f,0.f,1.f,1.f,2.f,1.f,-1.f,0.f,1.f,0.f,0.75f,0.f,3.f,1.f,3.f,0.f,1.f,0.f,1.f,1.f,2.f,1.f,2.f,0.f,1.f,0.f,0.75f,0.75f,0.f,1.f,-1.f,0.f,1.f,0.f,0.25f,0.f,2.f,1.f,-1.f,0.f,1.f,0.f,0.75f,0.f,2.f,1.f,0.f,0.f,1.f,0.f,0.75f,0.25f,0.f,1.f,-1.f,0.f,1.f,0.f,0.25f,0.f,2.f,1.f,0.f,0.f,1.f,0.f,0.75f,0.25f,0.f,1.f,0.f,0.f,1.f,0.f,0.25f,0.25f,-1.f,1.f,-1.f,0.f,1.f,0.f,0.f,0.f,0.f,1.f,0.f,0.f,1.f,0.f,0.25f,0.25f,0.f,1.f,3.f,0.f,1.f,0.f,0.25f,1.f,-1.f,1.f,-1.f,0.f,1.f,0.f,0.f,0.f,0.f,1.f,3.f,0.f,1.f,0.f,0.25f,1.f,-1.f,1.f,3.f,0.f,1.f,0.f,0.f,1.f,2.f,1.f,2.f,0.f,1.f,0.f,0.75f,0.75f,3.f,1.f,3.f,0.f,1.f,0.f,1.f,1.f,2.f,1.f,3.f,0.f,1.f,0.f,0.75f,1.f,2.f,1.f,2.f,0.f,1.f,0.f,0.75f,0.75f,2.f,1.f,3.f,0.f,1.f,0.f,0.75f,1.f,0.f,1.f,3.f,0.f,1.f,0.f,0.25f,1.f,2.f,1.f,2.f,0.f,1.f,0.f,0.75f,0.75f,0.f,1.f,3.f,0.f,1.f,0.f,0.25f,1.f,0.f,1.f,2.f,0.f,1.f,0.f,0.25f,0.75f } },
+			// two
+			{ { -1.f,1.f,-1.f,0.f,1.f,0.f,0.f,0.f,3.f,1.f,-1.f,0.f,1.f,0.f,1.f,0.f,3.f,1.f,3.f,0.f,1.f,0.f,1.f,1.f,-1.f,1.f,3.f,0.f,1.f,0.f,0.f,1.f }, { {0,2,0,2},{2,4,0,2} }, { 1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1 },
+			  { -1.f,1.f,-1.f,0.f,1.f,0.f,0.f,0.f,0.f,1.f,-1.f,0.f,1.f,0.f,0.25f,0.f,0.f,1.f,0.f,0.f,1.f,0.f,0.25f,0.25f,2.f,1.f,-1.f,0.f,1.f,0.f,0.75f,0.f,3.f,1.f,-1.f,0.f,1.f,0.f,1.f,0.f,3.f,1.f,0.f,0.f,1.f,0.f,1.f,0.25f,2.f,1.f,-1.f,0.f,1.f,0.f,0.75f,0.f,3.f,1.f,0.f,0.f,1.f,0.f,1.f,0.25f,2.f,1.f,0.f,0.f,1.f,0.f,0.75f,0.25f,3.f,1.f,2.f,0.f,1.f,0.f,1.f,0.75f,3.f,1.f,3.f,0.f,1.f,0.f,1.f,1.f,2.f,1.f,2.f,0.f,1.f,0.f,0.75f,0.75f,0.f,1.f,-1.f,0.f,1.f,0.f,0.25f,0.f,2.f,1.f,-1.f,0.f,1.f,0.f,0.75f,0.f,2.f,1.f,0.f,0.f,1.f,0.f,0.75f,0.25f,0.f,1.f,-1.f,0.f,1.f,0.f,0.25f,0.f,2.f,1.f,0.f,0.f,1.f,0.f,0.75f,0.25f,0.f,1.f,0.f,0.f,1.f,0.f,0.25f,0.25f,-1.f,1.f,-1.f,0.f,1.f,0.f,0.f,0.f,0.f,1.f,0.f,0.f,1.f,0.f,0.25f,0.25f,0.f,1.f,3.f,0.f,1.f,0.f,0.25f,1.f,-1.f,1.f,-1.f,0.f,1.f,0.f,0.f,0.f,0.f,1.f,3.f,0.f,1.f,0.f,0.25f,1.f,-1.f,1.f,3.f,0.f,1.f,0.f,0.f,1.f,2.f,1.f,2.f,0.f,1.f,0.f,0.75f,0.75f,3.f,1.f,3.f,0.f,1.f,0.f,1.f,1.f,2.f,1.f,3.f,0.f,1.f,0.f,0.75f,1.f,2.f,1.f,2.f,0.f,1.f,0.f,0.75f,0.75f,2.f,1.f,3.f,0.f,1.f,0.f,0.75f,1.f,0.f,1.f,3.f,0.f,1.f,0.f,0.25f,1.f,2.f,1.f,2.f,0.f,1.f,0.f,0.75f,0.75f,0.f,1.f,3.f,0.f,1.f,0.f,0.25f,1.f,0.f,1.f,2.f,0.f,1.f,0.f,0.25f,0.75f } },
+			// wall
+			{ { -1.f,-1.f,1.f,0.f,1.f,0.f,0.f,0.f,3.f,-1.f,1.f,0.f,1.f,0.f,1.f,0.f,3.f,3.f,1.f,0.f,1.f,0.f,1.f,1.f,-1.f,3.f,1.f,0.f,1.f,0.f,0.f,1.f }, { {0,2,0,2} }, { 1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1 },
+			  { -1.f,-1.f,1.f,0.f,1.f,0.f,0.f,0.f,0.f,-1.f,1.f,0.f,1.f,0.f,0.25f,0.f,0.f,0.f,1.f,0.f,1.f,0.f,0.25f,0.25f,2.f,-1.f,1.f,0.f,1.f,0.f,0.75f,0.f,3.f,-1.f,1.f,0.f,1.f,0.f,1.f,0.f,3.f,3.f,1.f,0.f,1.f,0.f,1.f,1.f,2.f,-1.f,1.f,0.f,1.f,0.f,0.75f,0.f,3.f,3.f,1.f,0.f,1.f,0.f,1.f,1.f,2.f,2.f,1.f,0.f,1.f,0.f,0.75f,0.75f,-1.f,-1.f,1.f,0.f,1.f,0.f,0.f,0.f,0.f,0.f,1.f,0.f,1.f,0.f,0.25f,0.25f,0.f,3.f,1.f,0.f,1.f,0.f,0.25f,1.f,-1.f,-1.f,1.f,0.f,1.f,0.f,0.f,0.f,0.f,3.f,1.f,0.f,1.f,0.f,0.25f,1.f,-1.f,3.f,1.f,0.f,1.f,0.f,0.f,1.f,2.f,2.f,1.f,0.f,1.f,0.f,0.75f,0.75f,3.f,3.f,1.f,0.f,1.f,0.f,1.f,1.f,2.f,3.f,1.f,0.f,1.f,0.f,0.75f,1.f } },
+			// gone
+			{ { -1.f,1.f,-1.f,0.f,1.f,0.f,0.f,0.f,3.f,1.f,-1.f,0.f,1.f,0.f,1.f,0.f,3.f,1.f,3.f,0.f,1.f,0.f,1.f,1.f,-1.f,1.f,3.f,0.f,1.f,0.f,0.f,1.f }, { {-2,4,-2,4} }, { 1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1 },
+			  {  } },
+			// rotated
+			{ { -1.f,1.f,-1.f,0.f,1.f,0.f,0.f,0.f,3.f,1.f,-1.f,0.f,1.f,0.f,1.f,0.f,3.f,1.f,3.f,0.f,1.f,0.f,1.f,1.f,-1.f,1.f,3.f,0.f,1.f,0.f,0.f,1.f }, { {0,2,0,2} }, { 0.7648421872844885,0,0.64421768723769102,0,0,1,0,0,-0.64421768723769102,0,0.7648421872844885,0,1,0,0.5,1 },
+			  { 0.46517089009284973f,1.f,-1.f,0.f,1.f,0.f,0.36629271507263184f,0.f,3.f,1.f,-1.f,0.f,1.f,0.f,1.f,0.f,3.f,1.f,2.0094552040100098f,0.f,1.f,0.f,1.f,0.75236380100250244f,-1.f,1.f,-1.f,0.f,1.f,0.f,0.f,0.f,0.41110667586326599f,1.f,-1.f,0.f,1.f,0.f,0.35277667641639709f,0.f,-0.3548465371131897f,1.f,-0.3548465371131897f,0.f,1.f,0.f,0.16128836572170258f,0.16128836572170258f,1.7311687469482422f,1.f,0.50304561853408813f,0.f,1.f,0.f,0.68279218673706055f,0.37576138973236084f,3.f,1.f,2.0094552040100098f,0.f,1.f,0.f,1.f,0.75236380100250244f,3.f,1.f,3.f,0.f,1.f,0.f,1.f,1.f,1.7311687469482422f,1.f,0.50304561853408813f,0.f,1.f,0.f,0.68279218673706055f,0.37576138973236084f,3.f,1.f,3.f,0.f,1.f,0.f,1.f,1.f,1.0645395517349243f,1.f,1.0645395517349243f,0.f,1.f,0.f,0.51613491773605347f,0.51613491773605347f,1.2194058895111084f,1.f,3.f,0.f,1.f,0.f,0.5548514723777771f,1.f,-1.f,1.f,3.f,0.f,1.f,0.f,0.f,1.f,-1.f,1.f,0.3650285005569458f,0.f,1.f,0.f,0.f,0.34125712513923645f,-1.f,1.f,-1.f,0.f,1.f,0.f,0.f,0.f,-0.3548465371131897f,1.f,-0.3548465371131897f,0.f,1.f,0.f,0.16128836572170258f,0.16128836572170258f,-1.f,1.f,0.18855875730514526f,0.f,1.f,0.f,0.f,0.29713967442512512f,1.0645395517349243f,1.f,1.0645395517349243f,0.f,1.f,0.f,0.51613491773605347f,0.51613491773605347f,3.f,1.f,3.f,0.f,1.f,0.f,1.f,1.f,1.2194058895111084f,1.f,3.f,0.f,1.f,0.f,0.5548514723777771f,1.f,1.0645395517349243f,1.f,1.0645395517349243f,0.f,1.f,0.f,0.51613491773605347f,0.51613491773605347f,1.2194058895111084f,1.f,3.f,0.f,1.f,0.f,0.5548514723777771f,1.f,0.20148433744907379f,1.f,1.7914810180664062f,0.f,1.f,0.f,0.30037108063697815f,0.69787025451660156f } },
+		};
+		for (const FCase& C : Cases)
+		{
+			const auto Out = BreachTriangles(C.In, 8, {0,1,2,0,2,3}, C.Matrix, C.Holes);
+			T.Require(Out.size() == C.Expected.size(), "breach triangle count equals source");
+			for (size_t I = 0; I < std::min(Out.size(), C.Expected.size()); I++) T.Near(Out[I], C.Expected[I], 2e-6, "breach vertex attribute equals source");
+		}
+		const auto Columns = FailedColumns({15,1,3,5,7,9,11,13,17,19,21}, 8);
+		T.Require(Columns.size() == 9, "breaches cap at nine sorted failed section cells");
+		T.Near(Columns[0].X0, 2, 0, "first failed column x");
+		T.Near(Columns[8].Z0, 4, 0, "ninth failed column z");
+		return T;
+	}
 	FChecks WaterRules()
 	{
 		using namespace TCWaterCore;
 		FChecks T;
+		T.Near(PresentationTime(1017.25, 8.f, false), 17.25, 0, "High water clock wraps at 1000 seconds");
+		T.Near(PresentationTime(99, 8.f, true), 8, 0, "Low water clock holds its previous value");
+		T.Near(PresentationTime(99, 0.f, true), 0, 0, "fresh Low water starts at zero");
+		T.Near(PresentationTime(99, 8.f, true, 1037.5), 37.5, 0, "matched capture override wraps on Low too");
+		T.Near(PresentationTime(99, 8.f, false, std::numeric_limits<double>::quiet_NaN()), 99, 0, "nonfinite override keeps the normal clock");
 		std::vector<std::string> Grid{ ".......", "..WFW..", "..W=W..", "..WWW..", "......." };
 		FWater Water;
 		Water.Char = [&](int C) { return (uint8_t)Grid[(size_t)C / 7][(size_t)C % 7]; };
@@ -365,9 +409,9 @@ namespace TCTerrainFormulas
 int main()
 {
 	int Failures = 0;
-	for (const auto& Result : { TCTerrainFormulas::ReliefRules(), TCTerrainFormulas::PaintRules(), TCTerrainFormulas::DecalRules(), TCTerrainFormulas::StructureRules(), TCTerrainFormulas::WaterRules(), TCTerrainFormulas::RailwayRules() })
+	for (const auto& Result : { TCTerrainFormulas::ReliefRules(), TCTerrainFormulas::PaintRules(), TCTerrainFormulas::DecalRules(), TCTerrainFormulas::StructureRules(), TCTerrainFormulas::BreachRules(), TCTerrainFormulas::WaterRules(), TCTerrainFormulas::RailwayRules() })
 		for (const auto& Error : Result.Errors) { std::fprintf(stderr, "%s\n", Error.c_str()); Failures++; }
-	std::printf("terrain reference formulas: 6 checks, %d failures\n", Failures);
+	std::printf("terrain reference formulas: 7 checks, %d failures\n", Failures);
 	return Failures ? 1 : 0;
 }
 #else
@@ -386,6 +430,10 @@ int main()
 #include "Serialization/JsonSerializer.h"
 #include "World/TCRelief.h"
 #include <cmath>
+
+#include "Engine/StaticMesh.h"
+#include "StaticMeshResources.h"
+#include "Client/TCModelLibrary.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -436,6 +484,13 @@ bool FTCTerrainStructureRulesTest::RunTest(const FString& Parameters)
 	for (const auto& Error : Result.Errors) AddError(UTF8_TO_TCHAR(Error.c_str()));
 	return Result.Errors.empty();
 }
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCTerrainBreachRulesTest, "ThreeCrossroads.Terrain.BuildingBreaches", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FTCTerrainBreachRulesTest::RunTest(const FString& Parameters)
+{
+	const auto Result = TCTerrainFormulas::BreachRules();
+	for (const auto& Error : Result.Errors) AddError(UTF8_TO_TCHAR(Error.c_str()));
+	return Result.Errors.empty();
+}
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCTerrainWaterRulesTest, "ThreeCrossroads.Terrain.WaterRules", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FTCTerrainWaterRulesTest::RunTest(const FString& Parameters)
 {
@@ -467,7 +522,68 @@ bool FTCTerrainWaterDiscoveryTest::RunTest(const FString& Parameters)
 	// The unmodified water.js emits Float32 0.05999999865889549 here, even though the delivered level is 3.
 	TestTrue(TEXT("late World cell retains the creation-time placeholder line"), FMath::IsNearlyEqual(Water.WaterAt(11, 7), .06f));
 	TestTrue(TEXT("a new body does not move the original body's line"), FMath::IsNearlyEqual(Water.WaterAt(3, 3), 5.06f));
+	Water.SetPresentationTime(1037.5);
+	Water.Flush(State, 99, false);
+	TestEqual(TEXT("matched renderer clock is presentation only"), Water.TimeSent(), 37.5f);
+	Water.ResetFrom(State);
+	TestEqual(TEXT("new map clears the last sent clock before a Low frame"), Water.TimeSent(), 0.f);
+	Water.SetPresentationTime(-1);
 	Water.Detach();
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCTerrainBuildingMeshTest, "ThreeCrossroads.Terrain.BuildingMesh", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FTCTerrainBuildingMeshTest::RunTest(const FString& Parameters)
+{
+	UStaticMesh* Source = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Models/Meshes/hq/SM_hq_0_body.SM_hq_0_body"));
+	if (!TestNotNull(TEXT("original source HQ mesh"), Source)) return false;
+	TestTrue(TEXT("cooked building retains buffers for source triangle clipping"), Source->bAllowCPUAccess);
+	const FTransform Root(FQuat::Identity, FVector(500, 500, 0));
+	bool Empty = false;
+	UStaticMesh* Mesh = TCStructures::BreachMesh(Source, {{4,6,4,6}}, Root, GetTransientPackage(), Empty);
+	if (!TestNotNull(TEXT("source HQ clipped at a delivered two-metre section"), Mesh)) return false;
+	TestFalse(TEXT("one breach leaves the other sections standing"), Empty);
+	TestEqual(TEXT("source material slots retained"), Mesh->GetStaticMaterials().Num(), Source->GetStaticMaterials().Num());
+	const auto& Lod = Mesh->GetRenderData()->LODResources[0];
+	const auto& Original = Source->GetRenderData()->LODResources[0];
+	// UE 5.8's fast builder pads FStaticMeshBuildVertex UVs to eight channels. Every source channel must survive.
+	TestTrue(TEXT("all source UV channels retained"), Lod.VertexBuffers.StaticMeshVertexBuffer.GetNumTexCoords() >= Original.VertexBuffers.StaticMeshVertexBuffer.GetNumTexCoords());
+	TestEqual(TEXT("source UV precision retained"), Lod.VertexBuffers.StaticMeshVertexBuffer.GetUseFullPrecisionUVs(), Original.VertexBuffers.StaticMeshVertexBuffer.GetUseFullPrecisionUVs());
+	UStaticMesh* Uncut = TCStructures::BreachMesh(Source, {{1000,1002,1000,1002}}, Root, GetTransientPackage(), Empty);
+	if (TestNotNull(TEXT("nonintersecting section leaves source attributes intact"), Uncut))
+	{
+		const auto& Copy = Uncut->GetRenderData()->LODResources[0];
+		TestEqual(TEXT("nonintersecting cut keeps every triangle"), Copy.IndexBuffer.GetNumIndices(), Original.IndexBuffer.GetNumIndices());
+		int32 BadUVs = 0;
+		for (uint32 I = 0; I < FMath::Min(Copy.IndexBuffer.GetNumIndices(), Original.IndexBuffer.GetNumIndices()); I++)
+			for (uint32 C = 0; C < Original.VertexBuffers.StaticMeshVertexBuffer.GetNumTexCoords(); C++)
+				if (!Copy.VertexBuffers.StaticMeshVertexBuffer.GetVertexUV(Copy.IndexBuffer.GetIndex(I), C).Equals(
+					Original.VertexBuffers.StaticMeshVertexBuffer.GetVertexUV(Original.IndexBuffer.GetIndex(I), C), 1e-6f)) BadUVs++;
+		TestEqual(TEXT("every source shader UV value survives the engine build"), BadUVs, 0);
+	}
+	int32 Intruding = 0;
+	for (uint32 I = 0; I < Lod.IndexBuffer.GetNumIndices(); I += 3)
+	{
+		FVector Centre = FVector::ZeroVector;
+		for (uint32 K = 0; K < 3; K++) Centre += Root.TransformPosition(FVector(Lod.VertexBuffers.PositionVertexBuffer.VertexPosition(Lod.IndexBuffer.GetIndex(I + K)))) / 3.0;
+		if (Centre.X > 400.001 && Centre.X < 599.999 && Centre.Y > 400.001 && Centre.Y < 599.999) Intruding++;
+	}
+	TestEqual(TEXT("no drawn triangle remains inside the failed section"), Intruding, 0);
+	TestNull(TEXT("fully clipped model has no placeholder mesh"), TCStructures::BreachMesh(Source, {{-100,100,-100,100}}, Root, GetTransientPackage(), Empty));
+	TestTrue(TEXT("complete removal is distinct from a missing source asset"), Empty);
+	FTCMatchState State; State.Map.W = 8;
+	FTCCellSection Section; Section.StructureId = TEXT("building:17"); Section.State = TEXT("failed"); State.Sections.Add(18, Section);
+	FTCModelPart Part; Part.Name = TEXT("body"); Part.Mesh = FSoftObjectPath(Source); FTCModelPart Out;
+	TCStructures::FBuildingBreaches Cache;
+	TestTrue(TEXT("live building resolves clipped source"), Cache.PartFor(Part, 17, State, Root, GetTransientPackage(), Out));
+	TestTrue(TEXT("failed section changes the drawn mesh"), Out.Mesh != Part.Mesh);
+	const FSoftObjectPath First = Out.Mesh;
+	Cache.PartFor(Part, 17, State, Root, GetTransientPackage(), Out);
+	TestTrue(TEXT("unchanged section reuses its clipped geometry"), Out.Mesh == First);
+	State.Sections[18].State = TEXT("standing"); State.Sections[18].Hp = 0; State.Sections[18].bHasHp = true;
+	Cache.PartFor(Part, 17, State, Root, GetTransientPackage(), Out);
+	TestTrue(TEXT("only source state failed clips; repair restores original"), Out.Mesh == Part.Mesh);
+	Cache.Reset();
 	return true;
 }
 

@@ -143,7 +143,7 @@ namespace TCLook
 
 	FName MapMood(const FString& MapName, const FString& MapKey)
 	{
-		// shared/weather.js MOOD_RULES (a "mood" field in the map file comes first; the client does not decode one yet)
+		// shared/weather.js MOOD_RULES: name/key inference, after MoodFor checks the authored map mood.
 		static const TCHAR* Rules[][2] = {
 			{ TEXT("snow"), TEXT("ardennes|bastogne|bulge|winter|snow") },
 			{ TEXT("dust"), TEXT("kasserine|desert|tobruk|alamein|africa|tunis") },
@@ -159,11 +159,13 @@ namespace TCLook
 		return FName(TEXT("warm"));
 	}
 
-	FName MoodFor(const FString& MapName, const FString& MapKey, const FString& WeatherKind, FName Override)
+	FName MoodFor(const FString& MapName, const FString& MapKey, const FString& WeatherKind, FName Override, const FString& AuthoredMood)
 	{
 		if (!Override.IsNone() && FindMood(Override)) return Override;
 		if (WeatherKind == TEXT("snow")) return FName(TEXT("snow"));
 		if (WeatherKind == TEXT("rain") || WeatherKind == TEXT("mud")) return FName(TEXT("overcast"));
+		if (AuthoredMood.Equals(AuthoredMood.ToLower(), ESearchCase::CaseSensitive))
+			if (const FTCMood* Authored = FindMood(FName(*AuthoredMood))) return Authored->Name;
 		const FName Name = MapMood(MapName, MapKey);
 		return FindMood(Name) ? Name : DefaultMood().Name;
 	}
@@ -317,7 +319,10 @@ namespace TCLook
 		S.bOverride_LensFlareIntensity = true; S.LensFlareIntensity = 0.f;
 		S.bOverride_MotionBlurAmount = true; S.MotionBlurAmount = 0.f;
 		S.bOverride_AmbientOcclusionIntensity = true; S.AmbientOcclusionIntensity = AmbientOcclusion;
-		S.bOverride_AmbientOcclusionRadius = true; S.AmbientOcclusionRadius = 160.f; // Existing view-space setting; source GTAO radius 1.6 is world-space. Parity remains open.
+		S.bOverride_AmbientOcclusionRadius = true; S.AmbientOcclusionRadius = 160.f;
+		int32 WorldRadius = 0;
+		FParse::Value(FCommandLine::Get(), TEXT("TCLookAOWorld="), WorldRadius);
+		S.bOverride_AmbientOcclusionRadiusInWS = true; S.AmbientOcclusionRadiusInWS = WorldRadius != 0;
 		// DiffuseIndirectComposite multiplies the existing scene color by material AO in its static-lighting pass.
 		// Model AO is zero to suppress the engine sky fill; that multiplication also erases their own hemisphere and
 		// environment light in Emissive. Keep screen AO for the sky pass, without applying material AO to scene color.
@@ -474,9 +479,9 @@ void ATCLighting::BeginPlay()
 		UE_LOG(LogTCLook, Warning, TEXT("look: r.AllowStaticLighting is on, so the model materials take the engine sky light (their reflections then include the sky fill; unreal/Config/TCPostProcess.md)"));
 }
 
-void ATCLighting::StartMatch(const FString& MapName, const FString& MapKey, const FString& WeatherNow, float BrowserYaw, FName Override)
+void ATCLighting::StartMatch(const FString& MapName, const FString& MapKey, const FString& WeatherNow, float BrowserYaw, FName Override, const FString& AuthoredMood)
 {
-	const FName Name = TCLook::MoodFor(MapName, MapKey, WeatherNow, Override);
+	const FName Name = TCLook::MoodFor(MapName, MapKey, WeatherNow, Override, AuthoredMood);
 	Base = *TCLook::FindMood(Name);
 	// moods.js LOOK[kind] ? kind : 'clear'
 	static const TSet<FString> Known = { TEXT("clear"), TEXT("fog"), TEXT("rain"), TEXT("mud"), TEXT("snow") };
@@ -1432,6 +1437,12 @@ bool FTCLookReferenceTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("rain is overcast"), MoodFor(TEXT("Three Crossroads"), TEXT(""), TEXT("rain")), FName(TEXT("overcast")));
 	TestEqual(TEXT("a desert map"), MoodFor(TEXT("Tobruk"), TEXT(""), TEXT("clear")), FName(TEXT("dust")));
 	TestEqual(TEXT("snow weather"), MoodFor(TEXT("Tobruk"), TEXT(""), TEXT("snow")), FName(TEXT("snow")));
+	TestEqual(TEXT("authored mood precedes map-name inference"), MoodFor(TEXT("Seelow Heights"), TEXT("seelow-heights"), TEXT("fog"), NAME_None, TEXT("dawn")), FName(TEXT("dawn")));
+	TestEqual(TEXT("snow precedes authored mood"), MoodFor(TEXT("Seelow Heights"), TEXT(""), TEXT("snow"), NAME_None, TEXT("dawn")), FName(TEXT("snow")));
+	TestEqual(TEXT("rain precedes authored mood"), MoodFor(TEXT("Seelow Heights"), TEXT(""), TEXT("rain"), NAME_None, TEXT("dawn")), FName(TEXT("overcast")));
+	TestEqual(TEXT("explicit URL override precedes weather"), MoodFor(TEXT("Seelow Heights"), TEXT(""), TEXT("snow"), TEXT("golden"), TEXT("dawn")), FName(TEXT("golden")));
+	TestEqual(TEXT("unknown authored mood falls back to map name"), MoodFor(TEXT("Tobruk"), TEXT(""), TEXT("clear"), NAME_None, TEXT("unknown")), FName(TEXT("dust")));
+	TestEqual(TEXT("source mood keys are case sensitive"), MoodFor(TEXT("Seelow Heights"), TEXT(""), TEXT("clear"), NAME_None, TEXT("DAWN")), FName(TEXT("day")));
 	// atmosphere.js blend and applyMood in fog
 	FTCWeatherLook Goal;
 	FLinearColor Haze;

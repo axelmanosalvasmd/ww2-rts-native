@@ -9,6 +9,8 @@
 // an instance whose custom data carries its colors. ATCUnitRenderer draws with it (TCUnitModels.cpp); the import and
 // the material contract are in unreal/Tools/models/README.md and the header of import-models.py.
 #pragma once
+#define TC_HAS_MODEL_SELECTION 1
+struct FTCPinhole;
 
 #include "CoreMinimal.h"
 #include "UObject/WeakObjectPtrTemplates.h"
@@ -95,6 +97,7 @@ public:
 	void ResetCounts() { Written = Matched = Moving = 0; }
 	// Instance keys: a unit's part (part index) or its men (man index), a ring, a body. 0 is no key (starts still).
 	static constexpr uint64 NoKey = 0;
+	void SelectionBounds(int32 UnitId, const FTCPinhole& View, double W, double H, TArray<FBox2D>& Out) const;
 	static uint64 PartKey(int32 UnitId, int32 Part) { return (1ull << 60) | (uint64(uint32(UnitId)) << 24) | (uint64(Part & 0xFFFF) << 4) | 0; }
 	static uint64 ManKey(int32 UnitId, int32 Man) { return (1ull << 60) | (uint64(uint32(UnitId)) << 24) | (uint64(Man & 0xFFFF) << 4) | 1; }
 	static uint64 RingKey(int32 UnitId, bool bSelection) { return (1ull << 60) | (uint64(uint32(UnitId)) << 24) | (bSelection ? 3 : 2); }

@@ -26,6 +26,11 @@
 #include "TCUnitMotion.generated.h"
 
 struct FTCModelEntry;
+struct FTCAircraftSpec
+{
+	double Nose = 0, Tail = 0, Ext = 0;
+	FSoftObjectPath Shadow;
+};
 class UInstancedStaticMeshComponent;
 class UMaterialInterface;
 class UMaterialInstanceDynamic;
@@ -47,6 +52,7 @@ struct THREECROSSROADS_API FTCPartMotion
 	// wheel-motion.js: the ground rolled (m, signed) and the hull's turn (rad) since the unit was first drawn: the
 	// two floats of the reference's per-instance wheelTravel attribute.
 	double WheelTravel = 0, WheelTurn = 0;
+	double Heading = 0;
 	// unit-models.js vehicleDamageAnchor: the rear engine deck point above the hull (the hull's bounds without the
 	// turret and mounts: 15 % in from the back, 18 cm over the top, mid width), carried by the hull motion, in the
 	// world (cm). Set by the renderer each frame it draws the unit; the damage smoke (TCEffects) rises from it.
@@ -91,6 +97,14 @@ public:
 	// wheel-motion.js wheelAngle: how far a wheel of radius Radius (m) has turned about its local z axle; Side is the
 	// track side it rolls with (wheelSide, else its pivot's z). Reference sign (three's rotation about +z).
 	static double WheelAngle(double Radius, double Side, double Travel, double Turn);
+	// unit-models.js deckSeats: source hull vertices in body-space centimetres, excluding turret and mounts.
+	static TArray<FTransform> RiderSeats(const TArray<FVector>& HullVertices);
+	static bool HasDeckRiders(const FString& Type);
+	// aircraft.js tick: advances smokeT only while visible and hurt, returns 0, light smoke (1) or heavy/fire (2).
+	static int32 PlaneDamage(double& Wait, double Health, bool bVisible, bool bLow, double Dt);
+	// Reproducible source builders' dimensions, shadow canvases and body-space vertices (Tools/motion/export-aircraft).
+	static const FTCAircraftSpec* AircraftSpec(const FString& Type, int32 Faction);
+	static const TArray<FTransform>& DeckFor(const FString& Type, int32 Faction);
 
 private:
 	struct FState;
@@ -177,6 +191,7 @@ struct THREECROSSROADS_API FTCSoldierDraw
 	bool bFar = false;             // the squad's level of detail (FTCInfantrySquadAnimation::IsFar)
 	int32 UnitId = 0;              // with ManIndex: lets the man fall where he stood when the squad loses him
 	int32 ManIndex = INDEX_NONE;
+	bool bDeckRider = false;       // hull passengers do not create squad casualty records
 };
 
 // unit-models.js CORPSES
@@ -266,6 +281,8 @@ private:
 		UTexture2D* Keys = nullptr;
 		UStaticMesh* Mesh = nullptr;
 		UInstancedStaticMeshComponent* Draw[2] = {}; // solid, faded
+		UInstancedStaticMeshComponent* Riders = nullptr;
+		UInstancedStaticMeshComponent* RiderShadow = nullptr;
 	};
 	struct FBatch { TArray<FTransform> Transforms; TArray<float> Data; int32 Floats = 0; TArray<uint64> Keys; };
 	struct FStood { bool bSet = false; FString FigureType; int32 Faction = 0, Slot = 0; FLinearColor Owner; FTransform Man; };
@@ -284,7 +301,7 @@ private:
 	UInstancedStaticMeshComponent* MakeBatch(UStaticMesh* Mesh, int32 Floats, const TArray<UMaterialInterface*>& Materials);
 	void Add(UInstancedStaticMeshComponent* Ism, const FTransform& Xf, const float* Data, int32 Floats, uint64 Key);
 	bool DrawNear(const FString& FigureType, int32 Faction, int32 Slot, const FTransform& Xf, const TArray<float>& Blend12, float Fade, bool bForceFaded, uint64 Key);
-	bool DrawFar(const FString& FigureType, int32 Faction, int32 Slot, const FTransform& Xf, const TArray<float>& Blend12, float Fade, const FLinearColor& Owner, bool bForceFaded, uint64 Key);
+	bool DrawFar(const FString& FigureType, int32 Faction, int32 Slot, const FTransform& Xf, const TArray<float>& Blend12, float Fade, const FLinearColor& Owner, bool bForceFaded, uint64 Key, bool bDeckRider = false);
 	void Fall(const FStood& Man);
 	void DropCorpse(int32 Index);
 	bool LoadFarFigures(FString& OutError);

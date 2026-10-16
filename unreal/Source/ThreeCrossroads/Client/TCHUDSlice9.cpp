@@ -418,7 +418,7 @@ float ATCHUD::DrawScoreStrip(UFont* Font, UFont* Big)
 	if (FTCType::IsLoaded())
 	{
 		// objectives.css: 600 16px/1.35 for the goal, 500 14px/1.35 for the banner.
-		auto TextMeasure = [](float Px, bool Bold) { return [Px, Bold](const FString& T) { return FVector2D(FTCType::Face(Bold)->Width(T, Px), Px * 1.35f / 1.15f); }; };
+		auto TextMeasure = [](float Px, bool Bold) { return [Px, Bold](const FString& T) { return FVector2D(FTCType::Width(T, Px, Bold), Px * 1.35f / 1.15f); }; };
 		FTCTextBox Goal, Banner;
 		Bottom = M->ScenarioText.Place(Y - 4.f, Canvas->ClipX, Canvas->ClipY, TextMeasure(16.f, true), TextMeasure(14.f, false), Goal, Banner);
 		FTCPaint P;
@@ -607,6 +607,18 @@ void ATCHUD::DrawAlertFeed(UFont* Font)
 	if (!M || !Canvas) return;
 	FTCAlertViewInput In;
 	In.Now = FPlatformTime::Seconds(); // the alert clock (alerts.js now(); ATCGameMode::OnCombatSnapshot)
+    // Opt-in presentation fixture. It changes only this HUD feed, never the match or the received envelopes.
+    int32 FixtureTick=0;
+    if (!bLossFixtureDrawn && FParse::Value(FCommandLine::Get(),TEXT("TCHudLossFixture="),FixtureTick) && FixtureTick>0 && M->State.Tick>=FixtureTick)
+    {
+        bLossFixtureDrawn=true;
+        for (const TCHAR* Type : {TEXT("rifle"),TEXT("tank"),TEXT("mortar"),TEXT("medic"),TEXT("mg"),TEXT("attacker"),TEXT("flamer"),TEXT("medium")})
+        {
+            const FString Text=FTCAlerts::UnitName(M->State,&M->UnitTable,Type,M->State.You)+TEXT(" lost");
+            M->AlertFeed.Push(TEXT("unitLost"),Text,true,FVector2D(122,117),In.Now);
+        }
+        UE_LOG(LogTC,Log,TEXT("hud: synthetic presentation fixture, eight simultaneous losses at tick %d, history %d"),M->State.Tick,M->AlertFeed.History().Entries().Num());
+    }
     // Verification only, matching the browser's held presentation clock on archived seated input.
     static bool Parsed=false; static double AlertAge=-1;
     if (!Parsed)
@@ -621,6 +633,7 @@ void ATCHUD::DrawAlertFeed(UFont* Font)
 	In.ViewW = Canvas->ClipX; In.ViewH = Canvas->ClipY; In.UiScale = UiNow;
 	// Native bounded placement keeps the pinned anchor where free and docks whole cards elsewhere when crowded.
 	for (const FBox2D& B : Panels) In.Avoid.Add(FBox2D(B.Min/UiNow,B.Max/UiNow));
+	if (Minimap.Rect().bIsValid) In.Avoid.Add(FBox2D(Minimap.Rect().Min/UiNow-FVector2D(5,5),Minimap.Rect().Max/UiNow+FVector2D(5,5)));
 	if (RecruitBox.bIsValid) In.Avoid.Add(FBox2D(RecruitBox.Min/UiNow,RecruitBox.Max/UiNow));
     if (CornerBox.bIsValid) In.Avoid.Add(FBox2D(CornerBox.Min/UiNow,CornerBox.Max/UiNow));
     // These banners paint after the HUD at physical scale 1. Reserve their actual measured boxes first.
@@ -632,11 +645,32 @@ void ATCHUD::DrawAlertFeed(UFont* Font)
 	if (APlayerController* PC = GetOwningPlayerController(); PC && PC->GetMousePosition(Mx, My)) { In.bMouse = true; In.Mouse = FVector2D(ToUi(Mx), ToUi(My)); }
 	M->AlertFeed.Frame(In.Now);
 	const FTCPaint P = M->AlertFeed.Layout(In, (FTCType::IsLoaded() ? FTCType::Measure() : FTCPaint::CanvasMeasure(Font)), FTCType::IsLoaded() ? FTCType::HeavyMeasure() : FTCMeasure());
+	if (FixtureTick>0 && bLossFixtureDrawn)
+	{
+	 static int32 LastCards=-1;
+	 const int32 Cards=P.TextsOf(TEXT("alert:loss-heading")).Num();
+	 if (Cards!=LastCards)
+	 {
+	  LastCards=Cards;
+	  UE_LOG(LogTC,Log,TEXT("hud: loss fixture presentation: %d cards, lines [%s], history %d, occupied %d"),Cards,
+	   *FString::Join(P.TextsOf(TEXT("alert:loss-detail")),TEXT(" | ")),M->AlertFeed.History().Entries().Num(),In.Avoid.Num());
+	 }
+	}
 	FTCType::Draw(P, Canvas, Font, UiNow);
 	// round 17: the history box (alert-history.js #alertHistory) for the sandbox panel's place next frame
 	AlertHistoryBox = FBox2D(ForceInit);
 	if (const FTCPaintItem* H = P.Find(TEXT("alert:history"))) AlertHistoryBox = FBox2D(H->Pos, H->Pos + H->Size);
-	for (const FTCPaintHit& H : P.Hits) { FTCUiCommand C(ETCUiAction::Alert); C.Unit = H.Tag; Buttons.Add({ ToScreen(H.Rect), C, H.Label, true }); }
+	for (const FTCPaintHit& H : P.Hits)
+    {
+        FTCUiCommand C(ETCUiAction::Alert); C.Unit=H.Tag; Buttons.Add({ToScreen(H.Rect),C,H.Label,true});
+        if (H.Tag.StartsWith(TEXT("alert:line:"))) OfferTooltip(TEXT("Space or click: look there"),ToScreen(H.Rect));
+        else if (H.Tag.StartsWith(TEXT("alert:entry:")))
+        {
+            const int32 Id=FCString::Atoi(*H.Tag.RightChop(12));
+            const FTCAlertHistoryEntry* Entry=M->AlertFeed.History().Entries().FindByPredicate([Id](const FTCAlertHistoryEntry& E) { return E.Id==Id; });
+            if (Entry) OfferTooltip(Entry->bHasAt?FString::Printf(TEXT("Recorded location: %.1f, %.1f"),Entry->At.X,Entry->At.Y):FString(TEXT("No recorded location")),ToScreen(H.Rect));
+        }
+    }
 	for (const FBox2D& B : P.Panels) Panels.Add(ToScreen(B));
 }
 
@@ -744,17 +778,12 @@ void ATCHUD::DrawMinimapPoints()
 	if (!M || !Minimap.Rect().bIsValid || !Canvas) return;
 	const FTCMatchState& S = M->State;
 	FVector2D Px, Edge;
-	// the start's spawns as squares in each seat's colour (World sends none for another team's)
-	for (int32 I = 0; I < S.Spawns.Num(); I++)
-		if (S.Spawns[I].IsSet() && Minimap.WorldToPixel(S.Spawns[I].GetValue(), Px))
-		{
-			DrawRect(FLinearColor::Black, Px.X - 3.5f, Px.Y - 3.5f, 7.f, 7.f);
-			DrawRect(ATCUnitRenderer::SeatColor(I), Px.X - 2.5f, Px.Y - 2.5f, 5.f, 5.f);
-		}
+	const float Cs=Minimap.CanvasScale();
+
 	for (const FTCCapturePoint& P : S.Objectives.Points())
 	{
 		if (!Minimap.WorldToPixel(P.Centre, Px) || !Minimap.WorldToPixel(P.Centre + FVector2D(TCObjectiveRules::PointRadius, 0), Edge)) continue;
-		const float Rad = FMath::Max(3.f, (float)FVector2D::Distance(Px, Edge));
+		const float Rad = FVector2D::Distance(Px, Edge);
 		// a disc in the owner's colour at 60% (neutral: light grey at 40%), outlined in black
 		const FLinearColor Fill = P.Owner >= 0 ? WithAlpha(ATCUnitRenderer::SeatColor(P.Owner), 0.6f) : FLinearColor(FColor(0xdd, 0xdd, 0xdd, 0x66));
 		constexpr int32 Segs = 16;
@@ -766,15 +795,15 @@ void ATCHUD::DrawMinimapPoints()
 			Tri.SetColor(Fill);
 			Tri.BlendMode = SE_BLEND_Translucent;
 			Canvas->DrawItem(Tri);
-			DrawLine(B0.X, B0.Y, B1.X, B1.Y, FLinearColor::Black, 1.f);
+			DrawLine(B0.X, B0.Y, B1.X, B1.Y, FLinearColor::Black, Cs);
 		}
 		// cut off from its HQ: a red cross through it
 		if (P.bCut)
 		{
 			const float R = Rad * 0.7f;
 			const FLinearColor C(FColor(0xd0, 0x36, 0x2c));
-			DrawLine(Px.X - R, Px.Y - R, Px.X + R, Px.Y + R, C, 2.f);
-			DrawLine(Px.X + R, Px.Y - R, Px.X - R, Px.Y + R, C, 2.f);
+			DrawLine(Px.X - R, Px.Y - R, Px.X + R, Px.Y + R, C, 3*Cs);
+			DrawLine(Px.X + R, Px.Y - R, Px.X - R, Px.Y + R, C, 3*Cs);
 		}
 		// locked for this side: dashed to the point it needs
 		FVector2D To;
@@ -782,13 +811,29 @@ void ATCHUD::DrawMinimapPoints()
 		{
 			const double L = FVector2D::Distance(Px, To);
 			const FVector2D D = L > 0 ? (To - Px) / L : FVector2D::ZeroVector;
-			for (double T = 0; T < L; T += 10.0)
+			for (double T = 0; T < L; T += 10.0*Cs)
 			{
-				const FVector2D A = Px + D * T, B = Px + D * FMath::Min(L, T + 6.0);
-				DrawLine(A.X, A.Y, B.X, B.Y, Brass, 2.f);
+				const FVector2D A = Px + D * T, B = Px + D * FMath::Min(L, T + 6.0*Cs);
+				DrawLine(A.X, A.Y, B.X, B.Y, Brass, 2*Cs);
 			}
 		}
 	}
+	// the start's spawns as squares in each seat's colour (World sends none for another team's)
+	for (int32 I = 0; I < S.Spawns.Num(); I++)
+		if (S.Spawns[I].IsSet() && Minimap.WorldToPixel(S.Spawns[I].GetValue(), Px))
+		{
+			FVector2D Q[4]; const FVector2D At=S.Spawns[I].GetValue();
+			const FVector2D D[4]={{-5,-5},{5,-5},{5,5},{-5,5}};
+			for (int32 K=0; K<4; K++) Minimap.WorldToPixel(At+D[K],Q[K]);
+			FillQuad(Q,ATCUnitRenderer::SeatColor(I));
+			for (int32 K=0; K<4; K++) DrawLine(Q[K].X,Q[K].Y,Q[(K+1)%4].X,Q[(K+1)%4].Y,FLinearColor::Black,Cs);
+		}}
+
+void ATCHUD::DrawMinimapAlertRings()
+{
+ ATCGameMode* M=GetWorld()->GetAuthGameMode<ATCGameMode>();
+ if (!M || !Minimap.Rect().bIsValid || !Canvas) return;
+ FVector2D Px;
 	// round 15: client/alerts.js drawPings: each alert line's mark, a spreading ring and a steady one, dark under the
 	// kind's colour (4 px, then 2 px)
 	const FLinearColor Ink(FColor(0x15, 0x16, 0x0f));

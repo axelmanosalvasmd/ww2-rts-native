@@ -572,13 +572,19 @@ FTCCombatEffects::FTCCombatEffects()
 	};
 	Debris.On.Pose = [this](const FString& Id, const FTCDebrisRow& Row)
 	{
-		// sections are drawn here (fx.js sectionPose, at most DEBRIS_LIMITS.active); a wreck's hull is drawn by the world
-		// objects, which hold its row
+		if (Row.bWreck) { WreckPoses.Add(Id, Row); return; }
+		// Sections are drawn here; the world renderer consumes the same interpolator's wreck poses.
 		if (Row.Kind != TEXT("section") || (!SectionPoses.Contains(Id) && SectionPoses.Num() >= 96)) return;
 		SectionPoses.Add(Id, Row);
 	};
-	Debris.On.Remove = [this](const FString& Id) { SectionPoses.Remove(Id); };
+	Debris.On.Remove = [this](const FString& Id) { SectionPoses.Remove(Id); WreckPoses.Remove(Id); };
 	Debris.On.Contact = [this](const FTCShot& Sh, const FTCShotExtra& Ex) { Counters.Collapses++; WorldContact(Sh, Ex); };
+}
+
+const FTCDebrisRow* FTCCombatEffects::WreckPose(int32 WreckId) const
+{
+	for (const auto& P : WreckPoses) if (P.Value.WreckId == WreckId) return &P.Value;
+	return nullptr;
 }
 
 void FTCCombatEffects::Start(const FTCMatchState& S)
@@ -591,13 +597,14 @@ void FTCCombatEffects::Reset()
 {
 	// fx.js reset, projectiles.reset, debris.reset (their removals change nothing drawn here)
 	Projectiles.Reset(); Debris.Reset();
-	Live.Reset(); FlightDraws.Reset(); SectionPoses.Reset(); Events.Reset(); Fires.Reset(); WreckFires.Reset(); Columns.Reset(); Clouds.Reset();
+	Live.Reset(); FlightDraws.Reset(); SectionPoses.Reset(); WreckPoses.Reset(); Events.Reset(); Fires.Reset(); WreckFires.Reset(); Columns.Reset(); Clouds.Reset();
 	Rockets.Reset(); Passes.Reset(); Falls.Reset(); Throws.Reset(); SalvoMarks.Reset(); LastBurst.Reset(); PrevHeld.Reset(); Killed.Reset(); KilledGone.Reset();
 	HeldWreckMotion.Reset(); Sounds.Reset(); ShooterEffects.Reset(); // Counters run for the object's life (logs, tests)
 	for (FTCFxDecal& D : DecalPool) D.bOn = false;
 	ShakeAmount = 0.f; WindXZ = FVector2D(0.55, 0.25); TickNow = 0; RefitT = 0.f; SimTick = 0;
 	for (FBlastMark& B : Blasts) B = FBlastMark();
 	BlastNext = 0; DamageCues.Reset(); FrameDt = 0.f;
+	PlaneSmokeWait.Reset();
 	Rng.Initialize(Seed);
 }
 
@@ -882,6 +889,24 @@ void FTCCombatEffects::VehicleDamageFrame(int32 Id, double Health, bool bKilled,
 void FTCCombatEffects::RetainDamage(const TSet<int32>& Present)
 {
 	for (auto It = DamageCues.CreateIterator(); It; ++It) if (!Present.Contains(It.Key())) It.RemoveCurrent();
+	for (auto It = PlaneSmokeWait.CreateIterator(); It; ++It) if (!Present.Contains(It.Key())) It.RemoveCurrent();
+}
+
+void FTCCombatEffects::PlaneDamageFrame(int32 Id, double Health, bool bVisible, float Dt, const FVector& RootMetres, double Rot, double Tail, double Nose)
+{
+	const bool Low = FTCGraphics::Get().IsLow();
+	const int32 Stage = FTCUnitMotion::PlaneDamage(PlaneSmokeWait.FindOrAdd(Id), Health, bVisible, Low, Dt);
+	if (!Stage) return;
+	const FVector Heading(FMath::Cos(Rot), FMath::Sin(Rot), 0);
+	const FVector P = RootMetres + Heading * (Tail * 0.8) + FVector(0, 0, 0.4);
+	Emit(Stage == 2 ? ETCFxPreset::AirSmokeDark : ETCFxPreset::AirSmoke,
+		P + At(Rr(-0.25, 0.25), Rr(-0.15, 0.15), Rr(-0.25, 0.25)), At(Rr(-0.25, 0.25), Rr(0.6, 1.2), Rr(-0.25, 0.25)),
+		Stage == 2 ? Rr(0.55, 0.8) : Rr(0.4, 0.6), Low ? 1.1 : Rr(1.5, 2.1));
+	if (Stage == 2)
+	{
+		const FVector Fire = RootMetres + Heading * (Nose * 0.5) + FVector(0, 0, 0.4);
+		Emit(ETCFxPreset::Burn, Fire + At(Rr(-0.2, 0.2), 0, Rr(-0.2, 0.2)), At(0, 0.8, 0), Rr(0.6, 0.8), Rr(0.2, 0.3));
+	}
 }
 
 void FTCCombatEffects::Muzzle(const FVector& P, double Dx, double Dz, double S, const FStyle& St)
@@ -2383,8 +2408,22 @@ void ATCEffects::DamageFrame(float Dt)
 	{
 		const FTCUnit& U = P.Value;
 		const FTCUnitDef* Def = Table->Find(U.Type);
-		if (!Def || Def->bInfantry || Def->bStructure || Def->bAir || FTCUnitMotion::IsSea(U.Type)) continue;
+		if (!Def || Def->bInfantry || Def->bStructure || FTCUnitMotion::IsSea(U.Type)) continue;
 		Present.Add(U.Id);
+		if (Def->bAir)
+		{
+			const int32 Faction = State->Factions.IsValidIndex(U.Owner) ? State->Factions[U.Owner] : U.Owner < 0 ? 0 : U.Owner % 3;
+			const FTCAircraftSpec* Spec = FTCUnitMotion::AircraftSpec(U.Type, Faction);
+			FVector2D Position(U.X, U.Z);
+			if (UnitView.IsValid()) UnitView->DrawnAt(U.Id, Position);
+			const double Ground = Terrain.IsValid() ? Terrain->HeightAt(Position.X, Position.Y) : 0;
+			const FTCPartMotion* Motion = UnitView.IsValid() ? UnitView->MotionOf(U.Id) : nullptr;
+			// The model's world heading is the eased root heading, not its bank/wobble.
+			const double Rot = Motion ? Motion->Heading : U.Rot;
+			if (Spec) Fx.PlaneDamageFrame(U.Id, Def->MaxHp() > 0 ? double(U.Hp) / Def->MaxHp() : 1.0, ATCUnitRenderer::IsDrawn(U), Dt,
+				FVector(Position.X, Position.Y, Ground + TCFxRules::AirAltitude), Rot, Spec->Tail, Spec->Nose);
+			continue;
+		}
 		const FTCPartMotion* M = UnitView.IsValid() ? UnitView->MotionOf(U.Id) : nullptr;
 		const bool bVisible = ATCUnitRenderer::IsDrawn(U) && M && M->bDamageAnchor;
 		const bool bDetailed = bVisible && (!bFrustum || Frustum.IntersectSphere(M->DamageAnchor, 2500.f));

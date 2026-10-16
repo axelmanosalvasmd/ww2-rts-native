@@ -11,6 +11,33 @@
 #include "TCCameraPawn.generated.h"
 
 class UCameraComponent;
+class APlayerController;
+class SWindow;
+
+// Native equivalent of pointer.js: confine the mouse and draw the source cursor in the viewport.
+// Esc suspends automatic capture until an explicit request, a mode change or a new match.
+class THREECROSSROADS_API FTCMouseCapture
+{
+public:
+	static FString ValidMode(const FString& Value);
+	static bool WindowFocused(const TSharedPtr<SWindow>& Window);
+	FString Mode() const { return ModeValue; }
+	FString Label() const;
+	void SetMode(const FString& Value) { ModeValue = ValidMode(Value); bSuspended = false; if (ModeValue == TEXT("off")) bCaptured = false; }
+	void Cycle();
+	bool Frame(bool bPlaying, bool bFullscreen, bool bFocused, bool bActivate, bool bEscape);
+	void ToggleNow(bool bPlaying) { bSuspended = bCaptured; bCaptured = !bCaptured && bPlaying; }
+	bool Captured() const { return bCaptured; }
+	bool Suspended() const { return bSuspended; }
+	void Drive(APlayerController* Controller, bool bPlaying);
+	void Request(APlayerController* Controller, bool bPlaying, bool bToggle);
+	void Fullscreen(APlayerController* Controller, bool bPlaying);
+private:
+	void Apply(APlayerController* Controller);
+	FString ModeValue = TEXT("fullscreen");
+	bool bCaptured = false, bSuspended = false, bWasPlaying = false, bWasFullscreen = false, bLoaded = false;
+	bool bApplied = false, bAppliedCapture = false;
+};
 
 UCLASS()
 class THREECROSSROADS_API ATCCameraPawn : public APawn
@@ -41,6 +68,14 @@ struct THREECROSSROADS_API FTCPinhole
 	// The point at height Height under the screen pixel S; false when the ray runs level.
 	bool Ground(FVector2D S, double VX, double VY, double Height, FVector2D& Out) const;
 };
+
+namespace TCSelectionBounds
+{
+	// selection-view.js clips each visible mesh envelope to the near/far planes before projecting it.
+	THREECROSSROADS_API bool Project(const FBox& Local, const FTransform& Model, const FTCPinhole& View, double W, double H, FBox2D& Out, double Near = 10, double Far = 1.e9);
+	THREECROSSROADS_API double Distance(const FBox2D& Bounds, FVector2D Point);
+	THREECROSSROADS_API bool Intersects(const FBox2D& Bounds, const FBox2D& Box);
+}
 
 namespace TCCameraFeel
 {

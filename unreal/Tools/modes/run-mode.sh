@@ -40,7 +40,7 @@ c.set('ThreeCrossroads', 'Graphics', sys.argv[2]); c.set('ThreeCrossroads', 'Gra
 c.set('ThreeCrossroads', 'UIScale', '100')
 with ini.open('w') as f: c.write(f)
 PY
-PREFERENCES=(-ini:GameUserSettings:ThreeCrossroads:Graphics="$GRAPHICS" -ini:GameUserSettings:ThreeCrossroads:GraphicsAutoDropped=1 -ini:GameUserSettings:ThreeCrossroads:UIScale=100 -TCGraphicsAt="$GRAPHICS@0")
+PREFERENCES=(-ini:GameUserSettings:[ThreeCrossroads]:Graphics="$GRAPHICS" -ini:GameUserSettings:[ThreeCrossroads]:GraphicsAutoDropped=1 -ini:GameUserSettings:[ThreeCrossroads]:UIScale=100 -TCGraphicsAt="$GRAPHICS@0")
 # Avoid the observed UE pre-init race between trace-worker logging and LLM teardown. These lanes do not record traces.
 DIAGNOSTICS=(-trace=none -notracethreading -notraceserver -nollm)
 if [ -n "${TC_MODES_URL:-}" ]; then URL="$TC_MODES_URL"; else URL="ws://127.0.0.1:$(cat "${TC_RUN_DIR:?set TC_RUN_DIR or TC_MODES_URL}/port")/ws"; fi

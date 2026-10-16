@@ -18,6 +18,7 @@
 #include "Client/TCModelLibrary.h"
 #include "Client/TCInfantryRig.h"
 #include "Client/TCUnitMotion.h"
+#include "World/TCStructures.h"
 #include "TCUnitRenderer.generated.h"
 
 class UInstancedStaticMeshComponent;
@@ -50,6 +51,8 @@ struct FTCUnitModelStats
 	int32 Moving = 0;            // of those: moved since the last frame (they carry a motion vector)
 	int32 Components = 0;        // instanced components alive (draw batches)
 	int32 Figures = 0;           // soldier figures made (near keyframe textures and far figures)
+	int32 Riders = 0;            // reference far kneelers on carrier decks, three per carried squad
+	int32 AircraftShadows = 0;
 };
 
 UCLASS()
@@ -69,6 +72,7 @@ public:
 	// The eased position drawn for a unit (reference metres), for picking what the player sees.
 	bool DrawnAt(int32 Id, FVector2D& Out) const;
 	int32 InstancesDrawn() const { return LastInstances; }
+	void SelectionBounds(int32 Id, const FTCPinhole& View, double W, double H, TArray<FBox2D>& Out) const;
 
 	static FLinearColor SeatColor(int32 Owner);
 	// Whether a unit is drawn at all: not inside a building or a carrier, not a plane parked at its base. Picking uses
@@ -150,6 +154,9 @@ private:
 	// unit-models.js animate() for a squad or crew: false when the entry has no men
 	bool AnimateSquad(const FTCModelEntry& Entry, const FTCUnit& U, const FTCUnitDef* Def, int32 Faction, FShown& S, const FTransform& Root, const ATCTerrain* Terrain, float Dt, const FVector& Eye, FSquadMen& Out);
 	void DrawSquadMen(const FTCModelEntry& Entry, const FTCUnit& U, int32 Faction, const FShown& S, const FTransform& Root, const FSquadMen& Men, const TArray<float>& Custom);
+	void DrawRiders(const FTCModelEntry& Entry, const FTCUnit& U, int32 Faction, const FTransform& Hull);
+	void DrawAircraftShadow(const FTCUnit& U, int32 Faction, const FShown& S, const FVector& Ground);
+	TMap<FString, TObjectPtr<UInstancedStaticMeshComponent>> AircraftShadows;
 	void AddRing(float Radius, const FLinearColor& Color, float Opacity, int32 ColorKey, const FVector& At, uint64 Key = 0);
 	// markers.js overlayMat rings are toneMapped: false; the game's post (M_TCLookPost) tone maps everything, so a
 	// ring's color is the ACES pre-image of its color at the light's exposure (ATCLighting), redone when it changes
@@ -173,8 +180,10 @@ private:
 	void ReportFrame();
 	double ReportAt = 0, FrameSum = 0, FrameMax = 0;
 	FString DrawnList; // this frame's "id type owner x z near|far" for each unit drawn with its model (ReportFrame)
+	FString DrawnMenList; // optional -TCUnitAudit: per-squad expected and successfully submitted members
 	int32 FrameCount = 0;
 
+	TCStructures::FBuildingBreaches BuildingBreaches;
 	FTCModelLibrary Library;
 	FString LibraryError;
 	bool bModelsTried = false;

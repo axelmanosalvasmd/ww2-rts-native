@@ -67,6 +67,7 @@ struct FTCCellData
 struct FTCMap
 {
 	FString Name;
+	FString Mood;               // client/moods.js: authored map mood, after weather and before name inference
 	int32 W = 0, H = 0;
 	bool bWorld = false;          // World Conquest: only cells this player's side has discovered are known
 	TArray<uint8> Chars;          // the cell's terrain character, W * H

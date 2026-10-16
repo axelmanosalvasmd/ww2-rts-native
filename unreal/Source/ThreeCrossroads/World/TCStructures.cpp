@@ -722,4 +722,216 @@ namespace TCStructures
 		B.Foot = Context.Foot; B.TintIndex = Context.TintIndex; B.Tints = Context.Tints;
 		B.Chunk(X0, Y0, X1, Y1);
 	}
+
+	std::vector<FColumn> FailedColumns(std::vector<int> Cells, int Width, double Cell)
+	{
+		if (Width <= 0 || !(Cell > 0)) return {};
+		std::sort(Cells.begin(), Cells.end());
+		Cells.erase(std::unique(Cells.begin(), Cells.end()), Cells.end());
+		if (Cells.size() > 9) Cells.resize(9);
+		std::vector<FColumn> Out;
+		for (const int C : Cells) Out.push_back({ (C % Width) * Cell, (C % Width + 1) * Cell,
+			std::floor((double)C / Width) * Cell, (std::floor((double)C / Width) + 1) * Cell });
+		return Out;
+	}
+
+	namespace
+	{
+		struct FVertex { double X, Z; std::vector<double> Values; };
+		using FPolygon = std::vector<FVertex>;
+		// Keep boundary vertices on both cuts, as clipPolygon does. Degenerate triangles are discarded below.
+		FPolygon ClipPolygon(const FPolygon& Poly, bool bX, double Boundary, bool bGreater)
+		{
+			FPolygon Out;
+			for (size_t I = 0; I < Poly.size(); I++)
+			{
+				const FVertex& A = Poly[I]; const FVertex& B = Poly[(I + 1) % Poly.size()];
+				const double Av = bX ? A.X : A.Z, Bv = bX ? B.X : B.Z;
+				const double Da = bGreater ? Av - Boundary : Boundary - Av, Db = bGreater ? Bv - Boundary : Boundary - Bv;
+				if (Da >= 0) Out.push_back(A);
+				if ((Da >= 0) != (Db >= 0))
+				{
+					const double T = Da / (Da - Db);
+					FVertex V { A.X + (B.X - A.X) * T, A.Z + (B.Z - A.Z) * T, {} };
+					for (size_t K = 0; K < A.Values.size(); K++) V.Values.push_back(A.Values[K] + (B.Values[K] - A.Values[K]) * T);
+					Out.push_back(std::move(V));
+				}
+			}
+			return Out;
+		}
+		std::vector<FPolygon> SubtractColumn(const FPolygon& Poly, const FColumn& Hole)
+		{
+			auto All = [&](bool bX, double Boundary, bool bLess)
+			{
+				return std::all_of(Poly.begin(), Poly.end(), [&](const FVertex& V)
+				{ const double P = bX ? V.X : V.Z; return bLess ? P <= Boundary : P >= Boundary; });
+			};
+			if (All(true, Hole.X0, true) || All(true, Hole.X1, false) || All(false, Hole.Z0, true) || All(false, Hole.Z1, false)) return { Poly };
+			std::vector<FPolygon> Out;
+			FPolygon Remaining = Poly;
+			const double Boundaries[] = { Hole.X0, Hole.X1, Hole.Z0, Hole.Z1 };
+			for (int K = 0; K < 4; K++)
+			{
+				FPolygon Piece = ClipPolygon(Remaining, K < 2, Boundaries[K], K % 2 != 0);
+				if (Piece.size() >= 3) Out.push_back(std::move(Piece));
+				Remaining = ClipPolygon(Remaining, K < 2, Boundaries[K], K % 2 == 0);
+				if (Remaining.size() < 3) break;
+			}
+			return Out;
+		}
+	}
+
+	std::vector<float> BreachTriangles(const std::vector<float>& Attributes, int Stride,
+		const std::vector<uint32_t>& Indices, const double Matrix[16], const std::vector<FColumn>& Columns)
+	{
+		std::vector<float> Out;
+		if (Stride < 3 || Attributes.size() % (size_t)Stride) return Out;
+		const size_t Vertices = Attributes.size() / (size_t)Stride, Count = Indices.empty() ? Vertices : Indices.size();
+		if (Count % 3 || std::any_of(Indices.begin(), Indices.end(), [&](uint32_t I) { return I >= Vertices; })) return Out;
+		for (size_t I = 0; I < Count; I += 3)
+		{
+			FPolygon Triangle;
+			for (size_t Corner = 0; Corner < 3; Corner++)
+			{
+				const size_t At = (Indices.empty() ? I + Corner : Indices[I + Corner]) * (size_t)Stride;
+				const FP3 World = Apply(Matrix, Attributes[At], Attributes[At + 1], Attributes[At + 2]);
+				FVertex V { World.X, World.Z, {} };
+				V.Values.assign(Attributes.begin() + At, Attributes.begin() + At + Stride);
+				Triangle.push_back(std::move(V));
+			}
+			std::vector<FPolygon> Pieces { std::move(Triangle) };
+			for (const FColumn& Column : Columns)
+			{
+				std::vector<FPolygon> Next;
+				for (const FPolygon& Poly : Pieces) for (FPolygon& Piece : SubtractColumn(Poly, Column)) Next.push_back(std::move(Piece));
+				Pieces = std::move(Next);
+			}
+			for (const FPolygon& Poly : Pieces) for (size_t K = 1; K + 1 < Poly.size(); K++)
+			{
+				const auto& A = Poly[0].Values; const auto& B = Poly[K].Values; const auto& C = Poly[K + 1].Values;
+				const double Ux = B[0] - A[0], Uy = B[1] - A[1], Uz = B[2] - A[2], Vx = C[0] - A[0], Vy = C[1] - A[1], Vz = C[2] - A[2];
+				if (std::hypot(Uy * Vz - Uz * Vy, Uz * Vx - Ux * Vz, Ux * Vy - Uy * Vx) < 1e-9) continue;
+				for (const FVertex* V : { &Poly[0], &Poly[K], &Poly[K + 1] }) for (const double Value : V->Values) Out.push_back((float)Value);
+			}
+		}
+		return Out;
+	}
 }
+
+#if !defined(TC_WORLD_CORE_ONLY)
+#include "Engine/StaticMesh.h"
+#include "StaticMeshResources.h"
+#include "StaticMeshAttributes.h"
+#include "StaticMeshDescription.h"
+#include "Client/TCModelLibrary.h"
+#include "Net/TCMatchState.h"
+#include "ThreeCrossroads.h"
+
+bool TCStructures::FBuildingBreaches::PartFor(const FTCModelPart& Source, int32 BuildingId, const FTCMatchState& State,
+	const FTransform& WorldTransform, UObject* Outer, FTCModelPart& Out)
+{
+	Out = Source;
+	const FString Id = FString::Printf(TEXT("building:%d"), BuildingId);
+	std::vector<int> Failed;
+	for (const auto& Pair : State.Sections) if (Pair.Value.StructureId == Id && Pair.Value.State == TEXT("failed")) Failed.push_back(Pair.Key);
+	if (Failed.empty()) return true; // restores the original mesh, including after repair or a fresh start
+	std::sort(Failed.begin(), Failed.end());
+	if (Failed.size() > 9) Failed.resize(9);
+	FString Key = FString::Printf(TEXT("%d|%s|%s"), BuildingId, *Source.Name.ToString(), *Source.Mesh.ToString());
+	for (const int C : Failed) Key += FString::Printf(TEXT(",%d"), C);
+	FEntry* Entry = Cache.Find(Key);
+	if (!Entry)
+	{
+		FEntry New;
+		UStaticMesh* Original = Cast<UStaticMesh>(Source.Mesh.TryLoad());
+		UStaticMesh* Clipped = BreachMesh(Original, FailedColumns(Failed, State.Map.W), WorldTransform, Outer, New.bEmpty);
+		if (!Clipped && !New.bEmpty)
+			UE_LOG(LogTC, Error, TEXT("structure breach: %s needs readable CPU mesh buffers; regenerate with the reference importer"), *Source.Mesh.ToString());
+		New.Mesh.Reset(Clipped);
+		Entry = &Cache.Add(Key, MoveTemp(New));
+	}
+	if (Entry->bEmpty) return false;
+	if (Entry->Mesh.IsValid()) Out.Mesh = FSoftObjectPath(Entry->Mesh.Get());
+	return true;
+}
+
+UStaticMesh* TCStructures::BreachMesh(UStaticMesh* Source, const std::vector<FColumn>& Columns,
+	const FTransform& WorldTransform, UObject* Outer, bool& bEmpty)
+{
+	bEmpty = false;
+	if (!Source || Columns.empty()) return Source;
+	const FStaticMeshRenderData* Data = Source->GetRenderData();
+	if (!Data || !Data->LODResources.Num()) return nullptr;
+	const FStaticMeshLODResources& Lod = Data->LODResources[0];
+	const auto& VB = Lod.VertexBuffers;
+	// A cooked importer must keep these buffers. Returning null preserves the intact source as a fallback.
+	if (!VB.PositionVertexBuffer.GetVertexData() || !VB.StaticMeshVertexBuffer.GetTangentData() || !Lod.IndexBuffer.GetNumIndices()) return nullptr;
+	const int32 Channels = VB.StaticMeshVertexBuffer.GetNumTexCoords();
+	const int32 Stride = 3 + 3 + 3 + 1 + 4 + 2 * Channels;
+	std::vector<float> Input;
+	for (uint32 V = 0; V < VB.PositionVertexBuffer.GetNumVertices(); V++)
+	{
+		const FVector3f P = VB.PositionVertexBuffer.VertexPosition(V);
+		const FVector3f N = VB.StaticMeshVertexBuffer.VertexTangentZ(V), T = VB.StaticMeshVertexBuffer.VertexTangentX(V), B = VB.StaticMeshVertexBuffer.VertexTangentY(V);
+		const FLinearColor C = VB.ColorVertexBuffer.GetNumVertices() ? FLinearColor(VB.ColorVertexBuffer.VertexColor(V)) : FLinearColor::White;
+		// Clip in source metres, retaining the imported local frame for normals and tangents.
+		for (const float F : { P.X / 100.f, P.Z / 100.f, P.Y / 100.f, N.X, N.Y, N.Z, T.X, T.Y, T.Z,
+			FVector3f::DotProduct(FVector3f::CrossProduct(N, T), B) < 0.f ? -1.f : 1.f, C.R, C.G, C.B, C.A }) Input.push_back(F);
+		for (int32 K = 0; K < Channels; K++) { const FVector2f UV = VB.StaticMeshVertexBuffer.GetVertexUV(V, K); Input.push_back(UV.X); Input.push_back(UV.Y); }
+	}
+	double Matrix[16] = {};
+	const FVector Origin = WorldTransform.GetTranslation();
+	const FVector Axes[] = { FVector(100,0,0), FVector(0,0,100), FVector(0,100,0) };
+	for (int32 K = 0; K < 3; K++)
+	{
+		const FVector A = WorldTransform.TransformVector(Axes[K]) / 100.0;
+		Matrix[K * 4] = A.X; Matrix[K * 4 + 1] = A.Z; Matrix[K * 4 + 2] = A.Y;
+	}
+	Matrix[12] = Origin.X / 100.0; Matrix[13] = Origin.Z / 100.0; Matrix[14] = Origin.Y / 100.0; Matrix[15] = 1;
+	FMeshDescription Desc;
+	FStaticMeshAttributes A(Desc); A.Register();
+	auto Positions = A.GetVertexPositions(); auto Normals = A.GetVertexInstanceNormals();
+	auto Tangents = A.GetVertexInstanceTangents(); auto Signs = A.GetVertexInstanceBinormalSigns();
+	auto Colours = A.GetVertexInstanceColors(); auto UVs = A.GetVertexInstanceUVs(); UVs.SetNumChannels(Channels);
+	int32 Triangles = 0;
+	for (const FStaticMeshSection& Section : Lod.Sections)
+	{
+		std::vector<uint32_t> Indices;
+		for (uint32 K = 0; K < Section.NumTriangles * 3; K++) Indices.push_back(Lod.IndexBuffer.GetIndex(Section.FirstIndex + K));
+		// Empty indices mean a non-indexed input to the core, so skip empty material sections explicitly.
+		if (Indices.empty()) continue;
+		const auto Clipped = BreachTriangles(Input, Stride, Indices, Matrix, Columns);
+		const FPolygonGroupID Group = Desc.CreatePolygonGroup();
+		A.GetPolygonGroupMaterialSlotNames()[Group] = Source->GetStaticMaterials().IsValidIndex(Section.MaterialIndex)
+			? Source->GetStaticMaterials()[Section.MaterialIndex].MaterialSlotName : NAME_None;
+		for (size_t K = 0; K < Clipped.size(); K += (size_t)Stride * 3)
+		{
+			TArray<FVertexInstanceID, TInlineAllocator<3>> Corners;
+			for (int32 J = 0; J < 3; J++)
+			{
+				const float* V = &Clipped[K + (size_t)J * Stride];
+				const FVertexID Id = Desc.CreateVertex(); Positions[Id] = FVector3f(V[0] * 100.f, V[2] * 100.f, V[1] * 100.f);
+				const FVertexInstanceID VI = Desc.CreateVertexInstance(Id); Corners.Add(VI);
+				Normals[VI] = FVector3f(V[3], V[4], V[5]); Tangents[VI] = FVector3f(V[6], V[7], V[8]); Signs[VI] = V[9];
+				Colours[VI] = FVector4f(V[10], V[11], V[12], V[13]);
+				for (int32 C = 0; C < Channels; C++) UVs.Set(VI, C, FVector2f(V[14 + 2 * C], V[15 + 2 * C]));
+			}
+			Desc.CreateTriangle(Group, Corners); Triangles++;
+		}
+	}
+	if (!Triangles) { bEmpty = true; return nullptr; }
+	UStaticMesh* Mesh = NewObject<UStaticMesh>(Outer);
+	Mesh->GetStaticMaterials() = Source->GetStaticMaterials();
+	UStaticMesh::FBuildMeshDescriptionsParams Params; Params.bBuildSimpleCollision = false; Params.bFastBuild = true;
+	Params.bAllowCpuAccess = true;
+	// The source importer uses full-precision UVs for surface selectors and model shader data.
+	// Fast runtime builds otherwise default to half precision, which changes interpolated attributes.
+	Params.PerLODOverrides.AddDefaulted();
+	Params.PerLODOverrides[0].bUseFullPrecisionUVs = VB.StaticMeshVertexBuffer.GetUseFullPrecisionUVs();
+	Params.PerLODOverrides[0].bUseHighPrecisionTangentBasis = VB.StaticMeshVertexBuffer.GetUseHighPrecisionTangentBasis();
+	Mesh->BuildFromMeshDescriptions({ &Desc }, Params);
+	// Runtime meshes have no streaming build data. Preserve the source's material UV density.
+	for (int32 I = 0; I < Mesh->GetStaticMaterials().Num(); I++) Mesh->GetStaticMaterials()[I].UVChannelData = Source->GetStaticMaterials()[I].UVChannelData;
+	return Mesh;
+}
+#endif

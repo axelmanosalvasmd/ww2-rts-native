@@ -373,6 +373,8 @@ public:
 	// bKilled main.js v.killed, bDetailed animationInterest (root visible and its 25 m ball in view). Anchor gives the
 	// engine deck point (unit-models.js vehicleDamageAnchor, Unreal axes in metres) when a puff is due.
 	void VehicleDamageFrame(int32 Id, double Health, bool bKilled, bool bDetailed, float Dt, TFunctionRef<bool(FVector& OutAt)> Anchor);
+	// aircraft.js tick and fx.js air: smoke behind the tail below 60 %, black smoke and nose fire below 30 %.
+	void PlaneDamageFrame(int32 Id, double Health, bool bVisible, float Dt, const FVector& RootMetres, double Rot, double Tail, double Nose);
 	// the damage cues of units that are gone
 	void RetainDamage(const TSet<int32>& Present);
 	bool WasKilled(int32 Id) const { return Killed.Contains(Id); }
@@ -384,9 +386,13 @@ public:
 
 	FTCProjectileView Projectiles;
 	FTCDebrisView Debris;
+	// debris.js poses for hulks, consumed by the world-object renderer along with section poses here.
+	const FTCDebrisRow* WreckPose(int32 WreckId) const;
 	int32 Seed = 0x7c2a;
 
 private:
+	TMap<FString, FTCDebrisRow> WreckPoses;
+	TMap<int32, double> PlaneSmokeWait;
 	static constexpr double Tau = 2.0 * UE_DOUBLE_PI;
 	struct FStyle;
 	static const FStyle& StyleOf(const FString& Kind);

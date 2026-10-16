@@ -83,10 +83,10 @@ namespace TCLook
 	const TArray<FTCMood>& Moods();
 	const FTCMood& DefaultMood(); // 'day'
 	const FTCMood* FindMood(FName Name);
-	// shared/weather.js mapMood: the map's own mood, else by its name and key; 'warm' when no rule matches
+	// shared/weather.js mapMood name/key inference; MoodFor checks authored mood first. No name rule yields 'warm'.
 	FName MapMood(const FString& MapName, const FString& MapKey);
 	// client/moods.js moodFor: an explicit mood, snow weather, rain or mud (overcast), the map's mood, else 'day'
-	FName MoodFor(const FString& MapName, const FString& MapKey, const FString& WeatherKind, FName Override = NAME_None);
+	FName MoodFor(const FString& MapName, const FString& MapKey, const FString& WeatherKind, FName Override = NAME_None, const FString& AuthoredMood = FString());
 	FTCWeatherLook WeatherLook(const FString& Kind);
 	// atmosphere.js blend(): what the look eases toward for a weather and a shower (rain, wet 0-1), and its haze
 	void WeatherGoal(const FTCMood& M, const FString& Kind, float Rain, float Wet, FTCWeatherLook& OutGoal, FLinearColor& OutHaze);
@@ -152,7 +152,7 @@ public:
 	// main.js at a match start: atmosphere.js start (the mood for the map and its weather, no easing in) and light.js
 	// aimSun (the sun up and to the right of the opening view). BrowserYaw: radians, the browser's (camera.js yaw;
 	// ATCCameraPawn's Yaw in degrees = -90 - degrees(BrowserYaw)). Override: a mood name ('?mood=' in the browser).
-	void StartMatch(const FString& MapName, const FString& MapKey, const FString& WeatherNow, float BrowserYaw, FName Override = NAME_None);
+	void StartMatch(const FString& MapName, const FString& MapKey, const FString& WeatherNow, float BrowserYaw, FName Override = NAME_None, const FString& AuthoredMood = FString());
 	// atmosphere.js setWeather: eases toward the new weather (about 8 s)
 	void SetWeather(const FString& Kind);
 	// snapshot wx: rain and wet ground, 0-1

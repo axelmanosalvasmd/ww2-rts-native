@@ -103,6 +103,8 @@ public:
 	static bool IsLoaded();
 	static const FTCTypeFace* Face(bool bBold);
 	static const FTCTypeFace* HeadingFace();
+	static void Pens(const FTCTypeFace& Face, const FString& Text, float Px, float Tracking, TArray<float>& Out, bool bTabular = true);
+	static float Width(const FString& Text, float Px, bool bBold = false, float Tracking = 0.f);
 	// The runtime font over the same files (typefaces 'Medium' and 'SemiBold'), or null
 	static UFont* Font();
 	// Chromium's widths: FTCTypeFace::Width with the weight bBold picks

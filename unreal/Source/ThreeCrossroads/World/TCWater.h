@@ -35,6 +35,13 @@
 
 namespace TCWaterCore
 {
+	// water.js tick: Low keeps the last value; High wraps the presentation clock every 1000 seconds.
+	// A finite nonnegative override is used only by matched renderer captures.
+	inline float PresentationTime(double Now, float Previous, bool Low, double Fixed = -1.0)
+	{
+		if (std::isfinite(Fixed) && Fixed >= 0.0) return (float)std::fmod(Fixed, 1000.0);
+		return Low ? Previous : (float)std::fmod(Now, 1000.0);
+	}
 	inline constexpr double Cell = 2.0;          // shared/sim.js CELL
 	inline constexpr double LevelMetres = 2.5;   // CFG.levelHeight
 	inline constexpr double Lift = 0.06;         // WATER_LIFT: the surface sits this far above a flat bank
@@ -662,12 +669,16 @@ public:
 	bool DrawnLow() const { return bDrawnLow; }
 	float TimeSent() const { return LastTime; }
 	int32 LevelSwitches() const { return LowSwitches; }
+	// Comparison-only clock, matching a browser water material held at the same uTime. No simulation state changes.
+	// Negative clears the override. Normal play keeps water.js's running High / held Low clock.
+	void SetPresentationTime(double Seconds) { FixedTime = Seconds; }
 
 private:
 	TCWaterCore::FWater Core;
 	FTCGraphicsWatch GfxWatch;
 	bool bDrawnLow = false;
 	float LastTime = 0.f;
+	double FixedTime = -1.0;
 	int32 LowSwitches = 0;
 	TArray<uint8> Chars;            // what the core reads: known cells' characters, '.' elsewhere
 	TArray<int8> Levels;            // current levels of known cells

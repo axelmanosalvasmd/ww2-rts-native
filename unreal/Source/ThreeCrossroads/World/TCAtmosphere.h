@@ -387,7 +387,7 @@ public:
 	// atmosphere.js start: the mood (TCLook::MoodFor for the map, its key and the weather), the weather with no easing
 	// in, the ground mask, the mist and fog bank sites, the birds' flights and the fall in the air. MapKey: the lobby's
 	// map name (main.js passes lobbyState.mapName). Mood: '?mood=' in the browser (NAME_None: none).
-	void StartMatch(const FTCMatchState& State, const FString& MapKey, const ATCTerrain* Terrain, FName MoodOverride = NAME_None);
+	void StartMatch(const FTCMatchState& State, const FString& MapKey, const ATCTerrain* Terrain, FName MoodOverride = NAME_None, const FString& AuthoredMood = FString());
 	// More ground for the shade and the wet ground to lie on beyond the terrain's own meshes (the apron past the map edge,
 	// cloudApron and coverApron): every procedural mesh section of the actor is mirrored.
 	void AddGroundActor(AActor* Ground);

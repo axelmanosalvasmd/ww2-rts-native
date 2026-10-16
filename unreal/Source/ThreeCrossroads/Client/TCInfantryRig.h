@@ -128,6 +128,8 @@ class THREECROSSROADS_API UTCInfantryRigLibrary : public UBlueprintFunctionLibra
 	GENERATED_BODY()
 
 public:
+	// shared/squad-men.js menDrawn and main.js OPERATIVE_FLAG: health thins the drawn slots, not the logical models.
+	static int32 MenDrawn(double Hp, int32 Slots, int32 MaxHp, bool bOperative);
 	static constexpr int32 NumBones = 31;
 	static constexpr int32 NumKeys = 29;
 	// Bone matrix texture layout: three RGBA32F texels per bone (the columns of its 4x3 matrix), one row per keyframe.

@@ -283,6 +283,8 @@ bool FTCLocaleTable::NativeTail(const FString& S, FString& Out)
 {
 	using namespace TCLocaleText;
 	const int32 Len = S.Len();
+	// drawAir puts the state and seconds in a single text node. These are not separate ability cooldown spans.
+	if (S.StartsWith(TEXT("On station ")) || S.StartsWith(TEXT("Rearming "))) return false;
 	if (Len >= 4 && S[Len - 1] == TEXT('s') && IsDigit(S[Len - 2]))
 	{
 		int32 J = Len - 2;
@@ -921,9 +923,74 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCLocaleHudMissingTest, "ThreeCrossroads.Local
 bool FTCLocaleHudMissingTest::RunTest(const FString& Parameters)
 {
 	FTCLocale::FScopedLanguage Es(ETCLanguage::Spanish);
-	for (const TCHAR* Text : {TEXT("decided when the clock ran out"), TEXT("decided when the last bunker fell"), TEXT("decided when the last Production Building fell"), TEXT("decided when the last defending structure fell"), TEXT("decided when the bridge was taken"), TEXT("(won)"), TEXT("Last match:"), TEXT("You are watching this room."), TEXT("A match is running: joining it...")})
+	for (const TCHAR* Text : {TEXT("decided when the clock ran out"), TEXT("decided when the last bunker fell"), TEXT("decided when the last Production Building fell"), TEXT("decided when the last defending structure fell"), TEXT("decided when the bridge was taken"), TEXT("(won)"), TEXT("Last match:"), TEXT("You are watching this room."), TEXT("A match is running: joining it..."), TEXT("The Rust host refused to restart this match. A match stopped by a server fault cannot restart."), TEXT("On station 25s"), TEXT("Rearming 30s")})
 		TestEqual(Text, TC_T(FString(Text)), FString(Text));
 	return true;
+}
+
+// Walk the production HUD source, including texts furnished by its menu/order/session modules. The test does not
+// carry a second translation table. Every literal reaches the same TC_T as live painting, and every exact reference
+// key must give the pinned es.js value. Composed strings and source names may legitimately remain English.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCLocaleHudStringsTest, "ThreeCrossroads.Locale.HudStrings", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)
+bool FTCLocaleHudStringsTest::RunTest(const FString&)
+{
+ FString Json;
+ if (!TestTrue(TEXT("reference dictionary required"),FFileHelper::LoadFileToString(Json,*FTCLocale::DataPath()))) return false;
+ TSharedPtr<FJsonObject> Root; FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Json),Root);
+ if (!Root) return false;
+ FTCExactStringMap Entries;
+ for (const TSharedPtr<FJsonValue>& V : Root->GetArrayField(TEXT("entries")))
+ { const auto& Pair=V->AsArray(); Entries.Add(Pair[0]->AsString(),Pair[1]->AsString()); }
+ TArray<FString> Files;
+ IFileManager::Get().FindFilesRecursive(Files,*(FPaths::ProjectDir()/TEXT("Source/ThreeCrossroads/Client")),TEXT("*.cpp"),true,false);
+ TArray<FString> Headers;
+ IFileManager::Get().FindFilesRecursive(Headers,*(FPaths::ProjectDir()/TEXT("Source/ThreeCrossroads/Client")),TEXT("*.h"),true,false);
+ Files.Append(Headers);
+ Files.Sort();
+ TSet<FString> Seen;
+ TArray<TSharedPtr<FJsonValue>> Rows;
+ int32 Exact=0, Kept=0;
+ for (const FString& File : Files)
+ {
+  FString Code; if (!FFileHelper::LoadFileToString(Code,*File)) continue;
+  int32 Tests=Code.Find(TEXT("#if WITH_DEV_AUTOMATION_TESTS")); if (Tests>=0) Code.LeftInline(Tests);
+  for (int32 At=0; (At=Code.Find(TEXT("TEXT(\""),ESearchCase::CaseSensitive,ESearchDir::FromStart,At))>=0;)
+  {
+   const int32 Begin=At+6; At=Begin; FString Text;
+   while (At<Code.Len())
+   {
+    TCHAR C=Code[At++]; if (C=='"') break;
+    if (C=='\\' && At<Code.Len())
+    {
+     C=Code[At++];
+     if (C=='n') C='\n'; else if (C=='t') C='\t'; else if (C=='r') C='\r';
+     else if (C=='u' && At+4<=Code.Len()) { C=static_cast<TCHAR>(FCString::Strtoi(*Code.Mid(At,4),nullptr,16)); At+=4; }
+    }
+    Text.AppendChar(C);
+   }
+   if (!TCLocaleText::HasAsciiLetter(Text) || Seen.Contains(Text)) continue;
+   Seen.Add(Text);
+   LocaleState().Table.ClearMemo();
+   { FTCLocale::FScopedLanguage En(ETCLanguage::English); TestEqualSensitive(TEXT("English HUD literal unchanged"),TC_T(Text),Text); }
+   FString Shown;
+   { FTCLocale::FScopedLanguage Es(ETCLanguage::Spanish); Shown=TC_T(Text); }
+   if (const FString* Expected=Entries.Find(Text))
+   { TestEqualSensitive(TEXT("HUD literal uses its es.js key: ")+Text,Shown,*Expected); Exact++; }
+   if (Shown.Equals(Text,ESearchCase::CaseSensitive)) Kept++;
+   TSharedRef<FJsonObject> Row=MakeShared<FJsonObject>(); Row->SetStringField(TEXT("source"),FPaths::GetCleanFilename(File));
+   Row->SetStringField(TEXT("english"),Text); Row->SetStringField(TEXT("spanish"),Shown); Row->SetBoolField(TEXT("exactReferenceKey"),Entries.Contains(Text));
+   Rows.Add(MakeShared<FJsonValueObject>(Row));
+  }
+ }
+ TestTrue(TEXT("the walk includes the actual HUD"),Seen.Contains(TEXT("Move to group")) && Seen.Contains(TEXT("Munitions: support calls and abilities. Hold points to earn them")));
+ TestTrue(TEXT("the walk includes refusal/fault presentation"),Seen.Contains(TEXT("The Rust host refused to restart this match. A match stopped by a server fault cannot restart.")));
+ TestTrue(TEXT("a broad HUD inventory was exercised"),Rows.Num()>500 && Exact>100);
+ FString Report;
+ if (FParse::Value(FCommandLine::Get(),TEXT("TCHudLocaleReport="),Report))
+ { TSharedRef<FJsonObject> O=MakeShared<FJsonObject>(); O->SetArrayField(TEXT("strings"),Rows); FString Out; FJsonSerializer::Serialize(O,TJsonWriterFactory<>::Create(&Out)); TestTrue(TEXT("write HUD localization inventory"),FFileHelper::SaveStringToFile(Out,*Report)); }
+ AddInfo(FString::Printf(TEXT("HUD source walk: %d distinct literals, %d exact es.js keys, %d unchanged (includes technical tokens and names)"),Rows.Num(),Exact,Kept));
+ LocaleState().Table.ClearMemo();
+ return !HasAnyErrors();
 }
 
 #endif

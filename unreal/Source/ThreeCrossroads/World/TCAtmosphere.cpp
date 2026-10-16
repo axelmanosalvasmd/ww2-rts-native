@@ -147,7 +147,7 @@ UProceduralMeshComponent* FTCAtmosphere::NewMesh(const TCHAR* Name, int32 Sort, 
 	return C;
 }
 
-void FTCAtmosphere::StartMatch(const FTCMatchState& State, const FString& MapKey, const ATCTerrain* Terrain, FName MoodOverride)
+void FTCAtmosphere::StartMatch(const FTCMatchState& State, const FString& MapKey, const ATCTerrain* Terrain, FName MoodOverride, const FString& AuthoredMood)
 {
 	using namespace TCAtmosImpl;
 	const int32 W = State.Map.W, H = State.Map.H;
@@ -159,7 +159,7 @@ void FTCAtmosphere::StartMatch(const FTCMatchState& State, const FString& MapKey
 
 	// the mood and the weather, no easing in (a match starts in its weather)
 	const FString Kind = State.Weather.Now.IsEmpty() ? FString(TEXT("clear")) : State.Weather.Now;
-	const FName MoodName = TCLook::MoodFor(State.Map.Name, MapKey, Kind, MoodOverride);
+	const FName MoodName = TCLook::MoodFor(State.Map.Name, MapKey, Kind, MoodOverride, AuthoredMood);
 	const FTCMood* Found = TCLook::FindMood(MoodName);
 	MoodRow = Found ? *Found : TCLook::DefaultMood();
 	ShowerRain = ShowerWet = 0.f;
@@ -469,7 +469,12 @@ void FTCAtmosphere::Update(float Dt, const FTCMatchState& State, const ATCTerrai
 		WindNow.Set(State.Wx.WindAngle, State.Wx.WindStrength);
 		if ((float)State.Wx.Rain != ShowerRain || (float)State.Wx.Wet != ShowerWet) { ShowerRain = (float)State.Wx.Rain; ShowerWet = (float)State.Wx.Wet; Blend(); }
 	}
-	T = FMath::Fmod(T + Dt, 10000.0);
+	// Comparison-only clock: hold animated weather at a recorded age without changing simulation or easing.
+	// The browser comparison copy holds its atmosphere.js time and accumulated drift at the same values.
+	double LookTime = 0;
+	const bool bFixedLookTime = FParse::Value(FCommandLine::Get(), TEXT("TCLookTime="), LookTime) && FMath::IsFinite(LookTime) && LookTime >= 0;
+	T = bFixedLookTime ? FMath::Fmod(LookTime, 10000.0) : FMath::Fmod(T + Dt, 10000.0);
+	if (bFixedLookTime) { DriftX = 0; DriftY = 0; }
 	SyncGround(Terrain, false);
 	// round 15: gfx.onChange(applyGfx): the mist and bank counts and the fall's draw range follow a change of level in
 	// the middle of a match (clouds, birds and the dust fall read the level every frame below)
@@ -512,7 +517,7 @@ void FTCAtmosphere::Update(float Dt, const FTCMatchState& State, const ATCTerrai
 		if (bCloudsShown)
 		{
 			// the cloud shade moves with the wind, summed frame by frame so a change of wind does not make it jump
-			Drift(DriftX, DriftY, WindNow.X, WindNow.Z, Dt);
+			if (!bFixedLookTime) Drift(DriftX, DriftY, WindNow.X, WindNow.Z, Dt);
 			GroundMat->SetVectorParameterValue(TEXT("DriftA"), FLinearColor(DriftX, DriftY, 0, 0));
 			GroundMat->SetVectorParameterValue(TEXT("DriftB"), FLinearColor(FMath::Fmod(DriftX * 1.6 + 0.37, 1.0), FMath::Fmod(DriftY * 1.9 + 0.61, 1.0), 0, 0));
 		}

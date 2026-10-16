@@ -1005,6 +1005,7 @@ private:
 // Rebuilds are spread over frames (MaxChunksPerFrame regions at most), so a big change never stalls a frame.
 class THREECROSSROADS_API FTCWorldObjectsView
 {
+	friend class FTCWreckPresentationTest;
 public:
 	// Spawns the actor that holds the components (once per world) and loads the model catalog and world materials.
 	bool Attach(UWorld* World);
@@ -1068,6 +1069,7 @@ private:
 	int32 RegionOfChunk(const FTCWorldObjects& Model, int32 Chunk) const;
 
 	TWeakObjectPtr<AActor> Actor;
+	TCStructures::FBuildingBreaches BuildingBreaches;
 	FTCModelLibrary Library;
 	FString LibraryError;
 	bool bAssetsLoaded = false;

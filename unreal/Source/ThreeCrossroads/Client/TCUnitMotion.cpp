@@ -40,6 +40,40 @@ namespace TCUnitMotionCore
 	inline double Angle(double A) { return std::atan2(std::sin(A), std::cos(A)); }
 	inline double ClampAbs(double X, double Limit) { return std::fmax(-Limit, std::fmin(Limit, X)); }
 
+	// unit-models.js deckSeats, in the source's (x, y up, z) metres.
+	struct FDeckSeat { double X, Y, Z, Yaw; };
+	inline std::vector<FDeckSeat> DeckSeats(const std::vector<double>& Pts)
+	{
+		if (Pts.empty()) return {};
+		double X0 = INFINITY, X1 = -INFINITY, Z0 = INFINITY, Z1 = -INFINITY, Top = 0;
+		for (size_t I = 0; I + 2 < Pts.size(); I += 3)
+		{
+			X0 = std::fmin(X0, Pts[I]); X1 = std::fmax(X1, Pts[I]);
+			Z0 = std::fmin(Z0, Pts[I + 2]); Z1 = std::fmax(Z1, Pts[I + 2]); Top = std::fmax(Top, Pts[I + 1]);
+		}
+		const double L = X1 - X0, W = Z1 - Z0, CZ = (Z0 + Z1) / 2;
+		std::vector<FDeckSeat> Out;
+		for (const double K : { 0.13, 0.27, 0.41 })
+			for (int J = 0; J < 3; J++)
+			{
+				const double X = X0 + L * K, Z = CZ + (J == 0 ? W * 0.3 : J == 1 ? -W * 0.3 : 0);
+				double Y = -INFINITY;
+				for (size_t I = 0; I + 2 < Pts.size(); I += 3)
+					if (std::fabs(Pts[I] - X) < 0.3 && std::fabs(Pts[I + 2] - Z) < 0.3) Y = std::fmax(Y, Pts[I + 1]);
+				Out.push_back({ X, std::isfinite(Y) ? Y : Top, Z, J == 0 ? -OnePi / 2 : J == 1 ? OnePi / 2 : 0 });
+			}
+		return Out;
+	}
+	inline int PlaneDamage(double& Wait, double Health, bool bVisible, bool bLow, double Dt)
+	{
+		if (!bVisible || !(Health < 0.6)) return 0;
+		Wait -= Dt;
+		if (Wait > 0) return 0;
+		const bool Bad = Health < 0.3;
+		Wait = (Bad ? 0.055 : 0.13) * (bLow ? 2 : 1);
+		return Bad ? 2 : 1;
+	}
+
 	// ------------------------------------------------------------------ model-motion.js moveModel
 
 	enum class EHull : uint8_t { None, Land, Sea };
@@ -377,6 +411,82 @@ double FTCUnitMotion::WheelAngle(double Radius, double Side, double Travel, doub
 	return TCUnitMotionCore::WheelAngle(Radius, Side, Travel, Turn);
 }
 
+bool FTCUnitMotion::HasDeckRiders(const FString& Type)
+{
+	// shared/sim.js UNITS: only these five carry men on their deck.
+	return Type == TEXT("tank") || Type == TEXT("medium") || Type == TEXT("tankdestroyer") || Type == TEXT("tiger") || Type == TEXT("churchill");
+}
+
+TArray<FTransform> FTCUnitMotion::RiderSeats(const TArray<FVector>& HullVertices)
+{
+	std::vector<double> Points;
+	Points.reserve(HullVertices.Num() * 3);
+	for (const FVector& P : HullVertices) { Points.push_back(P.X / 100); Points.push_back(P.Z / 100); Points.push_back(P.Y / 100); }
+	TArray<FTransform> Seats;
+	for (const auto& S : TCUnitMotionCore::DeckSeats(Points))
+		Seats.Add(FTransform(FQuat(FVector::UpVector, -S.Yaw), FVector(S.X * 100, (S.Z) * 100, (S.Y - 0.03) * 100), FVector(1.15)));
+	return Seats;
+}
+
+int32 FTCUnitMotion::PlaneDamage(double& Wait, double Health, bool bVisible, bool bLow, double Dt)
+{
+	return TCUnitMotionCore::PlaneDamage(Wait, Health, bVisible, bLow, Dt);
+}
+
+namespace TCSourcePresentation
+{
+	struct FData
+	{
+		TMap<FString, FTCAircraftSpec> Planes;
+		TMap<FString, TArray<FTransform>> Decks;
+		FData()
+		{
+			FString Text;
+			TSharedPtr<FJsonObject> Root;
+			if (!FFileHelper::LoadFileToString(Text, *FPaths::Combine(FPaths::ProjectContentDir(), TEXT("Models/Motion/Aircraft/aircraft.json"))) ||
+				!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Root) || !Root.IsValid() ||
+				Root->GetStringField(TEXT("reference")) != TEXT("e4e579a838aabae3b1d9dadbc17a0a87147bc52d"))
+			{
+				UE_LOG(LogTCUnitMotion, Warning, TEXT("Aircraft shadows and deck riders need the source export (Tools/motion/export-aircraft.mjs and import-aircraft.py)"));
+				return;
+			}
+			for (const auto& V : Root->GetArrayField(TEXT("planes")))
+			{
+				const auto& R = V->AsObject();
+				const FString Key = R->GetStringField(TEXT("type")) + TEXT("_") + FString::FromInt(R->GetIntegerField(TEXT("faction")));
+				FTCAircraftSpec S;
+				S.Nose = R->GetNumberField(TEXT("nose")); S.Tail = R->GetNumberField(TEXT("tail")); S.Ext = R->GetNumberField(TEXT("ext"));
+				S.Shadow = FSoftObjectPath(TEXT("/Game/Models/Motion/Aircraft/MI_Shadow_") + Key + TEXT(".MI_Shadow_") + Key);
+				Planes.Add(Key, S);
+			}
+			for (const auto& V : Root->GetArrayField(TEXT("decks")))
+			{
+				const auto& R = V->AsObject();
+				TArray<FVector> Points;
+				for (const auto& P : R->GetArrayField(TEXT("points")))
+				{
+					const auto& XYZ = P->AsArray();
+					Points.Add(FVector(XYZ[0]->AsNumber(), XYZ[2]->AsNumber(), XYZ[1]->AsNumber()) * 100);
+				}
+				Decks.Add(R->GetStringField(TEXT("type")) + TEXT("_") + FString::FromInt(R->GetIntegerField(TEXT("faction"))), FTCUnitMotion::RiderSeats(Points));
+			}
+		}
+	};
+	const FData& Get() { static const FData Data; return Data; }
+}
+
+const FTCAircraftSpec* FTCUnitMotion::AircraftSpec(const FString& Type, int32 Faction)
+{
+	return TCSourcePresentation::Get().Planes.Find(Type + TEXT("_") + FString::FromInt(Faction));
+}
+
+const TArray<FTransform>& FTCUnitMotion::DeckFor(const FString& Type, int32 Faction)
+{
+	static const TArray<FTransform> Empty;
+	const auto* Seats = TCSourcePresentation::Get().Decks.Find(Type + TEXT("_") + FString::FromInt(Faction));
+	return Seats ? *Seats : Empty;
+}
+
 const FTCPartMotion* FTCUnitMotion::Find(int32 Id) const
 {
 	FState* const* S = States.Find(Id);
@@ -402,6 +512,7 @@ const FTCPartMotion& FTCUnitMotion::Update(int32 Id, const FString& Type, const 
 	if (S && S->Type != Type) { delete S; S = nullptr; }
 	if (!S) { S = new FState; S->Type = Type; }
 	FTCPartMotion& Out = S->Out;
+	Out.Heading = Rot;
 	const FTCHARToUTF8 Name(*Type);
 	// three's root: position (x, y, z) metres, rotation.y = -rot
 	const double RX = Root.X / 100.0, RY = Root.Z / 100.0, RZ = Root.Y / 100.0, Yaw = -Rot;
@@ -976,7 +1087,7 @@ bool UTCSoldierCrowd::DrawNear(const FString& FigureType, int32 Faction, int32 S
 	return true;
 }
 
-bool UTCSoldierCrowd::DrawFar(const FString& FigureType, int32 Faction, int32 Slot, const FTransform& Xf, const TArray<float>& Blend12, float Fade, const FLinearColor& Owner, bool bForceFaded, uint64 Key)
+bool UTCSoldierCrowd::DrawFar(const FString& FigureType, int32 Faction, int32 Slot, const FTransform& Xf, const TArray<float>& Blend12, float Fade, const FLinearColor& Owner, bool bForceFaded, uint64 Key, bool bDeckRider)
 {
 	FFarFigure* F = FarFigure(FigureType, Faction, Slot);
 	if (!F) return false;
@@ -986,7 +1097,23 @@ bool UTCSoldierCrowd::DrawFar(const FString& FigureType, int32 Faction, int32 Sl
 	D[TCCrowdData::Bone] = 0.f;
 	D[TCCrowdData::Fade] = FMath::Clamp(Fade, 0.f, 1.f);
 	D[TCCrowdData::OwnerR] = Owner.R; D[TCCrowdData::OwnerG] = Owner.G; D[TCCrowdData::OwnerB] = Owner.B;
-	Add(F->Draw[bFaded ? 1 : 0], Xf, D, TCCrowdData::Far, Key);
+	if (bDeckRider)
+	{
+		if (!F->Riders)
+		{
+			TArray<UMaterialInterface*> Mats;
+			for (int32 I = 0; I < F->Draw[0]->GetNumMaterials(); I++) Mats.Add(F->Draw[0]->GetMaterial(I));
+			F->Riders = MakeBatch(F->Mesh, TCCrowdData::Far, Mats);
+			// setRiders bakes with shadow=true. Ordinary squad men keep shadow=false.
+			F->RiderShadow = MakeBatch(F->Mesh, TCCrowdData::Far, Mats);
+			F->RiderShadow->SetLightingChannels(true, false, false);
+			F->RiderShadow->SetCastShadow(true); F->RiderShadow->bCastHiddenShadow = true;
+			F->RiderShadow->SetHiddenInGame(true); F->RiderShadow->SetVisibility(false);
+		}
+		Add(F->Riders, Xf, D, TCCrowdData::Far, Key);
+		Add(F->RiderShadow, Xf, D, TCCrowdData::Far, Key);
+	}
+	else Add(F->Draw[bFaded ? 1 : 0], Xf, D, TCCrowdData::Far, Key);
 	if (bFaded) Now.FadedMen++;
 	return true;
 }
@@ -1004,11 +1131,11 @@ bool UTCSoldierCrowd::AddMan(const FTCSoldierDraw& Man)
 	if (bOff) { Now.Refused++; return false; }
 	const TArray<float> Blend12 = UTCInfantryRigLibrary::CrowdCustomData(Man.Blend);
 	const uint64 Key = Man.ManIndex >= 0 ? FTCInstanceHistory::ManKey(Man.UnitId, Man.ManIndex) : FTCInstanceHistory::NoKey;
-	const bool bDrawn = Man.bFar ? DrawFar(Man.FigureType, Man.Faction, Man.Slot, Man.Man, Blend12, Man.Fade, Man.Owner, false, Key)
+	const bool bDrawn = Man.bFar ? DrawFar(Man.FigureType, Man.Faction, Man.Slot, Man.Man, Blend12, Man.Fade, Man.Owner, false, Key, Man.bDeckRider)
 		: DrawNear(Man.FigureType, Man.Faction, Man.Slot, Man.Man, Blend12, Man.Fade, false, Key);
 	if (bDrawn) (Man.bFar ? Now.FarMen : Now.NearMen)++;
 	else Now.Refused++;
-	if (Man.ManIndex >= 0)
+	if (Man.ManIndex >= 0 && !Man.bDeckRider)
 	{
 		FSquadRecord& R = Squads.FindOrAdd(Man.UnitId);
 		if (R.Men.Num() <= Man.ManIndex) R.Men.SetNum(Man.ManIndex + 1);
@@ -1210,6 +1337,87 @@ void UTCSoldierCrowd::EndFrame(float Dt, const FVector& Eye, TFunctionRef<double
 #if WITH_DEV_AUTOMATION_TESTS
 #include "Misc/AutomationTest.h"
 #include "StaticMeshResources.h"
+
+// The conversion fixture is emitted by the original builders, including the private deckSeats function in a
+// comparison-only module copy. The runtime reference tree stays read only.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCPresentationDecksTest, "ThreeCrossroads.Motion.CarrierDecks", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FTCPresentationDecksTest::RunTest(const FString&)
+{
+	FString Text;
+	TSharedPtr<FJsonObject> Root;
+	if (!FFileHelper::LoadFileToString(Text, *FPaths::Combine(FPaths::ProjectContentDir(), TEXT("Models/Motion/Aircraft/aircraft.json"))) ||
+		!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Root)) { AddError(TEXT("Missing reproducible aircraft/deck export")); return false; }
+	int32 Checked = 0;
+	for (const auto& V : Root->GetArrayField(TEXT("decks")))
+	{
+		const auto& R = V->AsObject();
+		const FString Type = R->GetStringField(TEXT("type")); const int32 Faction = R->GetIntegerField(TEXT("faction"));
+		const auto& Seats = FTCUnitMotion::DeckFor(Type, Faction); const auto& Expected = R->GetArrayField(TEXT("seats"));
+		TestTrue(TEXT("source carrier type"), FTCUnitMotion::HasDeckRiders(Type));
+		if (!TestEqual(TEXT("nine seats, three per squad"), Seats.Num(), Expected.Num())) continue;
+		for (int32 I = 0; I < Seats.Num(); I++)
+		{
+			const auto& P = Expected[I]->AsArray();
+			const FVector At(P[0]->AsNumber() * 100, P[2]->AsNumber() * 100, (P[1]->AsNumber() - .03) * 100);
+			TestTrue(FString::Printf(TEXT("%s faction %d seat %d is on its source deck"), *Type, Faction, I), Seats[I].GetLocation().Equals(At, 1e-7));
+			const FQuat Facing(FVector::UpVector, -P[3]->AsNumber());
+			TestTrue(TEXT("source outward-facing kneeler at scale 1.15"), Seats[I].GetRotation().Equals(Facing, 1e-10) && Seats[I].GetScale3D().Equals(FVector(1.15)));
+			Checked++;
+		}
+	}
+	TestEqual(TEXT("all faction and carrier seats"), Checked, 180);
+	TestFalse(TEXT("halftracks carry their squads inside"), FTCUnitMotion::HasDeckRiders(TEXT("halftrack")));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCPresentationPlaneTest, "ThreeCrossroads.Motion.PlanePresentation", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FTCPresentationPlaneTest::RunTest(const FString&)
+{
+	FString Text; TSharedPtr<FJsonObject> Root;
+	if (!FFileHelper::LoadFileToString(Text, *FPaths::Combine(FPaths::ProjectContentDir(), TEXT("Models/Motion/Aircraft/aircraft.json"))) ||
+		!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Root)) { AddError(TEXT("Missing source aircraft export")); return false; }
+	double Wait = 0; bool LowBefore = false;
+	for (const auto& V : Root->GetArrayField(TEXT("damage")))
+	{
+		const auto& R = V->AsObject(); const bool Low = R->GetBoolField(TEXT("low"));
+		if (Low != LowBefore) { Wait = 0; LowBefore = Low; }
+		const int32 Stage = FTCUnitMotion::PlaneDamage(Wait, R->GetNumberField(TEXT("health")), R->GetBoolField(TEXT("visible")), Low, R->GetNumberField(TEXT("dt")));
+		TestEqual(TEXT("emission agrees with original aviation.tick"), Stage, R->GetIntegerField(TEXT("stage")));
+		TestTrue(TEXT("smokeT agrees, including hidden and healthy frames"), FMath::IsNearlyEqual(Wait, R->GetNumberField(TEXT("wait")), 1e-12));
+	}
+	for (const auto& V : Root->GetArrayField(TEXT("planes")))
+	{
+		const auto& R = V->AsObject(); const FTCAircraftSpec* Spec = FTCUnitMotion::AircraftSpec(R->GetStringField(TEXT("type")), R->GetIntegerField(TEXT("faction")));
+		if (!TestNotNull(TEXT("source dimensions"), Spec)) continue;
+		TestTrue(TEXT("tail and nose retain the source geometry dimensions"), Spec->Tail == R->GetNumberField(TEXT("tail")) && Spec->Nose == R->GetNumberField(TEXT("nose")));
+		TestNotNull(TEXT("source silhouette material"), Spec->Shadow.TryLoad());
+	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCPresentationMembersTest, "ThreeCrossroads.Motion.SquadMembers", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FTCPresentationMembersTest::RunTest(const FString&)
+{
+	FString Text; TSharedPtr<FJsonObject> Root;
+	if (!FFileHelper::LoadFileToString(Text, *FPaths::Combine(FPaths::ProjectContentDir(), TEXT("Models/Motion/Aircraft/aircraft.json"))) ||
+		!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Root)) { AddError(TEXT("Missing source squad-member export")); return false; }
+	FTCModelLibrary Models; FString Why;
+	if (!TestTrue(TEXT("original model catalog loads"), Models.Load(Why))) return false;
+	for (const auto& V : Root->GetArrayField(TEXT("members")))
+	{
+		const auto& R = V->AsObject(); const int32 Slots = R->GetIntegerField(TEXT("slots"));
+		TestEqual(TEXT("source health thinning"), UTCInfantryRigLibrary::MenDrawn(R->GetNumberField(TEXT("hp")), Slots, R->GetIntegerField(TEXT("max")), false), R->GetIntegerField(TEXT("alive")));
+		TestEqual(TEXT("an operative is one man"), UTCInfantryRigLibrary::MenDrawn(R->GetNumberField(TEXT("hp")), Slots, R->GetIntegerField(TEXT("max")), true), 1);
+		for (int32 Faction = 0; Faction < 4; Faction++)
+			if (const FTCModelEntry* E = Models.Resolve({R->GetStringField(TEXT("type")), Faction, FString()}))
+			{
+				int32 Count = 0;
+				for (const auto& Part : E->Parts) if (Part.Name.ToString().StartsWith(TEXT("man_")) && Part.Name.ToString().EndsWith(TEXT("_near"))) Count++;
+				TestEqual(TEXT("catalog has every source slot"), Count, Slots);
+			}
+	}
+	return true;
+}
 
 // The arithmetic is checked against the reference under Node (unreal/Tools/motion/oracle); these check the Unreal
 // adapters: axes, signs, composition, the asset paths and the crowd's bookkeeping.

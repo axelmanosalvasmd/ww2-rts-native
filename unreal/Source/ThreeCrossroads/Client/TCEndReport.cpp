@@ -80,7 +80,7 @@ FTCPaintItem& FTCPaint::Line(FVector2D A, FVector2D B, const FLinearColor& C, fl
 FTCPaintItem& FTCPaint::Text(const FString& Shown, float X, float Y, float FontPx, const FLinearColor& C, bool bBold, ETCPaintAlign Align, const TCHAR* Role)
 {
 	FTCPaintItem& I = Items.AddDefaulted_GetRef();
-	I.Kind = ETCPaintKind::Text; I.Pos = FVector2D(X, Y); I.Text = Shown; I.FontPx = FontPx; I.Colour = C; I.bBold = bBold; I.Align = Align; I.Role = Role;
+	I.Kind = ETCPaintKind::Text; I.Pos = FVector2D(X, Y); I.Text = TC_T(Shown); I.FontPx = FontPx; I.Colour = C; I.bBold = bBold; I.Align = Align; I.Role = Role;
 	I.Size = FVector2D(0, FontPx * 1.35f); // the line box (CSS line-height); a caller sets its own
 	return I;
 }

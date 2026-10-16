@@ -62,6 +62,9 @@ REPO = os.path.dirname(PROJECT)
 REFERENCE = os.path.join(REPO, 'reference', 'ww2-rts')
 CONTENT_ROOT = '/Game/Models'
 UV_CHANNELS = 4
+# shared/sim.js UNITS entries made by building(). Only these meshes need runtime breach buffers.
+BREACH_TYPES = frozenset({'hq', 'depot', 'barracks', 'motorpool', 'airfield', 'shipyard', 'flakpos',
+                          'worldbase', 'armory', 'pillbox', 'tower', 'wall', 'gate', 'supplycache'})
 
 # ------------------------------------------------------------------------------------------------ reference tables
 # Copies of the reference's tables. --selftest and every import parse the pinned sources and stop on a difference.
@@ -212,6 +215,10 @@ def _js_object_literal(text, name):
 def reference_parity(reference=REFERENCE):
     """Compare the tables above with the pinned reference. Returns a list of differences (empty when they agree)."""
     bad = []
+    sim = open(os.path.join(reference, 'shared/sim.js'), encoding='utf-8').read()
+    building_types = set(re.findall(r'UNITS\.(\w+)\s*=\s*building\(', sim))
+    if building_types != BREACH_TYPES:
+        bad.append('building types differ: %r' % sorted(building_types ^ BREACH_TYPES))
     rd = lambda p: open(os.path.join(reference, p), encoding='utf-8').read()
     geom, tex, um, surf, main, st = rd('client/models/geom.js'), rd('client/model-textures.js'), rd('client/unit-models.js'), rd('client/surfaces.js'), rd('client/main.js'), rd('client/structures.js')
     mats = re.findall(r"'([\w-]+)'", re.search(r'export const MATS = \[(.*?)\];', geom).group(1))
@@ -1706,6 +1713,8 @@ class UE(object):
         sm = self.eal.load_asset('%s/%s' % (dest, part['asset']))
         if not isinstance(sm, unreal.StaticMesh):
             raise RuntimeError('import of %s did not produce %s/%s (%r)' % (part['glb'], dest, part['asset'], result))
+        if model['type'] in BREACH_TYPES:
+            sm.set_editor_property('allow_cpu_access', True)
         return sm
 
     def finish_part(self, part, sm, children):

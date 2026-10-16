@@ -227,7 +227,9 @@ void FTCMatchControls::Reset()
 	const FString KeepName = FieldName;
 	const int32 KeepUnit = SandboxIndex;
 	const bool bKeepEnemy = bSpawnEnemy;
+	const FTCMouseCapture KeepCapture = MouseCapture;
 	*this = FTCMatchControls();
+	MouseCapture = KeepCapture;
 	FieldName = KeepName; SandboxIndex = KeepUnit; bSpawnEnemy = bKeepEnemy; // form values outlive a room
 }
 
@@ -814,6 +816,9 @@ FTCPaint FTCRoomBanners::Layout(const TArray<FTCRoomBanner>& Banners, float Top,
 #include "Engine/GameViewportClient.h"
 #include "Engine/Console.h"
 #include "Widgets/SWindow.h"
+#include "Client/TCUnitRenderer.h"
+#include "Camera/PlayerCameraManager.h"
+#include "Misc/FileHelper.h"
 
 void ATCPlayerController::RestoreMatchView(const FTCMatchView& V, const FTCMatchState& S)
 {
@@ -948,7 +953,9 @@ void ATCGameMode::ControlsMessage(const FString& T, const FJsonObject& M)
 		Controls.TerminalNotice.Reset();
 		const TSharedPtr<SWindow> Window = GEngine && GEngine->GameViewport ? GEngine->GameViewport->GetWindow() : nullptr;
 		if (Window && Controls.NormalWindowTitle.IsEmpty()) Controls.NormalWindowTitle = Window->GetTitle().ToString();
-		Controls.StartFlash.Start(Window && !Window->IsActive(), Controls.bResumePending, FPlatformTime::Seconds());
+		const bool bBackground = Window && !FTCMouseCapture::WindowFocused(Window);
+		Controls.StartFlash.Start(bBackground, Controls.bResumePending, FPlatformTime::Seconds());
+		if (FParse::Param(FCommandLine::Get(), TEXT("TCSessionLog"))) UE_LOG(LogTC, Log, TEXT("session: start title, window %d, background %d, restoring %d, flashing %d"), Window.IsValid(), bBackground, Controls.bResumePending, Controls.StartFlash.bActive);
 		bool bSandbox = false;
 		M.TryGetBoolField(TEXT("sandbox"), bSandbox);
 		Controls.OnStart(bSandbox);
@@ -1151,6 +1158,7 @@ bool ATCGameMode::ControlsEnter(const FTCRoomEntry& E, bool bKeepSeat)
 void ATCGameMode::ControlsFrame()
 {
 	const double Now = FPlatformTime::Seconds();
+	Controls.MouseCapture.Drive(GetWorld()->GetFirstPlayerController(), State.bHasMatch);
 	Options.TickPreview(ServerUrl, Now);
 	if (Controls.bResumePending && State.Snapshots > 0 && State.SeatConfirmed())
 	{
@@ -1165,14 +1173,15 @@ void ATCGameMode::ControlsFrame()
 	if (const TSharedPtr<SWindow> Window = GEngine && GEngine->GameViewport ? GEngine->GameViewport->GetWindow() : nullptr)
 	{
 		const bool bWasFlashing = Controls.StartFlash.bActive;
-		const bool bShowStarted = Controls.StartFlash.Frame(Window->IsActive(), Now);
+		const bool bFocused = FTCMouseCapture::WindowFocused(Window);
+		const bool bShowStarted = Controls.StartFlash.Frame(bFocused, Now);
 		if (bWasFlashing)
 		{
 			const FString Title = bShowStarted ? TC_T(TEXT("Match started")) : Controls.NormalWindowTitle;
 			if (Title != Window->GetTitle().ToString())
 			{
 				Window->SetTitle(FText::FromString(Title));
-				if (FParse::Param(FCommandLine::Get(), TEXT("TCSessionLog"))) UE_LOG(LogTC, Log, TEXT("session: window title '%s', active %d"), *Window->GetTitle().ToString(), Window->IsActive());
+				if (FParse::Param(FCommandLine::Get(), TEXT("TCSessionLog"))) UE_LOG(LogTC, Log, TEXT("session: window title '%s', active %d"), *Window->GetTitle().ToString(), bFocused);
 			}
 		}
 	}
@@ -1272,6 +1281,13 @@ void ATCGameMode::ControlsFrame()
 				Did = FString::Printf(TEXT("Backspace x%s (field %s: '%s')"), *St.Arg, LexToString(Form.Active), *Form.Buffer);
 			}
 			else if (St.Action == TEXT("key") && PC) { const FKey K(*St.Arg); PC->InjectKey(K, true); PC->InjectKey(K, false); Did = TEXT("key ") + St.Arg; }
+			else if (St.Action == TEXT("gate"))
+			{
+				auto Probe = MakeShared<FJsonObject>(); Probe->SetStringField(TEXT("t"), St.Arg);
+				Probe->SetArrayField(TEXT("ids"), {});
+				const bool bSent = SendCommand(Probe);
+				Did = FString::Printf(TEXT("command gate %s: %s (%s)"), *St.Arg, bSent ? TEXT("sent") : TEXT("blocked locally"), *LastSendProblemText);
+			}
 			else if (St.Action == TEXT("spawn") && PC)
 			{
 				FString X, Z;
@@ -1432,6 +1448,50 @@ void ATCGameMode::ControlsFrame()
 					Did = FString::Printf(TEXT("native move at %.2f,%.2f: %d selected unit(s) ordered"), At.X, At.Y, PC->IssueMoveAt(At));
 				}
 			}
+			else if (St.Action == TEXT("preffile"))
+			{
+				FString Text; TSharedPtr<FJsonObject> Values; int32 Written = 0;
+				if (FFileHelper::LoadFileToString(Text, *St.Arg) && FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Values) && Values.IsValid())
+					for (const auto& Entry : FTCSettingsStore::Entries())
+					{
+						FString Value;
+						if (Values->TryGetStringField(Entry.Reference, Value) && FTCSettingsStore::Game().Set(Entry.Reference, Value)) Written++;
+					}
+				Did = FString::Printf(TEXT("saved preferences written through game store: %d"), Written);
+			}
+			else if (St.Action == TEXT("prefs"))
+			{
+				for (const auto& Entry : FTCSettingsStore::Entries())
+				{
+					const auto Value = FTCSettingsStore::Game().Get(Entry.Reference);
+					UE_LOG(LogTC, Log, TEXT("session preference: %s=%s"), Entry.Reference, Value.IsSet() ? *Value.GetValue() : TEXT("<unset>"));
+				}
+				Did = TEXT("saved preferences read from the game store");
+			}
+#if defined(TC_HAS_MODEL_SELECTION)
+			else if (St.Action == TEXT("selectmesh") && PC && Units && PC->PlayerCameraManager)
+			{
+				const int32 Id = FCString::Atoi(*St.Arg);
+				int32 W = 0, H = 0; PC->GetViewportSize(W, H);
+				const FRotator R = PC->PlayerCameraManager->GetCameraRotation();
+				FTCPinhole View(PC->PlayerCameraManager->GetCameraLocation(), R.Yaw, -R.Pitch, 0, H > 0 ? double(W) / H : 1);
+				TArray<FBox2D> Bounds; Units->SelectionBounds(Id, View, W, H, Bounds);
+				FVector2D Root, Pixel; double Best = 0;
+				if (PC->ScreenOf(Id, Root)) for (const FBox2D& B : Bounds)
+				{
+					const FVector2D P = B.GetCenter(); const double D = FVector2D::Distance(P, Root);
+					if (P.X > 0 && P.Y > 0 && P.X < W && P.Y < H && D > Best) { Best = D; Pixel = P; }
+				}
+				bool bClick = false, bBox = false;
+				if (Best > 24)
+				{
+					PC->ClickSelectForChecks(Pixel, false); bClick = PC->Selected.Num() == 1 && PC->Selected.Contains(Id);
+					PC->BoxSelect(Pixel - FVector2D(1,1), Pixel + FVector2D(1,1), false); bBox = PC->Selected.Num() == 1 && PC->Selected.Contains(Id);
+				}
+				Did = FString::Printf(TEXT("model selection %d: %d mesh bounds, pixel %.2f,%.2f, %.2f px from root, click %d, box %d"), Id, Bounds.Num(), Pixel.X, Pixel.Y, Best, bClick, bBox);
+				if (!bClick || !bBox) UE_LOG(LogTC, Error, TEXT("session selection check failed: %s"), *Did);
+			}
+#endif
 			else if (St.Action == TEXT("view") && PC)
 			{
 				FString Groups;
@@ -1461,6 +1521,17 @@ bool ATCGameMode::RunControl(const FTCUiCommand& Command, bool bBack)
 {
 	const double Now = FPlatformTime::Seconds();
 	const FString& Key = Command.Unit;
+	if (Key == TEXT("CaptureMode") || Key == TEXT("CaptureNow") || Key == TEXT("Fullscreen"))
+	{
+		auto* PC = GetWorld()->GetFirstPlayerController();
+		if (Key == TEXT("Fullscreen")) Controls.MouseCapture.Fullscreen(PC, State.bHasMatch);
+		else
+		{
+			if (Key == TEXT("CaptureMode")) Controls.MouseCapture.Cycle();
+			Controls.MouseCapture.Request(PC, State.bHasMatch, Key == TEXT("CaptureNow"));
+		}
+		return true;
+	}
 	if (Key == TEXT("UseSeatHere"))
 	{
 		if (Connection && Connection->Notice().bReplaced)
@@ -1656,6 +1727,8 @@ TArray<FTCControlRow> ATCGameMode::MatchControlRows() const
 	if (Controls.MenuOpen())
 	{
 		for (const FTCControlButton& B : Controls.MenuButtons(Now)) if (B.bShown) Rows.Add(Row(FString(), FTCControlRow::Plain, { Button(B) }));
+		Rows.Add(Row(FString(), FTCControlRow::Plain, { Item(Controls.MouseCapture.Label(), TEXT("CaptureMode"), TEXT("Capture mouse"), true, Controls.MouseCapture.Mode() != TEXT("off")) }));
+		Rows.Add(Row(FString(), FTCControlRow::Plain, { Item(TEXT("Capture mouse"), TEXT("CaptureNow"), TEXT("Capture mouse"), true, Controls.MouseCapture.Captured()), Item(TEXT("Fullscreen"), TEXT("Fullscreen"), TEXT("Fullscreen")) }));
 #if defined(TC_HAS_STATS_GLUE)
 		// round 16: #menu's statsBtn ('Stats overlay: On' or 'Off', its title), for every reader of the menu
 		Rows.Add(Row(FString(), FTCControlRow::Plain, { Item(const_cast<ATCGameMode*>(this)->StatsOverlay().MenuLabel(), TEXT("Stats.Open"), FTCStatsSheet::MenuTitle()) }));

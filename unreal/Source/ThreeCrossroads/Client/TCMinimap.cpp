@@ -5,6 +5,7 @@
 #include "Client/TCUnitRenderer.h"
 #include "Net/TCMatchState.h"
 #include "World/TCTerrain.h"
+#include "World/TCRailways.h"
 #include "Client/TCCameraPawn.h"
 #include "CanvasItem.h"
 #include "Engine/Canvas.h"
@@ -61,7 +62,7 @@ bool FTCMinimap::HasDrawableMap(const FTCMatchState& State)
 		&& State.Map.Chars.Num() == N && State.Map.Levels.Num() == N && State.Map.Known.Num() == N;
 }
 
-FColor FTCMinimap::CellColour(const FTCMatchState& State, int32 Cell, bool bLitByUnit)
+FColor FTCMinimap::CellColour(const FTCMatchState& State, int32 Cell, bool bLitByUnit, bool bRail)
 {
 	if (!HasDrawableMap(State) || !State.Map.IsValidCell(Cell)) return FColor(MMCore::Shade, MMCore::Shade, MMCore::Shade, 255);
 	const bool bKnown = State.Map.Known[Cell];
@@ -69,7 +70,12 @@ FColor FTCMinimap::CellColour(const FTCMatchState& State, int32 Cell, bool bLitB
 	const bool bLifted = State.bFogLifted || (!State.Map.bWorld && State.Winner >= -1);
 	const int32 Alpha = MMCore::FogAlpha(bLifted, State.CellVisible(Cell) || bLitByUnit, State.CellExplored(Cell), State.Map.bWorld);
 	// The character and level are read only for a known cell.
-	const MMCore::FRgb P = bKnown ? MMCore::CellPixel(true, State.Map.Chars[Cell], State.Map.Levels[Cell], Alpha) : MMCore::CellPixel(false, '.', 0, Alpha);
+	MMCore::FRgb P = bKnown ? MMCore::CellPixel(true, State.Map.Chars[Cell], State.Map.Levels[Cell], Alpha) : MMCore::CellPixel(false, '.', 0, Alpha);
+	if (bKnown && bRail)
+	{
+	 const double A=Alpha/255.0;
+	 P={MMCore::ClampByte(46*(1-A)+MMCore::Shade*A),MMCore::ClampByte(40*(1-A)+MMCore::Shade*A),MMCore::ClampByte(36*(1-A)+MMCore::Shade*A)};
+	}
 	return FColor((uint8)P.R, (uint8)P.G, (uint8)P.B, 255);
 }
 
@@ -125,7 +131,7 @@ void FTCMinimap::Refresh(const FTCMatchState& State, const FTCUnitTable& Table, 
 		{
 			const int32 C = Y * W + X;
 			const bool bLit = Lit[C];
-			const FColor New = CellColour(State, C, bLit);
+			const FColor New = CellColour(State, C, bLit, Railways && Railways->IsOn() && Railways->Has(C));
 			if (State.Map.Known[C])
 			{
 				S.KnownCells++;
@@ -232,7 +238,6 @@ bool FTCMinimap::Draw(UCanvas* Canvas, const FTCMatchState& State, const FTCUnit
 	Refresh(State, Table, false);
 	if (!Arrange(Canvas->ClipX, Canvas->ClipY, State, View.YawDegrees)) return false;
 	if (!Texture.IsValid() || !Texture->GetResource()) return false;
-	const double K = Basis.CanvasScale();
 	const FVector2D Origin(LayoutX, LayoutY), Size(LayoutSide, LayoutSide);
 
 	// frame and background
@@ -271,15 +276,27 @@ bool FTCMinimap::Draw(UCanvas* Canvas, const FTCMatchState& State, const FTCUnit
 		Canvas->DrawItem(MapItem);
 	}
 
+	if (!bDeferUnitDots) DrawUnits(Canvas,State,Table,Selected);
+
+	// what the camera sees (client/camera.js corners), unless the HUD draws it last over its own overlays as
+	// drawMinimap does (bDeferViewOutline, then DrawViewOutline)
+	LastStats.bViewDrawn = false;
+	if (!bDeferViewOutline) DrawViewOutline(Canvas, View);
+	return true;
+}
+
+void FTCMinimap::DrawUnits(UCanvas* Canvas, const FTCMatchState& State, const FTCUnitTable& Table, const TSet<int32>& Selected)
+{
+ if (!Canvas || !Basis.IsValid() || LayoutSide<=0) return;
+ const double K=Basis.CanvasScale();
 	// held units: a dot each in the seat's colour (3.5 m for anything not infantry, 2.6 m for infantry), selected ones
-	// ringed white. Every held row is drawn, as client/main.js does; a minimum of 1 px keeps them visible on the
-	// largest World maps.
+	// ringed white. Every held row and radius matches client/main.js.
 	int32 Units = 0, Ringed = 0;
 	for (const auto& Pair : State.Units)
 	{
 		const FTCUnit& U = Pair.Value;
 		const FTCUnitDef* Def = Table.Find(U.Type);
-		const double R = FMath::Max(1.0, (Def && Def->bInfantry ? MMCore::InfantryDotMetres : MMCore::VehicleDotMetres) * Basis.S);
+		const double R = (Def && Def->bInfantry ? MMCore::InfantryDotMetres : MMCore::VehicleDotMetres) * Basis.S;
 		double PX, PY;
 		Basis.ToPixel(U.X, U.Z, PX, PY);
 		if (!Basis.InSquare(PX, PY)) continue;
@@ -307,13 +324,7 @@ bool FTCMinimap::Draw(UCanvas* Canvas, const FTCMatchState& State, const FTCUnit
 		}
 	}
 
-	// what the camera sees (client/camera.js corners), unless the HUD draws it last over its own overlays as
-	// drawMinimap does (bDeferViewOutline, then DrawViewOutline)
-	LastStats.bViewDrawn = false;
-	if (!bDeferViewOutline) DrawViewOutline(Canvas, View);
-	LastStats.UnitsDrawn = Units;
-	LastStats.SelectedDrawn = Ringed;
-	return true;
+ LastStats.UnitsDrawn=Units; LastStats.SelectedDrawn=Ringed;
 }
 
 bool FTCMinimap::DrawViewOutline(UCanvas* Canvas, const FTCMinimapView& View)
@@ -579,6 +590,9 @@ bool FTCMinimapModelTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("known cells"), Mm.Stats().KnownCells, 4);
 	TestEqual(TEXT("hidden cells"), Mm.Stats().HiddenCells, 20);
 	TestEqual(TEXT("static CellColour agrees"), FTCMinimap::CellColour(St, 4), ShadeColour);
+	TestEqual(TEXT("seen rail uses main.js mmTerrain RGB"),FTCMinimap::CellColour(St,0,false,true),FColor(46,40,36));
+	TestEqual(TEXT("explored rail is shaded after the rail paint"),FTCMinimap::CellColour(St,3,false,true),FColor(30,27,25));
+	TestEqual(TEXT("unknown World rail never reveals placeholder data"),FTCMinimap::CellColour(St,4,false,true),ShadeColour);
 
 	// a held unit lights its cell: a known one shows clear, an unknown one stays the shade
 	if (bTable)

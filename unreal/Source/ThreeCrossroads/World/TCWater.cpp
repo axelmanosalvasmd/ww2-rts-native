@@ -11,6 +11,8 @@
 #include "ProceduralMeshComponent.h"
 #include "RenderUtils.h"
 #include "TextureResource.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 
 const TCHAR* const FTCWater::ReferencePin = TEXT("e4e579a838aabae3b1d9dadbc17a0a87147bc52d");
 const TCHAR* const FTCWater::MaterialPath = TEXT("/Game/Water/M_TCWater.M_TCWater");
@@ -144,7 +146,11 @@ void FTCCellFog::Upload()
 
 // ---------------------------------------------------------------------------------------------------- water
 
-FTCWater::FTCWater() = default;
+FTCWater::FTCWater()
+{
+	// Capture tooling can pin only the water's presentation time. The default still reads the frame clock.
+	FParse::Value(FCommandLine::Get(), TEXT("TCWaterTime="), FixedTime);
+}
 FTCWater::~FTCWater() = default;
 
 void FTCWater::Attach(UWorld* World)
@@ -192,7 +198,7 @@ void FTCWater::CopyCells(const FTCMatchState& State, const TSet<int32>* Cells)
 void FTCWater::ResetFrom(const FTCMatchState& State)
 {
 	Core = TCWaterCore::FWater();
-	Triangles = 0;
+	Triangles = 0; LastTime = 0.f; // createWater starts uTime at zero, including a fresh match on Low.
 	W = State.Map.W; H = State.Map.H; bWorld = State.Map.bWorld;
 	if (Mesh.IsValid()) { Mesh->ClearAllMeshSections(); Mesh->SetVisibility(false); }
 	MaskTex.Reset(); MID.Reset();
@@ -341,7 +347,8 @@ void FTCWater::Flush(const FTCMatchState& State, double NowSeconds, bool bReveal
 	}
 	// wraps every 1000 s, where every speed in the shader lands on a whole cycle (water.js tick); water.js tick only
 	// moves uTime on High (if (!gfx.low)), so on Low the clock stands where it was
-	if (MID.IsValid() && !bDrawnLow) { LastTime = (float)FMath::Fmod(NowSeconds, 1000.0); MID->SetScalarParameterValue(TEXT("Time"), LastTime); }
+	LastTime = TCWaterCore::PresentationTime(NowSeconds, LastTime, bDrawnLow, FixedTime);
+	if (MID.IsValid()) MID->SetScalarParameterValue(TEXT("Time"), LastTime);
 }
 
 float FTCWater::WaterAt(float X, float Z) const

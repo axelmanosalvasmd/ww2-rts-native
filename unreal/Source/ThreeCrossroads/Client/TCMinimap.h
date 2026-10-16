@@ -323,6 +323,7 @@ public:
 	// Draw leaves the view outline out; the caller draws it with DrawViewOutline after its own overlays (the browser
 	// strokes the outline last, over points, pings and the logistics layer).
 	bool bDeferViewOutline = false;
+	bool bDeferUnitDots = false; // HUD draws the unit dots after capture points, spawns and strikes.
 
 	// Called with reference metres (clamped to the map) when a left press or drag on the minimap points the camera
 	// there. Bind it to ATCPlayerController::FocusOn. Without a hook, read FTCMinimapPress::Ground and MouseMove's out
@@ -335,6 +336,7 @@ public:
 
 	// Draws the minimap on the HUD's canvas. Returns false (and draws nothing) when there is no match to draw.
 	bool Draw(UCanvas* Canvas, const FTCMatchState& State, const FTCUnitTable& Table, const TSet<int32>& Selected, const FTCMinimapView& View);
+	void DrawUnits(UCanvas* Canvas, const FTCMatchState& State, const FTCUnitTable& Table, const TSet<int32>& Selected);
 	// The camera's view outline over the minimap as last arranged (Draw calls it unless bDeferViewOutline). False when
 	// nothing of it was drawn (no layout, fewer than four corners, or all of it outside the square).
 	bool DrawViewOutline(UCanvas* Canvas, const FTCMinimapView& View);
@@ -373,6 +375,7 @@ public:
 	bool Contains(FVector2D Pixel) const;
 	// The minimap square as last drawn (empty before the first draw of a match).
 	FBox2D Rect() const;
+	float CanvasScale() const { return Basis.IsValid()?Basis.CanvasScale():1.f; }
 	// Pixel <-> reference metres through the last drawn basis. PixelToWorld does not clamp; false without a basis.
 	bool PixelToWorld(FVector2D Pixel, FVector2D& OutMetres) const;
 	bool WorldToPixel(FVector2D Metres, FVector2D& OutPixel) const;
@@ -386,9 +389,12 @@ public:
 	bool PixelOf(int32 Cell, FColor& Out) const;
 
 	// The minimap colour of one cell of the state (no unit lighting). Unknown cells are the shade, whatever they hold.
-	static FColor CellColour(const FTCMatchState& State, int32 Cell, bool bLitByUnit = false);
+	static FColor CellColour(const FTCMatchState& State, int32 Cell, bool bLitByUnit = false, bool bRail = false);
+	// The same explored rail memory as the world renderer. main.js mmTerrain paints these cells before fog.
+	void SetRailways(const class FTCRailways* InRailways) { Railways=InRailways; }
 
 private:
+	const class FTCRailways* Railways = nullptr;
 	struct FImageKey
 	{
 		int32 MatchId = -1, W = 0, H = 0, You = -1;

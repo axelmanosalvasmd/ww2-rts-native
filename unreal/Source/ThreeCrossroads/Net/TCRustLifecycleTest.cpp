@@ -6,12 +6,94 @@
 #include "Client/TCKeys.h"
 #include "Misc/Paths.h"
 #include "HAL/FileManager.h"
+#include "Misc/FileHelper.h"
+#include "Misc/ConfigCacheIni.h"
+#include "GameFramework/GameUserSettings.h"
 #if WITH_DEV_AUTOMATION_TESTS
 #include "Misc/AutomationTest.h"
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCSessionHelloTest, "ThreeCrossroads.Session.Hello", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+bool FTCSessionHelloTest::RunTest(const FString&)
+{
+	FTCConnection::FSettings S;
+	S.Name = TEXT("Alder"); S.Token = TEXT("fixture-only"); S.bSpectate = true;
+	S.Listing = MakeShared<FJsonObject>(); S.Listing->SetBoolField(TEXT("public"), false); S.Listing->SetBoolField(TEXT("tutorial"), true); S.Listing->SetStringField(TEXT("title"), TEXT("Tutorial"));
+	const auto H = FTCConnection::Hello(S, true);
+	TestEqual(TEXT("hello name"), H->GetStringField(TEXT("name")), S.Name);
+	TestEqual(TEXT("hello token"), H->GetStringField(TEXT("token")), S.Token);
+	TestEqual(TEXT("hello protocol"), H->GetIntegerField(TEXT("proto")), FTCConnection::ProtocolVersion);
+	TestEqual(TEXT("hello client"), H->GetStringField(TEXT("client")), FString(FTCConnection::ClientId));
+	TestTrue(TEXT("listing and watching survive reconnect"), H->GetObjectField(TEXT("listing"))->GetBoolField(TEXT("tutorial")) && H->GetBoolField(TEXT("spectate")));
+	TestFalse(TEXT("Take a seat overrides the initial spectator switch on reconnect"), FTCConnection::Hello(S, false)->HasField(TEXT("spectate")));
+	S.Name = TEXT("Fern");
+	TestEqual(TEXT("rename is used in next hello"), FTCConnection::Hello(S, false)->GetStringField(TEXT("name")), S.Name);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCSessionCommandGateTest, "ThreeCrossroads.Session.CommandGate", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+bool FTCSessionCommandGateTest::RunTest(const FString&)
+{
+	TSharedPtr<FJsonObject> L;
+	FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(TEXT(R"({"t":"lobby","state":"play","you":0,"spectator":true,"players":[{"name":"Alder","connected":true,"ai":false}]})")), L);
+	FTCMatchControls C; C.ApplyLobby(*L);
+	for (const TCHAR* Type : { TEXT("move"),TEXT("amove"),TEXT("stop"),TEXT("orders"),TEXT("stance"),TEXT("buy"),TEXT("spawn"),TEXT("nextwave") }) TestFalse(Type,C.Sendable(Type));
+	for (const TCHAR* Type : { TEXT("ping"),TEXT("resync"),TEXT("name"),TEXT("pause"),TEXT("resume"),TEXT("restart"),TEXT("end"),TEXT("save"),TEXT("leave"),TEXT("handAi") }) TestTrue(Type,C.Sendable(Type));
+	L->SetBoolField(TEXT("spectator"),false); C.ApplyLobby(*L);
+	TestTrue(TEXT("seated commander can order"),C.Sendable(TEXT("move")));
+	C.SetOut(true); TestFalse(TEXT("eliminated commander cannot order"),C.Sendable(TEXT("move")));
+	L->SetStringField(TEXT("state"),TEXT("lobby")); C.ApplyLobby(*L);
+	TestTrue(TEXT("lobby settings remain sendable"),C.Sendable(TEXT("map")));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCSessionPreferencesTest, "ThreeCrossroads.Session.PreferencesRestart", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+bool FTCSessionPreferencesTest::RunTest(const FString&)
+{
+	// A game validates this object before BeginPlay. Editor automation has not necessarily done so.
+	if (UGameUserSettings* Settings = UGameUserSettings::GetGameUserSettings()) Settings->ValidateSettings();
+	FTCSettingsStore& Game = FTCSettingsStore::Game();
+	const auto SavedName = Game.Get(TEXT("ww2-name"));
+	GConfig->RemoveKey(TEXT("/Script/Engine.GameUserSettings"), TEXT("Version"), GGameUserSettingsIni);
+	TestTrue(TEXT("game preference save includes Unreal's version header"), Game.Set(TEXT("ww2-name"), TEXT("Preference fixture")));
+	int32 Version = 0;
+	FConfigFile OnDisk;
+	OnDisk.Read(FConfigCacheIni::GetDestIniFilename(TEXT("GameUserSettings"), nullptr, *FPaths::GeneratedConfigDir()));
+	TestTrue(TEXT("next engine launch will keep the whole preference branch"), OnDisk.GetInt(TEXT("/Script/Engine.GameUserSettings"), TEXT("Version"), Version) && Version > 0);
+	if (SavedName.IsSet()) Game.Set(TEXT("ww2-name"), SavedName.GetValue()); else Game.Remove(TEXT("ww2-name"));
+	const FString File = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Automation/SessionPreferences.ini"));
+	IFileManager::Get().MakeDirectory(*FPaths::GetPath(File), true);
+	const TMap<FString,FString> Values = {
+		{TEXT("ww2-name"),TEXT("Fern Álvarez")}, {TEXT("ww2-edge"),TEXT("False")}, {TEXT("ww2-pan"),TEXT("2")},
+		{TEXT("ww2-capture"),TEXT("always")}, {TEXT("ww2-volume"),TEXT("0.35")}, {TEXT("ww2-muted"),TEXT("1")},
+		{TEXT("ww2-ui-scale"),TEXT("150")}, {TEXT("ww2-stats"),TEXT("{\"on\":true,\"position\":\"bottom-left\"}")},
+		{TEXT("ww2-cover"),TEXT("False")}, {TEXT("ww2-controls-seen"),TEXT("1")}, {TEXT("ww2rts-lang"),TEXT("es")},
+		{TEXT("ww2-autocast"),TEXT("{\"classic:rifle\":false,\"rifle\":true}")}, {TEXT("ww2-gfx"),TEXT("high")},
+		{TEXT("ww2-gfx-auto"),TEXT("1")}, {TEXT("ww2-gore"),TEXT("off")}
+	};
+	{
+		FTCSettingsStore First(File);
+		for (const auto& Entry : FTCSettingsStore::Entries())
+		{
+			const FString* V = Values.Find(Entry.Reference);
+			if (TestNotNull(*FString::Printf(TEXT("saved preference fixture %s"), Entry.Reference), V)) TestTrue(Entry.Reference, First.Set(Entry.Reference, *V));
+		}
+		TestTrue(TEXT("flush preferences"), First.Flush());
+	}
+	FTCSettingsStore Restart(File);
+	for (const auto& Pair : Values) TestEqual(*Pair.Key, Restart.Get(Pair.Key).Get(FString()), Pair.Value);
+	TestFalse(TEXT("edge consumed after restart"), FTCSettingsStore::ReadEdge(Restart.Get(TEXT("ww2-edge"))));
+	TestEqual(TEXT("pan consumed after restart"), FTCSettingsStore::ReadPan(Restart.Get(TEXT("ww2-pan"))), 2);
+	TestEqual(TEXT("capture consumed after restart"), FTCMouseCapture::ValidMode(Restart.Get(TEXT("ww2-capture")).Get(FString())), FString(TEXT("always")));
+	TestEqual(TEXT("UI consumed after restart"), FTCSettingsStore::ReadUIScale(Restart.Get(TEXT("ww2-ui-scale"))), 150);
+	TestEqual(TEXT("volume consumed after restart"), FTCSettingsStore::ReadVolume(Restart.Get(TEXT("ww2-volume")), Restart.Get(TEXT("ww2-muted"))), 0.35);
+	TestEqual(TEXT("language consumed after restart"), FTCSettingsStore::ReadLanguage(Restart.Get(TEXT("ww2rts-lang")), TEXT("en")), FString(TEXT("es")));
+	IFileManager::Get().Delete(*File);
+	return true;
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCRustLifecycleOfflineCommanderTest, "ThreeCrossroads.Net.RustLifecycle.OfflineCommander", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
 bool FTCRustLifecycleOfflineCommanderTest::RunTest(const FString&)

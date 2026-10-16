@@ -1783,6 +1783,11 @@ bool FTCInfantrySquadAnimation::IsSetUp(const FString& UnitType, int32 Faction, 
 	return Type == UnitType && Fac == Faction && State->Men.Num() == Men && Men > 0;
 }
 
+int32 UTCInfantryRigLibrary::MenDrawn(double Hp, int32 Slots, int32 MaxHp, bool bOperative)
+{
+	return bOperative ? FMath::Min(1, Slots) : MaxHp > 0 ? FMath::Clamp(int32(FMath::CeilToDouble(Hp * Slots / MaxHp)), 0, Slots) : Slots;
+}
+
 void FTCInfantrySquadAnimation::SetAlive(int32 Alive)
 {
 	for (int32 I = 0; I < State->Men.Num(); I++) State->Men[I].bVisible = I < Alive;

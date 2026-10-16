@@ -121,6 +121,8 @@ public:
 	static bool IsVersionDeny(const FJsonObject& Message);
 	static bool ValidRoom(const FString& Room);
 	static int32 Utf8Length(const FString& Text);
+	// The initial spectator request is replaced by the server-confirmed role after sit/spectate.
+	static TSharedRef<FJsonObject> Hello(const FSettings& Settings, bool bWatching);
 
 private:
 	void Open();

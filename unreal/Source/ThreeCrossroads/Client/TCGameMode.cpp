@@ -327,6 +327,13 @@ FString ATCGameMode::ConnectionStatus() const
 bool ATCGameMode::SendCommand(const TSharedRef<FJsonObject>& Cmd)
 {
 	if (!Connection) { LastSendProblemText = TEXT("not sent: not connected"); return false; }
+	const FString Type = Cmd->GetStringField(TEXT("t"));
+	if (!Controls.Sendable(Type))
+	{
+		LastSendProblemText = TEXT("sendCmd drops it: this client is observing");
+		if (FParse::Param(FCommandLine::Get(), TEXT("TCSessionLog"))) UE_LOG(LogTC, Log, TEXT("session command gate: %s blocked locally"), *Type);
+		return false;
+	}
 	const FString RustRefusal = Lobby.RustCommandRefusal(*Cmd);
 	if (!RustRefusal.IsEmpty()) { LastSendProblemText = RustRefusal; return false; }
 	int32 Bytes = 0;
@@ -897,7 +904,7 @@ void ATCGameMode::Tick(float DeltaSeconds)
 		{
 			LightingStart = StartsReceived;
 			// main.js atmos.start({ key: lobbyState?.mapName }): the mood also reads the lobby's map key
-			Lighting->StartMatch(State.Map.Name, State.LobbyMap, State.Weather.Now, FMath::DegreesToRadians(-90.f - (LightPC ? LightPC->ViewYaw() : -90.f)));
+			Lighting->StartMatch(State.Map.Name, State.LobbyMap, State.Weather.Now, FMath::DegreesToRadians(-90.f - (LightPC ? LightPC->ViewYaw() : -90.f)), NAME_None, State.Map.Mood);
 		}
 		Lighting->SetWeather(State.Weather.Now);
 		if (State.Wx.bKnown) Lighting->SetShower((float)State.Wx.Rain, (float)State.Wx.Wet);
@@ -959,7 +966,7 @@ void ATCGameMode::Tick(float DeltaSeconds)
 		Railways.Frame(DeltaSeconds, State, Terrain); // railways.frame(dt): at most two rebuilds a second
 		// atmosphere.js start at each new match, then update(dt) with the weather row, snapshot wx and the camera target
 		ATCPlayerController* AtmosPC = Cast<ATCPlayerController>(GetWorld()->GetFirstPlayerController());
-		if (AtmosphereStart != StartsReceived) { AtmosphereStart = StartsReceived; Atmosphere.StartMatch(State, State.LobbyMap, Terrain); }
+		if (AtmosphereStart != StartsReceived) { AtmosphereStart = StartsReceived; Atmosphere.StartMatch(State, State.LobbyMap, Terrain, NAME_None, State.Map.Mood); }
 		Atmosphere.Update(DeltaSeconds, State, Terrain, AtmosPC, AtmosPC ? AtmosPC->ViewFocus() : FVector2D(State.Map.W, State.Map.H));
 	}
 	// client/feedback.js show: the save's sentence over the hint for 2 s (the hint is inside the HUD the lobby hides)

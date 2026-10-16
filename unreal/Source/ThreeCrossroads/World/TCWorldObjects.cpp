@@ -1,5 +1,7 @@
 #include "World/TCWorldObjects.h"
 #include "Client/TCGraphics.h"
+#include "Client/TCEffects.h"
+#include "EngineUtils.h"
 #include "ThreeCrossroads.h"
 #include "Net/TCMatchState.h"
 #include "World/TCTerrain.h"
@@ -932,6 +934,7 @@ bool FTCWorldObjectsView::Attach(UWorld* World)
 
 void FTCWorldObjectsView::Detach()
 {
+	BuildingBreaches.Reset();
 	if (AActor* A = Actor.Get()) A->Destroy();
 	Actor.Reset();
 	if (UTexture2D* Fog = FogTexture.Get()) Fog->RemoveFromRoot();
@@ -954,6 +957,7 @@ void FTCWorldObjectsView::ClearAll()
 
 void FTCWorldObjectsView::Reset()
 {
+	BuildingBreaches.Reset();
 	ClearAll();
 	Queue.Reset(); FogPending.Reset();
 	DrawnGen = 0xffffffffu; bFogAll = true; bModelsDirty = true; GhostHash = 0;
@@ -1225,7 +1229,7 @@ void FTCWorldObjectsView::DrawModels(const FTCWorldObjects& Model, const FTCMatc
 		return C;
 	};
 	// one model as main.js makeUnit builds it at rest: no squad men, the near level of detail, its rings left out
-	auto AddModel = [&](const FString& Type, int32 Owner, const FTransform& Root, bool bFaded, float Fade, float Damage) -> bool
+	auto AddModel = [&](const FString& Type, int32 Owner, const FTransform& Root, bool bFaded, float Fade, float Damage, int32 BuildingId = -1) -> bool
 	{
 		const int32 Faction = State.Factions.IsValidIndex(Owner) ? State.Factions[Owner] : Owner < 0 ? 0 : Owner % 3;
 		const FTCModelEntry* Entry = Library.Resolve({ Type, Faction, FString() });
@@ -1242,20 +1246,31 @@ void FTCWorldObjectsView::DrawModels(const FTCWorldObjects& Model, const FTCMatc
 			if (Parent != INDEX_NONE && !Visible[Parent]) bShow = false;
 			Visible[I] = bShow;
 			if (!bShow) continue;
-			UInstancedStaticMeshComponent* C = Comp(Part, bFaded);
+			const FTransform PartTransform = FTCModelLibrary::PartTransform(*Entry, I, Root);
+			FTCModelPart DrawPart = Part;
+			if (BuildingId >= 0 && !BuildingBreaches.PartFor(Part, BuildingId, State, PartTransform, A, DrawPart)) continue;
+			UInstancedStaticMeshComponent* C = Comp(DrawPart, bFaded);
 			if (!C) continue;
 			FBatch& B = Batches.FindOrAdd(C);
-			B.Transforms.Add(FTCModelLibrary::PartTransform(*Entry, I, Root));
+			B.Transforms.Add(PartTransform);
 			B.Data.Append(Custom);
 			ModelInstances++;
 		}
 		return true;
 	};
 	// client/main.js hulks: the wreck's own model in the wreck material, turned by -rot, on the ground
+	TActorIterator<ATCEffects> EffectsIt(A->GetWorld());
+	const ATCEffects* Effects = EffectsIt ? *EffectsIt : nullptr;
 	for (const FTCWreckRow& Wr : Model.Wrecks())
 	{
 		const float G = Ground ? Ground->HeightAt((float)Wr.X, (float)Wr.Z) : 0.f;
-		if (AddModel(Wr.Type, Wr.Owner, FTransform(FQuat(FVector::UpVector, Wr.Rot), ATCTerrain::ToWorld((float)Wr.X, (float)Wr.Z, G)), false, 1.f, 1.f)) WrecksDrawn++;
+		FTransform Pose(FQuat(FVector::UpVector, Wr.Rot), ATCTerrain::ToWorld((float)Wr.X, (float)Wr.Z, G));
+		// main.js debris.pose: Euler (0, -hullDir, tilt), XYZ. Reflecting Three Y/Z gives yaw then pitch -tilt.
+		if (Wr.bMoving && Effects)
+			if (const FTCDebrisRow* R = Effects->Fx.WreckPose(Wr.Id))
+				Pose = FTransform(FQuat(FVector::UpVector, R->HullDir) * FQuat(FVector::RightVector, -R->Tilt),
+					ATCTerrain::ToWorld(R->X, R->Z, R->Y));
+		if (AddModel(Wr.Type, Wr.Owner, Pose, false, 1.f, 1.f)) WrecksDrawn++;
 	}
 	// client/main.js applyGhosts: enemy buildings remembered under fog at 0.35 opacity, risen to their built share
 	for (const FTCGhost& Gh : State.Ghosts)
@@ -1263,7 +1278,7 @@ void FTCWorldObjectsView::DrawModels(const FTCWorldObjects& Model, const FTCMatc
 		const float G = Ground ? Ground->HeightAt((float)Gh.X, (float)Gh.Z) : 0.f;
 		FTransform Root(FQuat::Identity, ATCTerrain::ToWorld((float)Gh.X, (float)Gh.Z, G));
 		Root.SetScale3D(FVector(1, 1, 0.15f + 0.85f * FMath::Clamp((float)Gh.Built, 0.f, 1.f)));
-		if (AddModel(Gh.Type, Gh.Owner, Root, true, Library.GhostFade, 0.f)) GhostsDrawn++;
+		if (AddModel(Gh.Type, Gh.Owner, Root, true, Library.GhostFade, 0.f, Gh.Id)) GhostsDrawn++;
 	}
 	for (TPair<FString, TWeakObjectPtr<UInstancedStaticMeshComponent>>& P : ModelComps)
 	{
@@ -1328,7 +1343,14 @@ void FTCWorldObjectsView::Draw(FTCWorldObjects& Model, const FTCMatchState& Stat
 	// wrecks and ghosts: again when either list changed
 	uint32 Hash = 0;
 	for (const FTCGhost& G : State.Ghosts) Hash = FCrc::StrCrc32(*FString::Printf(TEXT("%d|%s|%d|%.3f|%.3f|%.3f"), G.Id, *G.Type, G.Owner, G.X, G.Z, G.Built), Hash);
-	if (Model.TakeWrecksDirty() || Hash != GhostHash || bModelsDirty) { GhostHash = Hash; bModelsDirty = false; DrawModels(Model, State, Ground); }
+	bool bMovingWreck = false;
+	for (const FTCWreckRow& Wr : Model.Wrecks()) bMovingWreck |= Wr.bMoving;
+	// Delivered failed sections invalidate remembered building meshes in stable cell order.
+	TArray<int32> FailedCells;
+	for (const auto& Section : State.Sections) if (Section.Value.State == TEXT("failed") && Section.Value.StructureId.StartsWith(TEXT("building:"))) FailedCells.Add(Section.Key);
+	FailedCells.Sort();
+	for (const int32 Cell : FailedCells) Hash = FCrc::StrCrc32(*FString::Printf(TEXT("%d|%s"), Cell, *State.Sections[Cell].StructureId), Hash);
+	if (Model.TakeWrecksDirty() || Hash != GhostHash || bModelsDirty || bMovingWreck) { GhostHash = Hash; bModelsDirty = false; DrawModels(Model, State, Ground); }
 	static double LastLog = 0;
 	const double Now = FPlatformTime::Seconds();
 	if (Now - LastLog >= 5.0)
@@ -1378,3 +1400,58 @@ FString FTCWorldObjectsView::StatusLine() const
 		Live, Comps.Num() + ModelComps.Num(), Pieces, Props, Detail, ModelInstances, WrecksDrawn, GhostsDrawn, ModelsMissing, TrianglesDrawn(), Queue.Num(), RegionsBuilt, LastBuildMs, FogW, FogH,
 		MissingWorldMaterials ? *FString::Printf(TEXT("missing for %d slots"), MissingWorldMaterials) : TEXT("ok"));
 }
+
+#if WITH_DEV_AUTOMATION_TESTS
+#include "Misc/AutomationTest.h"
+#include "Engine/Engine.h"
+#include "Serialization/JsonReader.h"
+#include "Serialization/JsonSerializer.h"
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCWreckPresentationTest, "ThreeCrossroads.World.WreckPresentation", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FTCWreckPresentationTest::RunTest(const FString&)
+{
+	// Exercise the real world adapter, including the callbacks that used to discard wreck poses.
+	auto Parse = [](const FString& S) { TSharedPtr<FJsonObject> O; FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(S), O); return O; };
+	const auto Start = Parse(TEXT(R"({"map":{"w":1,"h":1,"rows":["."]}})"));
+	const auto Snap = Parse(TEXT(R"({"wrecks":[[7,"tank",0,10,20,0.7,{}]]})"));
+	FTCMatchState State; State.Tick = 2; State.Factions.Add(0);
+	FTCWorldObjects Model;
+	if (!TestTrue(TEXT("wreck model starts"), Model.ApplyStart(*Start, State))) return false;
+	Model.ApplySnapshot(*Snap);
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, TEXT("TCWreckPresentation"));
+	if (!TestNotNull(TEXT("transient world"), World)) return false;
+	FWorldContext& Context = GEngine->CreateNewWorldContext(EWorldType::Game); Context.SetCurrentWorld(World);
+	ATCEffects* Effects = World->SpawnActor<ATCEffects>();
+	FTCWorldObjectsView View;
+	if (TestNotNull(TEXT("effects actor"), Effects) && TestTrue(TEXT("world view attaches"), View.Attach(World)))
+	{
+		FTCDebrisRow Row; Row.Id = TEXT("wreck-7"); Row.bWreck = true; Row.WreckId = 7;
+		Row.X = 10; Row.Y = 2; Row.Z = 20; Row.HullDir = .7; Row.Tilt = .1;
+		Effects->Fx.Debris.Snapshot(State, {Row}, {}, 0);
+		State.Tick = 4; Row.X = 14; Row.Y = 1; Row.Z = 22; Row.Tilt = .5;
+		Effects->Fx.Debris.Snapshot(State, {Row}, {}, .1); Effects->Fx.Debris.Frame(.15);
+		View.DrawModels(Model, State, nullptr);
+		TestEqual(TEXT("one real hulk is drawn"), View.WrecksDrawn, 1);
+		const FTCModelEntry* Entry = View.Library.Resolve({TEXT("tank"), 0, FString()});
+		if (TestNotNull(TEXT("source tank catalog"), Entry))
+		{
+			const FTCModelPart& Part = Entry->Parts[0];
+			const auto* Found = View.ModelComps.Find(Part.Mesh.ToString() + TEXT("|solid"));
+			UInstancedStaticMeshComponent* Comp = Found ? Found->Get() : nullptr;
+			if (TestNotNull(TEXT("hulk instance component"), Comp))
+			{
+				FTransform Drawn; TestTrue(TEXT("hulk has an instance"), Comp->GetInstanceTransform(0, Drawn, true));
+				// Independent reflection of Three Ry(-hullDir)*Rz(tilt), at the delivered halfway pose.
+				const FVector P = FTCModelLibrary::PartTransform(*Entry, 0, FTransform::Identity).TransformPosition(FVector(100,200,300));
+				const double X = P.X * FMath::Cos(.3) - P.Z * FMath::Sin(.3), Z = P.X * FMath::Sin(.3) + P.Z * FMath::Cos(.3);
+				const FVector Expected(1200 + X * FMath::Cos(.7) - P.Y * FMath::Sin(.7), 2100 + X * FMath::Sin(.7) + P.Y * FMath::Cos(.7), 150 + Z);
+				TestTrue(TEXT("world adapter draws interpolated slide, height and tilt"), Drawn.TransformPosition(FVector(100,200,300)).Equals(Expected, .01));
+			}
+		}
+		Effects->Fx.Reset(); TestNull(TEXT("match reset clears held wreck pose"), Effects->Fx.WreckPose(7));
+		View.Reset(); TestEqual(TEXT("reset clears world model instances"), View.InstancesDrawn(), 0);
+	}
+	View.Detach(); GEngine->DestroyWorldContext(World); World->DestroyWorld(false);
+	return true;
+}
+#endif

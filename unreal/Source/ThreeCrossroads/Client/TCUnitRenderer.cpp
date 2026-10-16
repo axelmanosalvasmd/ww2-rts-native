@@ -98,6 +98,7 @@ void ATCUnitRenderer::Draw(const FTCMatchState& State, const FTCUnitTable& Table
 	if (Crowd) Crowd->BeginFrame();
 	TSet<int32> Present;
 	DrawnList.Reset();
+	DrawnMenList.Reset();
 	for (const auto& Pair : State.Units)
 	{
 		const FTCUnit& U = Pair.Value;

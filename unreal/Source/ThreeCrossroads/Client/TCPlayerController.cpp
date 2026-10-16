@@ -1530,10 +1530,17 @@ int32 ATCPlayerController::PickSelectable(FVector2D Screen) const
 				continue;
 			}
 			FVector2D P;
-			if (!ScreenPoint(*M, U, Def, P)) continue;
-			const float D = FVector2D::Distance(P, Screen);
+			const bool bRoot = ScreenPoint(*M, U, Def, P);
+			const float D = bRoot ? FVector2D::Distance(P, Screen) : TNumericLimits<float>::Max();
 			const float Radius = Def->bBuilding ? PickBuilding : Def->bInfantry ? PickInfantry : PickVehicle;
 			if (D < Radius && D < BestD) { BestD = D; Best = U.Id; }
+			TArray<FBox2D> Meshes;
+			ModelBounds(U, Meshes);
+			for (const FBox2D& Bounds : Meshes)
+			{
+				const double Edge = TCSelectionBounds::Distance(Bounds, Screen);
+				if (Edge < 6 && Edge < BestD) { BestD = Edge; Best = U.Id; }
+			}
 		}
 		return Best;
 	};
@@ -1680,6 +1687,9 @@ void ATCPlayerController::BoxSelect(FVector2D A, FVector2D B, bool bAdd)
 		TArray<FBox2D> Roof;
 		if (U.Flags & TCFlags::Garrisoned) { if (RoofBounds(*M, U, Def, Roof) && TCOrders::RoofBoxHits(Roof, FBox2D(Lo, Hi))) Selected.Add(U.Id); continue; }
 		if (ScreenPoint(*M, U, Def, S) && S.X >= Lo.X && S.X <= Hi.X && S.Y >= Lo.Y && S.Y <= Hi.Y) Selected.Add(U.Id);
+		TArray<FBox2D> Meshes;
+		ModelBounds(U, Meshes);
+		for (const FBox2D& Bounds : Meshes) if (TCSelectionBounds::Intersects(Bounds, FBox2D(Lo, Hi))) { Selected.Add(U.Id); break; }
 	}
 }
 

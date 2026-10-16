@@ -49,7 +49,20 @@ ETCHostKind FTCConnection::HostKindOf(const FJsonObject& Message, int32* OutProt
 	return ETCHostKind::Rust;
 }
 
-FTCConnection::FTCConnection(const FSettings& InSettings) : Settings(InSettings) {}
+FTCConnection::FTCConnection(const FSettings& InSettings) : Settings(InSettings), bWatching(InSettings.bSpectate) {}
+
+TSharedRef<FJsonObject> FTCConnection::Hello(const FSettings& Settings, bool bWatching)
+{
+	auto M = MakeShared<FJsonObject>();
+	M->SetStringField(TEXT("t"), TEXT("hello"));
+	M->SetStringField(TEXT("name"), Settings.Name);
+	M->SetStringField(TEXT("token"), Settings.Token);
+	if (bWatching) M->SetBoolField(TEXT("spectate"), true);
+	M->SetNumberField(TEXT("proto"), ProtocolVersion);
+	M->SetStringField(TEXT("client"), ClientId);
+	if (Settings.Listing) M->SetObjectField(TEXT("listing"), Settings.Listing);
+	return M;
+}
 
 void FTCConnectionNotice::Receive(const FJsonObject& M)
 {
@@ -151,20 +164,8 @@ void FTCConnection::Open()
 		UE_LOG(LogTC, Log, TEXT("socket open (open #%d)"), Self->OpenCount);
 		if (Self->OnOpened) Self->OnOpened(Self->OpenCount);
 		if (Gen != Self->Generation || !Self->bRunning) return; // the callback stopped or restarted us
-		TSharedRef<FJsonObject> Hello = MakeShared<FJsonObject>();
-		Hello->SetStringField(TEXT("t"), TEXT("hello"));
-		Hello->SetStringField(TEXT("name"), Self->Settings.Name);
-		Hello->SetStringField(TEXT("token"), Self->Settings.Token);
-		// a spectator who reconnects keeps watching (client/main.js hello), instead of taking a seat a lobby room has free
-		const bool bSpectate = Self->Settings.bSpectate || Self->bWatching;
-		if (bSpectate) Hello->SetBoolField(TEXT("spectate"), true);
-		// docs/contracts/protocol.md v0 additions 1 (decided in #5, axel-interface-response-004): the protocol version
-		// and which client this is. The reference server reads only t, name and token (server.js) and ignores them.
-		Hello->SetNumberField(TEXT("proto"), FTCConnection::ProtocolVersion);
-		Hello->SetStringField(TEXT("client"), FTCConnection::ClientId);
-		// round 14: the room's listing (client/main.js hello listing), e.g. the Tutorial button's private Tutorial room
-		if (Self->Settings.Listing.IsValid()) Hello->SetObjectField(TEXT("listing"), Self->Settings.Listing);
-		const ETCSendResult Sent = Self->TrySend(Hello);
+		const bool bSpectate = Self->bWatching;
+		const ETCSendResult Sent = Self->TrySend(Hello(Self->Settings, bSpectate));
 		if (Sent != ETCSendResult::Sent) { UE_LOG(LogTC, Warning, TEXT("hello %s"), LexToString(Sent)); } // never the token
 		else { UE_LOG(LogTC, Log, TEXT("hello sent: proto %d, client %s%s%s"), FTCConnection::ProtocolVersion, FTCConnection::ClientId, bSpectate ? TEXT(", spectate") : TEXT(""), Self->Settings.Listing.IsValid() ? TEXT(", listing") : TEXT("")); }
 	});
@@ -248,6 +249,7 @@ void FTCConnection::NoteLobby(const FJsonObject& Message)
 	const bool bChanged = Kind != Host || Proto != HostProtoValue || Rules != HostRulesValue;
 	const bool bWasRust = Host == ETCHostKind::Rust;
 	Host = Kind; HostProtoValue = Proto; HostRulesValue = MoveTemp(Rules);
+	Message.TryGetBoolField(TEXT("spectator"), bWatching);
 	// Logged only for a Rust host (or when a Rust host turns into the reference): a reference session logs as before.
 	if (bChanged && (Kind == ETCHostKind::Rust || bWasRust)) UE_LOG(LogTC, Log, TEXT("host: %s server (lobby proto %s%s)"), LexToString(Kind), Proto >= 0 ? *FString::FromInt(Proto) : Kind == ETCHostKind::Rust ? TEXT("present, not an integer") : TEXT("absent"), HostRulesValue.IsEmpty() ? TEXT(", no rules hash") : *FString::Printf(TEXT(", rules %s"), *HostRulesValue.Left(24)));
 }

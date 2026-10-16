@@ -299,8 +299,11 @@ bool FTCMarkerDepthTest::RunTest(const FString&)
 {
 	UMaterial* GroundMat = LoadObject<UMaterial>(nullptr, TEXT("/Game/Markers/M_TCMarkerGround.M_TCMarkerGround"));
 	UMaterial* ThroughMat = LoadObject<UMaterial>(nullptr, TEXT("/Game/Markers/M_TCMarkerThrough.M_TCMarkerThrough"));
-	if (!TestNotNull(TEXT("generated ground material"), GroundMat) || !TestNotNull(TEXT("generated through material"), ThroughMat)) return false;
+	UMaterial* UnitRing = LoadObject<UMaterial>(nullptr, TEXT("/Game/Models/Materials/Look/M_TCLookRing.M_TCLookRing"));
+	if (!TestNotNull(TEXT("generated ground material"), GroundMat) || !TestNotNull(TEXT("generated through material"), ThroughMat) || !TestNotNull(TEXT("generated unit ring material"), UnitRing)) return false;
 	TestFalse(TEXT("ground is hidden by opaque scene depth"), GroundMat->bDisableDepthTest);
+	// markers.js ownerRing/selectionRing use makeOverlay's depthTest=true default. Only range rings opt out.
+	TestFalse(TEXT("owner and selection rings hide behind trees and houses"), UnitRing->bDisableDepthTest);
 	TestTrue(TEXT("range and faint cover layer remain visible through models"), ThroughMat->bDisableDepthTest);
 	TestTrue(TEXT("ground blends in scene linear light"), GroundMat->BlendMode == BLEND_Translucent);
 	return true;

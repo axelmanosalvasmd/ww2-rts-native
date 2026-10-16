@@ -428,6 +428,7 @@ private:
 	bool Pickable(const ATCGameMode& M, const FTCUnit& U, const FTCUnitDef* Def) const;
 	// round 16: a garrisoned squad's selection points (client/selection-view.js): its roof bar's meshes on screen
 	// (TCOrders::RoofBarScreenBounds). False when it is not garrisoned or nothing projects.
+	bool ModelBounds(const FTCUnit& Unit, TArray<FBox2D>& Out) const;
 	bool RoofBounds(const ATCGameMode& M, const FTCUnit& U, const FTCUnitDef* Def, TArray<FBox2D>& Out) const;
 	bool Boxable(const ATCGameMode& M, const FTCUnit& U, const FTCUnitDef* Def) const;
 	void ClickSelect(FVector2D Screen, bool bAdd);

@@ -375,6 +375,8 @@ bool FTCMatchState::ApplyStartDecode(const FJsonObject& M)
 	FTCMap NewMap;
 	NewMap.W = (int32)W; NewMap.H = (int32)H;
 	JMap.TryGetStringField(TEXT("name"), NewMap.Name);
+	JMap.TryGetStringField(TEXT("mood"), NewMap.Mood);
+	if (NewMap.Mood.Len() > 32) NewMap.Mood.Reset(); // no valid pinned mood key is longer than eight characters
 	NewMap.bWorld = JMap.HasField(TEXT("world"));
 	const int32 Count = NewMap.W * NewMap.H;
 	NewMap.Chars.Init('.', Count);

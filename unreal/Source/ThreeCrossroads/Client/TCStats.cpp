@@ -300,11 +300,18 @@ namespace
 	struct FTCTypeState
 	{
 		bool bTried = false, bLoaded = false;
-		FTCTypeFace Body, Bold, Heading;
+		FTCTypeFace Body, Bold, Heading, Symbols;
 		UFont* Font = nullptr;
 	};
 	FTCTypeState& TypeState() { static FTCTypeState S; return S; }
 	const TCHAR* TypefaceName(int32 Weight) { return Weight >= 700 ? TEXT("Bold") : Weight >= 600 ? TEXT("SemiBold") : Weight >= 500 ? TEXT("Medium") : TEXT("Regular"); }
+	FString SymbolsPath() { return FPaths::EngineContentDir()/TEXT("Slate/Fonts/DroidSansFallback.ttf"); }
+	const FTCTypeFace* SymbolsFace()
+	{
+	 static bool Tried=false;
+	 if (!Tried) { Tried=true; TArray<uint8> Bytes; if (FFileHelper::LoadFileToArray(Bytes,*SymbolsPath())) TypeState().Symbols.Parse(Bytes); }
+	 return TypeState().Symbols.IsValid()?&TypeState().Symbols:nullptr;
+	}
 }
 
 FString FTCType::Folder()
@@ -368,6 +375,11 @@ UFont* FTCType::Font()
 		// the project-relative path, as Slate names its own font files (a packaged build reads it from the pak)
 		E.Font = FFontData(FPaths::Combine(Folder(), File.Value), EFontHinting::AutoLight, EFontLoadingPolicy::LazyLoad);
 	}
+	if (SymbolsFace())
+	{
+	 FTypefaceEntry& E=F->GetMutableInternalCompositeFont().DefaultTypeface.Fonts.AddDefaulted_GetRef();
+	 E.Name=TEXT("HudSymbols"); E.Font=FFontData(SymbolsPath(),EFontHinting::AutoLight,EFontLoadingPolicy::LazyLoad);
+	}
 	F->AddToRoot();
 	St.Font = F;
 	return St.Font;
@@ -376,13 +388,34 @@ UFont* FTCType::Font()
 FTCMeasure FTCType::Measure()
 {
 	if (!IsLoaded()) return FTCPaint::ApproxMeasure();
-	return [](const FString& T, float Px, bool bBold, float Tracking) { return T.IsEmpty() ? 0.f : Face(bBold)->Width(T, Px, Tracking); };
+	return [](const FString& T, float Px, bool bBold, float Tracking) { return Width(T,Px,bBold,Tracking); };
+}
+
+void FTCType::Pens(const FTCTypeFace& Face, const FString& Text, float Px, float Tracking, TArray<float>& Out, bool bTabular)
+{
+ Face.Pens(Text,Px,Tracking,Out,bTabular);
+ const FTCTypeFace* Symbols=SymbolsFace(); if (!Symbols) return;
+ float Extra=0;
+ for (int32 I=0; I<Text.Len(); I++)
+ {
+  Out[I]+=Extra;
+  if (!Face.Glyph(Text[I]) && Symbols->Glyph(Text[I]))
+   Extra+=Px*(float(Symbols->Advance(Symbols->Glyph(Text[I])))/Symbols->UnitsPerEm()-float(Face.Advance(0))/Face.UnitsPerEm());
+ }
+ Out.Last()+=Extra;
+}
+
+float FTCType::Width(const FString& Text, float Px, bool bBold, float Tracking)
+{
+ if (Text.IsEmpty()) return 0;
+ if (!IsLoaded()) return FTCPaint::ApproxMeasure()(Text,Px,bBold,Tracking);
+ TArray<float> P; Pens(*Face(bBold),Text,Px,Tracking,P); return P.Last();
 }
 
 FTCMeasure FTCType::HeavyMeasure()
 {
 	if (!IsLoaded()) return FTCPaint::ApproxMeasure();
-	return [](const FString& T, float Px, bool bBold, float Tracking) { return T.IsEmpty() ? 0.f : (bBold ? HeadingFace() : Face(false))->Width(T, Px, Tracking); };
+	return [](const FString& T, float Px, bool bBold, float Tracking) { TArray<float> P; Pens(*(bBold?HeadingFace():Face(false)),T,Px,Tracking,P); return P.Last(); };
 }
 
 void FTCType::Draw(const FTCPaint& P, UCanvas* Canvas, UFont* Fallback, float Oversample, bool bTabular)
@@ -401,7 +434,7 @@ void FTCType::Draw(const FTCPaint& P, UCanvas* Canvas, UFont* Fallback, float Ov
 		// an h2 (the sheet's title) is the browser's default bold, 700; other bold texts are 600
 		const bool bHeading = I.bBold && (I.Role.EndsWith(TEXT(":title")) || I.Role == TEXT("boss:name") || I.Role == TEXT("alert:loss-heading") || I.Role == TEXT("alert:loss-detail"));
 		const FTCTypeFace* Face = bHeading ? HeadingFace() : FTCType::Face(I.bBold);
-		Face->Pens(I.Text, I.FontPx, I.Tracking, Pens, bTabular);
+		FTCType::Pens(*Face,I.Text,I.FontPx,I.Tracking,Pens,bTabular);
 		const float W = Pens.Last();
 		const float X0 = I.Pos.X - (I.Align == ETCPaintAlign::Centre ? W / 2 : I.Align == ETCPaintAlign::Right ? W : 0.f);
 		// CSS centres the content area (ascender 1000 to descender 200 per 1000 units: 1.2 em) in the line box
@@ -412,7 +445,9 @@ void FTCType::Draw(const FTCPaint& P, UCanvas* Canvas, UFont* Fallback, float Ov
 		for (int32 C = 0; C < I.Text.Len(); C++)
 		{
 			if (FChar::IsWhitespace(I.Text[C])) continue;
-			FCanvasTextItem T(FVector2D(X0 + Pens[C], Y), FText::FromString(FString::Chr(I.Text[C])), Info, I.Colour);
+			FSlateFontInfo GlyphInfo=Info;
+			if (!Face->Glyph(I.Text[C]) && SymbolsFace() && SymbolsFace()->Glyph(I.Text[C])) GlyphInfo.TypefaceFontName=TEXT("HudSymbols");
+			FCanvasTextItem T(FVector2D(X0 + Pens[C], Y), FText::FromString(FString::Chr(I.Text[C])), GlyphInfo, I.Colour);
 			T.Scale = FVector2D(1.f / K, 1.f / K); // the runtime atlas is alpha only: the item's own blend (AlphaOnly)
 			Canvas->DrawItem(T);
 		}
@@ -1146,6 +1181,10 @@ bool FTCStatsTypeTest::RunTest(const FString& Parameters)
 	// kerning and tabular figures are in: 'AV' closes up, the figures share one width
 	const FTCTypeFace* F = FTCType::Face(false);
 	TestTrue(TEXT("GPOS kerning: AV is tighter than A plus V"), F->Width(TEXT("AV"), 100) < F->Width(TEXT("A"), 100) + F->Width(TEXT("V"), 100) - 1.f);
+	const FTCTypeFace* Symbols=SymbolsFace();
+	TestTrue(TEXT("symbol fallback available for HUD arrows"),Symbols && Symbols->Glyph(0x2192) && !F->Glyph(0x2192));
+	if (Symbols && Symbols->Glyph(0x2192) && !F->Glyph(0x2192))
+		TestEqual(TEXT("HUD measure uses the drawn fallback glyph advance"),FTCType::Width(TEXT("→"),14),14.f*Symbols->Advance(Symbols->Glyph(0x2192))/Symbols->UnitsPerEm(),.01f);
 	TestTrue(TEXT("tnum: 1 and 0 are as wide"), FMath::IsNearlyEqual(F->Width(TEXT("1"), 100), F->Width(TEXT("0"), 100)));
 	// markers.js uses a canvas font, without the DOM body's tabular-nums. Browser canvas measurements, round 18.
 	TestEqual(TEXT("600 30px canvas node label"), FTCType::Face(true)->Width(TEXT("+1.5 MP/s"), 30, 0, false), 109.52989f, .02f);

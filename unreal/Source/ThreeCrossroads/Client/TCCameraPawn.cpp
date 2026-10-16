@@ -2,6 +2,158 @@
 #include "Camera/CameraComponent.h"
 #include "Misc/AutomationTest.h"
 #include "SceneView.h"
+#include "Client/TCPersistence.h"
+#include "ThreeCrossroads.h"
+#include "Engine/GameViewportClient.h"
+#include "GameFramework/GameUserSettings.h"
+#include "GameFramework/PlayerController.h"
+#include "UnrealClient.h"
+#include "Widgets/SLeafWidget.h"
+#include "Rendering/DrawElementTypes.h"
+#include "InputCoreTypes.h"
+#include "Widgets/SWindow.h"
+#include "GenericPlatform/GenericWindow.h"
+#if PLATFORM_LINUX
+// ApplicationCore exports the SDL API it uses. A cursor rectangle alone does not enable SDL's native grab.
+struct SDL_Window;
+extern "C" SDL_Window* SDL_GetKeyboardFocus(void);
+extern "C" bool SDL_SetWindowMouseGrab(SDL_Window*, bool);
+extern "C" bool SDL_GetWindowMouseGrab(SDL_Window*);
+#endif
+
+namespace TCCaptureImpl
+{
+	// The arrow polygon and ink/chalk colours are pointer.js SPRITES.arrow, with its (3,2) hot spot.
+	class SSourceCursor : public SLeafWidget
+	{
+	public:
+		SLATE_BEGIN_ARGS(SSourceCursor) {} SLATE_END_ARGS()
+		void Construct(const FArguments&) {}
+		virtual FVector2D ComputeDesiredSize(float) const override { return FVector2D(64, 64); }
+		virtual int32 OnPaint(const FPaintArgs&, const FGeometry& G, const FSlateRect&, FSlateWindowElementList& E, int32 Layer, const FWidgetStyle&, bool) const override
+		{
+			const TArray<FVector2D> Shape = { {3,2}, {3,24}, {8.6,18.8}, {12.5,27.6}, {16.1,26}, {12.2,17.4}, {20,17.4} };
+			const FLinearColor Ink(FColor(0x1b,0x1d,0x14)), Chalk(FColor(0xf3,0xe7,0xb0));
+			// Scanline fill keeps this text-defined source silhouette independent of an external cursor asset.
+			for (double Y = 2.25; Y < 28; Y += 0.5)
+			{
+				TArray<double> Cross;
+				for (int32 I = 0; I < Shape.Num(); I++)
+				{
+					const auto A = Shape[I], B = Shape[(I + 1) % Shape.Num()];
+					if ((A.Y <= Y && B.Y > Y) || (B.Y <= Y && A.Y > Y)) Cross.Add(A.X + (Y - A.Y) * (B.X - A.X) / (B.Y - A.Y));
+				}
+				Cross.Sort();
+				for (int32 I = 0; I + 1 < Cross.Num(); I += 2)
+					FSlateDrawElement::MakeLines(E, Layer, G.ToPaintGeometry(), TArray<FVector2D>{ {Cross[I] + 29, Y + 30}, {Cross[I+1] + 29, Y + 30} }, ESlateDrawEffect::None, Chalk, true, 0.7f);
+			}
+			TArray<FVector2D> Outline; for (const auto P : Shape) Outline.Add(P + FVector2D(29,30)); Outline.Add(Shape[0] + FVector2D(29,30));
+			FSlateDrawElement::MakeLines(E, Layer + 1, G.ToPaintGeometry(), Outline, ESlateDrawEffect::None, Ink, true, 1.6f);
+			return Layer + 1;
+		}
+	};
+}
+
+FString FTCMouseCapture::ValidMode(const FString& V)
+{
+	return V == TEXT("always") || V == TEXT("off") ? V : FString(TEXT("fullscreen"));
+}
+
+bool FTCMouseCapture::WindowFocused(const TSharedPtr<SWindow>& Window)
+{
+	const auto Native = Window ? Window->GetNativeWindow() : nullptr;
+#if PLATFORM_LINUX
+	return Native && SDL_GetKeyboardFocus() == Native->GetOSWindowHandle();
+#else
+	return Native && Native->IsForegroundWindow();
+#endif
+}
+
+FString FTCMouseCapture::Label() const
+{
+	return FString(TEXT("Capture mouse: ")) + (ModeValue == TEXT("always") ? TEXT("Always") : ModeValue == TEXT("off") ? TEXT("Off") : TEXT("In fullscreen"));
+}
+
+void FTCMouseCapture::Cycle()
+{
+	SetMode(ModeValue == TEXT("fullscreen") ? TEXT("always") : ModeValue == TEXT("always") ? TEXT("off") : TEXT("fullscreen"));
+	FTCSettingsStore::Game().Set(TEXT("ww2-capture"), ModeValue);
+}
+
+bool FTCMouseCapture::Frame(bool bPlaying, bool bFullscreen, bool bFocused, bool bActivate, bool bEscape)
+{
+	if (bPlaying && !bWasPlaying) bSuspended = false;
+	bWasPlaying = bPlaying;
+	if (bEscape) { bCaptured = false; bSuspended = true; }
+	if (!bPlaying || !bFocused || (bWasFullscreen && !bFullscreen && ModeValue == TEXT("fullscreen"))) bCaptured = false;
+	else if (!bSuspended && bActivate && (ModeValue == TEXT("always") || (ModeValue == TEXT("fullscreen") && bFullscreen))) bCaptured = true;
+	bWasFullscreen = bFullscreen;
+	return bCaptured;
+}
+
+void FTCMouseCapture::Apply(APlayerController* PC)
+{
+	if (!PC || !PC->GetWorld() || !PC->GetWorld()->GetGameViewport()) return;
+	auto* V = PC->GetWorld()->GetGameViewport();
+#if PLATFORM_LINUX
+	const auto Window = V->GetWindow();
+	const auto Native = Window ? Window->GetNativeWindow() : nullptr;
+	if (auto* Handle = Native ? static_cast<SDL_Window*>(Native->GetOSWindowHandle()) : nullptr)
+	{
+		if (SDL_GetWindowMouseGrab(Handle) != bCaptured && !SDL_SetWindowMouseGrab(Handle, bCaptured))
+		{
+			bCaptured = false;
+			UE_LOG(LogTC, Warning, TEXT("capture mouse: native window refused the mouse grab"));
+		}
+	}
+#endif
+	if (bApplied && bAppliedCapture == bCaptured) return;
+	bApplied = true; bAppliedCapture = bCaptured;
+	if (!V->HasSoftwareCursor(EMouseCursor::Default)) V->SetSoftwareCursorWidget(EMouseCursor::Default, SNew(TCCaptureImpl::SSourceCursor));
+	V->SetUseSoftwareCursorWidgets(bCaptured);
+	PC->DefaultMouseCursor = bCaptured ? EMouseCursor::Default : EMouseCursor::Crosshairs;
+	FInputModeGameAndUI Input;
+	Input.SetHideCursorDuringCapture(false);
+	Input.SetLockMouseToViewportBehavior(bCaptured ? EMouseLockMode::LockAlways : EMouseLockMode::DoNotLock);
+	PC->SetInputMode(Input);
+	PC->bShowMouseCursor = true;
+	if (!bCaptured && V->Viewport) V->Viewport->CaptureMouse(false);
+	UE_LOG(LogTC, Log, TEXT("capture mouse: mode %s, confined %d, drawn cursor %d, suspended %d"), *ModeValue, bCaptured, V->GetIsUsingSoftwareCursorWidgets(), bSuspended);
+}
+
+void FTCMouseCapture::Drive(APlayerController* PC, bool bPlaying)
+{
+	if (!PC || !PC->GetWorld()) return;
+	if (!bLoaded) { const auto Saved = FTCSettingsStore::Game().Get(TEXT("ww2-capture")); SetMode(Saved.Get(FString())); bLoaded = true; }
+	auto* V = PC->GetWorld()->GetGameViewport();
+	if (!V || !V->Viewport) return;
+	Frame(bPlaying, V->Viewport->IsFullscreen(), WindowFocused(V->GetWindow()), PC->WasInputKeyJustPressed(EKeys::LeftMouseButton), PC->WasInputKeyJustPressed(EKeys::Escape));
+	Apply(PC);
+}
+
+void FTCMouseCapture::Request(APlayerController* PC, bool bPlaying, bool bToggle)
+{
+	if (bToggle) ToggleNow(bPlaying);
+	else
+	{
+		bSuspended = false;
+		auto* V = PC && PC->GetWorld() ? PC->GetWorld()->GetGameViewport() : nullptr;
+		if (V && V->Viewport) Frame(bPlaying, V->Viewport->IsFullscreen(), WindowFocused(V->GetWindow()), true, false);
+	}
+	Apply(PC);
+}
+
+void FTCMouseCapture::Fullscreen(APlayerController* PC, bool bPlaying)
+{
+	auto* S = UGameUserSettings::GetGameUserSettings();
+	if (!S) return;
+	const bool bEntering = S->GetFullscreenMode() == EWindowMode::Windowed;
+	S->SetFullscreenMode(bEntering ? EWindowMode::WindowedFullscreen : EWindowMode::Windowed);
+	S->ApplyResolutionSettings(false);
+	if (bEntering && ModeValue != TEXT("off")) { bSuspended = false; bCaptured = bPlaying; }
+	else if (ModeValue == TEXT("fullscreen")) bCaptured = false;
+	Apply(PC);
+}
 
 ATCCameraPawn::ATCCameraPawn()
 {
@@ -53,6 +205,81 @@ bool FTCPinhole::Ground(FVector2D S, double VX, double VY, double Height, FVecto
 	Out = FVector2D(Pos.X + Dir.X * T, Pos.Y + Dir.Y * T);
 	return true;
 }
+
+bool TCSelectionBounds::Project(const FBox& Local, const FTransform& Model, const FTCPinhole& View, double W, double H, FBox2D& Out, double Near, double Far)
+{
+	Out = FBox2D(ForceInit);
+	if (!Local.IsValid || W <= 0 || H <= 0 || Near <= 0 || Far < Near) return false;
+	FVector Corners[8]; double Depth[8];
+	TArray<FVector> Clipped;
+	for (int32 I = 0; I < 8; I++)
+	{
+		Corners[I] = Model.TransformPosition(FVector(I & 1 ? Local.Max.X : Local.Min.X, I & 2 ? Local.Max.Y : Local.Min.Y, I & 4 ? Local.Max.Z : Local.Min.Z));
+		Depth[I] = (Corners[I] - View.Pos) | View.F;
+		if (Depth[I] >= Near && Depth[I] <= Far) Clipped.Add(Corners[I]);
+	}
+	for (int32 A = 0; A < 8; A++) for (int32 Bit : {1,2,4})
+	{
+		const int32 B = A ^ Bit; if (A > B) continue;
+		for (const double Plane : { Near, Far }) if ((Depth[A] < Plane) != (Depth[B] < Plane)) Clipped.Add(FMath::Lerp(Corners[A], Corners[B], (Plane - Depth[A]) / (Depth[B] - Depth[A])));
+	}
+	for (const FVector P : Clipped) { FVector2D S; if (View.Project(P, W, H, S) && FMath::IsFinite(S.X) && FMath::IsFinite(S.Y)) Out += S; }
+	return Out.bIsValid;
+}
+
+double TCSelectionBounds::Distance(const FBox2D& B, FVector2D P)
+{
+	if (!B.bIsValid) return TNumericLimits<double>::Max();
+	const double X = FMath::Max3(B.Min.X - P.X, 0., P.X - B.Max.X), Y = FMath::Max3(B.Min.Y - P.Y, 0., P.Y - B.Max.Y);
+	return FMath::Sqrt(X * X + Y * Y);
+}
+
+bool TCSelectionBounds::Intersects(const FBox2D& A, const FBox2D& B)
+{
+	return A.bIsValid && B.bIsValid && A.Max.X >= B.Min.X && A.Min.X <= B.Max.X && A.Max.Y >= B.Min.Y && A.Min.Y <= B.Max.Y;
+}
+
+// The lead patch adds this declaration to the existing renderer history. Definitions stay in this scope.
+#include "Client/TCModelLibrary.h"
+#include "Client/TCUnitRenderer.h"
+#include "Client/TCPlayerController.h"
+#include "Client/TCGameMode.h"
+#include "Components/InstancedStaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
+#if defined(TC_HAS_MODEL_SELECTION)
+void ATCUnitRenderer::SelectionBounds(int32 Id, const FTCPinhole& View, double W, double H, TArray<FBox2D>& Out) const
+{
+	History.SelectionBounds(Id, View, W, H, Out);
+	if (Crowd) Crowd->History.SelectionBounds(Id, View, W, H, Out);
+}
+
+bool ATCPlayerController::ModelBounds(const FTCUnit& U, TArray<FBox2D>& Out) const
+{
+	Out.Reset();
+	const ATCGameMode* M = Mode(); int32 W = 0, H = 0; GetViewportSize(W,H);
+	if (!M || !M->Units || !PlayerCameraManager || W <= 0 || H <= 0 || (U.Flags & TCFlags::Garrisoned)) return false;
+	const FRotator Rotation = PlayerCameraManager->GetCameraRotation();
+	FTCPinhole View(PlayerCameraManager->GetCameraLocation(),Rotation.Yaw,-Rotation.Pitch,0,double(W)/H);
+	M->Units->SelectionBounds(U.Id,View,W,H,Out);
+	return Out.Num() > 0;
+}
+
+void FTCInstanceHistory::SelectionBounds(int32 UnitId, const FTCPinhole& View, double W, double H, TArray<FBox2D>& Out) const
+{
+	for (const auto& Component : Last)
+	{
+		const auto* Ism = Component.Key.Get();
+		if (!Ism || !Ism->IsVisible() || !Ism->GetStaticMesh()) continue;
+		for (const auto& Instance : Component.Value)
+		{
+			const uint64 Key = Instance.Key;
+			if ((Key >> 60) != 1 || int32(uint32(Key >> 24)) != UnitId || (Key & 15) > 1) continue;
+			FBox2D Screen;
+			if (TCSelectionBounds::Project(Ism->GetStaticMesh()->GetBoundingBox(), Instance.Value, View, W, H, Screen)) Out.Add(Screen);
+		}
+	}
+}
+#endif
 
 namespace TCCameraFeel
 {
@@ -217,6 +444,49 @@ bool FTCCameraIntro::Skip(FTCCameraPose& Out)
 }
 
 #if WITH_DEV_AUTOMATION_TESTS
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCSelectionBoundsTest, "ThreeCrossroads.Camera.SelectionBounds", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)
+bool FTCSelectionBoundsTest::RunTest(const FString&)
+{
+	const FTCPinhole View(FVector::ZeroVector, 0, 0, 0, 16./9.);
+	FBox2D Left, Right, Clipped;
+	TestTrue(TEXT("left soldier mesh projects separately"), TCSelectionBounds::Project(FBox(FVector(100,-40,-5),FVector(110,-30,5)), FTransform::Identity, View, 1280, 720, Left));
+	TestTrue(TEXT("right soldier mesh projects separately"), TCSelectionBounds::Project(FBox(FVector(100,30,-5),FVector(110,40,5)), FTransform::Identity, View, 1280, 720, Right));
+	TestTrue(TEXT("gap between soldiers remains empty"), TCSelectionBounds::Distance(Left, {640,360}) > 6 && TCSelectionBounds::Distance(Right, {640,360}) > 6);
+	TestFalse(TEXT("box wholly in the gap selects neither model"), TCSelectionBounds::Intersects(Left, FBox2D({635,355},{645,365})) || TCSelectionBounds::Intersects(Right, FBox2D({635,355},{645,365})));
+	TestEqual(TEXT("click within mesh has zero distance"), TCSelectionBounds::Distance(Left, Left.GetCenter()), 0.);
+	TestTrue(TEXT("touching box edge counts"), TCSelectionBounds::Intersects(Left, FBox2D(Left.Max, Left.Max + FVector2D(5,5))));
+	TestTrue(TEXT("near-plane intersections survive"), TCSelectionBounds::Project(FBox(FVector(-10,-2,-2),FVector(20,2,2)), FTransform::Identity, View,1280,720,Clipped));
+	TestFalse(TEXT("mesh behind near plane is absent"), TCSelectionBounds::Project(FBox(FVector(-20,-2,-2),FVector(5,2,2)), FTransform::Identity,View,1280,720,Clipped));
+	TestFalse(TEXT("mesh beyond far plane is absent"), TCSelectionBounds::Project(FBox(FVector(100,-2,-2),FVector(120,2,2)), FTransform::Identity,View,1280,720,Clipped,10,90));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCMouseCaptureTest, "ThreeCrossroads.Camera.Capture", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)
+bool FTCMouseCaptureTest::RunTest(const FString&)
+{
+	FTCMouseCapture C;
+	TestFalse(TEXT("an offscreen viewport has no native focus"), FTCMouseCapture::WindowFocused(nullptr));
+	TestEqual(TEXT("unknown stored mode uses source default"), FTCMouseCapture::ValidMode(TEXT("bad")), FString(TEXT("fullscreen")));
+	TestFalse(TEXT("default mode leaves windowed pointer free"), C.Frame(true, false, true, true, false));
+	TestTrue(TEXT("fullscreen click captures"), C.Frame(true, true, true, true, false));
+	TestFalse(TEXT("Esc releases"), C.Frame(true, true, true, false, true));
+	TestFalse(TEXT("next click does not undo Esc suspension"), C.Frame(true, true, true, true, false));
+	C.SetMode(TEXT("always"));
+	TestTrue(TEXT("Always captures a windowed click"), C.Frame(true, false, true, true, false));
+	TestFalse(TEXT("blur releases confinement"), C.Frame(true, false, false, false, false));
+	TestFalse(TEXT("focus without activation remains free"), C.Frame(true, false, true, false, false));
+	TestTrue(TEXT("fresh click recaptures"), C.Frame(true, false, true, true, false));
+	C.SetMode(TEXT("off"));
+	TestFalse(TEXT("Off releases and does not auto capture"), C.Frame(true, true, true, true, false));
+	C.ToggleNow(true);
+	TestTrue(TEXT("explicit Capture mouse works even with automatic capture Off"), C.Frame(true, false, true, false, false));
+	TestFalse(TEXT("lobby releases"), C.Frame(false, false, true, false, false));
+	C.SetMode(TEXT("always")); C.Frame(true, false, true, true, true);
+	C.Frame(false, false, true, false, false);
+	TestTrue(TEXT("a new match resets Esc suspension"), C.Frame(true, false, true, true, false));
+	return true;
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCCameraProjectionTest, "ThreeCrossroads.Camera.Projection", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)
 bool FTCCameraProjectionTest::RunTest(const FString&)

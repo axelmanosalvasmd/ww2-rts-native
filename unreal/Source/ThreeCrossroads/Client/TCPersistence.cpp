@@ -704,6 +704,7 @@ bool FTCPersistenceReferenceTest::RunTest(const FString& Parameters)
 #include "Misc/ConfigCacheIni.h"
 #include "Misc/CString.h"
 #include "Misc/Paths.h"
+#include "GameFramework/GameUserSettings.h"
 
 const TCHAR* const FTCSettingsStore::Section = TEXT("ThreeCrossroads");
 
@@ -805,6 +806,10 @@ bool FTCSettingsStore::Remove(const FString& ReferenceKey)
 bool FTCSettingsStore::Flush() const
 {
 	if (bMemoryOnly || !GConfig || !TCSettingsImpl::Cached(Ini)) return true; // other files are written by Set
+	// ValidateSettings deletes the entire branch on the next launch if the engine's version was never saved.
+	// SaveSettings preserves that schema alongside our section, including when the player never opens Fullscreen.
+	if (Ini == GGameUserSettingsIni)
+		if (UGameUserSettings* Settings = UGameUserSettings::GetGameUserSettings()) Settings->SaveSettings();
 	return GConfig->Flush(false, Ini);
 }
 

@@ -40,6 +40,7 @@
 class UFont;
 class ATCTerrain;
 class FTCBossBar;
+class FTCHudPortraits;
 
 // Round 16 (hudfit): the HUD's fit rules at a large UI scale in a small window, pure so tests read them.
 namespace FTCHudFit
@@ -59,8 +60,9 @@ namespace FTCHudFit
 		int32 Count = 1, Hp = 0, MaxHp = 0;
 		TArray<FString> Tags;
 		FString Hover;
+		int32 Owner = -1;
 	};
-	struct FIcon { FString Key; FBox2D Box; FLinearColor Colour; };
+	struct FIcon { FString Key; FBox2D Box; FLinearColor Colour; bool bPortrait = false; int32 Owner = -1; };
 	struct FHit { FBox2D Box; FControl Control; };
 	struct FTextFit { FString Text; FBox2D Box, Clip; };
 	struct FBottomLayout
@@ -71,16 +73,23 @@ namespace FTCHudFit
 		TArray<FTextFit> TextBounds;
 		int32 SelectionMax = 0;
 		FBox2D SelectionList = FBox2D(ForceInit);
+		int32 MenuMax = 0, AirMax = 0, RecruitMax = 0;
+		FBox2D MenuList = FBox2D(ForceInit), AirList = FBox2D(ForceInit), RecruitList = FBox2D(ForceInit);
 		FBox2D Selection = FBox2D(ForceInit), Orders = FBox2D(ForceInit), Recruit = FBox2D(ForceInit), Economy = FBox2D(ForceInit);
 	};
 	THREECROSSROADS_API FBottomLayout LeftPanel(float ViewH, const FString& Title, const TArray<FSelection>& Selection,
 		const TArray<FString>& Details, const TArray<FControl>& Orders, const TArray<FControl>& Menu, const FTCMeasure& Measure, float Scale = 1.f,
-		int32 Idle = 0, int32 Destination = 1, bool bTransfer = false, bool bDropdown = false, int32 SelectionFirst = 0, float TopLimit = 80.f);
+		int32 Idle = 0, int32 Destination = 1, bool bTransfer = false, bool bDropdown = false, int32 SelectionFirst = 0, float TopLimit = 80.f,
+		int32 MenuFirst = 0, const TArray<FControl>& MenuTabs = {});
 	THREECROSSROADS_API FBottomLayout RecruitPanel(float ViewW, float ViewH, float Right, const TArray<FString>& Headings,
 		const TArray<FControl>& Tabs, const TArray<TArray<FControl>>& Lists, const TArray<FControl>& Above, const FTCMeasure& Measure, float Scale = 1.f,
-		const TArray<FString>& Logistics = {}, int32 TotalCards = 0);
+		const TArray<FString>& Logistics = {}, int32 TotalCards = 0, int32 First = 0, float TopLimit = 80.f, const FBox2D& Economy = FBox2D(ForceInit));
 	THREECROSSROADS_API FBottomLayout EconomyPanel(float ViewW, const FString& Money, const FString& Income, const FString& Population,
-		const TArray<FControl>& Support, const FTCMeasure& Measure, float Scale = 1.f, const TArray<FControl>& Resources = {}, const TArray<FControl>& Air = {});
+		const TArray<FControl>& Support, const FTCMeasure& Measure, float Scale = 1.f, const TArray<FControl>& Resources = {}, const TArray<FControl>& Air = {},
+		float MaxH = 0.f, int32 AirFirst = 0);
+	THREECROSSROADS_API TSet<int32> PlaneSelection(const class FTCMatchState& State, const TSet<int32>& Current, int32 Id, bool bToggle, bool bDouble);
+	// HUD controls keep their complete tooltip even when the visible caption is elided.
+	THREECROSSROADS_API FString ControlTip(const FControl& Control);
 	THREECROSSROADS_API FBottomLayout Tooltip(const FString& Shown, const FBox2D& Anchor, FVector2D View, const FTCMeasure& Measure);
 	THREECROSSROADS_API FBottomLayout Toolbar(float MaxW, const TArray<FControl>& Controls, const FTCMeasure& Measure, float Scale = 1.f);
 	THREECROSSROADS_API FBottomLayout SandboxToolbar(FVector2D View, float CornerRight, float ScoreLeft,
@@ -238,10 +247,20 @@ private:
 	void DrawRecruitPanel(UFont* Font, float Left, float Bottom);
 	void DrawBottomLayout(const FTCHudFit::FBottomLayout& Layout, UFont* Font);
 	void DrawHudIcon(const FString& Key, const FBox2D& Box, FLinearColor Colour);
+	void OfferTooltip(const FString& Text, const FBox2D& ScreenBox);
+	void DrawHint(UFont* Font);
+	TSharedPtr<FTCHudPortraits> Portraits;
+	bool bLossFixtureDrawn = false;
 	FString PendingTooltip;
 	FBox2D TooltipAnchor = FBox2D(ForceInit);
 	FBox2D SelectionScrollBox = FBox2D(ForceInit), CornerBox = FBox2D(ForceInit);
 	int32 SelectionFirst = 0, SelectionMax = 0;
+	int32 MenuFirst = 0, MenuMax = 0, AirFirst = 0, AirMax = 0, RecruitFirst = 0, RecruitMax = 0, BuildTab = 0;
+	FString MenuContext, RecruitContext;
+	FBox2D EconomyBox = FBox2D(ForceInit);
+	FBox2D MenuScrollBox = FBox2D(ForceInit), AirScrollBox = FBox2D(ForceInit), RecruitScrollBox = FBox2D(ForceInit);
+	int32 LastPlane = 0;
+	double LastPlanePress = -1.0;
 	int32 GroupDestination = 1;
 	bool bGroupDropdown = false, bRecruitLetters = false;
 	// A line over the ground through metre points (each leg split every 2 m so it follows the relief), Lift metres up.
@@ -291,6 +310,7 @@ public:
 private:
 	// client/main.js drawMinimap: the capture points (owner discs, the cut cross, the locked link) and the start's spawns
 	void DrawMinimapPoints();
+	void DrawMinimapAlertRings();
 	// ORDER_DASH: 2.2 m period, 1.3 m lit, anchored at the goal (overlay.js uEnd).
 	void GroundDashes(const ATCTerrain& T, FVector2D A, FVector2D B, const FLinearColor& Colour, float Thickness, float Period = 2.2f, float Lit = 1.3f);
 	// A filled screen-space quad (two canvas triangles).

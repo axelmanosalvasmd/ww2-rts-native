@@ -28,6 +28,7 @@
 #include "Engine/GameViewportClient.h"
 #include "Client/TCEndReport.h"
 #include "Client/TCPersistence.h"
+#include "Client/TCCameraPawn.h"
 #include "TCMatchControls.generated.h"
 
 class FJsonObject;
@@ -230,6 +231,7 @@ public:
 	bool bResumePending = false, bViewSeatActive = true;
 	double LastViewWrite = -1e9;
 	FTCMatchStartFlash StartFlash;
+	FTCMouseCapture MouseCapture;
 	FString NormalWindowTitle;
 	FString TerminalNotice;
 	// The host has no fault wire field. Scope this notice to its existing in-play restart/scenario refusal.
