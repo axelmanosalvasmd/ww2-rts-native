@@ -780,3 +780,7 @@ pub fn infantry_progress(g: &mut Game, rules: &Rules, moved: &[Moved]) {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "mov_audit_movement_tests.rs"]
+mod mov_audit;
