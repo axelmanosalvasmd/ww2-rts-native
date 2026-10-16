@@ -23,6 +23,7 @@ mod aligned_replay;
 #[cfg(test)]
 mod native_order_intent_tests;
 
+pub mod ai_view;
 pub mod assault_runtime;
 pub mod catalog;
 pub mod client_view;
@@ -72,6 +73,10 @@ pub mod seat_commander;
 pub(crate) mod existing_observers;
 pub mod logistics;
 pub mod map;
+pub mod map_authoring;
+pub mod map_save;
+#[cfg(test)]
+mod map_world_validation_tests;
 pub mod match_abilities;
 pub mod match_actor;
 pub mod match_aircraft_commands;
