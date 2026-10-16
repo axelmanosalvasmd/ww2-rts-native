@@ -85,6 +85,12 @@ pub(super) fn capture(state: &Match) -> Result<Vec<Map<String, Value>>, Snapshot
                             .filter(|t| state.world.game.players[u.owner].sees(t.id));
                         (4, target.map_or(*at, Unit::at))
                     }
+                    Command::Dig {
+                        ids,
+                        at,
+                        queue: false,
+                        ..
+                    } if ids.as_slice() == [i64::from(u.id)] => (7, *at),
                     Command::Entrench {
                         ids,
                         order:

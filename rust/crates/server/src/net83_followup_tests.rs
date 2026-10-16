@@ -4,7 +4,7 @@ use ww2_core::{match_end::EndReason, match_story::StoryKey};
 fn connection(id: u64) -> (Connection, mpsc::Receiver<Output>) {
     let (tx, rx) = mpsc::channel(64);
     let (cancel, _) = watch::channel(false);
-    (Connection { id, tx, cancel }, rx)
+    (Connection::new(id, tx, cancel), rx)
 }
 
 fn drain(hub: &mut Hub, rx: &mut mpsc::Receiver<Output>, now: u64) -> Vec<Value> {
