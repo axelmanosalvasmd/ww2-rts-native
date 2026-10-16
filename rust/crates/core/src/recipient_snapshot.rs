@@ -1,4 +1,4 @@
-//! Internal Conquest projections and an explicitly admitted quiet seat envelope.
+//! Internal ordinary-mode projections and an explicitly admitted seat envelope.
 //! Unsupported canonical actors remain explicit. No transport contract is added.
 use crate::{
     catalog::Catalog,
@@ -110,13 +110,25 @@ pub struct SnapshotCache<'a> {
 }
 impl<'a> SnapshotCache<'a> {
     pub fn new(state: &'a Match) -> Result<Self, SnapshotError> {
-        if !matches!(state.options.mode, Mode::Default | Mode::Conquest)
-            || state.world.game.mode.is_some()
+        if !matches!(
+            state.options.mode,
+            Mode::Default | Mode::Conquest | Mode::Assault | Mode::Annihilation | Mode::Classic
+        ) || !crate::match_actor::ordinary_ground_mode(&state.world.game, state.options.mode)
             || state.world.geography().is_some()
-            || state.assault.is_some()
+            || (state.options.mode != Mode::Assault && state.assault.is_some())
             || state.world_runtime.is_some()
         {
             return Err(SnapshotError::UnsupportedMode);
+        }
+        if state.options.mode == Mode::Assault {
+            state
+                .validate_match_finish_state()
+                .map_err(|_| SnapshotError::Rules)?;
+        }
+        if matches!(state.options.mode, Mode::Annihilation | Mode::Classic) {
+            state
+                .validate_elimination_state()
+                .map_err(|_| SnapshotError::Rules)?;
         }
         let g = &state.world.game;
         let cells = g.w.checked_mul(g.h).ok_or(SnapshotError::Rules)?;
@@ -456,12 +468,44 @@ fn near_cover(state: &Match, u: &Unit) -> Result<bool, SnapshotError> {
             && math::hypot(u.x - v.x, u.z - v.z) < 3.5
     }))
 }
+/// JSON omits fields that are undefined in the prototype's modeRow.
+fn ordinary_mode_row(state: &Match) -> Result<Option<Value>, SnapshotError> {
+    Ok(match state.options.mode {
+        Mode::Default | Mode::Conquest => None,
+        Mode::Assault => {
+            let mode = state.assault.ok_or(SnapshotError::Rules)?;
+            finite(&[mode.time_left])?;
+            Some(json!({"kind":"assault", "defenderTeam":mode.defender_team,
+                "attackerTeam":mode.attacker_team, "timeLeft":math::max(0., mode.time_left.ceil()),
+                "suddenDeath":false, "total":mode.total}))
+        }
+        Mode::Annihilation => {
+            let mode = state.elimination.as_ref().ok_or(SnapshotError::Rules)?;
+            Some(json!({"kind":"annihilation", "suddenDeath":false, "bunkers":mode.bunkers}))
+        }
+        Mode::Classic => {
+            let mode = state.elimination.as_ref().ok_or(SnapshotError::Rules)?;
+            let time = mode.time_left.ok_or(SnapshotError::Rules)?;
+            finite(&[time])?;
+            Some(
+                json!({"kind":"classic", "timeLeft":math::max(0., time.ceil()),
+                "suddenDeath":mode.sudden_death}),
+            )
+        }
+        _ => return Err(SnapshotError::UnsupportedMode),
+    })
+}
+
 fn economy_fields(state: &Match, slot: usize) -> Result<Map<String, Value>, SnapshotError> {
     let p = &state.start.economy.players[slot];
     finite(&[p.mp, p.mun, p.fuel, p.inc, p.vp])?;
     let mut fields = Map::new();
-    // Ordinary Conquest does not initialize the source player mun/fuel fields.
-    // Canonical accounting zeros do not make those wire fields present.
+    // Classic initializes these wallets. Other admitted ordinary modes leave
+    // them undefined in the prototype, even though native accounting has zeros.
+    if state.options.mode == Mode::Classic {
+        fields.insert("mun".into(), json!(p.mun.floor()));
+        fields.insert("fuel".into(), json!(p.fuel.floor()));
+    }
     for (key, value) in [("mp", p.mp.floor()), ("inc", r(p.inc))] {
         fields.insert(key.into(), json!(value));
     }
@@ -470,6 +514,9 @@ fn economy_fields(state: &Match, slot: usize) -> Result<Map<String, Value>, Snap
             finite(&[value])?;
             fields.insert(key.into(), json!(r(value)));
         }
+    }
+    if let Some(mode) = ordinary_mode_row(state)? {
+        fields.insert("mode".into(), mode);
     }
     fields.insert("tick".into(), json!(state.world.game.tick));
     fields.insert(

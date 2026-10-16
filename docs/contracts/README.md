@@ -6,6 +6,8 @@ These files reserve contract topics; no protocol or ABI is approved by their cre
 
 | Document | Draft owner | Consumer reviewer | Status |
 | --- | --- | --- | --- |
+| [start-cancellation.md](start-cancellation.md) | Julio | Axel | Identical prototype v0 pending-start cancellation and scenario-denial shapes; exact-head acknowledgement pending |
+| [ordinary-results.md](ordinary-results.md) | Julio | Axel | Identical prototype v0 ordinary mode/result fields; owner groups N/P recorded in #5 comment 6217590741; exact-head acknowledgement pending |
 | protocol.md | Julio | Axel | v0 draft; technical answers recorded (#5); three security corrections pending |
 | terrain.md | Julio | Axel | v0 draft; technical answers recorded (#5) |
 | [save-format.md](save-format.md) | Julio | Axel | Private JSON format v1; owner group I recorded in #5 comment 6217590741; implementation exact-head acknowledgement pending |

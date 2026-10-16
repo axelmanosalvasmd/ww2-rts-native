@@ -62,16 +62,19 @@ pub(super) fn capture(state: &Match) -> Result<Vec<Map<String, Value>>, Snapshot
         .array()
         .ok_or(SnapshotError::Rules)?;
     let grid = SpatialGrid::new(&g.units, 16.);
+    let nodes = state
+        .ordinary_snapshot_nodes()
+        .map_err(|_| SnapshotError::Rules)?;
     let mut result = Vec::with_capacity(g.players.len());
     for slot in 0..g.players.len() {
         let mut fields = Map::new();
         // Reuse Source's six-field ghost rows. Never consult a hidden live building here.
-        if matches!(state.options.mode, Mode::Classic | Mode::World)
-            && let Some((_, rows)) = state
+        if matches!(state.options.mode, Mode::Classic | Mode::World) {
+            let rows = state
                 .classic_known_buildings
                 .iter()
                 .find(|(team, _)| *team == g.players[slot].team)
-        {
+                .map_or(&[][..], |(_, rows)| rows.as_slice());
             let ghosts = rows
                 .iter()
                 .filter(|row| !seen_by(state, slot, row.id))
@@ -103,6 +106,9 @@ pub(super) fn capture(state: &Match) -> Result<Vec<Map<String, Value>>, Snapshot
         if state.scenario.is_some() {
             // The admitted migrated engine has no authored objectives.
             fields.insert("scenario".into(), json!({"version":1,"objectives":[]}));
+        }
+        if let Some(nodes) = &nodes {
+            fields.insert("nodes".into(), json!(nodes));
         }
         fields.insert("army".into(), json!({"pop":pop,"income":income}));
         fields.insert("wx".into(), json!(wx.map(r)));

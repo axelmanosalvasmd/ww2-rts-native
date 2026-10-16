@@ -88,6 +88,51 @@ impl Server {
         }
         self.clock.elapsed().as_millis().min(u128::from(u64::MAX)) as u64
     }
+
+    async fn dispatch(
+        &self,
+        code: &str,
+        connection: &Connection,
+        joined: &mut bool,
+        value: Value,
+    ) -> Option<tokio::task::JoinHandle<()>> {
+        let mut hub = self.hub.lock().await;
+        if *joined
+            && matches!(value["t"].as_str(), Some("start" | "restart"))
+            && hub.uses_trusted_start(code)
+        {
+            let command = value["t"].as_str().unwrap();
+            return match hub.claim_trusted_start(code, connection.id, command == "restart") {
+                Ok(request) => {
+                    let server = self.clone();
+                    let code = code.to_owned();
+                    // The socket loop and hub remain available for end while the
+                    // blocking map/startup owner prepares a replacement match.
+                    Some(tokio::spawn(async move {
+                        server.generate_start(code, request).await;
+                    }))
+                }
+                Err(_) => {
+                    hub.refuse_trusted_start(code, connection.id, command, self.now());
+                    None
+                }
+            };
+        }
+        hub.message(code, connection, joined, value, self.now());
+        None
+    }
+
+    async fn generate_start(&self, code: String, request: lobby::StartRequest) {
+        let worker = request.clone();
+        let generated = tokio::task::spawn_blocking(move || worker.generate())
+            .await
+            .unwrap_or_else(|error| Err(format!("native generation worker: {error}")));
+        let _ = self
+            .hub
+            .lock()
+            .await
+            .complete_trusted_start(&code, request, generated, self.now());
+    }
 }
 
 /// Trusted host access to the same Hub used by HTTP, sockets and maintenance.
@@ -343,7 +388,7 @@ async fn socket_loop(
                     }
                 };
                 if let Ok(value) = serde_json::from_slice(&bytes) {
-                    server.hub.lock().await.message(&code,&connection,&mut joined,value,server.now());
+                    let _ = server.dispatch(&code, &connection, &mut joined, value).await;
                 }
             }
         }

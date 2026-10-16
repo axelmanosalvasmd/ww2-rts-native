@@ -71,7 +71,7 @@ impl Hub {
     }
     pub(super) fn save_room(&self, code: &str, connection_id: u64) -> Result<String, String> {
         let room = self.rooms.get(code).ok_or("room absent")?;
-        if !room.is_host(connection_id) {
+        if room.starting.is_some() || !room.is_host(connection_id) {
             return Err("host required".into());
         }
         let native = room.native.as_ref().ok_or("running match required")?;
@@ -120,7 +120,7 @@ impl Hub {
             return Err("server stopped".into());
         }
         let room = self.rooms.get(code).ok_or("room absent")?;
-        if room.native.is_some() || !room.is_host(connection_id) {
+        if room.native.is_some() || room.starting.is_some() || !room.is_host(connection_id) {
             return Err("host in lobby required".into());
         }
         let saved = room.saves.read(code, id)?;
@@ -268,6 +268,7 @@ impl Hub {
                 .ok_or("invalid saved defender")?,
             empty_since: None,
             native: None,
+            starting: None,
             result: None,
         };
         let mut prepared =
