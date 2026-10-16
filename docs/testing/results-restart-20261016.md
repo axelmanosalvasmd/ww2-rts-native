@@ -10,6 +10,8 @@ Prototype: `reference/ww2-rts` at `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`, in
 
 The existing generic `fallen.structure` component check remains in `match_story::intent_tests::fallen_locations_remain_separate_and_explicit_finish_spots_override_the_centre`. Ordinary ending selectors consume the specific bunker or production-building position.
 
+The existing binary regression `trusted_room_process::ordinary_binary_two_seats_move_stop_takeover_and_restart_with_private_seed` also covers MODE-94 through the real server. Its restart expectations now require a fresh recorded seed, including wrapping from `u64::MAX` to zero, unchanged remaining settings, a fresh environment seed and matching startup data for both recipients. The old identical-seed assertion failed at `trusted_room_process.rs:181` before this correction.
+
 ## Dropped from this batch
 
 - MODE-90: `lobby::result_message` accepts only Conquest and refuses territory timelines. Existing Conquest and host-end checks do not prove complete ordinary-mode result publication.
@@ -21,6 +23,6 @@ Hosted Horde-only branches are excluded as requested. Tutorial, World room admis
 
 ## Validation
 
-Run from `rust/` with Rust 1.99.0, an S1-S3 flock, that slot's target directory, MemoryMax=6G and MemorySwapMax=0. The focused expression is `test(results_restart_tests) | test(mode94_)`. Final validation and producing commit are recorded in the PR body.
+Run from `rust/` with Rust 1.99.0, an S1-S3 flock, that slot's target directory, MemoryMax=6G and MemorySwapMax=0. Use `--cargo-profile ci-test -j4` for focused tests. The focused expression is `test(results_restart_tests) | test(trusted_room_tests) | binary(trusted_room_process)`. Final validation and producing commit are recorded in the PR body.
 
 Coordination readback: the #5 requests about main's elimination serde failure and exact-head validation are acknowledged by retaining #373's fix and validating this branch after merging current main. This stream posts no issue replies. Runtime owner acknowledgment and hosted checks remain the orchestrator's gates.

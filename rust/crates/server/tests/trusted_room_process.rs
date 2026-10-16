@@ -169,19 +169,26 @@ fn ordinary_binary_two_seats_move_stop_takeover_and_restart_with_private_seed() 
     clients[0].send(json!({"t":"restart"}));
     let fresh = clients[0].until(|m| m["t"] == "start");
     assert!(fresh["matchId"].as_u64().unwrap() > identity);
-    assert_eq!(
-        replacement.until(|m| m["t"] == "start")["matchId"],
-        fresh["matchId"]
-    );
-    assert_eq!(fresh["spawns"], start["spawns"]);
-    assert_eq!(fresh["weather"], start["weather"]);
+    let guest_fresh = replacement.until(|m| m["t"] == "start");
+    assert_eq!(guest_fresh["matchId"], fresh["matchId"]);
+    assert_eq!(guest_fresh["spawns"], fresh["spawns"]);
+    assert_eq!(guest_fresh["weather"], fresh["weather"]);
     clients[0].barrier();
     let receipts = server.receipts();
     assert_eq!(receipts.len(), 2);
-    assert_eq!(receipts[0]["options"], receipts[1]["options"]);
-    for receipt in receipts {
+    let mut fresh_settings = receipts[1]["options"].clone();
+    fresh_settings["seed"] = receipts[0]["options"]["seed"].clone();
+    assert_eq!(receipts[0]["options"], fresh_settings);
+    assert_ne!(
+        receipts[0]["environmentSeed"],
+        receipts[1]["environmentSeed"]
+    );
+    for (index, receipt) in receipts.into_iter().enumerate() {
         let options = &receipt["options"];
-        assert_eq!(options["seed"].as_u64(), Some(u64::MAX));
+        assert_eq!(
+            options["seed"].as_u64(),
+            Some(u64::MAX.wrapping_add(index as u64))
+        );
         assert_eq!(options["weatherSeed"], Value::Null);
         for key in ["shuffle", "tech", "supply", "livingWeather"] {
             assert_eq!(options[key], true);
