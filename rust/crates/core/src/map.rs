@@ -822,7 +822,7 @@ pub struct TerrainState {
     pub height: Option<Vec<i8>>,
     pub house: Vec<u8>,
     pub cell_hp: Vec<f32>,
-    pub tough: Option<Vec<f64>>,
+    pub tough: Option<Vec<f32>>,
     pub wear: Vec<f32>,
     pub surface_wear: Vec<f32>,
     pub trench_front: Option<Vec<f32>>,
@@ -968,7 +968,7 @@ impl AuthoritativeMap {
             let values = tough.get_or_insert_with(|| vec![1.0; n]);
             let mut seen = vec![false; n];
             for c in component(&self.chars, self.w, b.y * self.w + b.x, &mut seen) {
-                values[c] = cfg_num("stoneBridge")?;
+                values[c] = cfg_num("stoneBridge")? as f32;
             }
         }
         let mut terrain = TerrainState {
@@ -1011,7 +1011,7 @@ impl AuthoritativeMap {
                 rules.movement.house_hp[usize::from(terrain.house[c])]
             } else {
                 rules.movement.terrain_hp(*ch).unwrap_or(0.0)
-                    * terrain.tough.as_ref().map_or(1.0, |t| t[c])
+                    * terrain.tough.as_ref().map_or(1.0, |t| f64::from(t[c]))
             }) as f32;
         }
         if self.trench_facing {

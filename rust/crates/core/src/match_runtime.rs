@@ -346,12 +346,7 @@ impl StartPlan {
                 })
             })
             .collect::<Result<Vec<_>, String>>()?;
-        let army_key = match options.army {
-            ArmySize::Standard => "standard",
-            ArmySize::Large => "large",
-            ArmySize::Massive => "massive",
-            ArmySize::Endless => "endless",
-        };
+        let army_key = options.army.key();
         let income_scale = number(field(field(cfg, "armies")?, army_key)?, "income")?;
         let initial_mp = number(
             if world_mode {
