@@ -8,7 +8,7 @@ use std::{
 };
 
 pub(crate) const VERSION: u64 = 1;
-pub(crate) const AUTHORED_VERSION: u64 = 2;
+pub(crate) const AUTHORED_VERSION: u64 = 3;
 
 pub(crate) fn version_for(state: &ww2_core::match_runtime::Match) -> u64 {
     if state.authored_scenario.is_some() {

@@ -1,4 +1,4 @@
-# Native match save format, versions 1 and 2
+# Native match save format, versions 1 and 3
 
 This implements owner group I as recorded in [issue #5, comment 6217590741](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6217590741). The compatibility source is `reference/ww2-rts` at `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`. Hermes' exact-head implementation acknowledgement remains a merge requirement. This document does not mark another draft contract agreed.
 
@@ -33,7 +33,7 @@ The root has these seven required keys. The six content owners correspond to `se
 
 | Key | Value and source |
 | --- | --- |
-| `version` | Integer `1` for existing non-authored matches, or `2` for authored objective missions. Other versions are refused before native state restoration. Version 1 carrying authored state is refused. |
+| `version` | Integer `1` for existing non-authored matches, or `3` for authored scenario missions. Versions 2 and other unsupported versions are refused before native state restoration. Version 1 carrying authored state is refused. |
 | `g` | Lossless native `Match` checkpoint, described below. It owns every implemented authoritative ordinary-match component. The prototype stores the whole `g` at `server/saves.js:18`. |
 | `guard` | Separate local-defender player, corresponding to the non-enumerable `g.players[-1]` at `server/saves.js:15-26`. Currently `null`; a non-null guard is refused by room admission while World is closed. |
 | `map` | Full raw authored map, including private layers and triggers. It is never replaced with `mapForClient`. The prototype uses `null` in World (`server.js:426`); native World restoration is refused. |
@@ -97,7 +97,7 @@ The `state` struct field keys are listed below. These are native component bound
 | `capture_ticks`, `tick_state`, `ordinary_snapshot_only` | Capture clocks, tick phase state and the existing delivery capability restriction. |
 | `story`, `fallen`, `finish`, `timeline`, `next_unit_id` | Match statistics, fall locations, terminal decision, result samples and the canonical actor allocator. |
 | `assault`, `horde`, `tutorial`, `scenario`, `companions`, `rail_runs` | Existing mode and operative owners. Inactive records are retained; their presence does not grant room admission. |
-| `authored_scenario` | Optional bounded ordinary mission owner: `data`, `executions`, insertion-ordered `objectives`, `next_execution`. Absent in older checkpoints; defaults to `None`. See [scenario objectives](scenario-objectives.md). |
+| `authored_scenario` | Optional bounded ordinary mission owner: `data`, contextual `executions`, insertion-ordered `objectives`, typed condition `facts`, target `owners`, pending `deferred` arrivals and `next_execution`. Absent in older checkpoints; defaults to `None`. See [scenario objectives](scenario-objectives.md). |
 | `elimination` | Optional Annihilation/Classic owner: `teams`, `bunkers`, `time_left`, `sudden_death`, `nodes`. Each resource node retains `cell`, `at` (`x`, `z`), `depot`, `rate`, `fuel`. |
 | `rules` | Omitted and reconstructed from compiled rules. Saving modified rules is refused. |
 | `world_runtime` | Omitted; saving or loading a World runtime is refused. |
@@ -108,7 +108,9 @@ Version remains 1. The hotfix completes serialization of the existing `Match.eli
 
 Annihilation and Classic remain excluded by ordinary recipient snapshot admission, including the room save/load path. Their full Match checkpoint codec is tested independently, including Classic sudden death, resource nodes and next-tick continuation. Serializing their owners does not open room admission.
 
-Authored objective missions use envelope version 2 because older binaries ignore unknown struct fields and could otherwise silently discard the new mission owner. Non-authored matches continue writing version 1. This binary accepts both versions, but refuses authored state inside a version 1 envelope. The prototype game content remains represented by the same six owners; only the already-native envelope version changes. Pending authored announcements use the new `TickEvent.AuthoredScenario` variant, and the optional owner is serialized through the existing tagged codec.
+Authored scenario missions use envelope version 3. The contextual trigger records and durable condition/arrival facts replace the narrower objective-only schema from version 2, so this follows the required format-version increment. Older hosts refuse version 3 before decoding its state. This binary reads versions 1 and 3 and refuses version 2; it does not migrate the earlier objective-only checkpoint. Existing non-authored matches continue writing version 1, and a version 1 envelope carrying authored state is refused. The six prototype content owners and all socket messages retain their existing shapes (`server.js:425-426`, `server/saves.js:16-26`). Pending authored announcements retain `TickEvent.AuthoredScenario` through the tagged codec.
+
+The added facts correspond to the prototype's durable `g.scenario` owner at `shared/scenarios.js:90`: trigger counts, cooldown and previous predicate, scoped objectives, groups and authored IDs, deferred rosters, capture history and prior owners. Arrival entry, order and absolute expiry match `shared/scenarios.js:95,165`. Current and resumed ordinary scenario matches collect every seat's recipient snapshot through canonical victory and ending ticks. The server save test checks version 3 selection, version 1 and 2 refusal without changing the lobby/epoch, restored mission state and the pending announcement.
 
 ## Admission and delivery
 

@@ -942,6 +942,7 @@ impl Match {
             self.initialize_recipient_routing()?;
             self.initialize_logistics()?;
         }
+        self.setup_authored_scenario()?;
         Ok(())
     }
 

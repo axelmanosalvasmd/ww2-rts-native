@@ -78,6 +78,7 @@ pub mod legacy_scenario_runtime;
 pub mod match_companion_effects;
 mod match_companion_tick;
 pub mod match_companions;
+mod scenario_actuators;
 pub mod scenario_validation;
 pub mod seat_commander;
 

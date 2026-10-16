@@ -165,8 +165,23 @@ fn map15_map_loading_uses_the_existing_complete_scenario_validator() {
             "{pointer}"
         );
     }
-    let error = Match::new(&loaded, options()).err().unwrap();
-    assert!(error.contains("authored scenarios currently require ordinary match-scoped once-only objective and announcement triggers"));
+    let mut state = Match::new(&loaded, options()).unwrap();
+    assert!(
+        state
+            .world
+            .game
+            .units
+            .values()
+            .any(|u| u.owner == 0 && u.x == 19.0 && u.z == 19.0)
+    );
+    for _ in 0..3 {
+        state.advance_tick().unwrap();
+        let cache = SnapshotCache::new(&state).unwrap();
+        for slot in 0..2 {
+            cache.recipient(slot).unwrap();
+        }
+        assert!(state.tick_state.fault().is_none());
+    }
 }
 
 #[test]

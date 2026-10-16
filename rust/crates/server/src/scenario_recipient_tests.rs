@@ -122,7 +122,7 @@ fn mode86_ordinary_room_filters_scenario_reads_without_execution_and_keeps_norma
     }
     runtime.advance_tick(&[false; 3]).unwrap();
     // Pending private and public announcements survive the checkpoint codec before delivery.
-    assert_eq!(crate::saves::version_for(runtime.state()), 2);
+    assert_eq!(crate::saves::version_for(runtime.state()), 3);
     let saved = runtime.state().save_json().unwrap();
     let pending = Match::save_events_json(&runtime.pending_events).unwrap();
     let mut restored = Match::from_save_json(saved).unwrap();
