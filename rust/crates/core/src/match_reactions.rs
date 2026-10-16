@@ -301,7 +301,13 @@ impl Match {
         if self.options.mode == crate::economy::Mode::World {
             self.actor_policy(u.owner)?;
         }
-        if kind.structure || self.logistics.get(id).is_some_and(|r| r.forced) {
+        if kind.structure
+            || self
+                .convoys
+                .as_ref()
+                .is_some_and(|s| s.trucks.contains_key(&id))
+            || self.logistics.get(id).is_some_and(|r| r.forced)
+        {
             return Ok(());
         }
         if u.air.is_some() || u.riding || kind.rail {

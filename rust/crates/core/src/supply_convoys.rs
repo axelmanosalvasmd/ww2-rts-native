@@ -27,7 +27,7 @@ const SOURCE_RADIUS: f64 = 15.0;
 const TRUCK_RADIUS: f64 = 12.0;
 const UNLOAD: f64 = 8.0;
 const REFILL: f64 = 40.0;
-const GRACE: f64 = 10.0;
+pub(crate) const GRACE: f64 = 10.0;
 const LOAD: f64 = 4.0;
 const ROUTES: usize = 3;
 fn items(s: Stock) -> [f64; KEYS] {
