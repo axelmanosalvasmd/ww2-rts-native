@@ -24,6 +24,8 @@ mod falling;
 mod flights;
 #[path = "recipient_snapshot/owners.rs"]
 mod owners;
+#[path = "recipient_snapshot/projectiles.rs"]
+mod projectiles;
 #[path = "recipient_snapshot/public_state.rs"]
 mod public_state;
 #[path = "recipient_snapshot/selected.rs"]
@@ -83,9 +85,8 @@ pub struct RecipientProjection {
     pub missing: Vec<SnapshotCapability>,
 }
 
-/// The public Horde mode component, separate from complete recipient admission.
-/// No seat data or hidden purchase state enters this row. The complete Horde
-/// snapshot and host remain guarded by their existing mode checks.
+/// Prototype Horde mode fields, shared by all recipients. Internal purchase
+/// state stays private; profile and boss are absent until the first wave.
 pub fn horde_mode_row(state: &Match) -> Result<Value, SnapshotError> {
     let mode = state.horde_projection().map_err(|_| SnapshotError::Rules)?;
     let horde = state.horde.as_ref().ok_or(SnapshotError::Rules)?;
@@ -96,6 +97,10 @@ pub fn horde_mode_row(state: &Match) -> Result<Value, SnapshotError> {
         "left": mode.left, "active": mode.active, "boss": mode.boss,
         "slot": horde.slot
     });
+    if mode.wave == 0 {
+        row.as_object_mut().unwrap().remove("profile");
+        row.as_object_mut().unwrap().remove("boss");
+    }
     if let Some(profile) = mode.next_profile {
         row["nextProfile"] = json!(profile.as_str());
     }
@@ -112,13 +117,21 @@ pub struct SnapshotCache<'a> {
 }
 impl<'a> SnapshotCache<'a> {
     pub fn new(state: &'a Match) -> Result<Self, SnapshotError> {
-        if !matches!(state.options.mode, Mode::Default | Mode::Conquest)
-            || state.world.game.mode.is_some()
+        let horde = state.options.mode == Mode::Horde
+            && state.world.game.mode == Some(crate::game::ModeKind::Horde);
+        if !(horde
+            || matches!(state.options.mode, Mode::Default | Mode::Conquest)
+                && state.world.game.mode.is_none())
             || state.world.geography().is_some()
             || state.assault.is_some()
             || state.world_runtime.is_some()
         {
             return Err(SnapshotError::UnsupportedMode);
+        }
+        if horde {
+            state
+                .validate_horde_economy()
+                .map_err(|_| SnapshotError::Rules)?;
         }
         let g = &state.world.game;
         let cells = g.w.checked_mul(g.h).ok_or(SnapshotError::Rules)?;
@@ -154,6 +167,9 @@ impl<'a> SnapshotCache<'a> {
         }
         engineering::validate(state)?;
         aircraft::validate(state)?;
+        if state.options.mode == crate::economy::Mode::Horde {
+            projectiles::validate(state)?;
+        }
         let rows = state
             .world
             .game
@@ -167,6 +183,11 @@ impl<'a> SnapshotCache<'a> {
         let mut public = public;
         for (fields, support) in public.iter_mut().zip(support) {
             fields.extend(support);
+        }
+        if state.options.mode == crate::economy::Mode::Horde && !state.firing.flights.is_empty() {
+            for (slot, fields) in public.iter_mut().enumerate() {
+                fields.insert("flights".into(), projectiles::for_seat(state, slot)?);
+            }
         }
         for (fields, works) in public.iter_mut().zip(engineering::capture(state)?) {
             fields.insert("works".into(), works);
@@ -206,7 +227,9 @@ impl<'a> SnapshotCache<'a> {
         fields.extend(self.owners[slot].clone());
         fields.extend(self.public[slot].clone());
         fields.insert("falling".into(), falling::project(self.state, slot)?);
-        fields.insert("flights".into(), flights::project(self.state, slot)?);
+        if self.state.options.mode != crate::economy::Mode::Horde {
+            fields.insert("flights".into(), flights::project(self.state, slot)?);
+        }
         Ok(RecipientProjection {
             fields,
             missing: vec![

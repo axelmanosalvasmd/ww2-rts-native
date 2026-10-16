@@ -18,7 +18,7 @@ use ww2_core::{
 };
 
 #[test]
-fn net50_host_control_respects_pause_and_mode_without_admitting_horde_rooms() {
+fn net50_host_control_respects_pause_and_mode_with_canonical_horde_admission() {
     let map = AuthoritativeMap::from_json(
         &serde_json::to_vec(&json!({
             "name":"Host Horde control", "w":60,"h":60,"rows":vec![".".repeat(60);60],
@@ -40,7 +40,30 @@ fn net50_host_control_respects_pause_and_mode_without_admitting_horde_rooms() {
     }
     assert!(end_horde_break(&mut state, true, false).unwrap());
     assert_eq!(state.horde.as_ref().unwrap().time_left, 0.0);
-    assert!(RoomRuntime::new(state, 0).is_err());
+    let mut horde = RoomRuntime::new(state, 0).unwrap();
+    for _ in 0..6 {
+        horde.advance_tick(&[false, false]).unwrap();
+        let seats = [
+            SelectedSeat {
+                slot: 0,
+                full: true,
+                omit: false,
+            },
+            SelectedSeat {
+                slot: 1,
+                full: true,
+                omit: false,
+            },
+        ];
+        assert_eq!(
+            horde
+                .collect_frame(&seats, FrameKind::Scheduled)
+                .unwrap()
+                .len(),
+            2
+        );
+        assert!(horde.fault().is_none());
+    }
 
     let mut runtime = RoomRuntime::new(Match::new(&map, ordinary_options).unwrap(), 0).unwrap();
     for _ in 0..6 {
@@ -959,5 +982,67 @@ fn aircraft_and_artillery_fire_while_every_seat_receives_every_tick_through_vict
         }
         assert_eq!(room.held(), 120);
         assert_eq!(room.state().world.game.tick, end.end_tick + 60);
+    }
+}
+
+#[test]
+fn paused_scheduled_event_clear_resets_ai_alert_cursor_before_resume() {
+    use ww2_core::seat_commander::Brain;
+    let selected = [SelectedSeat {
+        slot: 0,
+        full: false,
+        omit: false,
+    }];
+    // A paused frame replaces the event batch even when every socket is backed up.
+    for seats in [selected.as_slice(), &[]] {
+        let mut runtime = section_runtime();
+        let game = &runtime.state().world.game;
+        let map = json!({"rows": vec![".".repeat(game.w); game.h]});
+        runtime.activate_ai(&map, 0, "normal").unwrap();
+        runtime.collect_frame(&selected, FrameKind::Scheduled).unwrap();
+        runtime.tick_ai(false).unwrap();
+        let cursor = |runtime: &RoomRuntime| {
+            let Brain::Human { state, .. } =
+                runtime.ai_commander(0).unwrap().brain()
+            else {
+                panic!("expected the human commander");
+            };
+            let snapshot = state.snapshot().unwrap();
+            (
+                snapshot.batch_generation,
+                snapshot.batch_read,
+                snapshot.alerts.len(),
+            )
+        };
+        assert_eq!(
+            cursor(&runtime),
+            (Some(1), 1, 1),
+            "the AI read the real section hurt before any send"
+        );
+        runtime.pause(0, "A", PauseReason::Host, 10).unwrap();
+        let pause = runtime.poll_pause(&[true; 2], 1010).unwrap();
+        assert!(pause.blocked && pause.send_frame);
+        runtime.collect_frame(seats, FrameKind::Current).unwrap();
+        assert_eq!(
+            runtime.event_generation, 1,
+            "catch-up keeps the current event batch"
+        );
+        runtime.collect_frame(seats, FrameKind::Scheduled).unwrap();
+        assert!(runtime.pending_events.is_empty());
+        assert_eq!(runtime.event_generation, 2);
+        runtime.resume(1011);
+        runtime.advance_tick(&[false; 2]).unwrap();
+        assert!(
+            runtime.pending_events.is_empty(),
+            "the replacement batch is shorter than the old cursor"
+        );
+        runtime.collect_frame(&selected, FrameKind::Scheduled).unwrap();
+        runtime
+            .tick_ai(false)
+            .expect("resume must reset the alert cursor instead of refusing a shorter batch");
+        let expected_generation = if seats.is_empty() { 2 } else { 3 };
+        assert_eq!(cursor(&runtime), (Some(expected_generation), 0, 1));
+        assert!(runtime.fault().is_none());
+        assert!(runtime.state().tick_state.fault().is_none());
     }
 }

@@ -105,6 +105,10 @@ pub(super) fn complete(
     projection.fields.insert("t".into(), json!("s"));
     // Admission inspected each actual canonical actor/list owner. Their
     // absent output is a represented source result for this bounded frame.
+    projection
+        .fields
+        .entry("flights")
+        .or_insert_with(|| json!([]));
     projection.fields.insert("shots".into(), json!([]));
     projection.fields.entry("air").or_insert_with(|| json!([]));
     projection.fields.insert(
@@ -180,6 +184,9 @@ pub(super) fn admit_actors(state: &Match, outside_events: &[Effect]) -> Result<(
         || !state.support.events.is_empty()
     {
         return Err(refused(SnapshotCapability::ShotsAndFlights));
+    }
+    if state.options.mode == Mode::Horde {
+        projectiles::validate(state)?;
     }
     // The caller must drain aviation events into the chronological tick batch
     // before delivery, just as it drains firing and support events above.

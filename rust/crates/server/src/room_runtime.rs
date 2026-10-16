@@ -1,5 +1,5 @@
 //! One trusted host runtime over the canonical Match and recipient producers.
-//! Public network start and complete gameplay admission are separate work.
+//! Hosted admission and public input capabilities stay with the lobby.
 use crate::{
     snapshot_lists::{ListScope, ListVersions, RoomListCache},
     tick_timing::{TickMeter, TickSample},
@@ -46,7 +46,7 @@ pub struct EndingAction {
     pub complete: bool,
 }
 
-/// Host control over an existing Horde clock. This does not admit Horde rooms.
+/// Host control over an existing Horde break clock.
 pub(crate) fn end_horde_break(state: &mut Match, host: bool, paused: bool) -> Result<bool, String> {
     if !host || paused {
         return Ok(false);
@@ -68,6 +68,7 @@ pub struct RoomRuntime {
     batch: u64,
     last_versions: Option<(u64, ListVersions)>,
     pending_events: Vec<TickEvent>,
+    event_generation: u64,
     tick_failure: Option<TickFailure>,
     fault: Option<String>,
     pause: Option<Pause>,
@@ -107,7 +108,7 @@ impl RoomRuntime {
                 .recipient(slot)
                 .map_err(|e| format!("AI start recipient: {e:?}"))?
                 .into_json();
-            self.ai.observe(slot, &snapshot)?;
+            self.ai.observe(slot, &snapshot, true)?;
             messages.push((slot, envelope.message(slot, snapshot)));
         }
         Ok(messages)
@@ -130,6 +131,7 @@ impl RoomRuntime {
             batch: 0,
             last_versions: None,
             pending_events: Vec::new(),
+            event_generation: 0,
             tick_failure: None,
             fault: None,
             pause: None,
@@ -146,6 +148,10 @@ impl RoomRuntime {
         slot: usize,
     ) -> Option<&ww2_core::human_commander::HumanView<ww2_core::commander_ai::Observation>> {
         self.ai.delivered_view(slot)
+    }
+    #[cfg(test)]
+    pub(crate) fn ai_decoded_view(&self, slot: usize) -> Option<&ww2_core::ai_view::SeatView> {
+        self.ai.decoded_view(slot)
     }
     pub(crate) fn activate_ai(
         &mut self,
@@ -312,9 +318,14 @@ impl RoomRuntime {
         kind: FrameKind,
     ) -> Result<Vec<CapturedSeat>, String> {
         self.running()?;
+        let next_event_generation = self
+            .event_generation
+            .checked_add(u64::from(kind == FrameKind::Scheduled))
+            .ok_or("AI frame generation exhausted")?;
         if selected.is_empty() {
             if kind == FrameKind::Scheduled {
                 self.pending_events.clear();
+                self.event_generation = next_event_generation;
             }
             return Ok(Vec::new());
         }
@@ -347,7 +358,7 @@ impl RoomRuntime {
                 .recipient(seat.slot)
                 .map_err(|e| format!("native recipient: {e:?}"))?
                 .into_json();
-            self.ai.observe(seat.slot, &message)?;
+            self.ai.observe(seat.slot, &message, kind == FrameKind::Scheduled)?;
             captured.push(CapturedSeat {
                 slot: seat.slot,
                 batch,
@@ -361,6 +372,7 @@ impl RoomRuntime {
         self.last_versions = Some((batch, versions));
         if kind == FrameKind::Scheduled {
             self.pending_events.clear();
+            self.event_generation = next_event_generation;
         }
         Ok(captured)
     }

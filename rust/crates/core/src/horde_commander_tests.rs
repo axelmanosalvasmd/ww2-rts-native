@@ -8,7 +8,7 @@ use crate::{
     match_human_observation::{HumanObservationMemory, HumanShot},
     match_runtime::{MatchOptions, PlayerConfig},
     orders::OrderKey,
-    recipient_snapshot::{DeliveryState, SelectedSeat, SnapshotCache, SnapshotError},
+    recipient_snapshot::{DeliveryState, SelectedSeat, SnapshotCache},
     seat_commander::{Advance, Brain, Delivered},
     unit_publication::StagedUnit,
     weather::WeatherChoice,
@@ -16,12 +16,15 @@ use crate::{
 use serde_json::json;
 
 fn scene(horde: bool) -> Match {
+    scene_with_points(horde, 1, 1.0)
+}
+fn scene_with_points(horde: bool, count: usize, vp: f64) -> Match {
     let map = AuthoritativeMap::from_json(
         &serde_json::to_vec(&json!({
             "name":"Horde commander intent", "w":80, "h":80,
             "rows":vec![".".repeat(80);80],
             "spawns":[{"x":40,"y":5},{"x":10,"y":74},{"x":70,"y":74}],
-            "defend":[0], "points":[{"x":40,"y":5,"vp":1}]
+            "defend":[0], "points":vec![json!({"x":40,"y":5,"vp":vp});count]
         }))
         .unwrap(),
     )
@@ -285,11 +288,71 @@ fn intent_ai16_real_dispatch_uses_human_seats_and_scripted_horde() {
         "unsent tick retains delivered packet"
     );
     assert!(state.pending() > 0);
+    // The full packet reaches the same real dispatcher, Normal schedule and
+    // queue, rather than a policy entry point unused by SeatCommander.
+    let mut full = m.create_seat_commander(slot, Level::Easy).unwrap();
+    m.world.game.tick = 26;
+    let view = m.horde_commander_observation(slot).unwrap();
+    let mut facts = detached_policy_facts(&m, &view);
+    facts.manpower = 1000.0;
+    facts.support.insert("dive".into(), 0.0);
+    let own_at = facts.units.values().find(|u| u.owner == slot).unwrap().at;
+    facts.units.insert(
+        100_001,
+        crate::horde_policy::Unit {
+            id: 100_001,
+            owner: 0,
+            kind: "tank".into(),
+            at: own_at,
+            hp: 360.0,
+            suppression: 0.0,
+            plane: None,
+            cooldown: 0.0,
+            auto_retreat: false,
+            garrisoned: false,
+            in_cover: false,
+            riding: false,
+        },
+    );
+    assert_eq!(
+        m.advance_seat_commander(
+            &mut full,
+            Some(Delivered::HordePolicy {
+                view,
+                facts: Box::new(facts),
+            }),
+            2,
+            &[]
+        )
+        .unwrap(),
+        Advance::Horde(vec![])
+    );
+    m.world.game.tick = 27;
+    let Advance::Horde(commands) = m.advance_seat_commander(&mut full, None, 2, &[]).unwrap()
+    else {
+        panic!()
+    };
+    assert!(
+        commands
+            .iter()
+            .any(|c| matches!(c,Command::Support{kind,..}if kind=="dive"))
+    );
+    assert!(commands.iter().any(|c| matches!(
+        c,
+        Command::Stance {
+            stance: crate::match_commands::Stance::AutoRetreat,
+            on: true,
+            ..
+        }
+    )));
+    assert_eq!(ids(&commands).len(), ORDER_BATCH);
+    let Brain::Horde(state) = full.brain() else {
+        panic!()
+    };
+    assert!(state.pending() > 0);
+    assert_eq!(state.policy_facts.as_ref().unwrap().tick, 26);
     assert!(m.validate_tick_state().is_err());
-    assert!(matches!(
-        SnapshotCache::new(&m),
-        Err(SnapshotError::UnsupportedMode)
-    ));
+    SnapshotCache::new(&m).unwrap();
     assert!(m.opening_commander_observation(slot).is_err());
     for mutation in 0..3 {
         let mut stale = director.clone();
@@ -321,6 +384,66 @@ fn intent_ai16_real_dispatch_uses_human_seats_and_scripted_horde() {
             0,
             "dispatcher reads live Match state before a stale-view think"
         );
+    }
+}
+
+/// Explicit test-only packet. It keeps ordinary runtime admission separate from
+/// a detached policy objective; it is not a production observation provider.
+fn detached_policy_facts(m: &Match, view: &View) -> crate::horde_policy::Facts {
+    use crate::horde_policy::{Facts, Unit};
+    let slot = view.wave.slot;
+    let mut units: BTreeMap<_, _> = view
+        .units
+        .keys()
+        .map(|id| {
+            let u = &m.world.game.units[id];
+            (
+                *id,
+                Unit {
+                    id: *id,
+                    owner: slot,
+                    kind: m.rules.kinds[u.kind].name.clone(),
+                    at: u.at(),
+                    hp: u.hp,
+                    suppression: u.supp,
+                    plane: u.air,
+                    cooldown: m.abilities.get(*id).unwrap().cooldown,
+                    auto_retreat: m.commands.units[id].auto_retreat,
+                    garrisoned: u.garrison.is_some(),
+                    in_cover: false,
+                    riding: u.riding,
+                },
+            )
+        })
+        .collect();
+    let enemy = usize::from(slot == 0);
+    units.insert(
+        100_000,
+        Unit {
+            id: 100_000,
+            owner: enemy,
+            kind: "bunker".into(),
+            at: m.start.players[slot].spawn,
+            hp: 3000.0,
+            suppression: 0.0,
+            plane: None,
+            cooldown: 0.0,
+            auto_retreat: false,
+            garrisoned: false,
+            in_cover: false,
+            riding: false,
+        },
+    );
+    Facts {
+        tick: view.tick,
+        slot,
+        spawn: m.start.players[slot].spawn,
+        teams: m.world.game.players.iter().map(|p| p.team).collect(),
+        manpower: m.start.economy.players[slot].mp.floor(),
+        support: BTreeMap::new(),
+        units,
+        points: vec![],
+        strikes: vec![],
     }
 }
 
@@ -522,11 +645,9 @@ fn intent_ai10_horde_observation_ignores_hidden_enemy_state_and_private_rng() {
 }
 
 #[test]
-fn new_private_queue_survives_full_ordinary_match_and_final_recipient_snapshots() {
-    let mut m = scene(false);
+fn full_private_policy_survives_natural_ordinary_finish_and_all_seat_snapshots() {
+    let mut m = scene_with_points(false, 9, 5.0);
     let all = add_rifles(&mut m, 0, 20);
-    m.start.win_vp = 6.0;
-    m.start.points[0].owner = Some(0);
     let mut delivery = DeliveryState::new(&m).unwrap();
     let mut state = HordeCommander::new(0);
     let mut human = m.create_seat_commander(1, Level::Hard).unwrap();
@@ -536,7 +657,7 @@ fn new_private_queue_survives_full_ordinary_match_and_final_recipient_snapshots(
     let mut received = Vec::new();
     let mut finish = None;
     let mut had_pending = false;
-    for _ in 0..600 {
+    for _ in 0..1600 {
         let tick = m.world.game.tick;
         let human_view = human.wants_view(tick, tick % 2 == 0).then(|| {
             Delivered::Human(Box::new(
@@ -554,15 +675,13 @@ fn new_private_queue_survives_full_ordinary_match_and_final_recipient_snapshots(
         let mut control = live(&view);
         control.winner = m.finish.is_some();
         let mut emitted = if tick % 2 == 0 {
-            state.observe(control, view).unwrap()
+            let facts = detached_policy_facts(&m, &view);
+            state.observe_policy(control, view, facts).unwrap()
         } else {
             vec![]
         };
-        if tick == 0 {
-            emitted.extend(state.submit(control, movement(&all, true, 100.0)).unwrap());
-            had_pending = state.pending() > 0;
-        }
         emitted.extend(state.act(control).unwrap());
+        had_pending |= state.pending() > 0;
         received.extend(ids(&emitted));
         for command in emitted {
             m.enqueue_command(
@@ -614,4 +733,44 @@ fn new_private_queue_survives_full_ordinary_match_and_final_recipient_snapshots(
     assert!(m.world.game.tick >= finish.unwrap() + 8);
     assert_eq!(state.pending(), 0);
     assert_eq!(m.tick_state.fault(), None);
+}
+
+#[test]
+fn full_policy_aimed_intent_supersedes_older_pending_movement_before_flush() {
+    let mut m = scene(false);
+    let all = add_rifles(&mut m, 0, 20);
+    let view = wave_view(&m, 0, 0);
+    let control = live(&view);
+    let mut state = HordeCommander::new(0);
+    state.observe(control, view.clone()).unwrap();
+    assert_eq!(
+        ids(&state.submit(control, movement(&all, true, 100.0)).unwrap()).len(),
+        ORDER_BATCH
+    );
+    let target = all[ORDER_BATCH];
+    assert!(state.pending.iter().any(|job| job.id == target));
+    let mut facts = detached_policy_facts(&m, &view);
+    let at = facts.units[&target].at;
+    facts.units.insert(
+        100_001,
+        crate::horde_policy::Unit {
+            id: 100_001,
+            owner: 1,
+            kind: "mg".into(),
+            at,
+            hp: 75.0,
+            suppression: 0.0,
+            plane: None,
+            cooldown: 0.0,
+            auto_retreat: false,
+            garrisoned: false,
+            in_cover: false,
+            riding: false,
+        },
+    );
+    state.observe_policy(control, view, facts).unwrap();
+    let commands = state.act(control).unwrap();
+    assert!(commands.iter().any(|command|matches!(command,Command::Ability{ids,at:Some(_),..}if ids.contains(&i64::from(target)))));
+    assert!(!state.pending.iter().any(|job| job.id == target));
+    assert!(!ids(&commands).contains(&target));
 }

@@ -25,6 +25,10 @@ pub enum Brain {
 pub enum Delivered {
     Human(Box<HumanView<Observation>>),
     Horde(View),
+    HordePolicy {
+        view: View,
+        facts: Box<crate::horde_policy::Facts>,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -177,10 +181,15 @@ impl Match {
                 let live = self.horde_commander_live();
                 let mut commands = Vec::new();
                 if let Some(delivered) = delivered {
-                    let Delivered::Horde(view) = delivered else {
-                        return Err("Horde commander requires a Horde observation".into());
-                    };
-                    commands.extend(state.observe(live, view)?);
+                    match delivered {
+                        Delivered::Horde(view) => commands.extend(state.observe(live, view)?),
+                        Delivered::HordePolicy { view, facts } => {
+                            commands.extend(state.observe_policy(live, view, *facts)?);
+                        }
+                        Delivered::Human(_) => {
+                            return Err("Horde commander requires a Horde observation".into());
+                        }
+                    }
                 }
                 commands.extend(state.act(live)?);
                 Advance::Horde(commands)

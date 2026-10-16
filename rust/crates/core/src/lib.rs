@@ -61,6 +61,7 @@ pub mod formation;
 pub mod game;
 pub mod grid;
 pub mod horde_commander;
+pub mod horde_policy;
 pub mod human_commander;
 pub mod human_commander_inputs;
 pub mod human_commander_policy;
