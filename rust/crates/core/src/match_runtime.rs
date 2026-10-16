@@ -302,7 +302,7 @@ impl StartPlan {
             deployment::spawn_slots(available.len(), &teams, Some(&distances), selection)
                 .map_err(|e| format!("spawn allocation: {e:?}"))?
         };
-        let mut authored_slots: Vec<_> = if world_mode {
+        let mut authored_slots: Vec<_> = if world_mode || tutorial {
             slots.clone()
         } else {
             slots.iter().map(|&slot| available[slot]).collect()

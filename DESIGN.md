@@ -1,3 +1,7 @@
+## Shared-enemy authored spawns (2026-10-16)
+
+Tutorial startup selects authored spawn indices 0 and 1 directly. It must not map those indices through the non-Assault spawn list, which can move both sides when a map marks its first spawns Assault-only. World already uses direct authored indices; ordinary Conquest keeps its existing filtered allocation. Horde continues to select the middle entry of the authored defender list and the first non-defender index. No persistent state, command or recipient capability is added.
+
 ## Tutorial runtime over existing Match systems (2026-10-16)
 
 The explicit `Match::new_tutorial` constructor adds the unattended Enemy seat and uses the existing `tutorial_steps` definitions. Tutorial shares the ordinary ground, routing, combat, objective and support systems. Its private step state owns only the current index, spawned IDs and pending dialogue. Lines leave through the core tick report from tick 40; no server or client transport is introduced. The runner advances at most one step per tick after capture and income, and finishes at the bridgehead through the common Match finish state.
