@@ -1,8 +1,27 @@
 # Three Crossroads Native: design decisions
 
+## Native feature input lifetime correction (2026-10-16)
+
+The first BASE14 grant ran once at `fe5d4560`, Rust tree `3c0e11aa`, and
+stopped during compilation with five E0506/E0502 errors in the new integration
+test inputs. No native test was selected or executed. The process and systemd
+launcher ended with exit 101, and the inherited S1 lock was released. The
+normal log and terminal result remain in
+`/tmp/native-feature-batches-0315/base_audit/`.
+
+Under the overseer's 03:23 source-fix direction, give region-loss, region-cap
+and depot-point observations separate copied input storage. Every fact value,
+expected value and assertion remains unchanged. This changes test borrowing
+only; no runtime, fixture or interface changes. Both BASE14 and LOG41 need new
+literal exact-head grants. Move the compact maps to normal testing documents
+and restore both parity files exactly to the incoming baseline for the new
+test-PR/status-PR split. No parity status is changed.
+
+
 ## LOG native intent test window (2026-10-16)
 
 The separate logistics contribution maps all 48 assigned remaining LOG rows
+in `docs/testing/logistics-native-intent.md`
 under Axel's approved native-intent rule. Twenty-eight new native tests use
 existing reserve, convoy, inventory and ground-network APIs with explicit
 component inputs. They exercise exhaustion timing, powered fuel consumption,
@@ -23,7 +42,7 @@ review; no previous green result is transferred and no row is promoted.
 
 Apply Axel's approved rules 1 to 5 from issue #5 comment 6206861267. The
 BASE_AUDIT contribution covers the 16 assigned remaining BASE rows through a
-literal row/test/prototype table in `docs/parity/bases.md`. Eight native tests
+literal row/test/prototype table in `docs/testing/base-audit-native-intent.md`. Eight native tests
 use the existing economy, current-depot and recruitment APIs. They cover
 Conquest startup army scaling, cut points and catch-up, Classic depot
 completion/destruction payments, World region-income and capacity loss,

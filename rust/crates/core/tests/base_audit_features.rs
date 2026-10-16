@@ -157,7 +157,7 @@ fn feature_base06_classic_depot_completion_destruction_and_currency_income() {
 #[test]
 fn feature_base08_world_region_loss_removes_income_and_depot_payment() {
     let mut w = wallets();
-    let mut regions = [
+    let regions = [
         Region {
             team: 0,
             kind: RegionKind::City,
@@ -190,8 +190,11 @@ fn feature_base08_world_region_loss_removes_income_and_depot_payment() {
     assert_eq!(w.players[0].inc, 4.275);
     assert_eq!(w.players[0].fuel_inc, Some(2.15));
     assert_eq!(w.players[0].mun, 0.55);
-    regions[1].team = 1;
-    c.world = Some(WorldContext { regions: &regions });
+    let mut regions_after_loss = regions;
+    regions_after_loss[1].team = 1;
+    c.world = Some(WorldContext {
+        regions: &regions_after_loss,
+    });
     w.advance_income_with_depots(&c, &depots, 1.0, false)
         .unwrap();
     assert_eq!(w.players[0].inc, 3.95);
@@ -201,7 +204,7 @@ fn feature_base08_world_region_loss_removes_income_and_depot_payment() {
 #[test]
 fn feature_base16_world_capacity_loss_and_active_seat_split() {
     let mut w = wallets();
-    let mut regions = vec![
+    let regions = vec![
         Region {
             team: 0,
             kind: RegionKind::Other
@@ -211,21 +214,26 @@ fn feature_base16_world_capacity_loss_and_active_seat_split() {
     let mut c = context(Mode::World);
     c.world = Some(WorldContext { regions: &regions });
     assert_eq!(w.population_cap(&c, 0).unwrap(), 30.0);
-    regions[0].team = 1;
-    c.world = Some(WorldContext { regions: &regions });
+    let mut regions_after_loss = regions.clone();
+    regions_after_loss[0].team = 1;
+    c.world = Some(WorldContext {
+        regions: &regions_after_loss,
+    });
     assert_eq!(w.population_cap(&c, 0).unwrap(), 29.0);
     w.players[1].out = true;
     assert_eq!(w.population_cap(&c, 0).unwrap(), 34.0);
     c.army = ArmySize::Massive;
     assert_eq!(w.population_cap(&c, 0).unwrap(), 170.0);
-    regions = vec![
+    let capped_regions = vec![
         Region {
             team: 0,
             kind: RegionKind::Other
         };
         200
     ];
-    c.world = Some(WorldContext { regions: &regions });
+    c.world = Some(WorldContext {
+        regions: &capped_regions,
+    });
     assert_eq!(w.population_cap(&c, 0).unwrap(), 800.0);
 }
 

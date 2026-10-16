@@ -384,7 +384,7 @@ fn feature_log19_store_lifecycle_preserves_contested_stock_and_scales_capacity()
     ctx.army_pop = 0.5;
     ctx.chars = b"A";
     ctx.aid = &[(0, 0)];
-    let mut points = [DepotPoint {
+    let points = [DepotPoint {
         at: at(50.0),
         owner: Some(0),
         contested: false,
@@ -414,15 +414,17 @@ fn feature_log19_store_lifecycle_preserves_contested_stock_and_scales_capacity()
             ..Stock::default()
         },
     ));
-    points[0].contested = true;
-    ctx.points = &points;
+    let mut contested_points = points;
+    contested_points[0].contested = true;
+    ctx.points = &contested_points;
     state.sync_stores(ctx, &world).unwrap();
     let point = state.store_mut(&StoreId::Point(0)).unwrap();
     assert!(!point.active);
     assert_eq!(point.total().provisions, 17.0);
-    points[0].contested = false;
-    points[0].owner = Some(1);
-    ctx.points = &points;
+    let mut captured_points = contested_points;
+    captured_points[0].contested = false;
+    captured_points[0].owner = Some(1);
+    ctx.points = &captured_points;
     state.sync_stores(ctx, &world).unwrap();
     assert_eq!(
         state.store_mut(&StoreId::Point(0)).unwrap().total(),

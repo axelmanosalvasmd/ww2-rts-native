@@ -1,0 +1,1 @@
+- Fix five compile-time borrow errors in the new BASE and logistics test inputs without changing facts or assertions. Preserve the first exit-101 output and zero-test result; move both row maps to testing documents while restoring the parity files for separate status updates.
