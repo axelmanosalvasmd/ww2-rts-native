@@ -3,7 +3,7 @@ use super::*;
 fn peer(id: u64) -> (Connection, mpsc::Receiver<Output>) {
     let (tx, rx) = mpsc::channel(64);
     let (cancel, _) = watch::channel(false);
-    (Connection { id, tx, cancel }, rx)
+    (Connection::new(id, tx, cancel), rx)
 }
 
 fn join(hub: &mut Hub, connection: &Connection, token: &str, now: u64) {
@@ -62,7 +62,7 @@ fn net66_presence_and_ping_survive_scheduled_paused_catchup_and_reconnect_delive
     }
     for rx in [&mut host_rx, &mut guest_rx] {
         let messages = drain(&mut hub, rx, 150);
-        assert!(!snapshots(&messages).collect::<Vec<_>>().is_empty());
+        assert!(snapshots(&messages).next().is_some());
         for frame in snapshots(&messages) {
             assert_eq!(frame["online"], json!([true, true]));
             assert_eq!(frame["ping"], json!([null, null]));
