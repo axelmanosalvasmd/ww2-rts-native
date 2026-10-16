@@ -1,0 +1,2 @@
+- Add operative start, offline death, reconnect and resync checks across lobby, play, pause and match ending. Strengthen independent fog delivery and per-tick status checks through an ordinary match's finish.
+- Correct the protocol draft to record both owners' exact attacker-position rule and cached nonowner mask. Save/load and the remaining operative NET and IF rows remain unclaimed.

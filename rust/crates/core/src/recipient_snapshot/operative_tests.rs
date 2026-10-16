@@ -106,7 +106,19 @@ fn operative_status_matches_alive_prediction_squad_and_hidden_attacker_fields() 
             "from":[-1.,81.],
         })
     );
-    state.world.game.tick = 21;
+    for age in 0..=11 {
+        state.world.game.tick = 10 + age;
+        assert_eq!(
+            state.companion_status("operative")["from"],
+            if age <= 10 {
+                json!([-1., 81.])
+            } else {
+                Value::Null
+            }
+        );
+    }
+    state.world.game.tick = 10;
+    state.world.game.units.get_mut(&id).unwrap().hit_from = None;
     assert_eq!(state.companion_status("operative")["from"], Value::Null);
     state.commands.units.get_mut(&squad).unwrap().follow = 0;
     assert_eq!(state.companion_status("operative")["squad"], Value::Null);
@@ -149,6 +161,16 @@ fn operative_status_dead_waiting_and_squad_respawn_use_exact_optional_shape() {
     assert_eq!(state.companion_status("operative")["waiting"], true);
     state.start.economy.players[0].mp = 10.;
     assert_eq!(state.companion_status("operative")["waiting"], false);
+    state.start.economy.players[0].mp = 0.;
+    state.world.game.units.get_mut(&squad).unwrap().riding = false;
+    state.world.game.units.get_mut(&squad).unwrap().garrison = Some(0);
+    assert_eq!(state.companion_status("operative")["squadSpawn"], false);
+    assert_eq!(state.companion_status("operative")["waiting"], true);
+    state.world.game.units.get_mut(&squad).unwrap().garrison = None;
+    state.world.game.units.get_mut(&squad).unwrap().hp = 20.;
+    assert_eq!(state.companion_status("operative")["squadSpawn"], false);
+    state.world.game.units.get_mut(&squad).unwrap().hp = 0.;
+    assert_eq!(state.companion_status("operative")["squad"], Value::Null);
     assert_eq!(
         state.companion_status("missing"),
         json!({
@@ -418,6 +440,41 @@ fn operative_delivery_keeps_commander_pending_memory_and_fog_independent_on_succ
     let peer = second.capture(&mut state, true, &[]).unwrap();
     assert_eq!(peer["cells"], first["cells"]);
     assert_eq!(peer["fog"], first["fog"]);
+    let unit = state.world.game.units.get_mut(&id).unwrap();
+    unit.x = 100.;
+    unit.z = 100.;
+    state.grid.update(id, unit);
+    state.advance_tick().unwrap();
+    let delivered = commander
+        .capture_selected_with_tick_events(&mut state, &selected, &[])
+        .unwrap()
+        .unwrap()
+        .recipient(0)
+        .unwrap()
+        .into_json();
+    assert!(
+        delivered["fog"]
+            .as_str()
+            .is_some_and(|delta| !delta.is_empty())
+    );
+    let first_delta = operative.capture(&mut state, false, &[]).unwrap();
+    let second_delta = second.capture(&mut state, false, &[]).unwrap();
+    assert_eq!(first_delta["fog"], delivered["fog"]);
+    assert_eq!(second_delta["fog"], delivered["fog"]);
+    assert!(
+        operative
+            .capture(&mut state, false, &[])
+            .unwrap()
+            .get("fog")
+            .is_none()
+    );
+    assert!(
+        second
+            .capture(&mut state, false, &[])
+            .unwrap()
+            .get("fog")
+            .is_none()
+    );
     let pending = state.world.pending(Recipient::Player(0)).cloned();
     let remembered = state.recipients[0].remembered().to_vec();
     state.companions.soldiers.get_mut(&id).unwrap().weapon = 2;
@@ -511,6 +568,25 @@ fn operative_death_respawn_and_full_match_finish_keep_every_recipient_live() {
         let snapshot = operative
             .capture(&mut state, false, &report.events)
             .unwrap();
+        let status = state.companion_status("operative");
+        assert_eq!(status["id"], id);
+        assert_eq!(status["maxHp"], 20.);
+        assert_eq!(status["cost"], 10.);
+        assert_eq!(status["squad"], Value::Null);
+        assert_eq!(status["squadSpawn"], false);
+        assert_eq!(status["waiting"], false);
+        assert_eq!(
+            status.as_object().unwrap().len(),
+            if id == 0 { 12 } else { 23 }
+        );
+        if id == 0 {
+            assert_eq!(status["hp"], 0.);
+            assert!(status.get("from").is_none());
+        } else {
+            assert!(status["hp"].as_f64().unwrap() > 0.);
+            assert!(status["mags"].is_array());
+            assert!(status.get("from").is_some());
+        }
         if id != 0 {
             assert!(
                 snapshot["units"]

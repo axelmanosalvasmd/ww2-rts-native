@@ -1,5 +1,8 @@
 use super::*;
 
+#[path = "operative_lifecycle_tests.rs"]
+mod lifecycle;
+
 fn client(id: u64) -> (Connection, mpsc::Receiver<Output>) {
     let (tx, rx) = mpsc::channel(256);
     let (cancel, _) = watch::channel(false);

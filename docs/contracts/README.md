@@ -6,7 +6,7 @@ These files reserve contract topics; no protocol or ABI is approved by their cre
 
 | Document | Draft owner | Consumer reviewer | Status |
 | --- | --- | --- | --- |
-| protocol.md | Julio | Axel | v0 draft; technical answers recorded (#5); three security corrections pending |
+| protocol.md | Julio | Axel | v0 draft; technical answers recorded (#5); operative hit-position and cached-mask decisions confirmed by both owners on 2026-10-16, recorded in protocol.md |
 | terrain.md | Julio | Axel | v0 draft; technical answers recorded (#5) |
 | [startup-tables/README.md](startup-tables/README.md) | Julio | Axel | Content/schema v1 candidate explicitly accepted by both owners in PR #195 review; internal producer/platform proof integrated through PR #198 at `514e15f4`; transport #199 remains unagreed and unimplemented; Unreal adoption pending |
 | rust-unreal-abi.md | Julio | Axel | Six ABI 2 recipient-view calls authoritative through PR #16, merged at `d88ef6d`; broader v0 contract remains draft; approved header unchanged; consumer source published in draft PR #201 at `9551d3976e9145c81030cf5a81ec7f0764b04d12`, explicitly not for merge, neither merged nor adopted on main; fresh live and complete decoder adoption pending |
@@ -15,4 +15,4 @@ These files reserve contract topics; no protocol or ABI is approved by their cre
 
 Contract PRs must state native/reference baseline, version/status, fields and semantics, ownership/privacy, error/recovery behavior, compatibility transition, fixtures and verification evidence. Both owners must explicitly approve breaking changes before adoption. Mark a contract agreed only after approvals and merge. Do not put credentials or private sessions in fixtures.
 
-The ABI 2 approval is limited to the six recipient-view calls in `rust-unreal-abi.md` and their staged Unreal consumer update. It does not approve additional interfaces or the pending protocol/privacy proposals. The broader drafts remain drafts; merged jointly approved scope is authoritative.
+The ABI 2 approval is limited to the six recipient-view calls in `rust-unreal-abi.md` and their staged Unreal consumer update. It does not approve additional interfaces. The operative privacy decisions recorded in `protocol.md` have separate owner confirmation. The broader drafts remain drafts; merged jointly approved scope is authoritative.
