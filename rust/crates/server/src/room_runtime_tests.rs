@@ -995,6 +995,16 @@ fn base21_hosted_classic_aircraft_train_fifo_at_exact_times_and_pause_without_lo
     assert_eq!(paid.iter().map(|j|j.kind.as_str()).collect::<Vec<_>>(), ["fighter", "attacker", "bomber"]);
     let selected = (0..2).map(|slot| SelectedSeat {slot,full:true,omit:false}).collect::<Vec<_>>();
     let mut runtime = RoomRuntime::new(state, 0).unwrap();
+    let initial_frames = runtime.collect_frame(&selected, FrameKind::Current).unwrap();
+    let owner = &initial_frames.iter().find(|f| f.slot == 0).unwrap().message;
+    let jobs = owner["productionJobs"].as_array().unwrap().iter().find(|row| row[0] == field).unwrap();
+    assert_eq!(jobs, &json!([field, [
+        {"id":paid[0].id,"type":"fighter","mp":200.,"fuel":40.,"status":"active"},
+        {"id":paid[1].id,"type":"attacker","mp":240.,"fuel":70.,"status":"waiting"},
+        {"id":paid[2].id,"type":"bomber","mp":300.,"fuel":100.,"status":"waiting"}
+    ]]));
+    let queue = owner["queues"].as_array().unwrap().iter().find(|row| row[0] == field).unwrap();
+    assert_eq!(queue, &json!([field,0.,140.,140.,"fighter","attacker","bomber"]));
     // An unfinished producer cannot advance even its active paid job.
     runtime.state_mut().world.game.units.get_mut(&field).unwrap().built = Some(0.5);
     for _ in 0..4 {

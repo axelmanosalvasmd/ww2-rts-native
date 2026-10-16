@@ -226,5 +226,55 @@ fn intent_ai43_recipient_readiness_and_emitted_patrol_survive_ordinary_ticks_all
         }
         assert!(m.tick_state.fault().is_none());
     }
-    assert_eq!(snapshots, 4);
+    assert_eq!(snapshots, 8);
+
+    // Publish a visible ground vehicle through the ordinary canonical initializer.
+    let attacker = m.spawn_aircraft(0, "attacker").unwrap();
+    let target = m.next_unit_id;
+    let draft = crate::unit_publication::StagedUnit::ordinary(
+        &m.world.game,
+        &m.rules,
+        1,
+        m.rules.kind("tank").unwrap(),
+        target,
+        0,
+        m.start.players[1].spawn,
+        Some(Point { x: 42.0, z: 16.0 }),
+    ).unwrap();
+    m.publish_starting_unit(draft).unwrap();
+    m.commands.units.get_mut(&target).unwrap().hold_fire = true;
+    m.commands.units.get_mut(&target).unwrap().auto_cast = false;
+    m.commands.units.get_mut(&target).unwrap().auto_retreat = false;
+    m.commands.units.get_mut(&attacker).unwrap().hold_fire = false;
+    for _ in 0..4 { m.advance_tick().unwrap(); }
+    let observation = m.opening_commander_observation(0).unwrap();
+    assert!(observation.input().units.iter().any(|u| u.id == target));
+    assert!(m.world.game.players[0].sees(target));
+    let commands = plan(
+        &observation, &[], &mut State::default(), Level::Normal, &mut MatchRandom::new(3),
+    ).unwrap();
+    let attack = commands.iter().find(|command| {
+        command["t"] == "attack" && command["ids"] == json!([attacker])
+    }).unwrap();
+    assert_eq!(attack["target"], target);
+    assert_eq!(m.execute_command(0, &Command::from_json(attack).unwrap(), false).unwrap(), None);
+    assert_eq!(m.world.game.units[&attacker].air, Some(PlaneState::Out));
+    assert!(!m.commands.units[&attacker].hold_fire);
+    let ammo_before = m.aviation.planes[&attacker].ammo;
+    let full_seats: Vec<_> = (0..2).map(|slot| SelectedSeat { slot, full: true, omit: false }).collect();
+    let mut retained_flight = false;
+    let mut full_snapshots = 0;
+    for _ in 0..16 {
+        let report = m.advance_tick().unwrap();
+        retained_flight |= m.firing.flights.values().any(|flight| flight.shooter == attacker);
+        let frame = delivery.capture_selected_with_tick_events(&mut m, &full_seats, &report.events).unwrap();
+        if let Some(frame) = frame {
+            full_snapshots += 1;
+            for slot in 0..2 { frame.recipient(slot).unwrap().into_json(); }
+        }
+        assert!(m.tick_state.fault().is_none());
+    }
+    assert!(retained_flight, "the policy-issued attacker mission must fire a retained flight");
+    assert!(m.aviation.planes[&attacker].ammo < ammo_before);
+    assert_eq!(full_snapshots, 16);
 }
