@@ -1,14 +1,17 @@
 //! Ordinary ground carrier commands and physical boarding using canonical Match owners.
-//! Wreck ejection shares canonical placement, damage and grid owners. Boat commands, rail and garrison exit remain explicit boundaries.
+//! Wreck ejection and shore landings share canonical placement, damage and grid owners.
 
 use crate::{
     catalog::Catalog,
+    existing_observers::{ExistingObservers, PreparedGroundExit},
     game::{CELL, MOVE, Point},
     grid::UnitId,
-    match_commands::{Command, Denial, MoveOutcome},
+    match_commands::{Command, Denial, MoveOutcome, search_route},
+    match_routing::{RecipientContext, prepare_recipient_exit_routing},
     match_runtime::Match,
     math,
     navigation::TerrainView,
+    pathfinding::PathRules,
     unit_spawn::SpawnPlacer,
 };
 use std::collections::{BTreeMap, BTreeSet};
@@ -90,9 +93,11 @@ impl Match {
             || !self.commands.units.contains_key(&id)
             || self.firing.get(id).is_none()
             || u.dig != self.field_works.is_active(id)
+            || u.entrench != self.field_works.membership(id).is_some()
         {
             return Err("invalid canonical carrier unit".into());
         }
+        crate::match_construction::validate_build_activity(u, &self.commands.units[&id])?;
         if meta.cargo.len() > 4096 {
             return Err("carrier cargo resource bound exceeded".into());
         }
@@ -206,12 +211,10 @@ impl Match {
                 self.rules.kinds[u.kind].infantry && !u.retreating
             })
             .collect();
-        if squads.iter().any(|id| self.carrier_boundary(*id)) {
-            return Ok(Some(Denial::Unsupported));
-        }
         if squads.iter().any(|id| {
             let u = &self.world.game.units[id];
-            u.entrench || u.build
+            let k = &self.rules.kinds[u.kind];
+            k.rail || k.air || u.rail || u.air.is_some()
         }) {
             return Ok(Some(Denial::Unsupported));
         }
@@ -255,11 +258,64 @@ impl Match {
                 .checked_add(1)
                 .ok_or("carrier path identity exhausted")?;
         }
+        // Route from each staged physical exit, including the sight revealed by that
+        // exit. Publish exits and routing knowledge only after the whole batch validates.
         let mut routes = Vec::new();
-        for &(id, c) in &assignments {
-            let u = self.world.game.units[&id].clone();
-            let at = self.world.game.units[&c].at();
-            routes.push(self.command_route(owner, &u, at)?);
+        let mut drafts = Vec::new();
+        if !assignments.is_empty() {
+            let exits = assignments
+                .iter()
+                .map(|(id, _)| PreparedGroundExit::prepare(&self.world.game, &self.rules, *id))
+                .collect::<Result<Vec<_>, _>>()?;
+            let context = RecipientContext {
+                world: &self.world,
+                rules: &self.rules,
+                building_cells: &self.building_cells,
+                start: &self.start,
+                options: &self.options,
+                environment: &self.environment,
+            };
+            let mut preview = prepare_recipient_exit_routing(
+                context,
+                self.recipients
+                    .get_mut(owner)
+                    .ok_or("missing boarding recipient")?,
+                &mut self.routing_fog,
+                owner,
+                ExistingObservers::new(&exits[..1])?,
+            )?;
+            let mut paths = preview.fork_paths(&self.commands.paths);
+            let rules = PathRules::compiled().map_err(|e| e.to_string())?;
+            for (i, &(_, carrier)) in assignments.iter().enumerate() {
+                preview.refresh_existing_exit_prefix(
+                    context,
+                    owner,
+                    ExistingObservers::new(&exits[..=i])?,
+                )?;
+                let query = preview.query();
+                let terrain = query
+                    .path_terrain(preview.live())
+                    .map_err(|e| format!("boarding terrain: {e:?}"))?;
+                let u = exits[i].unit();
+                routes.push(
+                    search_route(
+                        &mut paths,
+                        terrain,
+                        rules,
+                        &self.rules.kinds[u.kind],
+                        u,
+                        self.world.game.units[&carrier].at(),
+                    )?
+                    .result,
+                );
+            }
+            drafts = exits
+                .into_iter()
+                .map(PreparedGroundExit::into_unit)
+                .collect();
+            let (_, receipt) = preview.prepare_publication(&mut self.world, &self.environment)?;
+            receipt.commit();
+            self.commands.paths = paths;
         }
         for id in &eligible {
             self.commands.units.get_mut(id).unwrap().follow = 0;
@@ -279,9 +335,14 @@ impl Match {
         if !free.values().any(|n| *n > 0) && assignments.is_empty() {
             return Ok(Some(Denial::Maximum));
         }
-        for ((id, carrier), route) in assignments.into_iter().zip(routes) {
+        for (((id, carrier), route), draft) in assignments.into_iter().zip(routes).zip(drafts) {
             self.cancel_field_work(id)?;
             let u = self.world.game.units.get_mut(&id).unwrap();
+            crate::unit_placement::place_unit(&mut self.grid, u, |u| {
+                u.x = draft.x;
+                u.z = draft.z;
+                u.garrison = draft.garrison;
+            });
             u.traffic = None;
             u.traffic_wait = 0.;
             u.world_goal = None;
@@ -673,8 +734,8 @@ impl Match {
         }
         Ok(effects)
     }
-    /// Manual ground unload. Full ordered placements are staged before relations change;
-    /// no thrown damage, shore landing or rail drop is silently substituted.
+    /// Manual unload stages ordered placements before relations change. Boats stay
+    /// loaded unless dry or wadeable ground is within the prototype shore reach.
     pub fn carrier_unload_command(
         &mut self,
         owner: usize,
@@ -699,15 +760,37 @@ impl Match {
             .copied()
             .filter(|id| !self.combat.get(*id).unwrap().cargo.is_empty())
             .collect();
-        if carriers.iter().any(|id| {
-            self.carrier_boundary(*id) || self.rules.kinds[self.world.game.units[id].kind].naval
-        }) {
+        if carriers.iter().any(|id| self.carrier_boundary(*id)) {
             return Ok(Some(Denial::Unsupported));
         }
+        let shore = Catalog::compiled()
+            .map_err(|e| e.to_string())?
+            .table("CFG")
+            .map_err(|e| e.to_string())?
+            .get("shoreReach")
+            .and_then(|v| v.number())
+            .ok_or("missing shore reach")?;
         let mut placer = SpawnPlacer::new();
+        let mut landing = Vec::new();
+        for &carrier in &carriers {
+            let unit = &self.world.game.units[&carrier];
+            if self.rules.kinds[unit.kind].naval {
+                let cell = placer
+                    .nearest_free(view(self), unit.at(), MOVE, None)
+                    .map_err(|e| format!("shore landing: {e:?}"))?;
+                let at = Point {
+                    x: (cell % self.world.game.w) as f64 * CELL + CELL * 0.5,
+                    z: (cell / self.world.game.w) as f64 * CELL + CELL * 0.5,
+                };
+                if math::hypot(unit.x - at.x, unit.z - at.z) > shore {
+                    continue;
+                }
+            }
+            landing.push(carrier);
+        }
         let mut drops = Vec::new();
         let mut staged = BTreeSet::new();
-        for &carrier in &carriers {
+        for &carrier in &landing {
             if !staged.insert(carrier) {
                 continue;
             }
@@ -742,6 +825,9 @@ impl Match {
         if carriers.is_empty() {
             return Ok(Some(Denial::Needs));
         }
+        if landing.is_empty() {
+            return Ok(Some(Denial::Shore));
+        }
         for (carrier, id, at) in drops {
             self.combat
                 .get_mut(carrier)
@@ -764,3 +850,7 @@ impl Match {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+#[path = "match_carriers/transport_intent.rs"]
+mod transport_intent;

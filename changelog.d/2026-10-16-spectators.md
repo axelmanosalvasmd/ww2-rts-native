@@ -1,0 +1,10 @@
+- Admit spectators to running ordinary native matches and send the prototype's current full-map view with no fog or delay, through victory and the ending hold.
+- Keep spectator terrain and shared snapshot history separate from commander memory. Remove the prototype's private orders, jobs, economy and logistics fields, and keep its cached unit privacy mask.
+- Drop spectator army commands silently and close spectators over 4 MiB behind with code 1013. Replace the old newcomer-refusal expectation with spectator admission. World, operatives and save loading remain deferred.
+- Count queued socket bytes with diagnostics off so spectator limits always apply. Update the old test that expected this counter to be disabled.
+- Refresh spectator terrain on the prototype's terrain and vision revision boundary, including hidden ruins.
+- Replace the process test that rejected spectator joins and lobby seat release with checks that admit them, while preserving the other R1 refusals.
+- Retain spectator target IDs and shot identities after units die, matching the prototype's full visibility. Replace the test that expected dead identities to be omitted and check that seated recipients keep their existing redaction.
+- Assert delivery of every commander's and spectator's snapshot on each tick through ordinary victory and the ending hold.
+- Restore compilation after merging save support by adding the required serialization derives to elimination state and resource nodes.
+- Keep the merged save/load test helper exhaustive and reject unexpected spectator output on its seated connections.

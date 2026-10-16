@@ -46,7 +46,7 @@ fn begin(host: &mut Client, guest: &mut Client) -> (Value, Value) {
 }
 
 #[test]
-fn ordinary_binary_opt_in_rejects_public_roles_and_retains_default_refusal() {
+fn ordinary_binary_opt_in_admits_spectators_and_retains_other_refusals() {
     for args in [
         vec!["--trusted-room", "ABC"],
         vec!["--seed", "1"],
@@ -73,7 +73,6 @@ fn ordinary_binary_opt_in_rejects_public_roles_and_retains_default_refusal() {
         ("XYZ", json!({})),
         ("ABC", json!({"listing":{"public":true}})),
         ("ABC", json!({"listing":{"tutorial":true}})),
-        ("ABC", json!({"spectate":true})),
         ("ABC", json!({"role":"operative"})),
         ("ABC", json!({"role":"spectator"})),
         ("ABC", json!({"token":""})),
@@ -102,10 +101,20 @@ fn ordinary_binary_opt_in_rejects_public_roles_and_retains_default_refusal() {
         json!({"t":"hello","token":"c","name":"c"}),
     );
     third.deny("join");
-    for command in ["addAi", "spectate"] {
-        host.send(json!({"t":command}));
-        host.deny(command);
-    }
+    let mut watcher = Client::open(
+        server.address,
+        "ABC",
+        json!({"t":"hello","token":"watcher","name":"Watcher","spectate":true}),
+    );
+    let watching = watcher.until(|m| m["t"] == "lobby");
+    assert_eq!(watching["spectator"], true);
+    assert_eq!(watching["you"], -1);
+    host.send(json!({"t":"addAi"}));
+    host.deny("addAi");
+    host.send(json!({"t":"spectate"}));
+    let released = host.until(|m| m["t"] == "lobby" && m["spectator"] == true);
+    assert_eq!(released["players"].as_array().unwrap().len(), 1);
+    assert_eq!(released["spectators"].as_array().unwrap().len(), 2);
     assert!(host.barrier().iter().all(|m| m["t"] != "start"));
     assert!(server.receipts().is_empty());
 }
@@ -261,9 +270,6 @@ fn ordinary_binary_refuses_unsupported_settings_before_any_start_publication() {
         json!({"t":"mode","v":"classic"}),
         json!({"t":"mode","v":"horde"}),
         json!({"t":"mode","v":"tutorial"}),
-        json!({"t":"army","v":"large"}),
-        json!({"t":"army","v":"massive"}),
-        json!({"t":"army","v":"endless"}),
         json!({"t":"sandbox","v":true}),
         json!({"t":"team","slot":1,"v":0}),
     ];
@@ -431,4 +437,30 @@ fn net97_ordinary_binary_environment_writes_private_diagnostics_while_r1_snapsho
     assert!(!server.log().contains("NATIVE_FAULT"));
     drop(server);
     std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn mode06_binary_named_armies_start_and_deliver_to_both_sockets() {
+    for (key, income, pop) in [
+        ("standard", 1.0, 1.0),
+        ("large", 3.0, 2.5),
+        ("massive", 6.0, 5.0),
+        ("endless", 20.0, 5.0),
+    ] {
+        let server = BinaryServer::start(true, SEED);
+        let mut host = Client::join(server.address, "a");
+        let mut guest = Client::join(server.address, "b");
+        host.send(json!({"t":"army","v":key}));
+        host.barrier();
+        begin(&mut host, &mut guest);
+        for client in [&mut host, &mut guest] {
+            for _ in 0..3 {
+                let snapshot = client.until(|m| m["t"] == "s");
+                assert_eq!(snapshot["army"], json!({"pop":pop,"income":income}));
+            }
+        }
+        host.barrier();
+        assert_eq!(server.receipts()[0]["options"]["army"], key);
+        assert!(!server.log().contains("NATIVE_FAULT"));
+    }
 }
