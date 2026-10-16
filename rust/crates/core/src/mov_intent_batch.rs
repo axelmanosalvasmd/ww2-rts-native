@@ -643,12 +643,17 @@ fn mov_57_yield_preserves_route_and_remembers_bounded_trail() {
     assert!(out.yielding);
     assert_ne!(out.goal, retained.first().copied());
     assert_eq!(m.world.game.units[&b].path, retained);
-    let u = m.world.game.units.get_mut(&b).unwrap();
-    for i in 0..40 {
-        u.x = 30.0 + i as f64 * 2.0;
-        traffic::remember_position(u);
+    traffic::remember_position(m.world.game.units.get_mut(&b).unwrap());
+    assert!(
+        m.world.game.units[&b].traffic_trail.is_empty(),
+        "yielding does not record trail"
+    );
+    move_to(&mut m, &[b], p(140.0, 65.0), false, false);
+    assert!(m.world.game.units[&b].traffic.is_none());
+    for _ in 0..400 {
+        walk(&mut m, b);
     }
-    assert_eq!(u.traffic_trail.len(), 20);
+    assert_eq!(m.world.game.units[&b].traffic_trail.len(), 20);
 }
 #[test]
 fn mov_58_pass_stopped_unit_and_retain_destination() {
@@ -1296,3 +1301,6 @@ fn mov_90_aircraft_ignore_terrain_and_crowd_separation() {
     separation::separate_crowds(&mut m.world.game, &m.rules, &mut m.grid);
     assert_eq!(m.world.game.units[&a].at(), at);
 }
+
+#[path = "mov_intent_batch_tail.rs"]
+mod tail;

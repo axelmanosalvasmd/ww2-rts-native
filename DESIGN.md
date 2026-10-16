@@ -1,5 +1,11 @@
 # Three Crossroads Native: design decisions
 
+## Native MOV remaining window and trail witness repair (2026-10-16)
+
+Preserve the first native batch at `3a1728b5` and its 42 PASS/one FAIL result. MOV-57's failed trail check kept the unit yielding, while both `traffic.rs:715` and pinned `shared/local-traffic.js:203` deliberately skip trail recording during a yield. The source repair first confirms that exclusion, issues a new ordinary Move through the canonical command API, then runs real mover ticks before checking the twenty-point trail cap. No production behavior changes. Overseer 03:23 permits this source repair; no new native result is claimed without a fresh exact-head grant.
+
+Register the already written remaining fourteen tests as `mov_intent_batch::tail`, with literal row mappings and prototype references. Cover native support admission, public announcement, one-use fighter cover, recon visibility/expiry, strafe geometry, bombing and dive payload events, paratrooper publication/reservations, naval masks/scatter/motion, debris settling, motion tails and drawn-men geometry. Preserve the explicit missing World, Shipyard, full wreck lifecycle and client follower scopes. Propose one fifteen-test nextest selection: repaired MOV-57 plus these fourteen, excluding all forty-two passed first-window tests. No Source recorder, captured behavior output, fixture or new evidence bundle is created.
+
 ## Native MOV first-window result at 3a1728b5 (2026-10-16)
 
 One Root-granted S3 nextest invocation selected 43 enabled native intent tests on Rust tree `1acd5f3089f4d033a01940c4bbe6d7adb027f9ab`: 42 passed, MOV-57 failed, 153 tests were skipped, exit 100. Seven desired-behavior tests for missing actuators stayed ignored. MOV-57 reached its trail assertion after successful yield/route checks, but recorded zero trail points against twenty expected. Native execution continued through all selected tests with no fail-fast and no retries. The normal log and RESULT.json remain under `/tmp/native-feature-batches-0323/mov_impl/`. Root received terminal and inherited-lock release before this map update. No row is promoted before prototype intent review, and passing partial scopes retain their stated limits. No Source job, new behavior fixture or public action occurred.
