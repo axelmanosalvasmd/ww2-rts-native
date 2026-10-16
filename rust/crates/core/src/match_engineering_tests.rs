@@ -240,17 +240,13 @@ fn admission_guards_reject_before_payment_or_cancellation() {
     )
     .unwrap();
     let before = snapshot(&m);
-    for raw in [
-        json!({"t":"dig","ids":[1],"kind":"trench","x":20,"z":20,"queue":true}),
-        json!({"t":"dig","ids":[1],"kind":"wall","x":20,"z":20}),
-    ] {
-        let command = Command::from_json(&raw).unwrap();
-        assert_eq!(
-            m.execute_command(0, &command, false).unwrap(),
-            Some(Denial::Unsupported)
-        );
-        assert_eq!(snapshot(&m), before);
-    }
+    let command =
+        Command::from_json(&json!({"t":"dig","ids":[1],"kind":"gate","x":20,"z":20})).unwrap();
+    assert_eq!(
+        m.execute_command(0, &command, false).unwrap(),
+        Some(Denial::Unsupported)
+    );
+    assert_eq!(snapshot(&m), before);
     assert_eq!(
         Command::from_json(&json!({"t":"dig","ids":[1],"kind":"unknown","x":20,"z":20})),
         Err(Denial::Blocked)

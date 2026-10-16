@@ -94,6 +94,11 @@ pub enum Command {
         ids: Vec<i64>,
         id: Option<i64>,
     },
+    Rally {
+        ids: Vec<i64>,
+        id: Option<i64>,
+        at: Option<Point>,
+    },
     Board {
         ids: Vec<i64>,
         target: Option<i64>,
@@ -462,6 +467,15 @@ impl Command {
                 }
             }
 
+            Some("rally") => Ok(Self::Rally {
+                ids,
+                id: object.get("id").map(|value| safe_id(value).unwrap_or(-1)),
+                at: object
+                    .get("x")
+                    .and_then(|v| v.as_f64())
+                    .zip(object.get("z").and_then(|v| v.as_f64()))
+                    .map(|(x, z)| Point { x, z }),
+            }),
             Some("destroy") => Ok(Self::Destroy {
                 ids,
                 id: object.get("id").and_then(safe_id),
@@ -930,6 +944,9 @@ impl crate::match_runtime::Match {
         if let Command::FireAt { ids, at, queue } = command {
             return self.ground_fire_at_command(owner, ids, *at, *queue);
         }
+        if let Command::Rally { ids, id, at } = command {
+            return self.set_rally(owner, ids, *id, *at);
+        }
         if let Command::Build {
             ids,
             kind,
@@ -994,7 +1011,7 @@ impl crate::match_runtime::Match {
         } = command
         {
             if *queue {
-                return Ok(Some(Denial::Unsupported));
+                return self.queue_dig(owner, ids, *kind, *at, *direction, winner_decided);
             }
             return self.execute_dig(owner, ids, *kind, *at, *direction, winner_decided);
         }
@@ -1083,6 +1100,7 @@ impl crate::match_runtime::Match {
             | Command::Build { .. }
             | Command::Assist { .. }
             | Command::Destroy { .. }
+            | Command::Rally { .. }
             | Command::Board { .. }
             | Command::Unload { .. }
             | Command::Entrench { .. }
@@ -1441,6 +1459,7 @@ impl crate::match_runtime::Match {
             | Command::Build { .. }
             | Command::Assist { .. }
             | Command::Destroy { .. }
+            | Command::Rally { .. }
             | Command::Board { .. }
             | Command::Unload { .. }
             | Command::Entrench { .. }
