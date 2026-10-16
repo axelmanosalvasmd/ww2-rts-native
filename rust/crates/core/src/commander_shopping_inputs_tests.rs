@@ -363,58 +363,173 @@ fn intent_ai33_world_engineers_count_unclaimed_nodes_while_build_reserves_use_ow
 }
 
 #[test]
-fn intent_ai33_base_construction_defers_overlapping_fortification_without_spending_or_skipping() {
-    let mut input=fixture(vec![unit(1,"rifle",99.0),unit(2,"rifle",101.0),unit(3,"rifle",103.0),unit(10,"hq",99.0),unit(11,"barracks",79.0)]);
-    input.width=128; input.height=128; input.chars=vec![b'.';128*128]; input.flags=vec![0;128*128];
-    for u in &mut input.units {u.at.z=99.0;}
-    input.players[0].spawn=Point{x:99.0,z:99.0}; input.players[1].spawn=Point{x:199.0,z:39.0};
-    input.players[2].spawn=input.players[0].spawn;
-    input.tick=3000; input.manpower=400.0;
-    input.runtime.as_mut().unwrap().faction=economy::Faction::Germany;
-    let mut state=State::default();
-    let commands=plan(&Observation::new(input).unwrap(),&[],&mut state,Level::Normal,&mut MatchRandom::new(41)).unwrap();
-    let builds:Vec<_>=commands.iter().filter(|c|c["t"]=="build").collect();
-    assert_eq!(builds.len(),1,"{commands:?}");
-    assert_eq!(builds[0]["kind"],"motorpool");
-    assert!(!state.fort_steps.contains_key(&10));
-    let buys:f64=commands.iter().filter(|c|c["t"]=="buy").map(|c|economy::price_of(Mode::Conquest,c["unit"].as_str().unwrap()).unwrap().mp).sum();
-    assert!(cost("motorpool")+buys<=400.0);
+fn intent_ai33_base_and_fortification_share_the_wallet_without_overspending() {
+    let mut input = fixture(vec![
+        unit(1, "rifle", 99.0),
+        unit(2, "rifle", 101.0),
+        unit(3, "rifle", 103.0),
+        unit(10, "hq", 99.0),
+        unit(11, "barracks", 79.0),
+    ]);
+    input.width = 128;
+    input.height = 128;
+    input.chars = vec![b'.'; 128 * 128];
+    input.flags = vec![0; 128 * 128];
+    for u in &mut input.units {
+        u.at.z = 99.0;
+    }
+    input.players[0].spawn = Point { x: 99.0, z: 99.0 };
+    input.players[1].spawn = Point { x: 199.0, z: 39.0 };
+    input.players[2].spawn = input.players[0].spawn;
+    input.tick = 3000;
+    input.manpower = 400.0;
+    input.runtime.as_mut().unwrap().faction = economy::Faction::Germany;
+    let mut state = State::default();
+    let commands = plan(
+        &Observation::new(input).unwrap(),
+        &[],
+        &mut state,
+        Level::Normal,
+        &mut MatchRandom::new(41),
+    )
+    .unwrap();
+    let builds: Vec<_> = commands.iter().filter(|c| c["t"] == "build").collect();
+    assert_eq!(builds.len(), 2, "{commands:?}");
+    assert_eq!(builds[0]["kind"], "motorpool");
+    assert_eq!(builds[1]["kind"], "tower");
+    assert_eq!(state.fort_steps.get(&10), Some(&1));
+    let buys: f64 = commands
+        .iter()
+        .filter(|c| c["t"] == "buy")
+        .map(|c| {
+            economy::price_of(Mode::Conquest, c["unit"].as_str().unwrap())
+                .unwrap()
+                .mp
+        })
+        .sum();
+    assert!(cost("motorpool") + cost("tower") + buys <= 400.0);
 }
 
 #[test]
 fn intent_ai33_mounted_squads_cannot_spend_or_advance_construction() {
-    let mut input=fixture(vec![unit(1,"rifle",12.0),unit(2,"rifle",30.0),unit(3,"hq",18.0),unit(4,"barracks",24.0)]);
-    input.units[0].riding=true;
-    input.tick=3000;
-    let observation=Observation::new(input.clone()).unwrap();
-    let context=observation.input().runtime.as_ref().unwrap();
-    let ground=sight_game(&observation,context);
-    let crew=observation.input().units[..2].iter().collect::<Vec<_>>();
-    let base=crate::commander_construction::plan(&observation,&crew,1000.0,false,&ground,|_|true).unwrap();
-    assert_eq!(base.builders,vec![2]);
-    let fort=crate::commander_fortification::plan(&observation,&crew,1000.0,0.0,0.0,&ground,|_|true,&mut BTreeMap::new()).unwrap();
-    assert_eq!(fort.builders,vec![2]);
-    input.units[1].riding=true;
-    let observation=Observation::new(input).unwrap();
-    let crew=observation.input().units[..2].iter().collect::<Vec<_>>();
-    let base=crate::commander_construction::plan(&observation,&crew,1000.0,false,&ground,|_|true).unwrap();
+    let mut input = fixture(vec![
+        unit(1, "rifle", 12.0),
+        unit(2, "rifle", 30.0),
+        unit(3, "hq", 18.0),
+        unit(4, "barracks", 24.0),
+    ]);
+    input.units[0].riding = true;
+    input.tick = 3000;
+    let observation = Observation::new(input.clone()).unwrap();
+    let context = observation.input().runtime.as_ref().unwrap();
+    let ground = sight_game(&observation, context);
+    let crew = observation.input().units[..2].iter().collect::<Vec<_>>();
+    let base =
+        crate::commander_construction::plan(&observation, &crew, 1000.0, false, &ground, |_| true)
+            .unwrap();
+    assert_eq!(base.builders, vec![2]);
+    let fort = crate::commander_fortification::plan(
+        &observation,
+        &crew,
+        1000.0,
+        0.0,
+        0.0,
+        &ground,
+        |_| true,
+        &mut BTreeMap::new(),
+    )
+    .unwrap();
+    assert_eq!(fort.builders, vec![2]);
+    input.units[1].riding = true;
+    let observation = Observation::new(input).unwrap();
+    let crew = observation.input().units[..2].iter().collect::<Vec<_>>();
+    let base =
+        crate::commander_construction::plan(&observation, &crew, 1000.0, false, &ground, |_| true)
+            .unwrap();
     assert!(base.commands.is_empty());
-    assert_eq!(base.remaining_mp,1000.0);
-    let mut steps=BTreeMap::new();
-    let fort=crate::commander_fortification::plan(&observation,&crew,1000.0,0.0,0.0,&ground,|_|true,&mut steps).unwrap();
+    assert_eq!(base.remaining_mp, 1000.0);
+    let mut steps = BTreeMap::new();
+    let fort = crate::commander_fortification::plan(
+        &observation,
+        &crew,
+        1000.0,
+        0.0,
+        0.0,
+        &ground,
+        |_| true,
+        &mut steps,
+    )
+    .unwrap();
     assert!(fort.commands.is_empty());
-    assert_eq!(fort.remaining_mp,1000.0);
+    assert_eq!(fort.remaining_mp, 1000.0);
     assert!(steps.is_empty());
     // The earlier forward-HQ spender must apply the same canonical rider exclusion.
-    let mut input=fixture(vec![unit(1,"rifle",110.0),unit(2,"rifle",125.0),unit(3,"rifle",130.0),unit(4,"hq",20.0)]);
-    input.units[0].riding=true;
-    let observation=Observation::new(input.clone()).unwrap();
-    let ground=sight_game(&observation,observation.input().runtime.as_ref().unwrap());
-    let crew=observation.input().units[..3].iter().collect::<Vec<_>>();
-    let forward=crate::commander_forward_hq::plan(&observation,&crew,1000.0,&ground,|_|true).unwrap().unwrap();
-    assert_eq!(forward.unit,2);
-    for u in &mut input.units[..3] {u.riding=true;}
-    let observation=Observation::new(input).unwrap();
-    let crew=observation.input().units[..3].iter().collect::<Vec<_>>();
-    assert!(crate::commander_forward_hq::plan(&observation,&crew,1000.0,&ground,|_|true).unwrap().is_none());
+    let mut input = fixture(vec![
+        unit(1, "rifle", 110.0),
+        unit(2, "rifle", 125.0),
+        unit(3, "rifle", 130.0),
+        unit(4, "hq", 20.0),
+    ]);
+    input.units[0].riding = true;
+    let observation = Observation::new(input.clone()).unwrap();
+    let ground = sight_game(&observation, observation.input().runtime.as_ref().unwrap());
+    let crew = observation.input().units[..3].iter().collect::<Vec<_>>();
+    let forward = crate::commander_forward_hq::plan(&observation, &crew, 1000.0, &ground, |_| true)
+        .unwrap()
+        .unwrap();
+    assert_eq!(forward.unit, 2);
+    for u in &mut input.units[..3] {
+        u.riding = true;
+    }
+    let observation = Observation::new(input).unwrap();
+    let crew = observation.input().units[..3].iter().collect::<Vec<_>>();
+    assert!(
+        crate::commander_forward_hq::plan(&observation, &crew, 1000.0, &ground, |_| true)
+            .unwrap()
+            .is_none()
+    );
+}
+
+#[test]
+fn intent_ai33_assist_and_ordinary_dig_keep_other_builders_fortification_reserve() {
+    let mut units: Vec<_> = (1..=4).map(|id| unit(id, "mg", 30.0 + id as f64)).collect();
+    units.extend([
+        unit(10, "hq", 20.0),
+        unit(11, "barracks", 24.0),
+        unit(12, "motorpool", 26.0),
+        unit(13, "airfield", 28.0),
+    ]);
+    let mut input = fixture(units);
+    input.research = Some(ResearchObservation {
+        faction: economy::Faction::Germany,
+        tech: economy::TechState::new(1, 1, 1, 1).unwrap(),
+        busy: vec![Technology::Tier],
+        stock_base: false,
+        armory_ready: false,
+        standard_army: true,
+    });
+    input.tick = 3000;
+    input.manpower = cost("tower") - 1.0;
+    input.runtime.as_mut().unwrap().large_army = true;
+    input.runtime.as_mut().unwrap().faction = economy::Faction::Germany;
+    input.units.iter_mut().find(|u| u.id == 11).unwrap().hp = 1.0;
+    let commands = look(input.clone());
+    assert!(commands.iter().any(|c| c["t"] == "assist"));
+    assert!(!commands.iter().any(|c| c["t"] == "buy"), "{commands:?}");
+    // Ordinary Dig occupies its worker, but only a wall job blocks every fortifier.
+    input.units.iter_mut().find(|u| u.id == 11).unwrap().hp = num(
+        Catalog::compiled().unwrap().unit("barracks").unwrap(),
+        "hpPer",
+    );
+    input.units[0].dig = true;
+    assert!(!look(input.clone()).iter().any(|c| c["t"] == "buy"));
+    input
+        .runtime
+        .as_mut()
+        .unwrap()
+        .units
+        .get_mut(&1)
+        .unwrap()
+        .wall_work = true;
+    assert!(look(input).iter().any(|c| c["t"] == "buy"));
 }

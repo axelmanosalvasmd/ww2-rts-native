@@ -25,6 +25,7 @@ pub struct UnitFacts {
     pub stock: Option<Stock>,
     pub amove: Option<Point>,
     pub airborne: bool,
+    pub wall_work: bool,
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct Context {
@@ -482,7 +483,6 @@ fn plan_inner(
     let mut budget = input.manpower - reserved;
     let mut newly_busy = BTreeSet::new();
     let mut build_reserve = 0.0;
-    let construction_work;
     let adaptive = context.mode.is_construction() && skill.adaptive;
     let rush = adaptive
         && now < 240.0
@@ -501,7 +501,6 @@ fn plan_inner(
         mine.retain(|u| u.id != forward.unit);
         available_units.retain(|u| u.id != forward.unit);
         newly_busy.insert(forward.unit);
-        construction_work = true;
         commands.push(forward.command);
     } else {
         let construction = crate::commander_construction::plan(
@@ -517,12 +516,11 @@ fn plan_inner(
         mine.retain(|u| !construction.builders.contains(&u.id));
         available_units.retain(|u| !construction.builders.contains(&u.id));
         newly_busy.extend(construction.builders);
-        construction_work = !construction.commands.is_empty();
         commands.extend(construction.commands);
     }
     let mut fort_reserve = 0.0;
-    if !rush && !construction_work {
-        let fortification = crate::commander_fortification::plan(
+    if !rush {
+        let fortification = crate::commander_fortification::plan_after_builds(
             observation,
             &available_units,
             budget,
@@ -531,6 +529,7 @@ fn plan_inner(
             &sight_game,
             sees,
             &mut state.fort_steps,
+            &commands,
         )?;
         budget = fortification.remaining_mp;
         fort_reserve = fortification.reserve;

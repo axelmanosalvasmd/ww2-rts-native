@@ -1189,6 +1189,10 @@ impl Match {
                                         .is_some_and(|c| c.trucks.contains_key(&u.id)),
                                 amove: None,
                                 airborne: u.air.is_some() && vision::airborne(u),
+                                wall_work: u.owner == owner
+                                    && self.field_works.jobs().get(&u.id).is_some_and(|job| {
+                                        job.kind == crate::field_works::FortKind::Wall
+                                    }),
                                 stock: if u.owner == owner {
                                     self.logistics.get(u.id).map(|r| {
                                         crate::commander_tactics::Stock {

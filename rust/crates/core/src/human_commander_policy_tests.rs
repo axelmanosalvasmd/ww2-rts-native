@@ -874,53 +874,141 @@ fn intent_ai33_construction_spending_survives_ordinary_ticks_and_recipient_snaps
 }
 
 #[test]
-fn intent_ai33_fortification_jobs_and_gate_denial_do_not_fault_the_match() {
-    use crate::{match_commands::{Command,Denial},orders::OrderKey,recipient_snapshot::SnapshotCache};
-    let mut m=runtime_match();
-    for _ in 0..3000 {m.advance_tick().unwrap();}
-    let mut policy=HumanPolicy::new(0,771);
-    let mut sequence=0;
-    for expected in ["motorpool","airfield","tower","pillbox"] {
-        if m.world.game.tick%2!=0 {m.advance_tick().unwrap();}
-        m.start.economy.players[0].mp=if expected=="motorpool" {400.0} else {2000.0};
-        let view=m.human_commander_observation(&mut crate::match_human_observation::HumanObservationMemory::new(0)).unwrap();
-        let commands=policy.plan(screen(&view),Level::Normal).unwrap();
-        let builds:Vec<_>=commands.iter().filter(|c|c["t"]=="build").collect();
-        assert_eq!(builds.len(),1,"{expected}: {commands:?}");
-        assert_eq!(builds[0]["kind"],expected);
-        let tick=m.world.game.tick as u64+1;
-        for raw in &commands {
-            m.enqueue_command(OrderKey{tick,issuer:0,sequence},Command::from_json(raw).unwrap()).unwrap();
-            sequence+=1;
+fn intent_ai33_fortification_state_survives_full_match_and_every_seat_snapshot() {
+    use crate::{
+        match_commands::{Command, Denial},
+        orders::OrderKey,
+        recipient_snapshot::SnapshotCache,
+    };
+    let snapshot_all = |m: &crate::match_runtime::Match| {
+        let cache = SnapshotCache::new(m).unwrap();
+        for seat in 0..m.start.players.len() {
+            cache.recipient(seat).unwrap();
         }
-        let report=m.advance_tick().unwrap();
-        assert_eq!(report.commands.len(),commands.len());
-        assert!(report.commands.iter().all(|c|c.denial.is_none()),"{expected}: {:?}",report.commands);
-        let id=m.world.game.units.values().find(|u|m.rules.kinds[u.kind].name==expected).unwrap().id;
-        for _ in 0..2000 {
-            if m.world.game.units[&id].built==Some(1.0) {break;}
-            m.advance_tick().unwrap();
-            if m.world.game.tick%20==0 {SnapshotCache::new(&m).unwrap().recipient(0).unwrap();}
-        }
-        assert_eq!(m.world.game.units[&id].built,Some(1.0),"{expected}");
-        SnapshotCache::new(&m).unwrap().recipient(0).unwrap();
+    };
+    let mut m = runtime_match();
+    for _ in 0..3000 {
+        m.advance_tick().unwrap();
     }
-    let hq=m.world.game.units.values().find(|u|u.owner==0 && m.rules.kinds[u.kind].name=="hq").unwrap().id;
-    assert_eq!(policy.tactics.fort_steps.get(&hq),Some(&2));
+    let mut policy = HumanPolicy::new(0, 771);
+    let mut sequence = 0;
+    let required = ["motorpool", "airfield", "tower", "pillbox"];
+    for look in 0..4 {
+        if required.iter().all(|kind| {
+            m.world
+                .game
+                .units
+                .values()
+                .any(|u| m.rules.kinds[u.kind].name == *kind && u.built == Some(1.0))
+        }) {
+            break;
+        }
+        if m.world.game.tick % 2 != 0 {
+            m.advance_tick().unwrap();
+        }
+        m.start.economy.players[0].mp = if look == 0 { 400.0 } else { 2000.0 };
+        let view = m
+            .human_commander_observation(
+                &mut crate::match_human_observation::HumanObservationMemory::new(0),
+            )
+            .unwrap();
+        let commands = policy.plan(screen(&view), Level::Normal).unwrap();
+        let builds: Vec<_> = commands.iter().filter(|c| c["t"] == "build").collect();
+        assert!(!builds.is_empty(), "look {look}: {commands:?}");
+        assert!(
+            builds
+                .iter()
+                .all(|c| required.contains(&c["kind"].as_str().unwrap()))
+        );
+        let tick = m.world.game.tick as u64 + 1;
+        for raw in &commands {
+            m.enqueue_command(
+                OrderKey {
+                    tick,
+                    issuer: 0,
+                    sequence,
+                },
+                Command::from_json(raw).unwrap(),
+            )
+            .unwrap();
+            sequence += 1;
+        }
+        let report = m.advance_tick().unwrap();
+        assert_eq!(report.commands.len(), commands.len());
+        assert!(
+            report.commands.iter().all(|c| c.denial.is_none()),
+            "look {look}: {:?}",
+            report.commands
+        );
+        for _ in 0..2000 {
+            if !m.world.game.units.values().any(|u| u.build) {
+                break;
+            }
+            m.advance_tick().unwrap();
+            if m.world.game.tick % 20 == 0 {
+                snapshot_all(&m);
+            }
+        }
+        assert!(!m.world.game.units.values().any(|u| u.build));
+        snapshot_all(&m);
+    }
+    for kind in required {
+        assert!(
+            m.world
+                .game
+                .units
+                .values()
+                .any(|u| m.rules.kinds[u.kind].name == kind && u.built == Some(1.0)),
+            "{kind}"
+        );
+    }
+    let hq = m
+        .world
+        .game
+        .units
+        .values()
+        .find(|u| u.owner == 0 && m.rules.kinds[u.kind].name == "hq")
+        .unwrap()
+        .id;
+    assert_eq!(policy.tactics.fort_steps.get(&hq), Some(&2));
     // Existing gate admission keeps unsupported actors and links out.
     for raw in [json!({"t":"dig","kind":"gate","ids":[3],"x":50.0,"z":50.0})] {
-        let tick=m.world.game.tick as u64+1;
-        m.enqueue_command(OrderKey{tick,issuer:0,sequence},Command::from_json(&raw).unwrap()).unwrap();
-        sequence+=1;
-        assert_eq!(m.advance_tick().unwrap().commands[0].denial,Some(Denial::Unsupported));
-        for _ in 0..8 {m.advance_tick().unwrap();}
-        SnapshotCache::new(&m).unwrap().recipient(0).unwrap();
+        let tick = m.world.game.tick as u64 + 1;
+        m.enqueue_command(
+            OrderKey {
+                tick,
+                issuer: 0,
+                sequence,
+            },
+            Command::from_json(&raw).unwrap(),
+        )
+        .unwrap();
+        sequence += 1;
+        assert_eq!(
+            m.advance_tick().unwrap().commands[0].denial,
+            Some(Denial::Unsupported)
+        );
+        for _ in 0..8 {
+            m.advance_tick().unwrap();
+        }
+        snapshot_all(&m);
     }
-    m.start.economy.players[0].vp=m.start.win_vp;
-    m.advance_tick().unwrap();
+    // Capture income reaches ordinary victory while the policy keeps its fortification state.
+    for _ in 0..30000 {
+        if m.finish.is_some() {
+            break;
+        }
+        m.advance_tick().unwrap();
+        if m.world.game.tick % 20 == 0 {
+            snapshot_all(&m);
+        }
+    }
     assert!(m.finish.is_some());
-    for _ in 0..4 {m.advance_tick().unwrap();}
-    SnapshotCache::new(&m).unwrap().recipient(0).unwrap();
-    assert_eq!(policy.tactics.fort_steps.get(&hq),Some(&2));
-    assert_eq!(m.tick_state.fault(),None);
+    for _ in 0..4 {
+        m.advance_tick().unwrap();
+        snapshot_all(&m);
+    }
+    snapshot_all(&m);
+    assert_eq!(policy.tactics.fort_steps.get(&hq), Some(&2));
+    assert_eq!(m.tick_state.fault(), None);
 }

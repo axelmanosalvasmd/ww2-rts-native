@@ -26,6 +26,7 @@ fn flag(d: &Rule, key: &str) -> bool {
     d.get(key).and_then(Rule::boolean).unwrap_or(false)
 }
 
+#[cfg(test)]
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn plan(
     observation: &Observation,
@@ -36,6 +37,31 @@ pub(crate) fn plan(
     terrain: &Game,
     sees: impl Fn(Point) -> bool,
     steps: &mut BTreeMap<u32, u8>,
+) -> Result<Plan, String> {
+    plan_after_builds(
+        observation,
+        available,
+        budget,
+        build_reserve,
+        saved,
+        terrain,
+        sees,
+        steps,
+        &[],
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn plan_after_builds(
+    observation: &Observation,
+    available: &[&UnitObservation],
+    budget: f64,
+    build_reserve: f64,
+    saved: f64,
+    terrain: &Game,
+    sees: impl Fn(Point) -> bool,
+    steps: &mut BTreeMap<u32, u8>,
+    earlier: &[Value],
 ) -> Result<Plan, String> {
     let input = observation.input();
     let context = input
@@ -101,7 +127,9 @@ pub(crate) fn plan(
         || own.iter().any(|u| {
             matches!(u.kind.as_str(), "tower" | "pillbox" | "wall" | "gate") && built(u) < 1.0
         })
-        || available.iter().any(|u| u.entrench || u.dig)
+        || available
+            .iter()
+            .any(|u| u.entrench || context.units.get(&u.id).is_some_and(|f| f.wall_work))
     {
         return Ok(result);
     }
@@ -163,7 +191,7 @@ pub(crate) fn plan(
                 x: hq.at.x + fx * forward - fz * side,
                 z: hq.at.z + fz * forward + fx * side,
             };
-            if let Some(at) = site(observation, terrain, kind, aim, &sees)? {
+            if let Some(at) = site(observation, terrain, kind, aim, &sees, earlier)? {
                 result.commands.push(json!({"t":"build","ids":[worker.id],"kind":kind,"x":at.x,"z":at.z,"dir":angle}));
                 result.remaining_mp -= cost;
                 result.builders.push(worker.id);
@@ -183,6 +211,7 @@ fn site(
     kind: &str,
     aim: Point,
     sees: impl Fn(Point) -> bool,
+    earlier: &[Value],
 ) -> Result<Option<Point>, String> {
     let input = observation.input();
     let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
@@ -195,6 +224,17 @@ fn site(
         .map(|p| (p.at, observation.point_radius() + 2.0))
         .collect();
     avoid.extend(input.players.iter().map(|p| (p.spawn, 6.0)));
+    for command in earlier.iter().filter(|c| c["t"] == "build") {
+        let kind = command["kind"]
+            .as_str()
+            .ok_or("missing planned building kind")?;
+        let at = Point {
+            x: command["x"].as_f64().ok_or("missing planned building x")?,
+            z: command["z"].as_f64().ok_or("missing planned building z")?,
+        };
+        let definition = catalog.unit(kind).map_err(|e| e.to_string())?;
+        avoid.push((at, number(definition, "radius") + half + 4.0));
+    }
     for u in &input.units {
         if u.hp <= 0.0 {
             continue;

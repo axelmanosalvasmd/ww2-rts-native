@@ -110,8 +110,16 @@ fn intent_ai29_wait_keeps_safe_point_until_invalid_then_releases_expired_threat(
     );
     // Keep this threat-memory scene at a completed base, so the scout is not its builder.
     for (id, kind) in [(3, "hq"), (4, "barracks"), (5, "airfield")] {
-        input.units.insert(input.units.len()-1, unit(id, kind, 10.0));
-        input.runtime.as_mut().unwrap().units.insert(id, UnitFacts { built: 1.0, ..UnitFacts::default() });
+        input
+            .units
+            .insert(input.units.len() - 1, unit(id, kind, 10.0));
+        input.runtime.as_mut().unwrap().units.insert(
+            id,
+            UnitFacts {
+                built: 1.0,
+                ..UnitFacts::default()
+            },
+        );
     }
     let mut state = State::default();
     let commands = look(input.clone(), &seen, &mut state, Level::Normal);
