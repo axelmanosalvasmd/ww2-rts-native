@@ -1,0 +1,1 @@
+- Merge the first five engineering checks with MAP273 main, preserving both histories, incoming checks and registries, all 939 Acceptance cells, held World checks and authentic fixtures. Keep execution evidence tied to its producing head.

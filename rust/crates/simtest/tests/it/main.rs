@@ -59,6 +59,8 @@ mod ground_support_tick;
 mod legacy_scenario_tick;
 #[path = "../map_height_queries.rs"]
 mod map_height_queries;
+#[path = "../map_terrain_components.rs"]
+mod map_terrain_components;
 #[path = "../mass_project_tick.rs"]
 mod mass_project_tick;
 #[path = "../match_aircraft_runner.rs"]

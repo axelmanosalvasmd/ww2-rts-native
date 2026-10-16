@@ -1,0 +1,1 @@
+- Fix the MAP-31 test input overlap by authoring its neutral, zero-VP/MP objective on known open ground before map construction. Keep the original river, sight rays and assertions. Preserve the first admission failure at `92c18323`, its 456 ground comparisons and earlier `a99c2b38` Source result; this child has no execution result and promotes no row.

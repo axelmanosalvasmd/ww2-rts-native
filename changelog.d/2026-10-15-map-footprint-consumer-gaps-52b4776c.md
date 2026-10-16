@@ -1,0 +1,1 @@
+- Add two MAP-47 footprint cases that distinguish infantry ground rules and repeated cell samples, and retain VBLOCK-only cells under the original MOVE-only filter. Keep all seven earlier cases and the five-row acceptance/status text unchanged. Source and native execution remain unrun.
