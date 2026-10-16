@@ -789,7 +789,6 @@ impl Match {
     pub(crate) fn validate_opening_projection(&self, owner: usize) -> Result<(), String> {
         if !matches!(self.options.mode, Mode::Default | Mode::Conquest)
             || self.world.geography().is_some()
-            || self.options.logistics
         {
             return Err("opening commander requires ordinary Conquest".into());
         }
@@ -859,6 +858,9 @@ impl Match {
     /// Snapshot only the fields consumed by this bounded policy, at source public precision.
     /// Includes own research kinds and ready-base facts, but no opponent economy or labs.
     pub fn opening_commander_observation(&mut self, owner: usize) -> Result<Observation, String> {
+        if self.options.logistics {
+            return Err("quiet opening commander does not plan logistics".into());
+        }
         self.validate_opening_projection(owner)?;
         let g = &self.world.game;
         if g.tick % 2 != 0 {
@@ -932,6 +934,12 @@ impl Match {
             let ch = if row.ch == b'N' { surface } else { row.ch };
             chars[row.cell] = ch;
             flags[row.cell] = flag(ch);
+        }
+        let mut remembered_height = initial.height.clone();
+        for observed in rows {
+            if let Some(height) = &mut remembered_height {
+                height[observed.row.cell] = observed.row.height;
+            }
         }
         let players = g
             .players
@@ -1058,6 +1066,88 @@ impl Match {
             chars,
             manpower: self.start.economy.players[owner].mp.floor(),
             research,
+            runtime: Some(crate::commander_tactics::Context {
+                mode: self.options.mode,
+                horde: false,
+                defender: false,
+                faction: self.options.players[owner].faction,
+                munitions: self.start.economy.players[owner].mun.floor(),
+                fuel: self.start.economy.players[owner].fuel.floor(),
+                large_army: self.options.army != crate::economy_state::ArmySize::Standard,
+                height: remembered_height,
+                smokes: {
+                    let grid = crate::grid::SpatialGrid::new(&g.units, 16.0);
+                    g.smokes
+                        .iter()
+                        .filter(|q| {
+                            g.reveal
+                                || vision::team_sees(
+                                    g,
+                                    &self.rules,
+                                    &grid,
+                                    g.players[owner].team,
+                                    Point { x: q.x, z: q.z },
+                                )
+                        })
+                        .map(|q| crate::game::Smoke {
+                            id: q.id,
+                            remaining: None,
+                            x: rounded(q.x),
+                            z: rounded(q.z),
+                            r: q.r,
+                        })
+                        .collect()
+                },
+                sight: g.sight_mul(&self.rules),
+                build_reserve: 0.0,
+                fort_reserve: 0.0,
+                free_nodes: 0,
+                support: self.start.players[owner]
+                    .support
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.ceil().max(0.0)))
+                    .collect(),
+                units: g
+                    .units
+                    .values()
+                    .filter(|u| u.owner == owner || g.allied(u.owner, owner))
+                    .map(|u| {
+                        (
+                            u.id,
+                            crate::commander_tactics::UnitFacts {
+                                built: u.built.unwrap_or(1.0),
+                                auto_retreat: u.owner == owner
+                                    && self
+                                        .commands
+                                        .units
+                                        .get(&u.id)
+                                        .is_some_and(|c| c.auto_retreat),
+                                convoy: u.owner == owner
+                                    && self
+                                        .convoys
+                                        .as_ref()
+                                        .is_some_and(|c| c.trucks.contains_key(&u.id)),
+                                amove: None,
+                                airborne: u.air.is_some() && vision::airborne(u),
+                                stock: if u.owner == owner {
+                                    self.logistics.get(u.id).map(|r| {
+                                        crate::commander_tactics::Stock {
+                                            ammo: (r.ammo_max > 0.0).then(|| {
+                                                math::round(r.ammo / r.ammo_max * 100.0) / 100.0
+                                            }),
+                                            provisions: math::round(r.provisions * 100.0) / 100.0,
+                                            fuel: r.fuel.map(|f| math::round(f * 100.0) / 100.0),
+                                            forced: r.forced,
+                                        }
+                                    })
+                                } else {
+                                    None
+                                },
+                            },
+                        )
+                    })
+                    .collect(),
+            }),
         })
         .map_err(|e| format!("commander observation: {e:?}"))
     }
@@ -1108,6 +1198,9 @@ impl Match {
         &mut self,
         seat: &mut OpeningCommander,
     ) -> Result<OpeningTick, String> {
+        if self.options.logistics {
+            return Err("quiet opening commander does not plan logistics".into());
+        }
         let now = self.world.game.tick;
         if now < 0
             || seat.owner >= self.world.game.players.len()
