@@ -21,6 +21,7 @@ pub(crate) struct StartupSettings<'a> {
 }
 pub(crate) struct NativeStartup {
     map: Value,
+    raw_map: Value,
     count: usize,
 }
 pub(crate) struct StartEnvelope {
@@ -42,6 +43,20 @@ impl NativeStartup {
         Self::prepare_authored(state, settings, authored)
     }
 
+    pub(crate) fn raw_map(&self) -> &Value {
+        &self.raw_map
+    }
+    pub(crate) fn prepare_loaded(
+        state: &Match,
+        settings: StartupSettings<'_>,
+        raw: &Value,
+    ) -> Result<Self, String> {
+        let authored = ww2_core::map::AuthoritativeMap::from_json(
+            &serde_json::to_vec(raw).map_err(|e| e.to_string())?,
+        )
+        .map_err(|e| e.to_string())?;
+        Self::prepare_authored(state, settings, &authored)
+    }
     fn prepare_authored(
         state: &Match,
         settings: StartupSettings<'_>,
@@ -76,7 +91,13 @@ impl NativeStartup {
             || actual.objects != expected.objects
             || actual.mines != expected.mines
             || actual.height != expected.height
-            || actual.trench_front != expected.trench_front
+            || match (&actual.trench_front, &expected.trench_front) {
+                (Some(a), Some(b)) => {
+                    a.len() != b.len() || a.iter().zip(b).any(|(a, b)| a.to_bits() != b.to_bits())
+                }
+                (None, None) => false,
+                _ => true,
+            }
         {
             return Err("native startup authoring map binding changed".into());
         }
@@ -96,6 +117,7 @@ impl NativeStartup {
         }
         Ok(Self {
             map: public,
+            raw_map: authored.source().clone(),
             count: plan.players.len(),
         })
     }

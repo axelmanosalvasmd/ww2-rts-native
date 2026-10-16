@@ -13,7 +13,7 @@ use crate::{
     math, projectiles, vision,
 };
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FiringUnit {
     /// Chosen target, with zero meaning no target.
     pub target_id: UnitId,
@@ -21,7 +21,7 @@ pub struct FiringUnit {
     pub retarget: f64,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FiringState {
     pub units: BTreeMap<UnitId, FiringUnit>,
     pub flights: BTreeMap<u64, LiveFlight>,
@@ -52,7 +52,7 @@ impl Default for FiringState {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct LiveSalvo {
     pub at: Point,
     pub owner: usize,
@@ -62,12 +62,13 @@ pub struct LiveSalvo {
     pub spread: f64,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum LaunchEvent {
     Flight {
         id: u64,
         kind: usize,
-        effect: Option<&'static str>,
+        #[serde(deserialize_with = "crate::save_state::optional_static_string")]
+        effect: Option<crate::save_state::StaticStr>,
         shooter: UnitId,
         owner: usize,
         at: projectiles::Point3,
@@ -111,22 +112,23 @@ pub enum LaunchEvent {
 }
 
 /// Existing ordinary shot fields used by the operative producer.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SmallArmsEvent {
-    pub effect: &'static str,
+    #[serde(deserialize_with = "crate::save_state::static_string")]
+    pub effect: crate::save_state::StaticStr,
     pub shooter: UnitId,
     pub owner: usize,
     pub at: projectiles::Point3,
     pub hit: Option<SmallArmsHit>,
 }
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SmallArmsHit {
     pub target: UnitId,
     pub owner: usize,
     pub man: Option<u32>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ContactEvent {
     pub kind: usize,
     pub flight: u64,
@@ -142,12 +144,14 @@ pub struct ContactEvent {
     pub killed: bool,
     pub terminal: bool,
     pub explosive: bool,
-    pub effect: Option<&'static str>,
+    #[serde(deserialize_with = "crate::save_state::optional_static_string")]
+    pub effect: Option<crate::save_state::StaticStr>,
     pub blast: Option<f64>,
     pub normal: projectiles::Point3,
     pub direction: projectiles::Point3,
     pub impulse: f64,
-    pub material: &'static str,
+    #[serde(deserialize_with = "crate::save_state::static_string")]
+    pub material: crate::save_state::StaticStr,
 }
 // JSON.stringify renders both zero signs as 0; keep trajectory math untouched.
 pub(crate) fn normalize_json_zero(value: &mut serde_json::Value) {
@@ -271,7 +275,7 @@ impl LaunchEvent {
 
 /// A round retains its launch solution when its shooter or intended target moves.
 /// Shooter XP and hit metadata stay in CombatState while this ID remains referenced.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct LiveFlight {
     pub id: u64,
     pub owner: usize,
@@ -302,7 +306,8 @@ pub struct LiveFlight {
     pub scar: f64,
     pub blast_radius: Option<f64>,
     pub blast_source: Option<ExplosionSource>,
-    pub effect: Option<&'static str>,
+    #[serde(deserialize_with = "crate::save_state::optional_static_string")]
+    pub effect: Option<crate::save_state::StaticStr>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -2251,7 +2256,7 @@ impl FiringState {
 
 /// Physical grenade bookkeeping from the source late phase. This ticket holds
 /// no trajectory or blast payload; those belong to its one canonical flight.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct GrenadeTicket {
     pub at: Point,
     pub remaining: f64,

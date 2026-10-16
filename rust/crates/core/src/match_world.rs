@@ -27,7 +27,7 @@ pub struct RegionState {
     pub locked: Option<bool>,
     pub cap_tick: Option<i64>,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ResourceNode {
     pub cell: usize,
     pub at: Point,

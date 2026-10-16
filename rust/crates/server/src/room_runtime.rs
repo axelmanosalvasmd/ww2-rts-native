@@ -174,6 +174,42 @@ impl RoomRuntime {
         self.running()?;
         self.ai.tick(&mut self.state, sent)
     }
+    pub(crate) fn save_json(&self) -> Result<Value, String> {
+        self.running()?;
+        if self.held >= 120 {
+            return Err("completed ending cannot be saved".into());
+        }
+        Ok(
+            json!({"state":self.state.save_json()?, "pendingEvents":Match::save_events_json(&self.pending_events)?,"held":self.held}),
+        )
+    }
+    pub(crate) fn restore_saved_hold(&mut self, held: &Value) -> Result<(), String> {
+        let held = held
+            .as_u64()
+            .and_then(|v| u16::try_from(v).ok())
+            .filter(|v| *v < 120)
+            .ok_or("invalid saved ending hold")?;
+        if held > 0 && self.state.finish.is_none() {
+            return Err("saved hold has no finish".into());
+        }
+        self.held = held;
+        Ok(())
+    }
+    pub(crate) fn restore_saved_events(&mut self, value: Value) -> Result<(), String> {
+        let events = Match::events_from_save_json(value)?;
+        let mut probe = Self::new(Match::from_save_json(self.state.save_json()?)?, 0)?;
+        probe.pending_events = events.clone();
+        let selected = (0..self.state.world.game.players.len())
+            .map(|slot| SelectedSeat {
+                slot,
+                full: true,
+                omit: false,
+            })
+            .collect::<Vec<_>>();
+        probe.collect_frame(&selected, FrameKind::Scheduled)?;
+        self.pending_events = events;
+        Ok(())
+    }
     pub fn state(&self) -> &Match {
         &self.state
     }
@@ -309,6 +345,17 @@ impl RoomRuntime {
             self.pending_events.clear();
         }
         Ok(captured)
+    }
+    pub(crate) fn open_loaded_pause(
+        &mut self,
+        slot: usize,
+        by: &str,
+        now_ms: u64,
+    ) -> Result<(), String> {
+        self.pause = None;
+        self.auto_paused.clear();
+        self.pause(slot, by, PauseReason::Host, now_ms)?;
+        Ok(())
     }
     pub fn paused(&self) -> bool {
         self.pause.is_some()
