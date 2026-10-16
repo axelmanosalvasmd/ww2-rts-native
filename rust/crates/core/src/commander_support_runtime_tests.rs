@@ -207,3 +207,61 @@ fn support_motor_receipts_repeat_and_enter_canonical_admission() {
     };
     assert_eq!(run(), run());
 }
+
+#[test]
+fn preferred_dive_falls_back_or_waits_without_tick_or_recipient_faults() {
+    for artillery_ready in [true, false] {
+        let (mut m, enemy) = setup();
+        let heavy = scene::spawn(&mut m, "tank", 1, scene::point(72.0, 50.0));
+        m.recovery.initialize(heavy);
+        m.world.game.players[0].visible = vec![enemy, heavy];
+        m.start.economy.players[0].mun = 1000.0;
+        for (kind, cd) in &mut m.start.players[0].support {
+            *cd = if kind == "artillery" && !artillery_ready {
+                100.0
+            } else {
+                0.0
+            };
+        }
+        let mut memory = HumanObservationMemory::new(0);
+        let mut policy = SupportPolicy::new(0);
+        let first = m.human_support_observation(&mut memory).unwrap();
+        assert!(
+            policy
+                .plan(screen(&first), Level::Normal)
+                .unwrap()
+                .is_empty()
+        );
+        clock(&mut m, 62);
+        let view = m.human_support_observation(&mut memory).unwrap();
+        // The watched heavy, wallet and ready Dive would previously outrank artillery.
+        assert_eq!(view.packet.facts.cooldowns["dive"], 0.0);
+        assert!(
+            view.packet
+                .observation
+                .input()
+                .units
+                .iter()
+                .any(|u| u.id == heavy && u.kind == "tank")
+        );
+        let commands = policy.plan(screen(&view), Level::Normal).unwrap();
+        assert_eq!(commands.len(), usize::from(artillery_ready));
+        for raw in commands {
+            assert_eq!(raw["kind"], "artillery");
+            assert_eq!(
+                m.execute_command(0, &Command::from_json(&raw).unwrap(), false)
+                    .unwrap(),
+                None
+            );
+            policy.accepted_call(view.tick).unwrap();
+        }
+        for _ in 0..8 {
+            m.advance_tick().unwrap();
+            let cache = crate::recipient_snapshot::SnapshotCache::new(&m).unwrap();
+            for seat in 0..m.start.players.len() {
+                cache.recipient(seat).unwrap();
+            }
+            assert!(m.tick_state.fault().is_none());
+        }
+    }
+}

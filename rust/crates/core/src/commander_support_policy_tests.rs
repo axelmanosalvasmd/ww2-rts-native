@@ -108,7 +108,7 @@ fn chosen(obs: &Observation, facts: &SupportFacts, level: Level, called: f64) ->
 }
 
 #[test]
-fn cover_precedes_dive_and_ignores_the_situation_leash() {
+fn cover_ignores_the_situation_leash_and_unsupported_dive_stays_closed() {
     let obs = observation(vec![
         unit(1, "engineer", 0, 100.0),
         unit(2, "tank", 1, 120.0),
@@ -128,10 +128,7 @@ fn cover_precedes_dive_and_ignores_the_situation_leash() {
     f.strikes[0].owner = 0;
     assert_eq!(chosen(&obs, &f, Level::Normal, 0.0), None);
     f.situation = None;
-    assert_eq!(
-        chosen(&obs, &f, Level::Normal, 0.0).as_deref(),
-        Some("dive")
-    );
+    assert_eq!(chosen(&obs, &f, Level::Normal, 0.0), None);
     f.watched.clear();
     assert_eq!(chosen(&obs, &f, Level::Normal, 0.0), None);
     f.strikes[0].owner = 1;
@@ -140,77 +137,40 @@ fn cover_precedes_dive_and_ignores_the_situation_leash() {
 }
 
 #[test]
-fn paradrop_needs_six_fighters_a_seen_ready_point_and_non_horde_seat() {
-    let obs = observation((1..=6).map(|id| unit(id, "rifle", 0, 100.0)).collect());
-    let mut f = facts(&obs, &["para", "recon"]);
-    assert_eq!(
-        chosen(&obs, &f, Level::Normal, 0.0).as_deref(),
-        Some("para")
-    );
-    f.ready_points.clear();
-    assert_eq!(
-        chosen(&obs, &f, Level::Normal, 0.0).as_deref(),
-        Some("recon")
-    );
-    f.ready_points.insert(0);
-    f.visible_points.clear();
-    assert_eq!(
-        chosen(&obs, &f, Level::Normal, 0.0).as_deref(),
-        Some("recon")
-    );
-    f.visible_points.insert(0);
-    f.mode = Mode::Horde;
-    f.horde_seat = true;
-    assert_eq!(
-        chosen(&obs, &f, Level::Normal, 0.0).as_deref(),
-        Some("recon")
-    );
-    let fewer = observation((1..=5).map(|id| unit(id, "rifle", 0, 100.0)).collect());
-    assert_eq!(
-        chosen(&fewer, &facts(&fewer, &["para"]), Level::Normal, 0.0),
-        None
-    );
+fn unsupported_support_stays_closed_with_ready_targets_wallets_and_cooldowns() {
+    let mut units: Vec<_> = (1..=6).map(|id| unit(id, "rifle", 0, 100.0)).collect();
+    units.extend([
+        unit(7, "tank", 1, 130.0),
+        unit(8, "rifle", 1, 132.0),
+        unit(9, "rifle", 1, 134.0),
+    ]);
+    let targets = observation(units);
+    let no_enemies = observation(vec![unit(1, "rifle", 0, 100.0)]);
+    for obs in [&targets, &no_enemies] {
+        for kind in ["dive", "para", "bombing", "strafe", "recon"] {
+            assert_eq!(
+                chosen(obs, &facts(obs, &[kind]), Level::Normal, 0.0),
+                None,
+                "unsupported {kind} must not reach admission"
+            );
+        }
+    }
 }
 
 #[test]
-fn bombing_artillery_and_strafe_follow_source_else_if_priority() {
-    let mut enemy = unit(2, "rifle", 1, 130.0);
-    enemy.garrison = true;
+fn artillery_remains_available_when_higher_priority_air_support_is_ready() {
     let obs = observation(vec![
         unit(1, "rifle", 0, 100.0),
-        enemy,
+        unit(2, "tank", 1, 130.0),
         unit(3, "rifle", 1, 132.0),
     ]);
-    let mut f = facts(&obs, &["bombing", "artillery", "strafe"]);
-    assert_eq!(
-        chosen(&obs, &f, Level::Normal, 0.0).as_deref(),
-        Some("bombing")
-    );
-    f.cooldowns.insert("bombing".into(), 1.0);
+    let mut f = facts(&obs, &["dive", "bombing", "artillery", "strafe"]);
     assert_eq!(
         chosen(&obs, &f, Level::Normal, 0.0).as_deref(),
         Some("artillery")
     );
     f.cooldowns.insert("artillery".into(), 1.0);
-    assert_eq!(
-        chosen(&obs, &f, Level::Normal, 0.0).as_deref(),
-        Some("strafe")
-    );
-    // Artillery availability consumes this branch even when its smaller radius finds no group.
-    let spaced = observation(vec![
-        unit(1, "rifle", 0, 100.0),
-        unit(2, "rifle", 1, 130.0),
-        unit(3, "rifle", 1, 139.0),
-    ]);
-    assert_eq!(
-        chosen(
-            &spaced,
-            &facts(&spaced, &["artillery", "strafe"]),
-            Level::Normal,
-            0.0
-        ),
-        None
-    );
+    assert_eq!(chosen(&obs, &f, Level::Normal, 0.0), None);
 }
 
 #[test]
@@ -286,64 +246,48 @@ fn clusters_and_situations_bound_strikes_with_hard_friendly_safety() {
 
 #[test]
 fn reserves_cooldowns_easy_gap_and_classic_munitions_gate_calls() {
-    let mut input = observation(vec![unit(1, "rifle", 0, 100.0), unit(2, "tank", 1, 130.0)])
-        .input()
-        .clone();
-    input.manpower = 280.0;
+    let mut input = observation(vec![
+        unit(1, "rifle", 0, 100.0),
+        unit(2, "rifle", 1, 130.0),
+        unit(3, "rifle", 1, 132.0),
+    ])
+    .input()
+    .clone();
+    input.manpower = 250.0;
     let obs = Observation::new(input.clone()).unwrap();
-    let f = facts(&obs, &["dive"]);
+    let f = facts(&obs, &["artillery"]);
     assert_eq!(
         chosen(&obs, &f, Level::Normal, 100.0).as_deref(),
-        Some("dive")
+        Some("artillery")
     );
-    input.manpower = 279.0;
+    input.manpower = 249.0;
     let low = Observation::new(input.clone()).unwrap();
     assert_eq!(chosen(&low, &f, Level::Normal, 0.0), None);
-    input.manpower = 430.0;
+    input.manpower = 400.0;
     let obs = Observation::new(input).unwrap();
-    assert_eq!(chosen(&obs, &f, Level::Easy, 55.0).as_deref(), Some("dive"));
+    assert_eq!(
+        chosen(&obs, &f, Level::Easy, 55.0).as_deref(),
+        Some("artillery")
+    );
     assert_eq!(chosen(&obs, &f, Level::Easy, 55.01), None);
     let mut classic = f.clone();
     classic.mode = Mode::Classic;
-    classic.munitions = 70.0;
+    classic.munitions = 60.0;
     assert_eq!(
         chosen(&low, &classic, Level::Normal, 0.0).as_deref(),
-        Some("dive")
+        Some("artillery")
     );
-    classic.munitions = 69.99;
+    classic.munitions = 59.99;
     assert_eq!(chosen(&low, &classic, Level::Normal, 0.0), None);
-    classic.munitions = 109.99;
+    classic.munitions = 99.99;
     assert_eq!(chosen(&low, &classic, Level::Easy, 0.0), None);
-    classic.munitions = 110.0;
+    classic.munitions = 100.0;
     assert_eq!(
         chosen(&low, &classic, Level::Easy, 0.0).as_deref(),
-        Some("dive")
+        Some("artillery")
     );
-    classic.cooldowns.insert("dive".into(), 0.01);
+    classic.cooldowns.insert("artillery".into(), 0.01);
     assert_eq!(chosen(&low, &classic, Level::Easy, 0.0), None);
-}
-
-#[test]
-fn recon_requires_no_current_enemies_and_classic_or_more_than_250_mp() {
-    let mut input = observation(vec![unit(1, "rifle", 0, 100.0)])
-        .input()
-        .clone();
-    input.manpower = 250.0;
-    let obs = Observation::new(input).unwrap();
-    let mut f = facts(&obs, &["recon"]);
-    assert_eq!(chosen(&obs, &f, Level::Normal, 0.0), None);
-    f.mode = Mode::Classic;
-    assert_eq!(
-        chosen(&obs, &f, Level::Normal, 0.0).as_deref(),
-        Some("recon")
-    );
-    f.munitions = 24.99;
-    assert_eq!(chosen(&obs, &f, Level::Normal, 0.0), None);
-    let enemy = observation(vec![unit(1, "rifle", 0, 100.0), unit(2, "rifle", 1, 130.0)]);
-    let mut f = facts(&enemy, &["recon"]);
-    f.mode = Mode::Classic;
-    f.watched.clear();
-    assert_eq!(chosen(&enemy, &f, Level::Normal, 0.0), None);
 }
 
 #[test]

@@ -120,6 +120,12 @@ pub fn plan(
     }
     let watched = |id: u32| facts.horde_seat || facts.watched.contains(&id);
     let can = |kind: &str| -> Result<bool, String> {
+        if !crate::recipient_snapshot::SUPPORTED_SUPPORT_KINDS
+            .iter()
+            .any(|supported| supported.name() == kind)
+        {
+            return Ok(false);
+        }
         let price = economy::sup_cost(facts.mode, kind).map_err(|e| e.to_string())?;
         let (wallet, reserve) = match price.currency {
             Currency::Manpower => (
