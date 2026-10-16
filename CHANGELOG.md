@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Run the first native combat batch once: 49 selected, 46 passed and 3 failed at `38317a14`; retain the failed CMB-94/126/137 bodies and drop those rows from candidates. Add five native tests for the second 16-row window, keeping all missing/client/delegated clauses pending and every Acceptance cell exact. No semantic retry or new Source capture.
+
 - Check native barrage shell counts and exact family cooldowns in the new combat suite. Compare snapshot cooldowns through their numeric value so JSON float storage does not change the intended assertion. These tests remain unrun.
 
 - Format the new native combat test module with the existing pinned Rust 1.99.0 formatter, preserving literals and assertions. Native execution remains pending Root's grant.

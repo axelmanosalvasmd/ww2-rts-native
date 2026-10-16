@@ -1337,3 +1337,6 @@ fn cmb134_snapshot_filters_visibility_locked_target_private_timers_and_flags() {
     assert_eq!(own_row[11].as_f64(), Some(13.));
     assert_ne!(own_row[12].as_u64().unwrap() & 2048, 0);
 }
+
+#[path = "combat_feature_tail_tests.rs"]
+mod tail;

@@ -4254,3 +4254,37 @@ to integer 13 through Value's integer overload. Read the numeric value
 explicitly, preserving the intended 13-second assertion. Strengthen the
 barrage test to require 8/4/4 shells and 20/40/50-second cooldowns for
 rocket/mortar/howitzer. No native failure or semantic retry occurred.
+
+
+## Combat batch results and second window (2026-10-16)
+
+The single granted S2 0308 job at `38317a142f58209c6f95c59477700053a8c6110d`
+(Rust `4269b7065810842b37ffc436d5de53b195016164`) selects49,
+passes46 and fails3, with515 skipped. All selected tests run once with
+no-fail-fast and retries0. Core contributes40 new passes and3 new failures;
+the unchanged CMB88 spread, four exact formation checks and exact ability
+cost consumer also pass. Both runner and systemd launcher terminate100,
+and the inherited S2 flock is released before Root receives the row map.
+Actual scope: CPUs4-7, memory6442450944, swap0, quota400000/100000,
+external S2 target and89873981440 available disk bytes above20GiB.
+
+CMB126 fails in the authored scene's ground-only initial_unit helper with
+UnsupportedAir before visibility; CMB137 gets Unsupported for a compound
+command instead of success; CMB94 chooses the closer medic instead of the
+asserted rifle. Prototype threatFor checks truthy weapon objects and the
+medic has one despite zero range, so the last mismatch is not labeled a
+runtime defect. Preserve every failed body and producing result. These
+three rows stay in progress and cannot enter the passing candidate set.
+No repair or semantic retry is performed. All other passing components
+still need prototype intent review and their stated gaps remain held.
+
+The second16 window now has five actual new native tests: canonical
+aviation Escort, reconnect-persistent denial throttle, all infantry men
+layouts, unit-row fields/flags and armor/launch helpers. Its Escort test
+uses spawn_aircraft, the actual aviation publisher; the failed CMB126 body
+and ground helper remain exact. Pure functions retain the existing exact
+39-case men, armor, launch and contact fixtures. No new fixture is created.
+Eleven other second-window rows remain client/delegated/replay gaps, each
+listed in the row map. No row is promoted. Register only these new tests
+and request a separate focused9-instance nextest job; no first-window
+failure is selected or retried. Shipping runtime and interfaces stay exact.
