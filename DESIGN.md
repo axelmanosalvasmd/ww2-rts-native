@@ -1,5 +1,13 @@
 # Three Crossroads Native: design decisions
 
+## Native order-intent batch result (2026-10-16)
+
+At producing `eddedccdf5f07186cdb238f1407f9816be2a0bba`, Rust tree `e67a66462828168f5fae6a519ffb38752ed8e321`, Root's corrected S2 grant ran nine selected native tests once with no-fail-fast and zero retries: six PASS, three FAIL, 153 skipped. Candidate rows CMB-83, CMB-91, CMB-140 and MOV-49 have passing mapped native tests and await prototype-intent review. No row is promoted by this result annotation.
+
+CMB-144 stays incomplete: its foreign-only construction regression repeats the existing exact error versus Needs, and its group Retreat test fails the authored 3 m distance-to-home assertion after quarter tank damage, sprint and no-fire checks pass. The distance assertion alone establishes no gameplay defect. Paid building/project cancellation and aircraft return pass. CMB-145 stays incomplete: ordinary Unload before scuttle passes, but loaded scuttle reaches the unchanged thrown-carrier-ejection guard at tick 786 and fails. Preserve every failed assertion/body and the raw output; do not repair or rerun. Garrison exit and capture exclusion remain uncovered.
+
+Normal output and result JSON remain in `/tmp/native-feature-batches-0303/aligned_replay`. Native, runner and systemd terminal exit 100 and inherited flock release were delivered before the compact row map. Actual affinity was CPUs 4-7, memory.max 6442450944, swap.max 0 and cpu.max 400000/100000, with build jobs 4, test threads 1 and 85 GiB disk available before launch. The earlier 0258 parser exit 2 remains separately preserved with no compilation or native tests. This annotation changes documentation only, keeps the tested Rust tree exact, and creates no Source capture or evidence bundle. Root owns review, failed-row exclusion and integration.
+
 ## Native ground-order intent checks (2026-10-16, execution pending)
 
 Axel's [6206861267 owner decision](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6206861267) adopts rules 1 to 5 exactly. The new private `native_order_intent_tests` module exercises CMB-83/91/140/144/145 and MOV-49 through native orders and the ordinary tick runner. Startup keeps native random streams, an explicit seed and canonical providers. Construction, purchase, movement, boarding, unloading and retirement use existing native APIs. The aircraft case uses canonical spawn and command APIs. No runtime provider, interface, guard, reference pin or RNG seam changes.
