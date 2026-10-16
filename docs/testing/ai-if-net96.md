@@ -17,4 +17,6 @@ The JavaScript `shardOf` function was imported directly from the pinned read-onl
 
 The prototype's `ready {port}`, `record {key, run}` and `maps` messages are private process IPC. Native threads use private channels rather than replaying TCP upgrades between processes. Immutable embedded maps need no invalidation message, and native Horde record persistence remains unavailable. This change does not invent or implement those separate contracts. It makes no claim to recover live matches after a process-wide abort.
 
+The worker loop uses Tokio's default fair selection. Fixed priority with maintenance before requests could starve new sockets and directory queries whenever maintenance consistently exceeded the ten-millisecond timer period. The independent source reviewer confirmed that cooperative yielding does not change that branch priority. The loop still checks shutdown before every selection. This correction adds no worker or Match state.
+
 Parent validation before the main refresh: all four NET-96 tests passed in the combined 15-test selection, then passed again after the JavaScript whitespace correction. All 263 selected existing core/server tests also passed. The [IF-25 note](ai-if-if25.md#validation) records the shared validation and its producing-tree limits. The NET-96 author and independent reviewer ran no Cargo. No parity status was edited.

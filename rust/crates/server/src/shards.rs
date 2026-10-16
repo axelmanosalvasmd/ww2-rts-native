@@ -328,8 +328,8 @@ async fn run_worker(
         if *stop.borrow() {
             break;
         }
+        // Fair polling keeps requests serviceable when maintenance stays due.
         tokio::select! {
-            biased;
             _ = stop.changed() => break,
             Some(result) = sockets.join_next(), if !sockets.is_empty() => {
                 if result.is_err() { panic!("game socket task failed"); }
