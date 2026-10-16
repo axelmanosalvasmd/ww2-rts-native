@@ -101,6 +101,9 @@ fn validate_training_birth(
         "unknown queued birth kind",
     ))?;
     if rules.kinds[kind].air {
+        if mode == Mode::Classic {
+            return Ok(());
+        }
         return Err(ProductionStepError::Placement(
             crate::produced_units::Error::UnsupportedAir,
         ));
@@ -514,6 +517,9 @@ impl Match {
             .rules
             .kind(&completion.kind)
             .ok_or(ProductionStepError::InvalidState("training unit kind"))?;
+        if self.rules.kinds[kind].air {
+            return self.complete_aircraft_training(building, dt, completion);
+        }
         let mut view = terrain_view(game);
         view.versions = Versions {
             infantry: self.world.versions.infantry,
@@ -648,6 +654,83 @@ impl Match {
             unit: id,
             completion,
             route_status: status,
+        }))
+    }
+
+    fn complete_aircraft_training(
+        &mut self,
+        building: u32,
+        dt: f64,
+        completion: production::CompletedUnit,
+    ) -> Result<Option<CompletedTrainingUnit>, ProductionStepError> {
+        // The producer's position is authoritative for a queued aircraft birth,
+        // even when another Airfield is nearer to the player's spawn.
+        self.validate_aviation()
+            .map_err(|e| ProductionStepError::Control(e.to_string()))?;
+        let owner = completion.owner;
+        let kind = self
+            .rules
+            .kind(&completion.kind)
+            .ok_or(ProductionStepError::InvalidState("training aircraft kind"))?;
+        let id = self.next_unit_id;
+        let runtime = crate::match_aviation::initial_aircraft_runtime(&completion.kind)
+            .map_err(|e| ProductionStepError::Control(e.to_string()))?;
+        let staged = StagedUnit::aircraft(
+            &self.world.game,
+            &self.rules,
+            owner,
+            kind,
+            id,
+            u32::try_from(self.world.game.units.len())
+                .map_err(|_| ProductionStepError::InvalidState("training aircraft count"))?,
+            self.start.players[owner].spawn,
+            self.world.game.units[&building].at(),
+        )
+        .map_err(ProductionStepError::Publication)?;
+        let count = self.production_step_context()?;
+        let units = units(&self.world.game, &self.rules, count)?;
+        let context = context(
+            &self.options,
+            self.world.game.naval,
+            &units,
+            None,
+            self.elimination_sudden_death(),
+        );
+        let prepared =
+            self.production
+                .prepare_building_step(&context, &self.start.economy, building, dt)?;
+        if prepared.completed() != Some(&completion) {
+            return Err(ProductionStepError::InvalidState(
+                "training aircraft completion changed",
+            ));
+        }
+        let publication = prepare_publication(
+            PublicationParts {
+                units: &mut self.world.game.units,
+                grid: &mut self.grid,
+                controls: &mut self.commands.units,
+                recruitment: &mut self.recruit_metadata,
+                next_id: &mut self.next_unit_id,
+            },
+            &self.rules,
+            count,
+            vec![staged],
+        )
+        .map_err(ProductionStepError::Publication)?;
+        let completion = prepared
+            .commit()
+            .expect("staged aircraft training completion");
+        publication.publish_with(|unit, _| {
+            self.aviation.planes.insert(unit.id, runtime);
+            self.combat.initialize(unit.id).hit_by = Some(0);
+            self.firing.initialize(unit.id);
+            self.abilities.initialize(unit.id);
+            self.recovery.initialize(unit.id);
+        });
+        Ok(Some(CompletedTrainingUnit {
+            unit: id,
+            completion,
+            route_status: None,
         }))
     }
 }
