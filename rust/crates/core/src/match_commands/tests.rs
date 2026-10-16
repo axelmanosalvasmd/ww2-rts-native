@@ -895,6 +895,98 @@ fn log07_close(actual: f64, expected: f64) {
 }
 
 #[test]
+fn mov23_reserve_vehicle_caps_residual_motion_at_full_reduced_and_zero_fuel() {
+    for fraction in [1.0, 0.25, 0.0] {
+        for clearance in [false, true] {
+            let mut m = log07_match();
+            log07_move(&mut m);
+            let dt = m.rules.movement.tick;
+            m.logistics.get_mut(1).unwrap().fuel = Some(dt * fraction);
+            let unit = m.world.game.units.get_mut(&1).unwrap();
+            let before = unit.at();
+            unit.move_speed = 50.0;
+            unit.travel_dir = Some(0.0);
+            if clearance {
+                unit.clearance = Some(crate::game::Clearance {
+                    goal: crate::game::Pose {
+                        x: before.x + 5.0,
+                        z: before.z,
+                        rot: 0.0,
+                    },
+                    reverse: false,
+                    path: unit.path_gen,
+                    until: 100.0,
+                });
+            }
+            let moved = log07_step(&mut m, 1.0);
+            let unit = &m.world.game.units[&1];
+            let distance = crate::math::hypot(unit.x - before.x, unit.z - before.z);
+            log07_close(distance, moved.speed * dt);
+            if fraction == 0.0 {
+                assert_eq!(unit.at(), before);
+                assert_eq!(unit.move_speed, 0.0);
+            }
+        }
+    }
+}
+
+#[test]
+fn mov23_convoy_without_reserves_is_capped_but_ordinary_momentum_is_preserved() {
+    use crate::supply_convoys::{ConvoyState, StoreId, Truck, TruckState};
+
+    for convoy in [false, true] {
+        let mut m = initial(&json!({
+            "map": {
+                "name":"convoy movement cap", "w":32, "h":24,
+                "rows":vec!["................................"; 24],
+                "spawns":[{"x":0,"y":0},{"x":31,"y":23}],
+                "points":[{"id":"p","x":12,"y":12}]
+            },
+            "initial":[{"kind":"truck","x":25,"z":23}]
+        }));
+        log07_move(&mut m);
+        assert!(m.logistics.get(1).is_none());
+        if convoy {
+            let mut state = ConvoyState::default();
+            state.trucks.insert(
+                1,
+                Truck {
+                    state: TruckState::Idle,
+                    cargo: crate::logistics::Stock::default(),
+                    target: None,
+                    origin: StoreId::Source(0),
+                    timer: 0.0,
+                    manual: true,
+                    hold: false,
+                    route: vec![],
+                    destination: None,
+                    route_failure: None,
+                    retry: None,
+                },
+            );
+            m.convoys = Some(state);
+        }
+        let unit = m.world.game.units.get_mut(&1).unwrap();
+        let before = unit.at();
+        unit.move_speed = 20.0;
+        unit.travel_dir = Some(0.0);
+        let moved = log07_step(&mut m, 0.01);
+        let unit = &m.world.game.units[&1];
+        let distance = crate::math::hypot(unit.x - before.x, unit.z - before.z);
+        let budget = moved.speed * m.rules.movement.tick;
+        if convoy {
+            log07_close(distance, budget);
+        } else {
+            assert!(
+                distance > budget,
+                "ordinary braking retains its existing momentum"
+            );
+        }
+        assert!(m.logistics.get(1).is_none());
+    }
+}
+
+#[test]
 fn log07_parked_and_riding_movement_preserve_fuel() {
     let mut m = log07_match();
     let before = m.world.game.units[&1].at();
@@ -936,7 +1028,7 @@ fn log07_acceleration_charges_actual_distance_without_reticking_reserves() {
 }
 
 #[test]
-fn log07_ordinary_depletion_limits_speed_and_debits_emergency_overrun() {
+fn log07_ordinary_depletion_caps_travel_and_charges_actual_driving() {
     let mut baseline = log07_match();
     log07_move(&mut baseline);
     let full_speed = log07_step(&mut baseline, 1.0).speed;
@@ -950,7 +1042,7 @@ fn log07_ordinary_depletion_limits_speed_and_debits_emergency_overrun() {
         r.fuel = Some(ordinary);
         r.emergency = Some(emergency);
         assert!(!r.forced);
-        // Existing momentum exercises the dt cap; tiny powered speed exercises the .001 divisor floor.
+        // Existing momentum exercises the displacement cap; tiny powered speed exercises the .001 divisor floor.
         m.world.game.units.get_mut(&1).unwrap().move_speed = if fraction == 0.5 {
             full_speed
         } else {
@@ -962,11 +1054,12 @@ fn log07_ordinary_depletion_limits_speed_and_debits_emergency_overrun() {
         let unit = &m.world.game.units[&1];
         let distance = crate::math::hypot(unit.x - before.x, unit.z - before.z);
         assert!(distance > 0.0);
+        assert!(distance <= moved.speed * dt + 1e-12);
         let driving = crate::math::min(dt, distance / crate::math::max(moved.speed, 0.001));
         assert!(driving > ordinary);
         if fraction == 0.5 {
-            assert!(distance / moved.speed > dt);
-            assert_eq!(driving, dt);
+            log07_close(distance / moved.speed, dt);
+            log07_close(driving, dt);
         } else {
             assert!(moved.speed < 0.001 && driving < dt);
         }

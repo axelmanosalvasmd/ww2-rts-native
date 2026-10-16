@@ -1576,7 +1576,7 @@ impl Match {
             self.rules.movement.house_hp[usize::from(g.house[cell])]
         } else {
             self.rules.movement.terrain_hp(ch).unwrap_or(0.0)
-                * g.tough.as_ref().map_or(1.0, |t| t[cell])
+                * g.tough.as_ref().map_or(1.0, |t| f64::from(t[cell]))
         }
     }
     fn cover_quality(&self, cell: usize) -> Result<f64, String> {
