@@ -1,3 +1,9 @@
+## AI test-only integration on main40fe (2026-10-16, unrun)
+
+Start this candidate from literal40fe9e296b46060241693c6c627ecd615d4f8ea4 in the assigned physical checkout. Preserve prior8cb01c00 and passing0aaea3da refs. Import only nine new task tests in existing human_commander_state_tests.rs and match_human_observation/tests.rs. Main already has their complete helper types and test registration. No old81-line diagnostic helper, ai_receipt implementation, fixture, inherited runtime/history or replacement test provider is required. All docs/parity files stay exact main.
+
+Read current main before integration: it lacks ai_receipt_input and ai_delivered_sight and their Observation/Match/vision integration. Therefore prior AI01/02/04/06 candidates remain held on main; the test PR proposes only AI08/19/20/21/22/23/24/27. AI05's authorized history successor remains on the prior preserved branch, where its actual28-test PASS belongs to0aaea3da/Rust2f9cf68c. No old result transfers to this new unrun source. The14-name focused filter selects nine new and five existing library tests. Both full63-row maps and a concrete PR body live under docs/testing. Root owns the new integrated execution grant, independent review, public PR and proven-row ledger/status follow-up.
+
 # Three Crossroads Native: design decisions
 
 
@@ -4814,3 +4820,7 @@ fixture, provider, registry, guard, FFI, wire, contract or reference.
 Root owns fresh exact-child review, incoming-main preservation, any hosted
 gates and publication. Wider terrain features, World, recipient delivery
 and Unreal acceptance are not completed by these selected component rows.
+
+## AI sighting test lint correction (2026-10-16)
+
+PR #274 strict Clippy rejected a nested conditional in the stillness-reset assertion. Combine the existing option match and movement threshold with a let chain. The condition, assertions and authored inputs stay the same.

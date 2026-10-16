@@ -1,0 +1,1 @@
+- Marked AI-08, AI-20, AI-21, AI-22, AI-23, AI-24 and AI-27 ported in `docs/parity/ai.md`, citing their native intent tests merged in #274 (reviewed against the prototype under Axel's 2026-10-16 evidence standard).

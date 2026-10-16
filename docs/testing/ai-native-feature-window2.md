@@ -1,0 +1,21 @@
+# AI remaining feature window 2
+
+This normal row-to-test map covers all13 remaining owned rows, AI-54 through AI-66. Each complete row is excluded from promotion for the individual reason below. No test that only proves a refusal, a table or a partial component is presented as proof of missing gameplay. No new native job is requested for this zero-candidate window. Existing partial test names are literal; their earlier results retain their producing heads.
+
+The prior first50 window and its28-test job remain attributed to0aaea3da. The current main integration selects14 tests and proposes eight complete rows. The native-intent decision6206861267 applies without the added notes in6206844573. No new Source recorder, captured fixture or provenance bundle is used. All original row and Acceptance cells remain untouched.
+
+| Row | Existing partial native test | Prototype at e4e579a | Missing complete behavior |
+| --- | --- | --- | --- |
+| AI-54 | None for complete behavior | `shared/ai.js:1006-1039,333,435` | Classic depot/build order, richer-node choice, repairs and engineer buying are absent from the quiet native planner. |
+| AI-55 | None for complete behavior | `shared/ai.js:321-330,542-589` | Classic/World counters, rush defense, value-gated base attacks, depot raids and reconnaissance are absent. |
+| AI-56 | None for complete behavior | `shared/ai.js:310-316,457,766,912,986` | Assault/Annihilation target policy, defender radius and forward-HQ/fortification exclusions are absent. |
+| AI-57 | None for complete behavior | `shared/ai.js:309,338-346,438,531,671-682,971` | Horde-only planner, stance arming, queue and ability/support policies are absent. |
+| AI-58 | None for complete behavior | `shared/ai.js:423-424,434,629-715,1041-1068` | World observation admission and recover/region/frontier/rail/carrier planning are not connected. |
+| AI-59 | `human_commander_timing::private_human_timings_match_original_source` | `shared/ai.js:233-239; shared/ai-human.js:21-25` | Existing exact timing fixture covers Easy commander values and draws. Full Easy support, assault and casts policy is absent; complete row excluded. |
+| AI-60 | `human_commander_timing::private_human_timings_match_original_source` | `shared/ai.js:233-239; shared/ai-human.js:21-36` | Existing exact timing fixture covers Normal commander values and defaults. Full adaptive/support planner and actual Normal Horde seat are absent; complete row excluded. |
+| AI-61 | `human_commander_timing::private_human_timings_match_original_source` | `shared/ai.js:233-239,323-324,398,798; shared/ai-human.js:21-25` | Existing exact timing fixture covers Hard commander values. Counters, sighting-based support, focus fire and held-point guards are absent; complete row excluded. |
+| AI-62 | `human_commander_policy::tests::actual_native_handover_waits_for_delivery_before_its_first_due_plan` | `server.js:521-527,640-643; server/room-tick.js:21` | Detached handover timing is a component witness. Live server rejects addAi and level in the current supported room path; full seat-level selection and takeover are absent. |
+| AI-63 | `human_commander_state::tests::intent_ai19_lazy_opening_and_handover_reset` | `shared/ai.js:157-165; server.js:425-448; server/saves.js:16-22` | Commander reset is tested in window1. Durable planner memory save/restore, human-seat clearing and clone-failure policy are absent. |
+| AI-64 | `human_commander_policy::tests::actual_receipt_adapter_ignores_paid_hidden_enemy_recruitment` | `test.js:4587-4733` | Existing real hidden-purchase and terrain/privacy controls cover quiet Conquest components. Full all-level Classic/Assault/Horde perturbation matrix is absent. |
+| AI-65 | `human_commander_policy::tests::actual_policy_purpose_stream_is_replayable_and_failed_projection_publishes_neither_provider` | `shared/ai-schedule.js:37-72; test-ai-human.js:13-28` | Existing quiet policy replay test is a component witness. Complete seeded whole-match human commander and full mode runtime are absent. |
+| AI-66 | `human_commander_timing::private_human_timings_match_original_source` | `shared/ai.js:146-155,1034; shared/ai-human.js:40-61` | Exact private commander timing stream is implemented. Planner uses the documented Ai purpose stream; complete Classic draw-count branch is absent. No new intentional difference is approved by this report. |

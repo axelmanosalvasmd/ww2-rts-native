@@ -344,3 +344,549 @@ fn a_failed_due_plan_retains_urgent_causes_resume_origins_and_private_rng() {
     assert_eq!(callbacks, 1);
     assert_eq!(human, before);
 }
+
+// Native behavior checks use constructed detached facts, without a Source recorder.
+fn intent_state(level: &str) -> HumanState {
+    let mut state = HumanState::new(71, 0, Point { x: 10.0, z: 10.0 });
+    state
+        .advance::<(), _>(
+            TickControl {
+                level,
+                ..control(0)
+            },
+            None,
+            &empty_batch(),
+            |_| panic!("initialization cannot plan"),
+        )
+        .unwrap();
+    state
+}
+
+fn intent_unit(id: u32, owner: u32, x: f64, z: f64) -> HumanUnit {
+    HumanUnit {
+        motion: inputs::Unit {
+            id,
+            at: Point { x, z },
+            world_goal: None,
+            amove: None,
+            target_id: 0,
+            retreating: false,
+        },
+        owner,
+        kind: "rifle".into(),
+        hp: profile("rifle").unwrap().full_hp,
+        air: false,
+        build: false,
+        dig: false,
+        entrench: false,
+        garrison: false,
+    }
+}
+
+fn intent_view(tick: u64) -> HumanView<()> {
+    HumanView {
+        tick,
+        spawn: Some(Point { x: 10.0, z: 10.0 }),
+        units: vec![
+            intent_unit(1, 0, 10.0, 10.0),
+            intent_unit(2, 1, 30.0, 10.0),
+            intent_unit(3, 1, 200.0, 10.0),
+            intent_unit(4, 0, 300.0, 10.0),
+        ],
+        visible: vec![2, 3],
+        sightings: vec![],
+        packet: (),
+    }
+}
+
+#[test]
+fn intent_ai19_lazy_opening_and_handover_reset() {
+    for level in ["easy", "normal", "hard"] {
+        let mut state = HumanState::new(71, 0, Point { x: 10.0, z: 10.0 });
+        assert!(state.snapshot().is_none());
+        assert!(state.wants_view(0));
+        state
+            .advance::<(), _>(
+                TickControl {
+                    level,
+                    ..control(7)
+                },
+                None,
+                &empty_batch(),
+                |_| panic!("opening must wait"),
+            )
+            .unwrap();
+        let first = state.snapshot().unwrap();
+        assert_eq!(first.camera, Point { x: 10.0, z: 10.0 });
+        assert_eq!(first.timing.draws(), 2);
+        assert!(first.look.as_ref().unwrap().at > 7);
+        assert!(first.inputs.is_empty());
+        state.reset_with_seed(72);
+        assert!(state.snapshot().is_none());
+        state
+            .advance::<(), _>(
+                TickControl {
+                    level,
+                    ..control(8)
+                },
+                None,
+                &empty_batch(),
+                |_| panic!("reset must open again"),
+            )
+            .unwrap();
+        let reset = state.snapshot().unwrap();
+        let mut timing = Timing::new(72, 0);
+        let delay = timing.opening_delay(Skill::for_level(level)).unwrap();
+        assert_eq!(reset.look.unwrap().at, 8 + delay);
+        assert_eq!(reset.timing, timing);
+    }
+}
+
+#[test]
+fn intent_ai20_camera_memory_expires_and_own_units_stay_available() {
+    let mut state = intent_state("normal");
+    let runtime = state.runtime.as_mut().unwrap();
+    let mut view = intent_view(1);
+    view.sightings = vec![
+        crate::human_commander::HumanSighting {
+            id: 2,
+            payload: json!({}),
+        },
+        crate::human_commander::HumanSighting {
+            id: 3,
+            payload: json!({}),
+        },
+    ];
+    runtime.remember(&view);
+    assert_eq!(runtime.screen_view(&view).visible, vec![2]);
+    assert_eq!(
+        runtime
+            .screen_view(&view)
+            .units
+            .iter()
+            .map(|u| u.motion.id)
+            .collect::<Vec<_>>(),
+        vec![1, 2, 4]
+    );
+    assert_eq!(
+        runtime
+            .screen_view(&view)
+            .sightings
+            .iter()
+            .map(|s| s.id)
+            .collect::<Vec<_>>(),
+        vec![2]
+    );
+    let mut edges = intent_state("normal").snapshot().unwrap();
+    let mut boundary = intent_view(1);
+    boundary.units[1].motion.at = Point { x: 65.0, z: 50.0 };
+    boundary.units[2].motion.at = Point { x: 65.001, z: 50.0 };
+    edges.remember(&boundary);
+    assert_eq!(edges.screen_view(&boundary).visible, vec![2]);
+    assert!(!edges.seen.contains_key(&3));
+    runtime.camera = Point { x: 200.0, z: 10.0 };
+    view.tick = 601;
+    runtime.remember(&view);
+    assert_eq!(runtime.screen_view(&view).visible, vec![2, 3]);
+    view.tick = 602;
+    runtime.remember(&view);
+    assert_eq!(runtime.screen_view(&view).visible, vec![3]);
+    assert!(
+        runtime
+            .screen_view(&view)
+            .units
+            .iter()
+            .any(|u| u.motion.id == 4)
+    );
+}
+
+#[test]
+fn intent_ai21_alert_floor_area_throttle_and_urgent_resume() {
+    let mut state = intent_state("hard");
+    let runtime = state.runtime.as_mut().unwrap();
+    let event = |ordinal, x| crate::human_commander::Hurt {
+        ordinal,
+        id: 1,
+        at: Point { x, z: 10.0 },
+    };
+    let mut result = HumanAdvance::default();
+    runtime
+        .read_alerts(
+            10,
+            &OwnerHurtBatch {
+                generation: 1,
+                through_ordinal: 2,
+                events: vec![event(0, 10.0), event(1, 30.0)],
+            },
+            &mut result,
+        )
+        .unwrap();
+    assert_eq!(result.new_alerts.len(), 1);
+    let alert = result.new_alerts[0].clone();
+    assert!(alert.on_screen && alert.due >= 14);
+    runtime.inputs.push_back(QueuedInput::Action {
+        input: Input {
+            kind: InputKind::Click,
+            at: Point { x: 10.0, z: 10.0 },
+            ids: None,
+            minimap: None,
+            command: Some(json!({"t":"cover","ids":[4]})),
+        },
+        origin: 3,
+        causes: vec![],
+    });
+    runtime.schedule_alerts().unwrap();
+    assert!(runtime.look.as_ref().unwrap().urgent);
+    runtime.start_look(alert.due).unwrap();
+    assert!(
+        matches!(runtime.inputs.front(), Some(QueuedInput::Plan { resume, .. })
+        if resume.len() == 1 && resume[0].origin == 3 && resume[0].command["ids"][0] == 4)
+    );
+    runtime
+        .read_alerts(
+            410,
+            &OwnerHurtBatch {
+                generation: 2,
+                through_ordinal: 1,
+                events: vec![event(0, 10.0)],
+            },
+            &mut result,
+        )
+        .unwrap();
+    assert_eq!(result.new_alerts.len(), 2);
+    let mut noticed = Vec::new();
+    for level in ["easy", "hard"] {
+        let mut offscreen = intent_state(level).snapshot().unwrap();
+        offscreen.inputs.push_back(QueuedInput::Action {
+            input: Input {
+                kind: InputKind::Key,
+                at: offscreen.camera,
+                ids: None,
+                minimap: None,
+                command: Some(json!({"t":"cover","ids":[4]})),
+            },
+            origin: 3,
+            causes: vec![],
+        });
+        let mut alerts = HumanAdvance::default();
+        offscreen
+            .read_alerts(
+                10,
+                &OwnerHurtBatch {
+                    generation: 1,
+                    through_ordinal: 1,
+                    events: vec![event(0, 200.0)],
+                },
+                &mut alerts,
+            )
+            .unwrap();
+        let alert = &alerts.new_alerts[0];
+        assert!(!alert.on_screen && alert.due >= 14);
+        noticed.push(alert.due);
+        offscreen.schedule_alerts().unwrap();
+        offscreen.start_look(alert.due).unwrap();
+        assert!(
+            matches!(offscreen.inputs.front(), Some(QueuedInput::Action { input, .. })
+            if input.kind == InputKind::Camera && input.at == Point { x: 200.0, z: 10.0 })
+        );
+        assert!(
+            matches!(offscreen.inputs.back(), Some(QueuedInput::Plan { resume, .. })
+            if resume.len() == 1 && resume[0].origin == 3)
+        );
+    }
+    assert!(
+        noticed[1] < noticed[0],
+        "Hard notices the same offscreen damage before Easy"
+    );
+    let mut earliest = intent_state("hard").snapshot().unwrap();
+    let mut alerts = HumanAdvance::default();
+    earliest
+        .read_alerts(
+            10,
+            &OwnerHurtBatch {
+                generation: 1,
+                through_ordinal: 2,
+                events: vec![event(0, 200.0), event(1, 10.0)],
+            },
+            &mut alerts,
+        )
+        .unwrap();
+    assert_eq!(alerts.new_alerts.len(), 2);
+    earliest.schedule_alerts().unwrap();
+    assert_eq!(
+        earliest.look.as_ref().unwrap().at,
+        alerts
+            .new_alerts
+            .iter()
+            .map(|alert| alert.due)
+            .min()
+            .unwrap()
+    );
+}
+
+#[test]
+fn intent_ai22_scan_prioritizes_unseen_dots_and_scales_with_input_load() {
+    let state = intent_state("normal");
+    let mut runtime = state.snapshot().unwrap();
+    let mut view = intent_view(100);
+    view.units.push(intent_unit(5, 0, 12.0, 10.0));
+    let first = runtime.scan_look(0, 100, &view).unwrap();
+    assert_eq!(first.target, Some(Point { x: 30.0, z: 10.0 }));
+    runtime.seen.insert(2, 100);
+    let second = runtime.scan_look(0, 100, &view).unwrap();
+    assert_eq!(second.target, Some(Point { x: 200.0, z: 10.0 }));
+    runtime.seen.insert(3, 100);
+    let mut loaded = runtime.clone();
+    loaded.recent = std::iter::repeat_n(99, loaded.skill.peak).collect();
+    let quiet = runtime.scan_look(0, 100, &view).unwrap();
+    let busy = loaded.scan_look(0, 100, &view).unwrap();
+    assert_eq!(quiet.target, Some(Point { x: 11.0, z: 10.0 }));
+    assert!((busy.at - 100).abs_diff(4 * (quiet.at - 100)) <= 2);
+    assert_eq!(
+        runtime.scan_look(0, 100, &view).unwrap().target,
+        Some(Point { x: 300.0, z: 10.0 })
+    );
+    assert_eq!(runtime.scan_look(0, 100, &view).unwrap().target, view.spawn);
+}
+
+#[test]
+fn intent_ai23_plan_waits_for_delivery_at_reached_tick() {
+    let mut state = intent_state("normal");
+    let runtime = state.runtime.as_mut().unwrap();
+    runtime.look = None;
+    runtime.inputs.push_back(QueuedInput::Plan {
+        ready: None,
+        causes: vec![],
+        resume: vec![],
+    });
+    let calls = std::cell::Cell::new(0);
+    let mut planner = |_: ScreenView<'_, ()>| {
+        calls.set(calls.get() + 1);
+        Ok(vec![])
+    };
+    let mut result = HumanAdvance::default();
+    runtime
+        .run_input(
+            0,
+            control(100),
+            Some(&intent_view(99)),
+            &mut planner,
+            &mut result,
+        )
+        .unwrap();
+    assert!(matches!(
+        runtime.inputs.front(),
+        Some(QueuedInput::Plan {
+            ready: Some(100),
+            ..
+        })
+    ));
+    runtime
+        .run_input(
+            0,
+            control(101),
+            Some(&intent_view(99)),
+            &mut planner,
+            &mut result,
+        )
+        .unwrap();
+    assert_eq!(calls.get(), 0);
+    runtime
+        .run_input(
+            0,
+            control(102),
+            Some(&intent_view(100)),
+            &mut planner,
+            &mut result,
+        )
+        .unwrap();
+    assert_eq!(calls.get(), 1);
+}
+
+#[test]
+fn intent_ai24_fight_response_retreats_hurt_and_uses_only_idle_nearby_units() {
+    let state = intent_state("normal");
+    let mut runtime = state.snapshot().unwrap();
+    let mut view = intent_view(1);
+    runtime.remember(&view);
+    let alert = Alert {
+        id: 0,
+        tick: 1,
+        victim: 1,
+        at: view.units[0].motion.at,
+        on_screen: true,
+        due: 5,
+        answered: None,
+    };
+    view.units[0].hp = 1.0;
+    assert_eq!(
+        runtime
+            .fight_response(0, "normal", &view, &alert, &[])
+            .unwrap(),
+        Some(json!({"t":"retreat","ids":[1]}))
+    );
+    view.units[0].hp = profile("rifle").unwrap().full_hp * 0.4;
+    assert_eq!(
+        runtime
+            .fight_response(0, "hard", &view, &alert, &[])
+            .unwrap(),
+        Some(json!({"t":"retreat","ids":[1]}))
+    );
+    assert_eq!(
+        runtime
+            .fight_response(0, "normal", &view, &alert, &[])
+            .unwrap(),
+        Some(json!({"t":"attack","ids":[1],"target":2}))
+    );
+    view.units[0].hp = profile("rifle").unwrap().full_hp;
+    assert_eq!(
+        runtime
+            .fight_response(0, "normal", &view, &alert, &[])
+            .unwrap(),
+        Some(json!({"t":"attack","ids":[1],"target":2}))
+    );
+    view.units[0].dig = true;
+    assert_eq!(
+        runtime
+            .fight_response(0, "normal", &view, &alert, &[])
+            .unwrap(),
+        None
+    );
+    view.units[0].dig = false;
+    assert_eq!(
+        runtime
+            .fight_response(
+                0,
+                "normal",
+                &view,
+                &alert,
+                &[json!({"t":"cover","ids":[1]})]
+            )
+            .unwrap(),
+        None
+    );
+}
+
+#[test]
+fn intent_ai27_peak_minute_and_locality_block_without_consuming_inputs() {
+    for level in ["easy", "normal", "hard"] {
+        let state = intent_state(level);
+        let mut runtime = state.snapshot().unwrap();
+        runtime.look = None;
+        runtime.inputs.push_back(QueuedInput::Action {
+            input: Input {
+                kind: InputKind::Click,
+                at: Point { x: 10.0, z: 10.0 },
+                ids: None,
+                minimap: None,
+                command: Some(json!({"t":"amove","orders":[[1,10,10]]})),
+            },
+            origin: 0,
+            causes: vec![],
+        });
+        let view = intent_view(1500);
+        let mut planner = |_: ScreenView<'_, ()>| panic!("physical input must not plan");
+        let mut out = HumanAdvance::default();
+        runtime.recent = std::iter::repeat_n(1499, runtime.skill.peak).collect();
+        runtime
+            .run_input(
+                0,
+                TickControl {
+                    level,
+                    ..control(1500)
+                },
+                Some(&view),
+                &mut planner,
+                &mut out,
+            )
+            .unwrap();
+        assert!(out.input.is_none() && runtime.inputs.len() == 1);
+        runtime.recent = std::iter::repeat_n(1200, runtime.skill.minute).collect();
+        runtime
+            .run_input(
+                0,
+                TickControl {
+                    level,
+                    ..control(1500)
+                },
+                Some(&view),
+                &mut planner,
+                &mut out,
+            )
+            .unwrap();
+        assert!(out.input.is_none() && runtime.inputs.len() == 1);
+        runtime.recent.clear();
+        runtime.last_place = Some(Point { x: 300.0, z: 10.0 });
+        runtime.last_place_tick = Some(1496);
+        runtime
+            .run_input(
+                0,
+                TickControl {
+                    level,
+                    ..control(1500)
+                },
+                Some(&view),
+                &mut planner,
+                &mut out,
+            )
+            .unwrap();
+        assert!(out.input.is_none() && runtime.inputs.len() == 1);
+        runtime
+            .run_input(
+                0,
+                TickControl {
+                    level,
+                    ..control(1501)
+                },
+                Some(&view),
+                &mut planner,
+                &mut out,
+            )
+            .unwrap();
+        assert!(out.input.is_some() && runtime.inputs.is_empty());
+        assert!(runtime.next_input > 1501);
+        runtime.inputs.push_back(QueuedInput::Action {
+            input: Input {
+                kind: InputKind::Key,
+                at: Point { x: 10.0, z: 10.0 },
+                ids: None,
+                minimap: None,
+                command: None,
+            },
+            origin: 0,
+            causes: vec![],
+        });
+        let mut same_tick = HumanAdvance::default();
+        runtime
+            .run_input(
+                0,
+                TickControl {
+                    level,
+                    ..control(1501)
+                },
+                Some(&view),
+                &mut planner,
+                &mut same_tick,
+            )
+            .unwrap();
+        assert!(same_tick.input.is_none() && runtime.inputs.len() == 1);
+    }
+}
+
+#[test]
+fn intent_ai17_scripted_stagger_and_four_tick_view_window() {
+    use crate::commander_ai::Level;
+    for level in [Level::Easy, Level::Normal, Level::Hard] {
+        for slot in 0..6 {
+            for tick in 0..400 {
+                let phase = (tick + slot as i64 * 13) % level.every();
+                assert_eq!(level.due(tick, slot), phase == 0);
+                assert_eq!(
+                    level.wants_view(tick, slot),
+                    (level.every() - phase) % level.every() < 4
+                );
+            }
+        }
+    }
+    assert_eq!(Level::Normal.every(), 40);
+}
