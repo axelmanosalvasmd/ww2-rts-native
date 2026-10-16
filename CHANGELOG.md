@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Separate the order-intent test contribution from parity status updates: move its mappings to docs/testing and restore both parity files exactly. Ignore the two actual failed-row diagnostics while preserving every body, input, assertion and raw producing result; no semantic fix or retry is included.
+
 - Record the six-pass/three-fail native order-intent batch on eddedccd. Keep CMB-83/91/140 and MOV-49 pending prototype review, and hold CMB-144/145 for the preserved foreign-control, home-distance and loaded-carrier failures. No failed test is repaired or rerun.
 
 - Add nine native order-intent tests and literal mappings for CMB-83/91/140/144/145 and MOV-49 under Axel's approved behavior standard. Keep all six rows in progress pending native execution and prototype review. Preserve the failed foreign-construction control as an explicit ignored regression; CMB-144 also retains uncovered garrison and capture branches. No new behavior Source recorder or capture is added.

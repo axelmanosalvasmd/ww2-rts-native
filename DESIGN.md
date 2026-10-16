@@ -1,5 +1,13 @@
 # Three Crossroads Native: design decisions
 
+## Order tests separated from parity status updates (2026-10-16, source only)
+
+Apply the authoritative 03:35 test-PR/status-PR split to this task's own delta after `0290fcf602eb5cc9f030c862358e5cfa2b836560`. Move the appended CMB/MOV mappings and results to [docs/testing/native-order-intent.md](docs/testing/native-order-intent.md), restoring both parity files byte for byte to that parent. No parity content or status changes belong to this test contribution. Other authors' rows remain intact.
+
+Exclude two failed-row diagnostics with explicit ignore attributes: CMB-144's actual authored home-distance assertion failure and CMB-145's actual unconnected loaded-carrier-ejection failure. The foreign-construction regression was already ignored. Every body, input and assertion is preserved; removing the two added attributes reconstructs the entire tested module byte for byte. No semantic fix, retry or executable job runs. Producing `eddedccd` retains six PASS and three FAIL on Rust `e67a6646`; this source child's new Rust tree has no execution result.
+
+The four candidate rows remain CMB-83, CMB-91, CMB-140 and MOV-49, pending prototype review and final integration-head qualification. Root must integrate only this task's own new module, cfg(test) registration and normal documentation delta, never the inherited unpublished branch. Root owns public actions, review and the proof ledger. Runtime providers, interfaces and guards are unchanged.
+
 ## Native order-intent batch result (2026-10-16)
 
 At producing `eddedccdf5f07186cdb238f1407f9816be2a0bba`, Rust tree `e67a66462828168f5fae6a519ffb38752ed8e321`, Root's corrected S2 grant ran nine selected native tests once with no-fail-fast and zero retries: six PASS, three FAIL, 153 skipped. Candidate rows CMB-83, CMB-91, CMB-140 and MOV-49 have passing mapped native tests and await prototype-intent review. No row is promoted by this result annotation.
