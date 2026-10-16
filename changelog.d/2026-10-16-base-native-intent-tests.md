@@ -2,3 +2,4 @@
 - Preserve the original 33 test bodies, all earlier Source recipes and fixtures, and the recorded 1243b165 result of 2 PASS, 1 FAIL and 2 UNRUN. No historical result qualifies this new source head.
 - Give the new native test context helper an explicit borrow lifetime after its first compile returned E0106. No test assertion, input or runtime behavior changes. All 27 tests remain unrun.
 - Fix Classic construction completion using the existing preflighted story update instead of a general finish validator that excludes Classic. The first native batch ran all 27 tests: 25 passed and the 2 completion/repair checks failed on that guard; the successor is unrun.
+- Verify all 27 native BASE intent checks at db3ab341 after the Classic completion fix. Keep the row mappings in docs/testing/bases-native-intent.md and leave the parity inventory unchanged for separate review and status updates.

@@ -4901,3 +4901,23 @@ No wallet, timer, pose or completion state is installed to make the test pass.
 The successor requires a new Root-granted batch run and Hermes runtime ACK on
 its exact final head. The original 25/2 log remains unchanged in Root's 0323
 path; the earlier parser and compile failures remain tied to their own heads.
+
+
+## BASE completion successor native result (2026-10-16)
+
+The one granted grouped job at db3ab341 passed all 27 selected tests, with no
+failures or unrun selections (170 unrelated tests skipped). The native suite
+took 1.733 seconds on the Vostro with actual CPUs 8-11, 6 GiB memory, zero
+cgroup swap, 400 percent CPU quota, build jobs 4 and one test thread. The exact
+Rust tree is d6934f6584b631f23b0fc42a751ebc34a4f5ac85. No retry ran. The native
+process and systemd launcher are terminal and the inherited S3 lock is released.
+The ordinary logs are in /tmp/native-feature-batches-0345/impl_bases.
+
+Preserve the earlier 309f02bc result of 25 PASS and 2 FAIL, the b3d152c1 compile
+failure, the parser refusal and the older 1243b165 result independently. The
+passing completion test now checks one Built increment; all earlier assertions
+and old test bodies remain. Restore bases.md to its original bytes for Root's
+test-PR split and keep literal row/test/prototype/gap references in
+docs/testing/bases-native-intent.md. Root's separate proof ledger owns later
+status updates. Prototype-intent review and exact-final-head Hermes runtime ACK
+remain pending; no complete-row promotion follows from partial native coverage.
