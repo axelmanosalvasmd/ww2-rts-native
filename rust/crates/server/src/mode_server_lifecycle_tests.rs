@@ -6,7 +6,7 @@ fn drain(hub: &mut Hub, receiver: &mut mpsc::Receiver<Output>, now: u64) {
     while let Ok(output) = receiver.try_recv() {
         match output {
             Output::Snapshot(frame) => hub.complete_snapshot(&frame, true, now),
-            Output::Json(_) => {}
+            Output::Json(_) | Output::Watcher(_) => {}
             Output::Close(_, _) => panic!("unexpected connection close"),
         }
     }

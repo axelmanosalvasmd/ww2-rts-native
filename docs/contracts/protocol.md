@@ -38,11 +38,11 @@ These are new relative to the reference. The pinned browser client and Node serv
 
 ## Corrections the Rust server makes
 
-The reference leaks some information to clients that should not have it. The proposals below correct these without changing message shapes, so the browser client would keep working. Axel keeps all three pending (#5): each lands only as its own documented security change, with browser and Unreal fixtures, once both owners decide it. They block no other work, and until then the Rust server behaves as the reference does.
+The three privacy choices below keep the existing message shapes. Owner clarifications on 2026-10-16 retain reference spectator behavior and select the cached flag mask. The companion correction remains pending (#5), with browser and Unreal fixtures required before adoption.
 
 1. **The companion's hit direction.** At the pin, `operative.from` sends the hidden attacker's position to the metre for 10 ticks after a hit (NET and FPS limitations). The browser client uses only its bearing (`client/operative-view.js:342`). The Rust server sends a point 20 m from the soldier along that bearing instead: the hit indicator is unchanged and the attacker's range stays hidden.
-2. **Spectators outside World Conquest.** At the pin, anyone who joins a running match with a new token becomes a spectator and sees the whole map, so a player can watch the enemy from a second tab. Tokens are free to make, so no rule based on who joined when closes this. Options for Axel: (a) an observer delay: spectator snapshots run a fixed time behind the match (for example 60 s), which the browser client handles unchanged; (b) spectators get seat 0's team view, as in World Conquest; (c) keep the reference behavior until accounts exist. Julio proposes (a).
-3. **Owner-only flag bits.** For rows the receiver does not own, the reference's cached snapshot path clears the gate-open, companion and cargo bits (`shared/sim.js:5903`), while its uncached path keeps them (`:6044`). The Rust server applies one mask on every path; which of those bits allies may see is a question for Axel.
+2. **Spectators outside World Conquest.** Owner clarification J on 2026-10-16 selects (c), the reference behavior: the whole map with no delay outside World. The proposed observer delay and seat 0 team view are not adopted. World alone uses seat 0's team view and remains closed on R1. See [ordinary spectator delivery](spectators-v0.md) for prototype-identical fields and tests.
+3. **Owner-only flag bits.** Owner clarification on 2026-10-16 selects the prototype's cached path (`shared/sim.js:5903`): non-owners receive mask `2047|32768|(7<<20)|262144`, clearing gate-open, companion and cargo bits. The uncached path's broader visibility is not adopted. See [ordinary spectator delivery](spectators-v0.md).
 
 ## Error and recovery behavior
 
@@ -72,6 +72,6 @@ The in-process recorder does not exercise WebSocket framing, close codes, subpro
 
 ## Still open (product and security decisions)
 
-1. Spectators (correction 2): observer delay, seat 0's team view, or the reference behavior.
-2. Flag bits for allies (correction 3): whether teammates see open gates, companions and carried squads.
+1. Spectators (correction 2): resolved to reference behavior by owner clarification J, 2026-10-16.
+2. Flag bits for allies (correction 3): resolved to the cached prototype mask by owner clarification, 2026-10-16.
 3. The companion's hit direction (correction 1): the proposed point 20 m along the bearing.

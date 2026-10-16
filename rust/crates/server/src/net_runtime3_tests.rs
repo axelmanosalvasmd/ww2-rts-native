@@ -40,7 +40,7 @@ fn drain(
             Output::Json(message) if message["t"] == "start" => {
                 view.apply(&message.to_string()).unwrap();
             }
-            Output::Json(_) => {}
+            Output::Json(_) | Output::Watcher(_) => {}
             Output::Close(code, reason) => panic!("unexpected close {code}: {reason}"),
         }
     }
