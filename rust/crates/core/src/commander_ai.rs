@@ -238,6 +238,14 @@ impl Observation {
             ]
             .iter()
             .all(|v| v.is_finite())
+                || context
+                    .nodes
+                    .iter()
+                    .any(|n| !within(n.at) || !n.rate.is_finite() || n.rate < 0.0)
+                || context
+                    .claimed_nodes
+                    .iter()
+                    .any(|i| *i >= context.nodes.len())
                 || context.height.as_ref().is_some_and(|h| h.len() != cells)
                 || context
                     .smokes

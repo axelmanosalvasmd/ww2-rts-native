@@ -27,6 +27,13 @@ pub struct UnitFacts {
     pub airborne: bool,
 }
 #[derive(Clone, Debug, PartialEq)]
+pub struct NodeObservation {
+    pub at: Point,
+    pub rate: f64,
+    pub fuel: bool,
+    pub visible: bool,
+}
+#[derive(Clone, Debug, PartialEq)]
 pub struct Context {
     pub mode: Mode,
     pub horde: bool,
@@ -43,6 +50,8 @@ pub struct Context {
     pub build_reserve: f64,
     pub fort_reserve: f64,
     pub free_nodes: usize,
+    pub nodes: Vec<NodeObservation>,
+    pub claimed_nodes: BTreeSet<usize>,
 }
 impl Default for Context {
     fn default() -> Self {
@@ -62,6 +71,8 @@ impl Default for Context {
             build_reserve: 0.0,
             fort_reserve: 0.0,
             free_nodes: 0,
+            nodes: Vec::new(),
+            claimed_nodes: BTreeSet::new(),
         }
     }
 }
@@ -167,6 +178,7 @@ pub struct State {
     pub decision: Option<Decision>,
     pub called: Option<f64>,
     pub cleared_sightings: BTreeMap<u32, f64>,
+    pub node: BTreeMap<u32, usize>,
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct Decision {
@@ -477,6 +489,18 @@ fn plan_inner(
         mine.retain(|u| u.id != forward.unit);
         commands.push(forward.command);
     }
+    let economy = crate::commander_classic_economy::plan(
+        observation,
+        &available_units,
+        &remembered,
+        &mut state.node,
+        level,
+        budget,
+        &sight_game,
+        random,
+    )?;
+    budget = economy.remaining_mp;
+    commands.extend(economy.commands);
     let count = |kind: &str| mine.iter().filter(|u| u.kind == kind).count();
     let watched = |id| context.horde || state.mind.watched(id, now, skill.notice);
     let mut sit = Situation {
@@ -667,8 +691,20 @@ fn plan_inner(
             state.aim = Some((i, sit.until));
         }
     }
+    let shopping_observation = if context.mode == Mode::Classic {
+        let mut shopping_input = input.clone();
+        let shopping_context = shopping_input.runtime.as_mut().unwrap();
+        shopping_context.build_reserve = economy.reserve;
+        shopping_context.free_nodes = economy.free_nodes;
+        if economy.rush {
+            shopping_context.fort_reserve = 0.0;
+        }
+        Some(Observation::new(shopping_input).map_err(|e| e.to_string())?)
+    } else {
+        None
+    };
     let shopping = crate::commander_shopping::plan(
-        observation,
+        shopping_observation.as_ref().unwrap_or(observation),
         &mine,
         &remembered,
         armor_seen.len(),

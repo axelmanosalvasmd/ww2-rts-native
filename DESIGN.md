@@ -4855,3 +4855,39 @@ prototype's `Object.hasOwn(unitTypes, v)` and `unitTypes[v]` coerce that array t
 the property name `"rifle"`. This stricter choice rejects malformed schema values
 instead of carrying JavaScript property-key coercion into the native validator.
 It does not admit or execute general authored scenarios.
+
+## MAC-AI seat scheduling and detached Classic economy (2026-10-16)
+
+The AI schedule delivers all requested observations before any seat acts and
+retains the last delivered view between snapshot beats. Player and terrain
+memory use public starting facts and only that seat's recipient rows. World
+metadata and remembered-terrain decoding remain detached components; the live
+adapter admits only ordinary Conquest. AI refreshes preserve browser terrain
+updates, including a handover after the browser has consumed its latest delta.
+
+Classic economy decisions now run inside the detached tactics planner before
+shopping: repair/help, depot allocation, production facilities, nearby-plane
+flak defense and budget reserves. Node assignments live in a per-seat BTreeMap.
+Node positions, rates, visibility and claims must come from delivered facts.
+The existing Classic admission and recipient guards stay closed, and the
+strategy is inactive in ordinary Conquest and World. Stable IDs break engineer
+and building distance ties; node indices break equal node scores. Site searches
+reuse core footprint rules over remembered terrain and delivered occupancy.
+Every idle engineer attempting a non-depot site consumes one Ai-purpose draw,
+including non-flak, unaffordable and unavailable sites, as in the prototype's
+object-literal evaluation. Existing native purpose-separated streams are kept;
+this change does not replace them with the prototype's global Math.random.
+
+The simtest seeded runner delivers opening observations, steps the real Match,
+completes each observation pass before acting, admits physical commander inputs
+through the canonical dispatcher and collects every seat's recipient snapshot.
+It retains native random streams and logs [slot, tick, kind, cmd, accepted].
+The source default map is copied verbatim from e4e579a, with no Source recorder.
+This is bounded native reproducibility infrastructure, not complete AI-65 proof:
+the attempted seed-7 Easy default-map 3,600-tick run first failed at tick 310
+with the existing ShotsAndFlights recipient refusal. The regression retains
+that failure, rather than clearing actors or weakening admission. Short-prefix
+reproducibility is separate from full-match and JavaScript-aligned evidence.
+AI-64 also remains blocked by missing Classic/Assault/Horde recipient producers.
+Those rows need a separately authorized recipient/runtime stream; no parity
+status, privacy rule, wire format, FFI or World admission changes here.
