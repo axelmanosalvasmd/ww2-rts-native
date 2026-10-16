@@ -242,7 +242,6 @@ fn admission_guards_reject_before_payment_or_cancellation() {
     let before = snapshot(&m);
     for raw in [
         json!({"t":"dig","ids":[1],"kind":"trench","x":20,"z":20,"queue":true}),
-        json!({"t":"dig","ids":[1],"kind":"bridge","x":20,"z":20}),
         json!({"t":"dig","ids":[1],"kind":"wall","x":20,"z":20}),
     ] {
         let command = Command::from_json(&raw).unwrap();
@@ -355,3 +354,6 @@ fn ordinary_default_dig_matches_real_source_payment_and_preserves_refused_work()
         );
     }
 }
+
+#[path = "engineering_runtime_build_tests.rs"]
+mod runtime_builds;

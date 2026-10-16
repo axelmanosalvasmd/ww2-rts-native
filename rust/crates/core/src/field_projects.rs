@@ -492,6 +492,7 @@ pub fn line_fort(kind: FortKind) -> bool {
             | FortKind::Traps
             | FortKind::Mines
             | FortKind::Demine
+            | FortKind::Fill
     )
 }
 
