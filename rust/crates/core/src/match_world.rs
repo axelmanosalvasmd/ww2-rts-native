@@ -330,6 +330,7 @@ impl Match {
             recruit_metadata: BTreeMap::new(),
             produced_placer: crate::produced_units::ProducedPlacer::new(),
             scenario: None,
+            authored_scenario: None,
             logistics: crate::logistics::LogisticsState::default(),
             capture_ticks: Vec::new(),
             story: vec![crate::match_story::PlayerStory::default(); count],

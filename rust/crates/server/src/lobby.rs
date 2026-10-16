@@ -234,6 +234,7 @@ struct RoomResult {
 struct Room {
     code: String,
     saves: crate::saves::SaveStore,
+    records: crate::HordeRecords,
     listed: bool,
     title: String,
     players: Vec<Person>,
@@ -371,10 +372,37 @@ impl Room {
         }
         let outcomes = result.teams.iter().map(|team| json!({"team":team,
             "outcome":if result.winner == -1 { "draw" } else if result.winner == *team { "victory" } else { "defeat" }})).collect::<Vec<_>>();
-        let report = result_message(
+        let mut report = result_message(
             result,
             self.players.iter().map(|p| p.name.clone()).collect(),
         )?;
+        let state = native.runtime.state();
+        if let Some(horde) = &state.horde {
+            let run = crate::horde_records::Run {
+                wave: u64::from(horde.wave),
+                kills: state
+                    .story
+                    .iter()
+                    .take(horde.slot)
+                    .map(|row| row.kills as u64)
+                    .sum(),
+                time: ww2_core::math::round(state.world.game.tick as f64 * 0.05) as u64,
+                names: self
+                    .players
+                    .iter()
+                    .map(|person| person.name.clone())
+                    .collect(),
+            };
+            if let Some(record) = self.records.record(
+                &self.map,
+                self.players.len(),
+                &self.army,
+                run,
+                state.options.sandbox,
+            ) {
+                report["horde"] = record;
+            }
+        }
         let status = crate::NativeRoomStatus {
             epoch: native.epoch,
             tick: native.runtime.state().world.game.tick,
@@ -422,7 +450,7 @@ impl Room {
             "t":"lobby", "proto":0, "code": self.code, "state":if self.native.is_some() { "play" } else { "lobby" },
             "role":"commander", "operatives":[], "spectator":you.is_none(),
             "amHost":self.is_host(id), "spectators":self.spectators.iter().map(|p| &p.name).collect::<Vec<_>>(),
-            "listed":self.listed, "saves":self.saves.lobby_list(&self.code), "hordeBest":null,
+            "listed":self.listed, "saves":self.saves.lobby_list(&self.code), "hordeBest":if self.mode == "horde" { self.records.lookup(&self.map,self.players.len(),&self.army).unwrap_or(Value::Null) } else { Value::Null },
             "you":you.map_or(-1, |i| i as i64), "host":self.host().map_or(-1, |i| i as i64),
             "maps":maps.as_object().unwrap().keys().collect::<Vec<_>>(),
             "mapName":if self.mode == "world" { "world" } else { &self.map },
@@ -813,6 +841,8 @@ pub(crate) struct Hub {
     rooms: BTreeMap<String, Room>,
     room_order: Vec<String>,
     maps: Value,
+    map_editor: Option<crate::MapEditor>,
+    map_revision: u64,
     max_rooms: usize,
     public_url: String,
     accounts: BTreeMap<u64, SnapshotAccount>,
@@ -823,6 +853,7 @@ pub(crate) struct Hub {
     diagnostics: Option<crate::diagnostics::Recorder>,
     tick_log: bool,
     saves: crate::saves::SaveStore,
+    records: crate::HordeRecords,
 }
 impl Hub {
     pub fn new(max_rooms: usize, public_url: String) -> Self {
@@ -830,6 +861,8 @@ impl Hub {
             rooms: BTreeMap::new(),
             room_order: Vec::new(),
             maps: serde_json::from_str(include_str!("map-catalog.json")).unwrap(),
+            map_editor: None,
+            map_revision: 0,
             max_rooms,
             public_url,
             accounts: BTreeMap::new(),
@@ -840,6 +873,26 @@ impl Hub {
             diagnostics: None,
             tick_log: false,
             saves: crate::saves::SaveStore::new("saves".into()),
+            records: crate::HordeRecords::new("horde-records.json"),
+        }
+    }
+    pub(crate) fn configure_records(&mut self, records: crate::HordeRecords) {
+        self.records = records;
+        for room in self.rooms.values_mut() {
+            room.records = self.records.clone();
+        }
+    }
+    pub(crate) fn configure_maps(&mut self, editor: Option<crate::MapEditor>) {
+        self.map_editor = editor;
+        self.refresh_maps();
+    }
+    fn refresh_maps(&mut self) {
+        if let Some(editor) = &self.map_editor {
+            let (revision, maps) = editor.catalog();
+            if revision != self.map_revision {
+                self.map_revision = revision;
+                self.maps = maps;
+            }
         }
     }
     pub(crate) fn configure_saves(&mut self, dir: std::path::PathBuf) {
@@ -880,7 +933,11 @@ impl Hub {
             return Err("server stopped".into());
         }
         let room = self.rooms.get(code).ok_or("room does not exist")?;
-        self.prepare_native_room(room, state, now, replace, None)
+        let raw = self
+            .map_editor
+            .as_ref()
+            .and_then(|editor| editor.raw(&room.map));
+        self.prepare_native_room(room, state, now, replace, raw.as_ref())
     }
     fn prepare_native_room(
         &self,
@@ -1308,6 +1365,7 @@ impl Hub {
         Some((build, stringify))
     }
     pub fn poll_native(&mut self, now_ms: u64, now_ns: u64) {
+        self.refresh_maps();
         if self.is_stopped() {
             return;
         }
@@ -1620,25 +1678,35 @@ impl Hub {
                 })
             })
             .collect::<Result<Vec<_>, String>>()?;
-        let state = crate::authoritative_maps::create_match(
-            &room.map,
-            MatchOptions {
-                seed: trusted.seed,
-                mode: Mode::Conquest,
-                players,
-                shuffle: true,
-                army: ArmySize::Standard,
-                weather: WeatherChoice::from_reference(Some(&room.weather)),
-                weather_seed: None,
-                living_weather: true,
-                map_key: Some(room.map.clone()),
-                tech: true,
-                supply: true,
-                logistics: false,
-                sandbox: false,
-            },
-        )
-        .map_err(|e| e.to_string())?;
+        let options = MatchOptions {
+            seed: trusted.seed,
+            mode: Mode::Conquest,
+            players,
+            shuffle: true,
+            army: ArmySize::Standard,
+            weather: WeatherChoice::from_reference(Some(&room.weather)),
+            weather_seed: None,
+            living_weather: true,
+            map_key: Some(room.map.clone()),
+            tech: true,
+            supply: true,
+            logistics: false,
+            sandbox: false,
+        };
+        let state = if let Some(raw) = self
+            .map_editor
+            .as_ref()
+            .and_then(|editor| editor.raw(&room.map))
+        {
+            let map = ww2_core::map::AuthoritativeMap::from_json(
+                &serde_json::to_vec(&raw).map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string())?;
+            Match::new(&map, options)?
+        } else {
+            crate::authoritative_maps::create_match(&room.map, options)
+                .map_err(|e| e.to_string())?
+        };
         let mut prepared = self.prepare_native(code, state, now, restart)?;
         prepared.attached.receipt =
             Some(trusted.receipt(prepared.attached.runtime.state(), prepared.attached.epoch));
@@ -1722,6 +1790,7 @@ impl Hub {
         msg: Value,
         now: u64,
     ) {
+        self.refresh_maps();
         if self.is_stopped() || !msg.is_object() {
             return;
         }
@@ -1787,11 +1856,13 @@ impl Hub {
             self.room_order.push(code.into());
         }
         let saves = self.saves.clone();
+        let records = self.records.clone();
         let room = self.rooms.entry(code.into()).or_insert_with(|| {
             let tutorial = msg["listing"]["tutorial"] == true;
             Room {
                 code: code.into(),
                 saves,
+                records,
                 listed: msg["listing"]["public"] == true && !tutorial,
                 title: clean(
                     msg["listing"]["title"].as_str().unwrap_or("Open skirmish"),
@@ -2442,3 +2513,7 @@ mod save_load_tests;
 
 #[path = "lobby_saves.rs"]
 mod save_runtime;
+
+#[cfg(test)]
+#[path = "scenario_start_tests.rs"]
+mod scenario_start_tests;

@@ -1,0 +1,1 @@
+- Add ordinary scenario intent tests for startup refusal without room-state loss, player/team contexts, repeats, arrival ordering, work limits, and private objectives and announcements. Checkpoints, all seated recipients and match endings are covered; World remains closed.
