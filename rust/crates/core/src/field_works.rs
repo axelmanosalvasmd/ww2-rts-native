@@ -337,6 +337,39 @@ fn mine_known(w: &World, c: usize, team: i32) -> bool {
             .is_some_and(|p| p.team == team)
         || w.mine_seen.get(&c).copied().unwrap_or(0) >> ((team as u32) & 31) & 1 == 1
 }
+/// The recipient planner and canonical admission share the same complete visibility footprint.
+pub(crate) fn visible_placement(
+    game: &crate::game::Game,
+    kind: FortKind,
+    at: Point,
+    direction: f64,
+    mut sees: impl FnMut(Point) -> bool,
+) -> Result<bool, Error> {
+    if !position(at) || !direction.is_finite() {
+        return Ok(false);
+    }
+    let definition = &definitions()?.forts[&kind];
+    let direction = if kind == FortKind::Gate {
+        square_direction(direction)
+    } else {
+        direction
+    };
+    let sx = math::cos(direction);
+    let sz = math::sin(direction);
+    for (along, forward, _) in offsets(kind, definition.count) {
+        if let Some(cell) = game.cell_of(
+            at.x + (sx * along + sz * forward) * 2.,
+            at.z + (sz * along - sx * forward) * 2.,
+        ) && !sees(Point {
+            x: (cell % game.w) as f64 * 2. + 1.,
+            z: (cell / game.w) as f64 * 2. + 1.,
+        }) {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
 /// Visibility is checked on every planned in-map cell before reading its buildability.
 pub fn placement(
     w: &World,
@@ -358,14 +391,8 @@ pub fn placement(
     let sx = math::cos(direction);
     let sz = math::sin(direction);
     let plan = offsets(kind, d.count);
-    for &(along, forward, _) in &plan {
-        if let Some(cell) = w.game.cell_of(
-            at.x + (sx * along + sz * forward) * 2.,
-            at.z + (sz * along - sx * forward) * 2.,
-        ) && !sees(center(w, cell))
-        {
-            return Err(Error::Refused(Reason::NotVisible));
-        }
+    if !visible_placement(&w.game, kind, at, direction, &mut sees)? {
+        return Err(Error::Refused(Reason::NotVisible));
     }
     let mut cells = Vec::new();
     for (along, forward, ch) in plan {

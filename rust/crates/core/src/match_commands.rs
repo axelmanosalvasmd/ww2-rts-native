@@ -358,6 +358,9 @@ pub enum Denial {
     NoBuilders,
     NotVisible,
     Coast,
+    Shore,
+    Station,
+    RailCut,
 }
 impl Denial {
     pub fn name(self) -> &'static str {
@@ -382,6 +385,9 @@ impl Denial {
             Self::NoBuilders => "noBuilders",
             Self::NotVisible => "notVisible",
             Self::Coast => "coast",
+            Self::Shore => "shore",
+            Self::Station => "station",
+            Self::RailCut => "railCut",
         }
     }
 }
@@ -509,11 +515,17 @@ impl Command {
             Some("rally") => Ok(Self::Rally {
                 ids,
                 id: object.get("id").map(|value| safe_id(value).unwrap_or(-1)),
-                at: object
-                    .get("x")
-                    .and_then(|v| v.as_f64())
-                    .zip(object.get("z").and_then(|v| v.as_f64()))
-                    .map(|(x, z)| Point { x, z }),
+                at: match (object.get("x"), object.get("z")) {
+                    (None, None) => None,
+                    (x, z) => Some(Point {
+                        x: x.and_then(|v| v.as_f64())
+                            .filter(|v| v.is_finite())
+                            .ok_or(Denial::Blocked)?,
+                        z: z.and_then(|v| v.as_f64())
+                            .filter(|v| v.is_finite())
+                            .ok_or(Denial::Blocked)?,
+                    }),
+                },
             }),
             Some("destroy") => Ok(Self::Destroy {
                 ids,

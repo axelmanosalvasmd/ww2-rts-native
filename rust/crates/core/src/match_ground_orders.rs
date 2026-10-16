@@ -508,17 +508,12 @@ impl Match {
         let mut homes = Vec::with_capacity(selected.len());
         for id in &selected {
             let unit = exits.iter().find(|exit| exit.id() == *id).unwrap().unit();
-            if let Some(state) = self.convoys.as_ref().filter(|s| s.trucks.contains_key(id)) {
-                let home = state
-                    .stores
-                    .iter()
-                    .filter(|s| s.active && s.source && self.world.game.allied(owner, s.owner))
-                    .min_by(|a, b| {
-                        crate::math::hypot(a.at.x - unit.x, a.at.z - unit.z)
-                            .total_cmp(&crate::math::hypot(b.at.x - unit.x, b.at.z - unit.z))
-                    })
-                    .map(|s| s.at);
-                let Some(home) = home else {
+            if self
+                .convoys
+                .as_ref()
+                .is_some_and(|s| s.trucks.contains_key(id))
+            {
+                let Some(home) = self.convoy_retreat_home(unit) else {
                     return Ok(Some(Denial::Blocked));
                 };
                 homes.push(home);
