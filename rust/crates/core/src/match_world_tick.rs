@@ -181,6 +181,7 @@ impl Match {
             | Command::Stop { .. }
             | Command::Stance { .. }
             | Command::Destroy { .. }
+            | Command::Rally { .. }
             | Command::Technology { .. } => Ok(()),
             Command::Autocast { ids, on }
                 if !*on
