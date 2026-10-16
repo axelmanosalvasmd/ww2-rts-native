@@ -4,6 +4,8 @@ mod batch5_tests;
 #[cfg(test)]
 mod causal_tests;
 #[cfg(test)]
+mod full_tick_tests;
+#[cfg(test)]
 mod runtime_tests;
 
 use crate::{
@@ -63,6 +65,22 @@ fn facts<'a>(u: &Unit, rules: &'a Rules) -> UnitFacts<'a> {
         riding: u.riding,
     }
 }
+pub(crate) fn initial_unit_reserves(
+    enabled: bool,
+    unit: &Unit,
+    rules: &Rules,
+) -> Result<Option<logistics::Reserves>, String> {
+    let definition =
+        Definition::from_catalog(&rules.kinds[unit.kind].name).map_err(|e| e.to_string())?;
+    let mut prepared = logistics::LogisticsState::default();
+    prepared.initialize_unit(
+        reserve_context(enabled),
+        facts(unit, rules),
+        Some(&definition),
+    );
+    Ok(prepared.remove(unit.id))
+}
+
 impl Match {
     #[cfg(test)]
     pub(crate) fn test_supply_truck(&mut self, owner: usize) -> u32 {
@@ -124,15 +142,7 @@ impl Match {
         {
             return Err("invalid new reserve identity".into());
         }
-        let definition = Definition::from_catalog(&self.rules.kinds[unit.kind].name)
-            .map_err(|e| e.to_string())?;
-        let mut prepared = logistics::LogisticsState::default();
-        prepared.initialize_unit(
-            reserve_context(self.options.logistics),
-            facts(unit, &self.rules),
-            Some(&definition),
-        );
-        Ok(prepared.remove(unit.id))
+        initial_unit_reserves(self.options.logistics, unit, &self.rules)
     }
     /// The source network runs on its own early-phase beat, using the tick's captured ordered list.
     pub fn refresh_supply_network(&mut self, unit_order: &[u32]) -> Result<(), String> {
@@ -370,7 +380,11 @@ impl Match {
         self.validate_supply_context()
     }
     fn validate_supply_context(&self) -> Result<(), String> {
-        if !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode) {
+        if !matches!(
+            self.options.mode,
+            crate::economy::Mode::Default | crate::economy::Mode::Conquest
+        ) || self.world.game.mode.is_some()
+        {
             return Err("supply adapter supports ordinary Conquest only".into());
         }
         let g = &self.world.game;
@@ -949,8 +963,20 @@ impl supply_convoys::World for ConvoyWorld<'_> {
     }
 }
 
-fn queued_points(control: &UnitControl, id: u32, abilities: bool) -> Result<Vec<Point>, String> {
+fn queued_points(control: &UnitControl, id: u32, non_truck: bool) -> Result<Vec<Point>, String> {
     use crate::match_commands::Command;
+    // Only manual truck interception reads queued waypoint geometry. Other
+    // actors retain their own typed queues and need only orders_pending here.
+    if non_truck {
+        if control
+            .orders
+            .iter()
+            .any(|c| matches!(c, Command::Unsupported))
+        {
+            return Err("unsupported queued supply command".into());
+        }
+        return Ok(Vec::new());
+    }
     let mut points = Vec::new();
     for command in &control.orders {
         match command {
@@ -973,15 +999,6 @@ fn queued_points(control: &UnitControl, id: u32, abilities: bool) -> Result<Vec<
                 }
                 points.push(orders[0].at);
             }
-            Command::Ability {
-                ids,
-                at: Some(at),
-                queue: false,
-                automatic: false,
-            } if abilities
-                && ids.as_slice() == [i64::from(id)]
-                && at.x.is_finite()
-                && at.z.is_finite() => {}
             _ => return Err("unsupported queued convoy command projection".into()),
         }
     }

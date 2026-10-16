@@ -310,8 +310,14 @@ impl crate::match_runtime::Match {
         if self.options.mode == crate::economy::Mode::Tutorial {
             self.validate_tutorial_state()?;
         }
-        if self.options.logistics || self.convoys.is_some() {
-            return Err("reserve and convoy tick phases are not connected".into());
+        if world && (self.options.logistics || self.convoys.is_some()) {
+            return Err("World logistics tick phases are not connected".into());
+        }
+        if !world && self.options.logistics != self.convoys.is_some() {
+            return Err("logistics requires initialized convoy state".into());
+        }
+        if !world && self.options.logistics {
+            self.validate_supply()?;
         }
         self.preflight_legacy_scenario()?;
         self.tick_state.paths.validate()?;
@@ -581,7 +587,10 @@ impl crate::match_runtime::Match {
             }
             let unit = &self.world.game.units[&id];
             let factor = movement::supp_speed(unit.supp);
-            // Reserve adapters attach before this pre-timer order phase.
+            if self.options.logistics {
+                self.advance_unit_reserves(id)?;
+                self.advance_supply_withdrawal(id)?;
+            }
             if self.options.mode == crate::economy::Mode::World {
                 self.apply_world_guard_home(id)?;
             }
@@ -689,6 +698,13 @@ impl crate::match_runtime::Match {
             if let Some(result) = self.move_unit_with_command_routes(id, factor)? {
                 moved.push(result);
             }
+            if let Some(reserves) = self.logistics.get_mut(id).filter(|r| r.forced) {
+                let unit = self.world.game.units.get_mut(&id).expect("current unit");
+                if !unit.path.is_empty() && !self.commands.units[&id].supply_hold {
+                    reserves.stranded = unit.stuck > 1.0;
+                    unit.retreating = !reserves.stranded;
+                }
+            }
             self.apply_moved_ground_contact_emitting(id, before, before_dust, &mut |effect| {
                 events.push(TickEvent::Environment(effect));
             })?;
@@ -701,6 +717,9 @@ impl crate::match_runtime::Match {
             let result = self.apply_unit_firing(id, moving, dt);
             self.take_firing_tick_events(events);
             result?;
+        }
+        if self.options.logistics {
+            phases.push(TickPhase::UnitReserves);
         }
         phases.extend([TickPhase::UnitOrders, TickPhase::Abilities]);
         if self.options.mode != crate::economy::Mode::World {
@@ -840,7 +859,13 @@ impl crate::match_runtime::Match {
             self.apply_point_supply(&unit_order)?;
             phases.push(TickPhase::PointSupply);
         }
-        // Network refresh attaches between point supply and prepared reinforcement.
+        if self.convoys.is_some() {
+            let beat = crate::supply_network::SupplyRules::compiled()?.network_ticks;
+            if beat != 0 && (tick as u64).is_multiple_of(beat) {
+                self.refresh_supply_network(&unit_order)?;
+                phases.push(TickPhase::SupplyNetwork);
+            }
+        }
         self.reinforce(&recovery, dt)?;
         phases.push(TickPhase::Reinforcement);
         self.tick_retirement(&unit_order, retirement, events)?;
@@ -865,6 +890,10 @@ impl crate::match_runtime::Match {
             }
             self.apply_point_capture_income(&unit_order)?;
             phases.push(TickPhase::PointCaptureIncome);
+            if self.convoys.is_some() {
+                self.step_supply_convoys(self.finish.is_some())?;
+                phases.push(TickPhase::Convoys);
+            }
             match self.options.mode {
                 crate::economy::Mode::Assault => {
                     self.apply_assault_victory(dt)?;
@@ -921,12 +950,9 @@ impl crate::match_runtime::Match {
                 ]
             } else {
                 vec![
-                    TickPhase::UnitReserves,
                     TickPhase::Production,
                     TickPhase::Rail,
                     TickPhase::GroundEffects,
-                    TickPhase::SupplyNetwork,
-                    TickPhase::Convoys,
                 ]
             },
         })
@@ -980,6 +1006,7 @@ impl crate::match_runtime::Match {
             .collect::<Vec<_>>();
         self.retire_rail_links(&removed_ids);
         for record in &progress.removed {
+            self.record_convoy_death(&record.unit)?;
             self.companion_died(record.unit.id)?;
             progress.companions_notified += 1;
             let kind = self.rules.kinds[record.unit.kind].name.clone();
