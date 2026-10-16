@@ -1,5 +1,6 @@
 #include "World/TCWorldObjects.h"
 #include "Client/TCGraphics.h"
+#include "Client/TCLighting.h"
 #include "Client/TCEffects.h"
 #include "EngineUtils.h"
 #include "ThreeCrossroads.h"
@@ -928,7 +929,7 @@ bool FTCWorldObjectsView::Attach(UWorld* World)
 	Actor = A;
 	if (!Library.IsLoaded() && !Library.Load(LibraryError))
 		UE_LOG(LogTC, Error, TEXT("world objects: the model catalog does not load (%s); map pieces, props, wrecks and ghosts are not drawn"), *LibraryError);
-	Queue.Reset(); Comps.Reset(); ModelComps.Reset(); DrawnGen = 0xffffffffu; bFogAll = true; bModelsDirty = true;
+	Queue.Reset(); Comps.Reset(); ModelComps.Reset(); ModelShadowTwins.Reset(); DrawnGen = 0xffffffffu; bFogAll = true; bModelsDirty = true;
 	return true;
 }
 
@@ -938,7 +939,7 @@ void FTCWorldObjectsView::Detach()
 	if (AActor* A = Actor.Get()) A->Destroy();
 	Actor.Reset();
 	if (UTexture2D* Fog = FogTexture.Get()) Fog->RemoveFromRoot();
-	Comps.Reset(); ModelComps.Reset(); Mids.Reset(); Queue.Reset();
+	Comps.Reset(); ModelComps.Reset(); ModelShadowTwins.Reset(); Mids.Reset(); Queue.Reset();
 	PieceAssets.Reset(); PropAssets.Reset(); bAssetsLoaded = false; KeepLoaded.Reset();
 	FogTexture.Reset(); FogBytes.Reset(); FogW = FogH = 0;
 	DrawnGen = 0xffffffffu;
@@ -952,6 +953,7 @@ void FTCWorldObjectsView::ClearAll()
 		P.Value.Count = 0;
 	}
 	for (TPair<FString, TWeakObjectPtr<UInstancedStaticMeshComponent>>& P : ModelComps) if (UInstancedStaticMeshComponent* C = P.Value.Get()) C->ClearInstances();
+	for (const auto& P : ModelShadowTwins) if (UInstancedStaticMeshComponent* C = P.Value.Get()) C->ClearInstances();
 	GhostsDrawn = WrecksDrawn = ModelInstances = 0;
 }
 
@@ -1161,20 +1163,39 @@ void FTCWorldObjectsView::BuildRegion(const FTCWorldObjects& Model, int32 Region
 void FTCWorldObjectsView::EnsureFog(const FTCWorldObjects& Model)
 {
 	const int32 W = Model.MapW(), H = Model.MapH();
-	if (FogTexture.IsValid() && FogW == W && FogH == H) return;
+	const FTCFogFrontier* Shared = TCFogLook::Active();
+	UTexture2D* Alpha = Shared && Shared->HasMap() && Shared->MapW() == W && Shared->MapH() == H ? Shared->AlphaTexture() : nullptr;
+	if (Alpha)
+	{
+		// Bind fog.js's one live texture. Copying target multiplier bytes here loses fades and inverts clear fog.
+		if (FogTexture.Get() != Alpha)
+		{
+			if (UTexture2D* Old = FogTexture.Get()) Old->RemoveFromRoot();
+			Alpha->AddToRoot(); FogTexture = Alpha; FogW = W; FogH = H; FogBytes.Reset();
+			for (TPair<FSoftObjectPath, TWeakObjectPtr<UMaterialInstanceDynamic>>& P : Mids)
+				if (UMaterialInstanceDynamic* Mid = P.Value.Get())
+				{
+					Mid->SetTextureParameterValue(TEXT("FogMap"), Alpha);
+					Mid->SetVectorParameterValue(TEXT("FogSize"), FLinearColor(W * TCWorldCore::CellMetres, H * TCWorldCore::CellMetres, 0, 1));
+					Mid->SetScalarParameterValue(TEXT("FogOn"), 1.f);
+				}
+		}
+		return;
+	}
+	if (FogTexture.IsValid() && FogW == W && FogH == H && FogBytes.Num() == W * H) return;
 	UTexture2D* T = UTexture2D::CreateTransient(W, H, PF_G8);
 	if (!T) return;
 	if (UTexture2D* Old = FogTexture.Get()) Old->RemoveFromRoot();
 	T->AddToRoot(); // held by the dynamic materials too, but drawn into before they exist
 	T->SRGB = false;
-	T->Filter = TF_Nearest;
+	T->Filter = TF_Bilinear; // fog.js LinearFilter
 	T->AddressX = TA_Clamp;
 	T->AddressY = TA_Clamp;
 	T->NeverStream = true;
 	T->UpdateResource();
 	FogTexture = T;
 	FogW = W; FogH = H;
-	FogBytes.Init(255, W * H);
+	FogBytes.Init(0, W * H);
 	bFogAll = true;
 	for (TPair<FSoftObjectPath, TWeakObjectPtr<UMaterialInstanceDynamic>>& P : Mids)
 		if (UMaterialInstanceDynamic* Mid = P.Value.Get())
@@ -1192,7 +1213,7 @@ void FTCWorldObjectsView::WriteFog(const FTCWorldObjects& Model, const FTCMatchS
 	// ATCTerrain::CellColor's dimming: in sight 1, explored 0.55, never seen 0.32; none once an authored match is decided
 	const bool bReveal = Ground && Ground->IsEndRevealed();
 	// round 14: the shared look (fog.js: World's frontier darkening and the lit cells under units included)
-	auto Byte = [&](int32 C) -> uint8 { return TCFogLook::Byte(State, bReveal, C); };
+	auto Byte = [&](int32 C) -> uint8 { return TCFogLook::AlphaByte(State, bReveal, C); };
 	bool bChanged = false;
 	if (Cells) { for (const int32 C : *Cells) if (FogBytes.IsValidIndex(C)) { const uint8 B = Byte(C); bChanged |= FogBytes[C] != B; FogBytes[C] = B; } }
 	else { for (int32 C = 0; C < FogBytes.Num(); C++) FogBytes[C] = Byte(C); bChanged = true; }
@@ -1215,12 +1236,40 @@ void FTCWorldObjectsView::DrawModels(const FTCWorldObjects& Model, const FTCMatc
 	if (!A || !Library.IsLoaded()) return;
 	TMap<UInstancedStaticMeshComponent*, FBatch> Batches;
 	GhostsDrawn = WrecksDrawn = ModelInstances = ModelsMissing = 0;
-	auto Comp = [&](const FTCModelPart& Part, bool bFaded) -> UInstancedStaticMeshComponent*
+	auto Comp = [&](const FTCModelPart& Part, bool bFaded, bool bWreck) -> UInstancedStaticMeshComponent*
 	{
-		FString Key = Part.Mesh.ToString() + (bFaded ? TEXT("|faded") : TEXT("|solid"));
+		FString Key = Part.Mesh.ToString() + (bFaded ? TEXT("|faded") : bWreck ? TEXT("|wreck") : TEXT("|solid"));
 		if (const TWeakObjectPtr<UInstancedStaticMeshComponent>* Found = ModelComps.Find(Key)) return Found->Get();
 		UInstancedStaticMeshComponent* C = NewObject<UInstancedStaticMeshComponent>(A);
 		if (!FTCModelLibrary::SetupComponent(C, Part, bFaded)) { ModelComps.Add(Key, nullptr); return nullptr; }
+		if (bWreck)
+		{
+			// main.js: replace every non-MeshBasicMaterial with the same opaque Lambert wreckMaterial.
+			// Retaining the original blend mode leaves glass/paint transparent and changes the hulk's colour.
+			UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TCLook::LambertPath);
+			UMaterialInstanceDynamic* Wreck = Base ? UMaterialInstanceDynamic::Create(Base, C) : nullptr;
+			if (Wreck) Wreck->SetVectorParameterValue(TEXT("Color"), TCLook::HexLinear(0x1d1b18));
+			for (int32 I = 0; I < C->GetNumMaterials(); I++)
+			{
+				float Unlit = 0.f;
+				UMaterialInterface* Source = C->GetMaterial(I);
+				if (Source) Source->GetScalarParameterValue(FMaterialParameterInfo(TEXT("Unlit")), Unlit);
+				if (Unlit <= 0.5f && Wreck) C->SetMaterial(I, Wreck); // opaque, flat colour, no texture/paint/rim or metal reflection
+			}
+			if (TCLook::HasUnitSun(A->GetWorld()))
+			{
+				// makeUnit's meshes cast but never receive the sun's shadow, including when they become hulks.
+				C->SetLightingChannels(false, true, false); C->SetCastShadow(false);
+				auto* Twin = NewObject<UInstancedStaticMeshComponent>(A);
+				Twin->SetStaticMesh(C->GetStaticMesh());
+				for (int32 I = 0; I < C->GetNumMaterials(); I++) Twin->SetMaterial(I, C->GetMaterial(I));
+				Twin->SetNumCustomDataFloats(C->NumCustomDataFloats);
+				Twin->SetMobility(EComponentMobility::Movable); Twin->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+				Twin->SetCastShadow(true); Twin->bCastHiddenShadow = true; Twin->SetHiddenInGame(true); Twin->SetVisibility(false);
+				Twin->SetupAttachment(A->GetRootComponent()); Twin->RegisterComponent(); A->AddInstanceComponent(Twin);
+				ModelShadowTwins.Add(C, Twin);
+			}
+		}
 		C->SetCanEverAffectNavigation(false);
 		C->SetupAttachment(A->GetRootComponent());
 		C->RegisterComponent();
@@ -1234,7 +1283,8 @@ void FTCWorldObjectsView::DrawModels(const FTCWorldObjects& Model, const FTCMatc
 		const int32 Faction = State.Factions.IsValidIndex(Owner) ? State.Factions[Owner] : Owner < 0 ? 0 : Owner % 3;
 		const FTCModelEntry* Entry = Library.Resolve({ Type, Faction, FString() });
 		if (!Entry) { ModelsMissing++; return false; }
-		const TArray<float> Custom = Library.CustomData(Owner, Faction, Fade, Damage);
+		// The wreck has an actual Lambert replacement. Basic materials retain their original colour/emission.
+		const TArray<float> Custom = Library.CustomData(Owner, Faction, Fade, 0.f);
 		TArray<bool> Visible;
 		Visible.SetNum(Entry->Parts.Num());
 		for (int32 I = 0; I < Entry->Parts.Num(); I++)
@@ -1249,7 +1299,7 @@ void FTCWorldObjectsView::DrawModels(const FTCWorldObjects& Model, const FTCMatc
 			const FTransform PartTransform = FTCModelLibrary::PartTransform(*Entry, I, Root);
 			FTCModelPart DrawPart = Part;
 			if (BuildingId >= 0 && !BuildingBreaches.PartFor(Part, BuildingId, State, PartTransform, A, DrawPart)) continue;
-			UInstancedStaticMeshComponent* C = Comp(DrawPart, bFaded);
+			UInstancedStaticMeshComponent* C = Comp(DrawPart, bFaded, Damage > 0.f);
 			if (!C) continue;
 			FBatch& B = Batches.FindOrAdd(C);
 			B.Transforms.Add(PartTransform);
@@ -1285,9 +1335,17 @@ void FTCWorldObjectsView::DrawModels(const FTCWorldObjects& Model, const FTCMatc
 		UInstancedStaticMeshComponent* C = P.Value.Get();
 		if (!C) continue;
 		C->ClearInstances();
+		UInstancedStaticMeshComponent* Twin = ModelShadowTwins.FindRef(C).Get();
+		if (Twin) Twin->ClearInstances();
 		if (FBatch* B = Batches.Find(C))
 		{
 			C->AddInstances(B->Transforms, false, false, false);
+			if (Twin)
+			{
+				Twin->AddInstances(B->Transforms, false, false, false);
+				if (!B->Transforms.IsEmpty()) Twin->SetCustomData(0, B->Transforms.Num() - 1, B->Data, false);
+				Twin->MarkRenderStateDirty();
+			}
 			const int32 Floats = TCModelData::Count;
 			for (int32 I = 0; I < B->Transforms.Num(); I++) C->SetCustomData(I, TArrayView<const float>(B->Data.GetData() + I * Floats, Floats), false);
 		}
@@ -1421,6 +1479,7 @@ bool FTCWreckPresentationTest::RunTest(const FString&)
 	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, TEXT("TCWreckPresentation"));
 	if (!TestNotNull(TEXT("transient world"), World)) return false;
 	FWorldContext& Context = GEngine->CreateNewWorldContext(EWorldType::Game); Context.SetCurrentWorld(World);
+	World->SpawnActor<ATCLighting>();
 	ATCEffects* Effects = World->SpawnActor<ATCEffects>();
 	FTCWorldObjectsView View;
 	if (TestNotNull(TEXT("effects actor"), Effects) && TestTrue(TEXT("world view attaches"), View.Attach(World)))
@@ -1436,10 +1495,18 @@ bool FTCWreckPresentationTest::RunTest(const FString&)
 		if (TestNotNull(TEXT("source tank catalog"), Entry))
 		{
 			const FTCModelPart& Part = Entry->Parts[0];
-			const auto* Found = View.ModelComps.Find(Part.Mesh.ToString() + TEXT("|solid"));
+			const auto* Found = View.ModelComps.Find(Part.Mesh.ToString() + TEXT("|wreck"));
 			UInstancedStaticMeshComponent* Comp = Found ? Found->Get() : nullptr;
 			if (TestNotNull(TEXT("hulk instance component"), Comp))
 			{
+				TestTrue(TEXT("wreck receives the source unshadowed unit sun"), Comp->LightingChannels.bChannel1 && !Comp->CastShadow);
+				for (int32 I = 0; I < Comp->GetNumMaterials(); I++)
+					if (Comp->GetMaterial(I)->GetName().StartsWith(TEXT("MaterialInstanceDynamic")))
+					{
+						FLinearColor Colour;
+						TestTrue(TEXT("hulk uses opaque Lambert replacement"), Comp->GetMaterial(I)->GetBlendMode() == BLEND_Opaque);
+						TestTrue(TEXT("wreck colour is the original flat 0x1d1b18"), Comp->GetMaterial(I)->GetVectorParameterValue(FMaterialParameterInfo(TEXT("Color")), Colour) && Colour.Equals(TCLook::HexLinear(0x1d1b18), 1e-6f));
+					}
 				FTransform Drawn; TestTrue(TEXT("hulk has an instance"), Comp->GetInstanceTransform(0, Drawn, true));
 				// Independent reflection of Three Ry(-hullDir)*Rz(tilt), at the delivered halfway pose.
 				const FVector P = FTCModelLibrary::PartTransform(*Entry, 0, FTransform::Identity).TransformPosition(FVector(100,200,300));

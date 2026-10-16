@@ -1153,6 +1153,12 @@ void UTCSoldierCrowd::Fall(const FStood& Man)
 	AddCorpse(Man.FigureType, Man.Faction, Man.Slot, Man.Owner, At, Heading + (Random.FRand() - 0.5) * 0.4, static_cast<float>(Man.Man.GetScale3D().X));
 }
 
+void UTCSoldierCrowd::SwapMen(int32 UnitId, int32 A, int32 B)
+{
+	FSquadRecord* R = Squads.Find(UnitId);
+	if (R && R->Men.IsValidIndex(A) && R->Men.IsValidIndex(B)) Swap(R->Men[A], R->Men[B]);
+}
+
 void UTCSoldierCrowd::SquadAlive(int32 UnitId, int32 Alive)
 {
 	FSquadRecord& R = Squads.FindOrAdd(UnitId);

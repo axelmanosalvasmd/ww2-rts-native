@@ -394,15 +394,25 @@ FTCMeasure FTCType::Measure()
 void FTCType::Pens(const FTCTypeFace& Face, const FString& Text, float Px, float Tracking, TArray<float>& Out, bool bTabular)
 {
  Face.Pens(Text,Px,Tracking,Out,bTabular);
- const FTCTypeFace* Symbols=SymbolsFace(); if (!Symbols) return;
+ const FTCTypeFace* Symbols=SymbolsFace();
  float Extra=0;
  for (int32 I=0; I<Text.Len(); I++)
  {
   Out[I]+=Extra;
-  if (!Face.Glyph(Text[I]) && Symbols->Glyph(Text[I]))
+  const float AtlasAdvance=HudSymbolAdvance(Text[I]);
+  if (AtlasAdvance>=0)
+   Extra+=Px*(AtlasAdvance-float(Face.Advance(Face.Glyph(Text[I])))/Face.UnitsPerEm());
+  else if (!Face.Glyph(Text[I]) && Symbols && Symbols->Glyph(Text[I]))
    Extra+=Px*(float(Symbols->Advance(Symbols->Glyph(Text[I])))/Symbols->UnitsPerEm()-float(Face.Advance(0))/Face.UnitsPerEm());
  }
  Out.Last()+=Extra;
+}
+
+bool FTCType::HasGlyph(uint32 CodePoint, bool bBold)
+{
+ if (FChar::IsWhitespace(static_cast<TCHAR>(CodePoint)) || HudSymbolAdvance(CodePoint)>=0) return true;
+ const FTCTypeFace* F=Face(bBold), *S=SymbolsFace();
+ return (F && F->Glyph(CodePoint)) || (S && S->Glyph(CodePoint));
 }
 
 float FTCType::Width(const FString& Text, float Px, bool bBold, float Tracking)
@@ -445,6 +455,7 @@ void FTCType::Draw(const FTCPaint& P, UCanvas* Canvas, UFont* Fallback, float Ov
 		for (int32 C = 0; C < I.Text.Len(); C++)
 		{
 			if (FChar::IsWhitespace(I.Text[C])) continue;
+            if (DrawHudSymbol(I.Text[C],Canvas,FVector2D(X0+Pens[C],Y),I.FontPx,I.Colour)) continue;
 			FSlateFontInfo GlyphInfo=Info;
 			if (!Face->Glyph(I.Text[C]) && SymbolsFace() && SymbolsFace()->Glyph(I.Text[C])) GlyphInfo.TypefaceFontName=TEXT("HudSymbols");
 			FCanvasTextItem T(FVector2D(X0 + Pens[C], Y), FText::FromString(FString::Chr(I.Text[C])), GlyphInfo, I.Colour);

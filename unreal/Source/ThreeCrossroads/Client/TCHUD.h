@@ -91,10 +91,11 @@ namespace FTCHudFit
 	// HUD controls keep their complete tooltip even when the visible caption is elided.
 	THREECROSSROADS_API FString ControlTip(const FControl& Control);
 	THREECROSSROADS_API FBottomLayout Tooltip(const FString& Shown, const FBox2D& Anchor, FVector2D View, const FTCMeasure& Measure);
+	THREECROSSROADS_API FBottomLayout IconBar(bool bMenu, bool bCaptured, const FTCMeasure& Measure, float Scale = 1.f);
 	THREECROSSROADS_API FBottomLayout Toolbar(float MaxW, const TArray<FControl>& Controls, const FTCMeasure& Measure, float Scale = 1.f);
 	THREECROSSROADS_API FBottomLayout SandboxToolbar(FVector2D View, float CornerRight, float ScoreLeft,
 		const TArray<FControl>& Controls, const TArray<FBox2D>& Avoid, const FTCMeasure& Measure, float Scale = 1.f);
-	// Prefer the browser's position. A crowded HUD docks the boss beside the centre stack and wraps the sandbox.
+	// The browser's central boss frame and padding, including its overlaps in a crowded viewport.
 	THREECROSSROADS_API FTCPaint BossCard(const FTCBossBar& Boss, FVector2D View, float Top, const FBox2D& Economy,
 		const TArray<FBox2D>& Avoid, double Now, const FTCMeasure& Measure, float Scale = 1.f);
 	// Empty on a sound layout. Text is checked against its actual container, controls against each other and panels.
@@ -174,6 +175,7 @@ private:
 	// transform, laid out in a window of ClipX / UiNow by ClipY / UiNow; the world's own overlays, the minimap (drawn
 	// at its own size here) and the Controls sheet (a dialog outside #hud) are not. Buttons and panels are recorded in
 	// screen pixels, so the controller's hit tests need no change.
+	void DrawMenuRows(UFont* Font, float X, float Y, const TArray<FTCControlRow>& Rows);
 	float UiNow = 1.f;
 	bool bUiPushed = false;
 	float UiOldClipX = 0.f, UiOldClipY = 0.f;

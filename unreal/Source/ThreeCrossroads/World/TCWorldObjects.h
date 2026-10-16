@@ -1096,6 +1096,7 @@ private:
 	int32 FogW = 0, FogH = 0;
 	// wrecks and ghosts
 	TMap<FString, TWeakObjectPtr<UInstancedStaticMeshComponent>> ModelComps;
+	TMap<UInstancedStaticMeshComponent*, TWeakObjectPtr<UInstancedStaticMeshComponent>> ModelShadowTwins;
 	uint32 GhostHash = 0;
 	bool bModelsDirty = true;
 	int32 GhostsDrawn = 0, WrecksDrawn = 0, ModelInstances = 0, ModelsMissing = 0;

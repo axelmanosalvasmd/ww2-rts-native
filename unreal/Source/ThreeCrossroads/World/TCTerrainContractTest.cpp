@@ -21,7 +21,9 @@
 #endif
 #define TC_WATER_CORE_ONLY
 #define TC_RAIL_CORE_ONLY
+#define TC_FOG_FRONTIER_CORE_ONLY
 #endif
+#include "World/TCFogFrontier.h"
 #include "World/TCStructures.h"
 #include "World/TCWorldObjects.h"
 #include "World/TCWater.h"
@@ -48,6 +50,61 @@ namespace TCTerrainFormulas
 			}
 		}
 	};
+
+	FChecks FogSamplingRules()
+	{
+		using namespace TCFogFrontierCore;
+		FChecks T;
+		#include "World/TCFogFrontier.Sampling.inl"
+		for (const auto& S : FogSamplingOracle)
+		{
+			T.Near(MistHash(S[0], S[1]), S[4], 1e-11, "source mist hash");
+			T.Near(MistNoise(S[0], S[1]), S[5], 1e-11, "source Hermite value noise");
+			T.Near(Mist(S[3], S[0], S[1], S[2]), S[6], 1e-11, "source drifting fog alpha");
+		}
+		const uint8_t Pixels[] = { 0, 120, 185, 255 };
+		const double Sampling[][3] = { { 1, 1, 0 }, { 3, 1, 120 }, { 1, 3, 185 }, { 3, 3, 255 },
+			{ 2, 2, 140 }, { 2, 1, 60 }, { 1, 2, 92.5 }, { -7, -8, 0 }, { 9, 9, 255 },
+			{ -3, 2, 92.5 }, { 9, 2, 187.5 }, { 2.5, 1.5, 126.875 } };
+		for (const auto& S : Sampling) T.Near(SampleAlpha(Pixels, 2, 2, S[0], S[1]), S[2] / 255, 1e-14, "LinearFilter and ClampToEdge at texel centres, boundaries and outside map");
+		T.Near(SampleAlpha(nullptr, 0, 0, 0, 0), 0, 0, "empty map has no fog");
+		for (const double A : { 0.0, 120.0 / 255, 1.0 })
+		{
+			T.Near(OuterAlpha(A, 0), A, 1e-14, "outer overlay meets map exactly");
+			T.Near(OuterAlpha(A, 6), A, 1e-14, "outer vision carries six metres");
+			T.Near(OuterAlpha(A, 19), (A + 185.0 / 255) / 2, 1e-14, "outer transition midpoint");
+			T.Near(OuterAlpha(A, 32), 185.0 / 255, 1e-14, "outer overlay reaches unseen");
+			T.Near(OuterAlpha(A, 900), 185.0 / 255, 1e-14, "outer water stays fogged");
+		}
+		T.Near(Composite(.7, 120.0 / 255), .389042675893887, 1e-14, "overlay blends linear lit colour toward shade");
+		T.Near(Composite(.7, 1), 10.0 / 255, 1e-14, "opaque frontier meets unknown shade with no light seam");
+		T.Near(Composite(.7, 1, true), .0392, 1e-14, "pieces retain literal surfaces.js shade");
+		T.Near(Composite(.7, 0), .7, 0, "clear water unchanged by fog");
+		TCRelief::FRelief Relief;
+		Relief.Reset(2, 1, true, 1, true);
+		Relief.InGrid = {'W', '.'}; Relief.InKnown = {1, 0};
+		Relief.Build();
+		const TCRelief::FPart Seal = Relief.FrontierSeal(0);
+		T.Require(!Seal.Idx.empty(), "known river edge joins the unknown placeholder with no sky crack");
+		for (const int Owner : Seal.Owner) T.Require(Owner == 0, "frontier seal reads a known cell only");
+		for (size_t K = 1; K < Seal.Pos.size() / 3; K += 2)
+		{
+			T.Near(Seal.Pos[K * 3], 2, 0, "placeholder join uses the exact cell edge");
+			T.Near(Seal.Pos[K * 3 + 1], 0, 0, "placeholder join uses the public level zero");
+		}
+		T.Require(Relief.FrontierSeal(1).Idx.empty(), "undiscovered cells contribute no secret geometry");
+		Relief.InKnown = {1, 1}; Relief.Build();
+		T.Require(Relief.FrontierSeal(0).Idx.empty(), "a discovered neighbour removes the seal");
+		// The same alpha state drives both ground/water overlay and instanced surfaces throughout a fade.
+		uint8_t Seen[] = { 0, 1 }, Ever[] = { 1, 1 };
+		FFog F; F.Start(2, 1, Seen, Ever, false, false);
+		F.Snapshot({ 0, 1 }, {}); F.Frame(.05, false);
+		T.Require(F.Bytes[0] == 83 && F.Bytes[1] == 37, "fade uses alpha per second before byte rounding");
+		T.Near(SampleAlpha(F.Bytes.data(),2,1,2,1), 60.0 / 255, 1e-14, "a fading cell boundary is bilinear, without nearest-cell steps");
+		F.Frame(.20, false);
+		T.Require(F.Bytes[0] == 0 && F.Bytes[1] == 120, "quarter-second fade settles exactly");
+		return T;
+	}
 
 	FChecks ReliefRules()
 	{
@@ -409,13 +466,14 @@ namespace TCTerrainFormulas
 int main()
 {
 	int Failures = 0;
-	for (const auto& Result : { TCTerrainFormulas::ReliefRules(), TCTerrainFormulas::PaintRules(), TCTerrainFormulas::DecalRules(), TCTerrainFormulas::StructureRules(), TCTerrainFormulas::BreachRules(), TCTerrainFormulas::WaterRules(), TCTerrainFormulas::RailwayRules() })
+	for (const auto& Result : { TCTerrainFormulas::FogSamplingRules(), TCTerrainFormulas::ReliefRules(), TCTerrainFormulas::PaintRules(), TCTerrainFormulas::DecalRules(), TCTerrainFormulas::StructureRules(), TCTerrainFormulas::BreachRules(), TCTerrainFormulas::WaterRules(), TCTerrainFormulas::RailwayRules() })
 		for (const auto& Error : Result.Errors) { std::fprintf(stderr, "%s\n", Error.c_str()); Failures++; }
-	std::printf("terrain reference formulas: 7 checks, %d failures\n", Failures);
+	std::printf("terrain reference formulas: 8 checks, %d failures\n", Failures);
 	return Failures ? 1 : 0;
 }
 #else
 #include "CoreMinimal.h"
+#include "World/TCTerrain.h"
 #include "Net/TCMatchState.h"
 #include "Misc/AutomationTest.h"
 #include "Misc/FileHelper.h"
@@ -434,6 +492,14 @@ int main()
 #include "Engine/StaticMesh.h"
 #include "StaticMeshResources.h"
 #include "Client/TCModelLibrary.h"
+#include "Engine/Texture2D.h"
+#include "Engine/World.h"
+#include "Engine/Engine.h"
+#include "UObject/UObjectIterator.h"
+#include "Components/InstancedStaticMeshComponent.h"
+#include "ProceduralMeshComponent.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/Material.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -453,6 +519,92 @@ namespace TCTerrainContract
 		if (!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(FString(UTF8_TO_TCHAR((const ANSICHAR*)Raw.GetData()))), Root) || !Root.IsValid()) { T.AddError(FString::Printf(TEXT("cannot parse %s"), *Path)); return nullptr; }
 		return Root;
 	}
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCFogSamplingContract, "ThreeCrossroads.Terrain.FogSampling", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)
+bool FTCFogSamplingContract::RunTest(const FString& Parameters)
+{
+	const auto Result = TCTerrainFormulas::FogSamplingRules();
+	for (const auto& Error : Result.Errors) AddError(UTF8_TO_TCHAR(Error.c_str()));
+	return Result.Errors.empty();
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCFogOverlayContract, "ThreeCrossroads.Terrain.FogOverlay", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FTCFogOverlayContract::RunTest(const FString& Parameters)
+{
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+	if (!TestNotNull(TEXT("isolated overlay world"), World)) return false;
+	FWorldContext& Context = GEngine->CreateNewWorldContext(EWorldType::Game);
+	Context.SetCurrentWorld(World);
+	FTCMatchState State;
+	State.Map.W = State.Map.H = 8; State.Map.bWorld = true;
+	State.Map.Chars.Init('.', 64); State.Map.Levels.Init(0, 64); State.Map.Known.Init(false, 64);
+	State.Map.Known[27] = true;
+	State.FogVisible.Init(false, 64); State.FogExplored.Init(false, 64);
+	State.FogVisible[27] = State.FogExplored[27] = true;
+	FTCFogFrontier Fog;
+	Fog.Attach(World); Fog.Start(State);
+	const FTCFogFrontier* Previous = TCFogLook::Active();
+	TCFogLook::SetActive(&Fog); Fog.Frame(0, false, State);
+	if (UTexture2D* Alpha = Fog.AlphaTexture())
+	{
+		TestEqual(TEXT("raw alpha is linearly filtered"), Alpha->Filter, TF_Bilinear);
+		TestFalse(TEXT("alpha is data, no sRGB conversion"), Alpha->SRGB);
+		TestEqual(TEXT("outside vision clamps to the edge"), Alpha->AddressX, TA_Clamp);
+		TestEqual(TEXT("outside vision clamps north/south"), Alpha->AddressY, TA_Clamp);
+	}
+	else AddError(TEXT("raw alpha texture missing"));
+	TestEqual(TEXT("every unknown cell has a placeholder"), Fog.UnknownCovered(), 63);
+	UProceduralMeshComponent* Overlay = Fog.UnknownOverlayForTests();
+	if (TestNotNull(TEXT("fog also covers unknown water after translucency"), Overlay))
+	{
+		TestEqual(TEXT("fog draws after water priority -1"), Overlay->TranslucencySortPriority, 1);
+		TestEqual(TEXT("overlay is visual only"), Overlay->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
+		const FProcMeshSection* Section = Overlay->GetProcMeshSection(0);
+		if (TestNotNull(TEXT("unknown cells have fog triangles"), Section)) TestEqual(TEXT("eight rows and the split known row"), Section->ProcIndexBuffer.Num(), 9 * 6);
+		if (UMaterialInstanceDynamic* Mid = Cast<UMaterialInstanceDynamic>(Overlay->GetMaterial(0)))
+		{
+			UTexture* Bound = nullptr;
+			TestTrue(TEXT("overlay binds raw alpha"), Mid->GetTextureParameterValue(FMaterialParameterInfo(TEXT("FogAlpha")), Bound));
+			TestTrue(TEXT("overlay reads the actual recipient alpha"), Bound == Fog.AlphaTexture());
+		}
+		else AddError(TEXT("reference fog overlay material missing"));
+	}
+	// Priority orders only primitives in the same translucency pass. A later water pass bypasses fog.
+	for (const TCHAR* Path : { FTCFogOverlay::MaterialPath, FTCWater::MaterialPath, TEXT("/Game/Terrain/Materials/M_TCRubbleDecal.M_TCRubbleDecal") })
+		if (UMaterialInterface* Material = LoadObject<UMaterialInterface>(nullptr, Path))
+			TestEqual(*FString::Printf(TEXT("%s composites before tone mapping with fog"), Path), Material->GetMaterial()->TranslucencyPass, MTP_BeforeDOF);
+		else AddError(FString::Printf(TEXT("fog pass material missing: %s"), Path));
+	TestEqual(TEXT("raw lookup uses current alpha, not the brightness multiplier"), TCFogLook::AlphaByte(State, false, 27), (uint8)Fog.AlphaNow(27));
+	TestEqual(TEXT("lifted raw alpha is clear"), TCFogLook::AlphaByte(State, true, 27), (uint8)0);
+	// Test the actual scenery adapter. Replacing its shader without replacing its old multiplier
+	// texture would make every clear spectator tree opaque fog grey.
+	TSharedPtr<FJsonObject> Start;
+	FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(TEXT("{\"map\":{\"w\":8,\"h\":8,\"world\":true,\"rows\":[\"HHHHHHHH\",\"HHHHHHHH\",\"HHHHHHHH\",\"HHHHHHHH\",\"HHHHHHHH\",\"HHHHHHHH\",\"HHHHHHHH\",\"HHHHHHHH\"]}}")), Start);
+	State.Map.Chars.Init('H', 64);
+	ATCTerrain* Ground = World->SpawnActor<ATCTerrain>(); Ground->ResetFrom(State); Ground->Flush(State);
+	FTCWorldObjects Objects; FTCWorldObjectsView View;
+	if (TestTrue(TEXT("scenery fixture starts"), Start.IsValid() && Objects.ApplyStart(*Start, State)) && TestTrue(TEXT("scenery fixture attaches"), View.Attach(World)))
+	{
+		Objects.Update(*Ground, nullptr); View.Draw(Objects, State, Ground);
+		int Bound = 0;
+		for (TObjectIterator<UInstancedStaticMeshComponent> It; It; ++It)
+			if (It->GetWorld() == World)
+				for (int M = 0; M < It->GetNumMaterials(); M++)
+					if (UMaterialInterface* Material = It->GetMaterial(M))
+					{
+						UTexture* Texture = nullptr;
+						if (Material->GetTextureParameterValue(FMaterialParameterInfo(TEXT("FogMap")), Texture))
+						{
+							Bound++;
+							TestTrue(TEXT("scenery shares the live faded raw-alpha texture"), Texture == Fog.AlphaTexture());
+						}
+					}
+		TestTrue(TEXT("at least one real scenery material is checked"), Bound > 0);
+	}
+	View.Detach();
+	Fog.Detach(); TCFogLook::SetActive(Previous); GEngine->DestroyWorldContext(World); World->DestroyWorld(false);
+	return true;
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCTerrainRampRulesTest, "ThreeCrossroads.Terrain.RampRules", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

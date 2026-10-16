@@ -337,6 +337,8 @@ public:
 	// Draws the minimap on the HUD's canvas. Returns false (and draws nothing) when there is no match to draw.
 	bool Draw(UCanvas* Canvas, const FTCMatchState& State, const FTCUnitTable& Table, const TSet<int32>& Selected, const FTCMinimapView& View);
 	void DrawUnits(UCanvas* Canvas, const FTCMatchState& State, const FTCUnitTable& Table, const TSet<int32>& Selected);
+	// alerts.js radii and stroke widths are in the source 240-pixel canvas, before CSS/UI scaling.
+	void DrawRing(UCanvas* Canvas, FVector2D Ground, float CanvasRadius, float CanvasWidth, FLinearColor Colour);
 	// The camera's view outline over the minimap as last arranged (Draw calls it unless bDeferViewOutline). False when
 	// nothing of it was drawn (no layout, fewer than four corners, or all of it outside the square).
 	bool DrawViewOutline(UCanvas* Canvas, const FTCMinimapView& View);

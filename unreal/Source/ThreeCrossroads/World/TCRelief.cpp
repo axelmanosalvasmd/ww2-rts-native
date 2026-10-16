@@ -997,6 +997,48 @@ void FRelief::Fans()
 		}
 }
 
+FPart FRelief::FrontierSeal(int PartIndex) const
+{
+	FPart P;
+	if (PartIndex < 0 || PartIndex >= NumParts()) return P;
+	const int X0 = ChunkCells > 0 ? (PartIndex % PartsX) * ChunkCells : 0;
+	const int X1 = ChunkCells > 0 ? std::min(W, X0 + ChunkCells) : W;
+	const int Z0 = ChunkCells > 0 ? (PartIndex / PartsX) * ChunkCells : PartIndex;
+	const int Z1 = ChunkCells > 0 ? std::min(H, Z0 + ChunkCells) : Z0 + 1;
+	for (int Z = Z0; Z < Z1; Z++) for (int X = X0; X < X1; X++)
+	{
+		const int C = Z * W + X;
+		if (!Kn(C)) continue;
+		for (int Side = 0; Side < 4; Side++)
+		{
+			const int Ox = X + (Side == 0 ? -1 : Side == 1 ? 1 : 0);
+			const int Oz = Z + (Side == 2 ? -1 : Side == 3 ? 1 : 0);
+			if (Ox < 0 || Oz < 0 || Ox >= W || Oz >= H || Kn(Oz * W + Ox)) continue;
+			const int Steps = Flat[(size_t)C] ? 1 : Side < 2 ? NZ[(size_t)C] : NX[(size_t)C];
+			for (int K = 0; K < Steps; K++)
+			{
+				const uint32_t B = (uint32_t)P.Vertices();
+				for (int End = 0; End < 2; End++)
+				{
+					const double T = (double)(K + End) / Steps;
+					const double U = Side == 0 ? 0 : Side == 1 ? 1 : T;
+					const double V = Side == 2 ? 0 : Side == 3 ? 1 : T;
+					double Shift[2] = {0, 0};
+					if (Flat[(size_t)C] != 1) EdgeShift(X + U, Z + V, Shift);
+					const double Hh = Heights[(size_t)C * Stride + (size_t)(JsRound(V * S) * 5 + JsRound(U * S))];
+					// Exact relief edge, then the same unshifted y=0 edge used by the unknown cover.
+					P.Pos.insert(P.Pos.end(), {(float)((X + U) * Cell + Shift[0]), (float)Hh, (float)((Z + V) * Cell + Shift[1]),
+						(float)((X + U) * Cell), 0, (float)((Z + V) * Cell)});
+					for (int J = 0; J < 2; J++) { P.Nrm.insert(P.Nrm.end(), {0, 1, 0}); P.Owner.push_back(C); }
+				}
+				// The public placeholder can be above or below the known edge. Seal both viewing directions.
+				for (const uint32_t J : {0u, 1u, 2u, 1u, 3u, 2u, 2u, 1u, 0u, 2u, 3u, 1u}) P.Idx.push_back(B + J);
+			}
+		}
+	}
+	return P;
+}
+
 void FRelief::EmitPart(int PartIndex)
 {
 	FPart& P = Parts[(size_t)PartIndex];

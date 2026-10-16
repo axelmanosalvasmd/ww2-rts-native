@@ -336,6 +336,17 @@ namespace TCMarkersCore
 		return C * C * (3 - 2 * C);
 	}
 	inline constexpr double NodeTagLift = 3.0, HqTagLift = 17.0, PointTagLift = 10.0, RegionNameLift = 12.0;
+	// main.js GEO.shield, COVER_LOOK and makeUnit: independent of health-bar visibility.
+	struct FCoverShield { uint32_t Hex = 0; double Alpha = 0; };
+	inline FCoverShield CoverShield(int Cover, bool Garrisoned)
+	{
+		if (Garrisoned) return {};
+		if (Cover == 1) return { 0xe2b850, 1.0 };
+		if (Cover == 2) return { 0xb2de92, 1.0 };
+		if (Cover == 3) return { 0xe2b850, 0.45 };
+		return {};
+	}
+	inline constexpr double ShieldPoints[5][2] = { {-0.5, 0.5}, {0.5, 0.5}, {0.5, 0}, {0, -0.6}, {-0.5, 0} };
 }
 
 #ifndef TC_MARKERS_CORE_ONLY
@@ -474,6 +485,8 @@ namespace TCMarkersHud
 	void DrawCoverLayer(FTCMarkerPainter& P, const TArray<FTCCoverGlyph>& Glyphs, float Opacity, bool bDepthTest = true);
 	// makeUnit's veterancy stars over a bar centred at BarCentre (canvas pixels), PxPerMetre the bar group's scale.
 	void DrawBadge(UCanvas* Canvas, const FString& Type, int32 Owner, FVector2D BarCentre, float PxPerMetre);
+	void DrawCoverShield(UCanvas* Canvas, FVector2D BarCentre, float PxPerMetre, int32 Cover, bool bGarrisoned, const FVector& World);
+	FLinearColor WorldColour(UCanvas* Canvas, const FLinearColor& Colour, const FVector& World);
 	void DrawStars(UCanvas* Canvas, FVector2D BarCentre, float PxPerMetre, int32 Stars);
 
 	// Verification switches (round 17), read once from the command line; call once per HUD frame:

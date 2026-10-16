@@ -76,11 +76,12 @@ bool ATCUnitRenderer::DrawnAt(int32 Id, FVector2D& Out) const
 	return true;
 }
 
-void ATCUnitRenderer::Draw(const FTCMatchState& State, const FTCUnitTable& Table, const ATCTerrain* Terrain, const TSet<int32>& Selected, float DeltaSeconds)
+void ATCUnitRenderer::Draw(const FTCMatchState& State, const FTCUnitTable& Table, const ATCTerrain* Terrain, const TSet<int32>& Selected, float DeltaSeconds, const TArray<int32>* SnapshotOrder)
 {
 	// A cooked headless client cannot initialize the ring meshes' render resources.
 	if (!FApp::CanEverRender()) return;
 	EnsureModels();
+	PrepareTrenchSeats(State, Table, SnapshotOrder);
 	UpdateRingLooks();
 	TMap<UInstancedStaticMeshComponent*, TArray<FTransform>> Frames;
 	TMap<UInstancedStaticMeshComponent*, TArray<uint64>> FrameKeys; // FTCInstanceHistory keys, by placeholder batch

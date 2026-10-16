@@ -49,7 +49,7 @@ bool FTCCellFogMap::Update(const FTCMatchState& State, const ATCTerrain* Terrain
 		if (!T) return false;
 		T->AddToRoot(); // held by dynamic materials too, but written before they take it
 		T->SRGB = false;
-		T->Filter = TF_Nearest;
+		T->Filter = TF_Bilinear; // surfaces.js uses fog.js's LinearFilter, including on roofs and tracks
 		T->AddressX = TA_Clamp;
 		T->AddressY = TA_Clamp;
 		T->NeverStream = true;
@@ -58,12 +58,12 @@ bool FTCCellFogMap::Update(const FTCMatchState& State, const ATCTerrain* Terrain
 		Bytes.Init(0, W * H);
 		bNew = true;
 	}
-	// ATCTerrain::CellColor: in sight 1, explored 0.55, never seen 0.32; nothing dimmed once an authored match is decided
+	// Raw alpha follows the same faded state as the ground overlay.
 	const bool bReveal = Terrain && Terrain->IsEndRevealed();
 	bool bChanged = bNew;
 	for (int32 C = 0; C < Bytes.Num(); C++)
 	{
-		const uint8 B = TCFogLook::Byte(State, bReveal, C); // round 14: the shared look (fog.js)
+		const uint8 B = TCFogLook::AlphaByte(State, bReveal, C);
 		if (Bytes[C] != B) { Bytes[C] = B; bChanged = true; }
 	}
 	if (!bChanged) return bNew;

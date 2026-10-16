@@ -326,6 +326,8 @@ public:
 	bool bFogLifted = false;      // a spectator of an authored map gets no fog mask
 	TArray<uint8> FogVisible, FogExplored;
 	TMap<int32, FTCUnit> Units;
+	// world-state.js Map insertion order, retained across delta replacements and Rust row adoption.
+	TArray<int32> UnitOrder;
 	// Ids the server says this client holds whose row could not be read: they count toward the held check (so one bad
 	// row does not ask for a resend every second) but are not drawn. Never also in Units.
 	TSet<int32> UnreadableIds;

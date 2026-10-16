@@ -1726,10 +1726,12 @@ struct FTCInfantrySquadAnimation::FState
 {
 	TCInfantryRigCore::FAnimSquad Squad;
 	TArray<TCInfantryRigCore::FManIn> Men;
+	TArray<FVector2D> Home;
 	TArray<TCInfantryRigCore::FAnimMan> Posed;
 	// each man's figure muzzles (TCInfantryRigCore::FigureMuzzles), shared per figure
 	TArray<TSharedPtr<TArray<TCInfantryRigCore::FV>>> Tips;
 	bool bDigger = false;
+	bool bSolo = false;
 };
 
 FTCInfantrySquadAnimation::FTCInfantrySquadAnimation() : State(new FState) {}
@@ -1753,6 +1755,7 @@ void FTCInfantrySquadAnimation::Setup(const FString& UnitType, int32 Faction, co
 	State->bDigger = IsDigger(ParseType(Name.Get()));
 	const int32 Count = SlotsCm.Num();
 	State->Men.SetNum(Count);
+	State->Home = SlotsCm;
 	State->Posed.SetNum(Count);
 	State->Tips.SetNum(Count);
 	Out.SetNum(Count);
@@ -1763,6 +1766,7 @@ void FTCInfantrySquadAnimation::Setup(const FString& UnitType, int32 Faction, co
 		FCtx Ctx;
 		const bool bKnown = MakeCtx(Figure, Faction, I, Ctx);
 		Out[I] = FTCInfantryManPose();
+		Out[I].FigureSlot = I;
 		Out[I].Scale = Scale;
 		Out[I].Job = bKnown ? JobName(Ctx.Job) : FString();
 		if (!bKnown) continue;
@@ -1791,6 +1795,74 @@ int32 UTCInfantryRigLibrary::MenDrawn(double Hp, int32 Slots, int32 MaxHp, bool 
 void FTCInfantrySquadAnimation::SetAlive(int32 Alive)
 {
 	for (int32 I = 0; I < State->Men.Num(); I++) State->Men[I].bVisible = I < Alive;
+}
+
+int32 FTCInfantrySquadAnimation::HitMan(int32 Shot, int32 Alive)
+{
+	int32 Before = 0;
+	for (const auto& M : State->Men) if (M.bVisible) Before++;
+	const int32 Last = Before - 1;
+	if (Alive >= Before || Shot < 0 || Shot >= Last || !State->Men.IsValidIndex(Last)) return INDEX_NONE;
+	const FVector2D A(State->Men[Shot].SlotX, State->Men[Shot].SlotZ), B(State->Men[Last].SlotX, State->Men[Last].SlotZ);
+	// Swapping slots/home and then model objects leaves numbered slots/home fixed. Motion and kit follow the model.
+	Swap(State->Men[Shot], State->Men[Last]);
+	State->Men[Shot].SlotX = A.X; State->Men[Shot].SlotZ = A.Y;
+	State->Men[Last].SlotX = B.X; State->Men[Last].SlotZ = B.Y;
+	State->Men[Shot].bRefill = true;
+	Swap(State->Tips[Shot], State->Tips[Last]);
+	Swap(State->Posed[Shot], State->Posed[Last]);
+	Swap(Out[Shot], Out[Last]);
+	return Last;
+}
+
+void FTCInfantrySquadAnimation::SetOperative(bool bOperative)
+{
+	// main.js: the first operative transition moves slot zero and its home to the squad root, once.
+	if (!bOperative || State->bSolo || State->Men.IsEmpty()) return;
+	State->bSolo = true;
+	State->Home[0] = FVector2D::ZeroVector;
+	State->Men[0].SlotX = State->Men[0].SlotZ = 0;
+}
+
+TArray<FVector2D> FTCInfantryTrenches::Claim(FVector2D Target, int32 Men, int32 Alive, int32 Cover, bool bGarrisoned,
+	TFunctionRef<uint8(int32, int32)> Cell, TSet<FVector2D>& Taken)
+{
+	TArray<FVector2D> Cells, Spots, Free, Result;
+	if (Cover != 2 || bGarrisoned) return Result;
+	const int32 Cx = FMath::FloorToInt(Target.X / 2.0), Cz = FMath::FloorToInt(Target.Y / 2.0);
+	for (int32 Z = Cz - 3; Z <= Cz + 3; Z++)
+		for (int32 X = Cx - 3; X <= Cx + 3; X++)
+			if (Cell(X, Z) == 'T') Cells.Add(FVector2D((X + 0.5) * 2.0, (Z + 0.5) * 2.0));
+	Cells.StableSort([Target](const FVector2D& A, const FVector2D& B)
+	{
+		return std::hypot(A.X - Target.X, A.Y - Target.Y) < std::hypot(B.X - Target.X, B.Y - Target.Y);
+	});
+	if (Cells.IsEmpty()) return Result;
+	const FVector2D Quad[] = { {-0.45, -0.45}, {0.45, 0.45}, {-0.45, 0.45}, {0.45, -0.45} };
+	for (const FVector2D& Q : Quad) for (const FVector2D& C : Cells) Spots.Add(C + Q);
+	for (const FVector2D& P : Spots) if (!Taken.Contains(P)) Free.Add(P);
+	for (int32 I = 0; I < Men; I++)
+	{
+		const FVector2D P = Free.IsValidIndex(I) ? Free[I] : Spots[I % Spots.Num()];
+		Result.Add(P);
+		if (I < Alive) Taken.Add(P);
+	}
+	return Result;
+}
+
+void FTCInfantrySquadAnimation::SeatTrench(const TArray<FVector2D>& WorldSpots, FVector2D Position, double Rotation)
+{
+	const double C = std::cos(Rotation), S = std::sin(Rotation);
+	for (int32 I = 0; I < State->Men.Num(); I++)
+	{
+		auto& M = State->Men[I];
+		if (WorldSpots.IsValidIndex(I))
+		{
+			const FVector2D D = WorldSpots[I] - Position;
+			M.SlotX = D.X * C + D.Y * S; M.SlotZ = D.Y * C - D.X * S;
+		}
+		else { M.SlotX = State->Home[I].X / 100.0; M.SlotZ = State->Home[I].Y / 100.0; }
+	}
 }
 
 bool FTCInfantrySquadAnimation::IsFar() const { return State->Squad.bFar; }
@@ -1958,4 +2030,67 @@ FAnimInstanceProxy* UTCInfantryAnimInstance::CreateAnimInstanceProxy()
 {
 	return new FTCInfantryAnimInstanceProxy(this);
 }
+
+#if WITH_DEV_AUTOMATION_TESTS
+#include "Misc/AutomationTest.h"
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCInfantryTrenchSeatsTest, "ThreeCrossroads.Motion.TrenchSeats", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FTCInfantryTrenchSeatsTest::RunTest(const FString&)
+{
+    // main.js manTrench: equal-distance cells retain the source z/x scan order.
+    auto Cell = [](int32 X, int32 Z) -> uint8 { return Z == 5 && (X == 4 || X == 5) ? 'T' : '.'; };
+    TSet<FVector2D> Taken;
+    const auto First = FTCInfantryTrenches::Claim({10,11}, 6, 3, 2, false, Cell, Taken);
+    const FVector2D Expected[] = {{8.55,10.55},{10.55,10.55},{9.45,11.45},{11.45,11.45},{8.55,11.45},{10.55,11.45}};
+    TestEqual(TEXT("one spot for each model, including dead slots"), First.Num(), 6);
+    for (int32 I = 0; I < First.Num(); I++) TestTrue(TEXT("nearest cells first, then next quadrant"), First[I].Equals(Expected[I], 1e-12));
+    TestEqual(TEXT("only living men claim spots"), Taken.Num(), 3);
+    const auto Next = FTCInfantryTrenches::Claim({10,11}, 6, 6, 2, false, Cell, Taken);
+    TestTrue(TEXT("another squad first uses the next unclaimed spot"), Next[0].Equals({11.45,11.45}, 1e-12));
+    TestTrue(TEXT("overflow doubles onto the original spots as source does"), Next[5].Equals(First[5], 1e-12));
+    TestTrue(TEXT("garrisons use no trench slots"), FTCInfantryTrenches::Claim({10,11}, 6, 6, 2, true, Cell, Taken).IsEmpty());
+    TestTrue(TEXT("open ground restores formation"), FTCInfantryTrenches::Claim({10,11}, 6, 6, 0, false, Cell, Taken).IsEmpty());
+    TestTrue(TEXT("trench search stops at three cells"), FTCInfantryTrenches::Claim({40,40}, 6, 6, 2, false, Cell, Taken).IsEmpty());
+    FTCInfantrySquadAnimation A;
+    A.Setup(TEXT("rifle"), 0, {{100,200}}, 1.1f);
+    A.SetAlive(1);
+    FTCInfantrySquadFrame F; F.Root = FVector(1000,1100,0); F.Id = 1; F.bTrench = true;
+    F.Eye = FVector(1000,1100,1000); F.Yaw = -0.7;
+    A.SeatTrench({First[0]}, {10,11}, 0.7);
+    TestTrue(TEXT("seated animation updates"), A.Animate(F, 0));
+    const FTransform Root(FQuat(FVector::UpVector, 0.7), F.Root);
+    const FVector Seat = A.ManTransform(0, Root).GetLocation();
+    TestTrue(TEXT("inverse root rotation keeps the source world seat"), FVector2D(Seat.X,Seat.Y).Equals(First[0] * 100, .001));
+    A.SeatTrench({}, {10,11}, 0.7); F.bTrench = false; A.Animate(F, 0);
+    FTCInfantrySquadAnimation Operative;
+    Operative.Setup(TEXT("rifle"), 0, {{100,200}}, 1.1f);
+    Operative.SetOperative(true); Operative.SeatTrench({}, {10,11}, 0.7); Operative.Animate(F, 0);
+    TestTrue(TEXT("an operative's initial slot and home stay at the root"), FVector2D(Operative.ManTransform(0, Root).GetLocation() - F.Root).IsNearlyZero(.001));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCInfantryTargetedCasualtyTest, "ThreeCrossroads.Motion.TargetedCasualty", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FTCInfantryTargetedCasualtyTest::RunTest(const FString&)
+{
+	FTCInfantrySquadAnimation A;
+	A.Setup(TEXT("rifle"), 0, {{0,0},{200,0},{400,0}}, 1.1f);
+	FTCInfantrySquadFrame F; F.Id = 17; F.Eye = FVector(0,0,2000);
+	A.Animate(F, .016f);
+	const auto Before = A.Men();
+	TestEqual(TEXT("the hit man trades with the last living model"), A.HitMan(0, 2), 2);
+	TestEqual(TEXT("the casualty retains its original kit"), A.Men()[2].FigureSlot, 0);
+	TestEqual(TEXT("the replacement retains its original kit"), A.Men()[0].FigureSlot, 2);
+	TestTrue(TEXT("the casualty falls at its own previous position"), A.Men()[2].Local.Equals(Before[0].Local, .001));
+	TestTrue(TEXT("the replacement starts where it stood"), A.Men()[0].Local.Equals(Before[2].Local, .001));
+	A.SetAlive(2);
+	A.SeatTrench({}, FVector2D::ZeroVector, 0);
+	A.Animate(F, .1f);
+	TestFalse(TEXT("the hit model is hidden"), A.Men()[2].bVisible);
+	TestTrue(TEXT("the replacement walks toward the vacant numbered slot"), A.Men()[0].Local.X < Before[2].Local.X && A.Men()[0].Local.X > Before[0].Local.X);
+	TestEqual(TEXT("a repeated hit without lost health does not swap again"), A.HitMan(0, 2), INDEX_NONE);
+	TestEqual(TEXT("the last man needs no swap"), A.HitMan(1, 1), INDEX_NONE);
+	TestEqual(TEXT("reinforcement needs no swap"), A.HitMan(0, 3), INDEX_NONE);
+	return true;
+}
+#endif
+
 #endif // TC_INFANTRY_RIG_STANDALONE

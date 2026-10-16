@@ -79,6 +79,14 @@ namespace TCLook
 	FLinearColor ACESFilmic(const FLinearColor& Linear, float Exposure);
 	// ACESFilmic then the sRGB OETF: what three writes to the canvas, 0-1
 	FLinearColor ToneMapped(const FLinearColor& Linear, float Exposure);
+	// three fog_fragment, tonemapping_fragment and OutputPass for an unlit world billboard.
+	// Returns linear colour for the HUD canvas, which applies the output transfer itself. Alpha is unchanged.
+	FLinearColor BillboardColour(const FLinearColor& Linear, float Depth, float Near, float Far,
+		const FLinearColor& Haze, float Exposure, bool bBeforeTone);
+	struct FShadowView { double Radius = 0, Texel = 0, FarDepth = 0, CascadeRadius = 0; int32 Resolution = 0; };
+	// light.js followView: the four ground intersections, 10 m pad and 8 m radius steps.
+	FShadowView ShadowView(const FVector& Eye, const FVector& Forward, const FVector& Right, const FVector& Up,
+		double TanHalfFovX, double TanHalfFovY, double Ground, int32 MapSize, double FilterRadius, bool bSoft);
 
 	const TArray<FTCMood>& Moods();
 	const FTCMood& DefaultMood(); // 'day'
@@ -201,6 +209,7 @@ private:
 	void AimSun(float BrowserYaw);
 	void CheckSkyCapture();
 	void Audit();
+	void FollowShadowView();
 	FTCMood Base, Look;
 	bool bLobbyLook = false;
 	FTCLobbyLook LobbyLook;

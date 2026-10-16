@@ -86,6 +86,9 @@ namespace TCRelief
 		bool bMergeFlatRuns = true;
 		int NumParts() const { return (int)Parts.size(); }
 		const FPart& Part(int I) const { return Parts[(size_t)I]; }
+		// Close the native known-only surface against the public flat unknown placeholder. The browser's
+		// continuous ground has no opening here. These shaded joins read only a known cell's drawn edge.
+		FPart FrontierSeal(int I) const;
 		int PartOfCell(int C) const;
 		FStats Stats;
 

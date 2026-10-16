@@ -2,6 +2,7 @@
 #include "ThreeCrossroads.h"
 #include "Net/TCMatchState.h"
 #include "World/TCFogFrontier.h"
+#include "World/TCWater.h"
 #include "ProceduralMeshComponent.h"
 #include "Materials/MaterialInterface.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -60,6 +61,7 @@ ATCTerrain::ATCTerrain()
 
 void ATCTerrain::ResetFrom(const FTCMatchState& State)
 {
+	FogOverlay.Attach(GetWorld());
 	const int32 NewW = State.Map.W, NewH = State.Map.H;
 	const int32 NewChunksX = FMath::DivideAndRoundUp(NewW, ChunkCells), NewChunksY = FMath::DivideAndRoundUp(NewH, ChunkCells);
 	// A reconnect to the match already on screen keeps its chunks drawn while every one is rebuilt from the new start,
@@ -71,6 +73,7 @@ void ATCTerrain::ResetFrom(const FTCMatchState& State)
 	if (!bKeep)
 	{
 		Mesh->ClearAllMeshSections();
+		FogOverlay.Clear();
 		SectionVerts.Init(0, NewChunksX * NewChunksY);
 	}
 	W = NewW; H = NewH; ChunksX = NewChunksX; ChunksY = NewChunksY;
@@ -106,6 +109,12 @@ void ATCTerrain::ResetFrom(const FTCMatchState& State)
 		bKeep ? TEXT(" (same match: drawn ground kept while it rebuilds)") : TEXT(""));
 }
 
+void ATCTerrain::EndPlay(const EEndPlayReason::Type Reason)
+{
+	FogOverlay.Detach();
+	Super::EndPlay(Reason);
+}
+
 void ATCTerrain::EnsureMaterial(bool bLow)
 {
 	// client/relief-material.js over the painted ground (unreal/Tools/relief/make-relief-material.py); without it the
@@ -114,6 +123,7 @@ void ATCTerrain::EnsureMaterial(bool bLow)
 	{
 		Material = LoadObject<UMaterialInterface>(nullptr, TCTerrainImpl::ReliefMaterialPath, nullptr, LOAD_NoWarn | LOAD_Quiet);
 		if (!Material) { Material = LoadObject<UMaterialInterface>(nullptr, TCTerrainImpl::FallbackMaterialPath, nullptr, LOAD_NoWarn | LOAD_Quiet); UE_LOG(LogTC, Warning, TEXT("terrain: %s missing, the ground is drawn with the plain Lambert"), TCTerrainImpl::ReliefMaterialPath); }
+		TCFogLook::PrepareMaterial(Material.Get());
 	}
 	if (Material && !MaterialMid) MaterialMid = UMaterialInstanceDynamic::Create(Material, this);
 	if (MaterialMid) MaterialMid->SetScalarParameterValue(TEXT("Low"), bLow ? 1.f : 0.f);
@@ -189,6 +199,7 @@ void ATCTerrain::MarkCells(const TSet<int32>& Shaped, const TSet<int32>& Fogged)
 
 void ATCTerrain::Flush(const FTCMatchState& State)
 {
+	FogOverlay.Flush(State);
 	if (W <= 0 || State.Map.W != W || State.Map.H != H) return;
 	// client/main.js: the fog lifts once the match is decided, on authored maps only (the server sends every unit then)
 	if (!bEndRevealed && !State.Map.bWorld && State.Winner >= -1)
@@ -272,6 +283,7 @@ float ATCTerrain::WaterAt(float X, float Z) const
 
 void ATCTerrain::UploadChunk(const FTCMatchState& State, int32 Chunk, bool bShape)
 {
+	if (bShape) UploadFrontierSeal(Chunk);
 	const TCRelief::FPart& P = ReliefCore.Part(Chunk);
 	const int32 NV = P.Vertices();
 	TArray<FVector> Verts, Normals;
@@ -303,12 +315,40 @@ void ATCTerrain::UploadChunk(const FTCMatchState& State, int32 Chunk, bool bShap
 	}
 	MeshedTotal++;
 	SectionVerts[Chunk] = NV;
-	if (!NV) { Mesh->ClearMeshSection(Chunk); return; }
+	if (!NV) { Mesh->ClearMeshSection(Chunk); FogOverlay.ClearSection(Chunk); return; }
 	TArray<int32> Tris;
 	Tris.SetNumUninitialized(P.Idx.size());
 	for (int32 I = 0; I < Tris.Num(); I++) Tris[I] = (int32)P.Idx[(size_t)I];
 	Mesh->CreateMeshSection_LinearColor(Chunk, Verts, Tris, Normals, UV0, UV1, UV2, UV3, Colors, TArray<FProcMeshTangent>(), false);
 	Mesh->SetMaterial(Chunk, MaterialMid ? (UMaterialInterface*)MaterialMid : Material.Get());
+	FogOverlay.SetSection(Chunk, Verts, Tris, Normals);
+}
+
+void ATCTerrain::UploadFrontierSeal(int32 Chunk)
+{
+	const int32 Section = ReliefCore.NumParts() + Chunk;
+	const TCRelief::FPart P = bBuiltWorld ? ReliefCore.FrontierSeal(Chunk) : TCRelief::FPart();
+	if (P.Idx.empty()) { Mesh->ClearMeshSection(Section); FogOverlay.ClearSection(Section); return; }
+	if (!FrontierSealMid)
+	{
+		UMaterialInterface* M = LoadObject<UMaterialInterface>(nullptr, FTCFogFrontier::UnknownMaterialPath);
+		if (!M) return;
+		TCFogLook::PrepareMaterial(M);
+		FrontierSealMid = UMaterialInstanceDynamic::Create(M, this);
+		const float Shade = TCFogFrontierCore::Shade / 255.f;
+		FrontierSealMid->SetVectorParameterValue(TEXT("Color"), FLinearColor(Shade, Shade, Shade, 1));
+	}
+	TArray<FVector> V, N;
+	TArray<int32> I;
+	for (int K = 0; K < P.Vertices(); K++)
+	{
+		V.Add(FVector(P.Pos[K * 3] * 100.0, P.Pos[K * 3 + 2] * 100.0, P.Pos[K * 3 + 1] * 100.0));
+		N.Add(FVector::UpVector);
+	}
+	for (const uint32_t K : P.Idx) I.Add((int32)K);
+	Mesh->CreateMeshSection_LinearColor(Section, V, I, N, {}, {}, {}, false);
+	Mesh->SetMaterial(Section, FrontierSealMid);
+	FogOverlay.SetSection(Section, V, I, N);
 }
 
 bool ATCTerrain::RayToGround(const FVector& Origin, const FVector& Dir, FVector2D& OutMetres) const
@@ -346,6 +386,7 @@ bool ATCTerrain::RayToGround(const FVector& Origin, const FVector& Dir, FVector2
 #include "Serialization/JsonSerializer.h"
 #include "ShaderCompiler.h"
 #include "TextureResource.h"
+#include "DynamicRHI.h"
 #if WITH_EDITOR
 #include "AssetCompilingManager.h"
 #endif
@@ -409,6 +450,83 @@ namespace TCTerrainImpl
 
 #if WITH_DEV_AUTOMATION_TESTS
 #include "Misc/AutomationTest.h"
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCFogOverlayPixelsTest, "ThreeCrossroads.Terrain.FogOverlayPixels", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FTCFogOverlayPixelsTest::RunTest(const FString& Parameters)
+{
+	if (GUsingNullRHI) { AddInfo(TEXT("FogOverlayPixels requires a real RHI; no pixel assertion under nullrhi")); return true; }
+	TCTerrainImpl::FScratchWorld Scratch(TEXT("TCFogOverlayPixels"));
+	UWorld* World = Scratch.World;
+	FTCMatchState State;
+	State.Map.W = State.Map.H = 8;
+	State.Map.Chars.Init('.',64); State.Map.Levels.Init(0,64); State.Map.Known.Init(true,64);
+	State.FogVisible.Init(false,64); State.FogExplored.Init(true,64);
+	FTCFogFrontier Fog;
+	const FTCFogFrontier* Previous = TCFogLook::Active();
+	Fog.Attach(World); Fog.Start(State); TCFogLook::SetActive(&Fog); Fog.Frame(0,false,State);
+	FTCFogOverlay Overlay; Overlay.Attach(World);
+	const TArray<FVector> P = { FVector(0,0,0),FVector(1600,0,0),FVector(0,1600,0),FVector(1600,1600,0) };
+	const TArray<int32> I = {0,2,3,0,3,1};
+	const TArray<FVector> N = {FVector::UpVector,FVector::UpVector,FVector::UpVector,FVector::UpVector};
+	Overlay.SetSection(0,P,I,N); Overlay.Flush(State);
+	AActor* Ground = World->SpawnActor<AActor>();
+	UProceduralMeshComponent* Mesh = NewObject<UProceduralMeshComponent>(Ground);
+	Ground->SetRootComponent(Mesh); Ground->AddInstanceComponent(Mesh); Mesh->RegisterComponent();
+	Mesh->CreateMeshSection_LinearColor(0,P,I,N,{}, {}, {}, false);
+	UMaterialInterface* Plain = LoadObject<UMaterialInterface>(nullptr,FTCFogFrontier::UnknownMaterialPath);
+	UMaterialInstanceDynamic* Base = UMaterialInstanceDynamic::Create(Plain,Ground);
+	Base->SetVectorParameterValue(TEXT("Color"),FLinearColor(.8,.6,.4,1)); Mesh->SetMaterial(0,Base);
+	UTextureRenderTarget2D* Target = NewObject<UTextureRenderTarget2D>(World->GetWorldSettings());
+	Target->RenderTargetFormat = RTF_RGBA16f; Target->ClearColor = FLinearColor::Black;
+	Target->InitAutoFormat(64,64); Target->UpdateResourceImmediate(true);
+	USceneCaptureComponent2D* Capture = NewObject<USceneCaptureComponent2D>(World->GetWorldSettings());
+	Capture->TextureTarget=Target; Capture->CaptureSource=SCS_SceneColorHDRNoAlpha;
+	Capture->ProjectionType=ECameraProjectionMode::Orthographic; Capture->OrthoWidth=1600;
+	Capture->bCaptureEveryFrame=false; Capture->bCaptureOnMovement=false;
+	Capture->ShowFlags.SetEyeAdaptation(false); Capture->ShowFlags.SetAntiAliasing(false);
+	Capture->SetWorldLocationAndRotation(FVector(800,800,2000),FRotator(-90,0,0));
+	Capture->RegisterComponentWithWorld(World); TCTerrainImpl::FinishCompiling();
+	auto Pixel = [&]() {
+		for (int F=0;F<3;F++) { World->SendAllEndOfFrameUpdates(); Capture->CaptureScene(); FlushRenderingCommands(); }
+		TArray<FLinearColor> Pixels;
+		if (!Target->GameThread_GetRenderTargetResource()->ReadLinearColorPixels(Pixels) || Pixels.Num()!=4096) { AddError(TEXT("fog pixel readback failed")); return FLinearColor::Black; }
+		return Pixels[32*64+32];
+	};
+	Overlay.MeshComponent()->SetVisibility(false); const FLinearColor Lit=Pixel();
+	Overlay.MeshComponent()->SetVisibility(true); const FLinearColor Dim=Pixel();
+	AddInfo(FString::Printf(TEXT("FogOverlayPixels base %.6f %.6f %.6f, dim %.6f %.6f %.6f"),Lit.R,Lit.G,Lit.B,Dim.R,Dim.G,Dim.B));
+	TestTrue(TEXT("test ground renders"),Lit.R>.7);
+	const double Alpha=TCFogFrontierCore::Mist(120.0/255,8.125,8.125,0);
+	TestNearlyEqual(TEXT("GPU overlay follows the source linear blend"),Dim.R,(float)TCFogFrontierCore::Composite(Lit.R,Alpha),.015f);
+	TestTrue(TEXT("fog changes lit radiance"),Dim.R<Lit.R-.15f);
+	// A real water layer sits above the copied ground, writes no depth and must draw before fog.
+	State.Map.Chars.Init('W',64);
+	FTCWater Water; Water.Attach(World); Water.ResetFrom(State); Water.SetPresentationTime(37); Water.Flush(State,37,false);
+	TCTerrainImpl::FinishCompiling();
+	Overlay.MeshComponent()->SetVisibility(false); const FLinearColor Wet=Pixel();
+	Overlay.MeshComponent()->SetVisibility(true); const FLinearColor WetDim=Pixel();
+	AddInfo(FString::Printf(TEXT("FogOverlayPixels water %.6f %.6f %.6f, fogged %.6f %.6f %.6f"),Wet.R,Wet.G,Wet.B,WetDim.R,WetDim.G,WetDim.B));
+	TestTrue(TEXT("water changes the test surface"),FMath::Abs(Wet.R-Lit.R)>.05f);
+	TestNearlyEqual(TEXT("fog composites after translucent water"),WetDim.R,(float)TCFogFrontierCore::Composite(Wet.R,Alpha),.015f);
+	Water.Detach();
+	// Spatial sampling must also work near the World river at (218,846), far from the origin.
+	State.Map.W=State.Map.H=512;
+	State.Map.Chars.Init('.',512*512); State.Map.Levels.Init(0,512*512); State.Map.Known.Init(true,512*512);
+	State.FogVisible.Init(true,512*512); State.FogExplored.Init(true,512*512);
+	for (int Y=420;Y<428;Y++) for (int X=105;X<113;X++) State.FogVisible[Y*512+X]=false;
+	Fog.Start(State); Fog.Frame(0,false,State);
+	const FVector Offset(21000,84000,0);
+	TArray<FVector> FarP=P; for (FVector& V:FarP) V+=Offset;
+	Mesh->SetWorldLocation(Offset); Overlay.SetSection(0,FarP,I,N); Overlay.Flush(State);
+	Capture->SetWorldLocationAndRotation(FVector(800,800,2000)+Offset,FRotator(-90,0,0));
+	Overlay.MeshComponent()->SetVisibility(false); const FLinearColor FarLit=Pixel();
+	Overlay.MeshComponent()->SetVisibility(true); const FLinearColor FarDim=Pixel();
+	const double FarAlpha=TCFogFrontierCore::Mist(TCFogFrontierCore::SampleAlpha(Fog.CoreState().Bytes.data(),512,512,218.125,848.125),218.125,848.125,0);
+	AddInfo(FString::Printf(TEXT("FogOverlayPixels distant base %.6f, dim %.6f, alpha %.6f"),FarLit.R,FarDim.R,FarAlpha));
+	TestNearlyEqual(TEXT("World-sized raw texture samples world metres"),FarDim.R,(float)TCFogFrontierCore::Composite(FarLit.R,FarAlpha),.015f);
+	Capture->DestroyComponent(); Overlay.Detach(); Fog.Detach(); TCFogLook::SetActive(Previous);
+	return true;
+}
 
 // The pinned client/relief.js against the port: unreal/Tools/relief/relief-oracle.mjs ran the reference unmodified on all
 // 33 authored maps, two incremental cases, Low graphics and a World Conquest sample and kept its inputs, relief.hAt at

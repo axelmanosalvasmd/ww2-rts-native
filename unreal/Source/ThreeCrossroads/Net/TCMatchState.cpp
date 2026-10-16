@@ -289,7 +289,7 @@ void FTCMatchState::ClearMatch()
 	Map = FTCMap();
 	bFogLifted = false;
 	FogVisible.Reset(); FogExplored.Reset();
-	Units.Reset(); UnreadableIds.Reset(); WarnedUnreadable.Reset(); DropRowsAside();
+	Units.Reset(); UnitOrder.Reset(); UnreadableIds.Reset(); WarnedUnreadable.Reset(); DropRowsAside();
 	bPaused = false; PauseText.Reset(); LastDeny.Reset(); DenyCmd.Reset(); DenyReason.Reset(); Denies = 0;
 	Snapshots = 0;
 	ConfirmedMatch = -1; ConfirmedSeat = -1;
@@ -418,7 +418,7 @@ bool FTCMatchState::ApplyStartDecode(const FJsonObject& M)
 	if (M.TryGetArrayField(TEXT("teams"), Arr)) for (const auto& V : *Arr) Teams.Add(IntOr(V, -1));
 
 	// The start replaces every unit held: snapshots then send rows against an empty "sent" map (server.js sendStart).
-	Units.Reset(); UnreadableIds.Reset(); WarnedUnreadable.Reset(); DropRowsAside();
+	Units.Reset(); UnitOrder.Reset(); UnreadableIds.Reset(); WarnedUnreadable.Reset(); DropRowsAside();
 	DirtyCells.Reset(); FogDirtyCells.Reset();
 	bMapReset = true;
 
@@ -594,9 +594,9 @@ bool FTCMatchState::ApplySnapshot(const FJsonObject& M)
 	const bool bHasHeld = M.TryGetArrayField(TEXT("held"), Held) && Held->Num() >= 2;
 	bool bAll = false;
 	M.TryGetBoolField(TEXT("all"), bAll);
-	if (bAll || !bHasHeld) { Units.Reset(); UnreadableIds.Reset(); }
+	if (bAll || !bHasHeld) { Units.Reset(); UnitOrder.Reset(); UnreadableIds.Reset(); }
 	const TArray<TSharedPtr<FJsonValue>>* Arr;
-	if (M.TryGetArrayField(TEXT("gone"), Arr)) for (const auto& V : *Arr) { const int32 Id = IntOr(V, 0); Units.Remove(Id); UnreadableIds.Remove(Id); }
+	if (M.TryGetArrayField(TEXT("gone"), Arr)) for (const auto& V : *Arr) { const int32 Id = IntOr(V, 0); Units.Remove(Id); UnitOrder.Remove(Id); UnreadableIds.Remove(Id); }
 	if (M.TryGetArrayField(TEXT("units"), Arr))
 	{
 		for (const auto& V : *Arr)
@@ -604,12 +604,13 @@ bool FTCMatchState::ApplySnapshot(const FJsonObject& M)
 			const TArray<TSharedPtr<FJsonValue>>* Row;
 			if (!V.IsValid() || !V->TryGetArray(Row)) continue;
 			FTCUnit U;
-			if (ParseUnit(*Row, U)) { const int32 Id = U.Id; UnreadableIds.Remove(Id); Units.Add(Id, MoveTemp(U)); continue; }
+			if (ParseUnit(*Row, U)) { const int32 Id = U.Id; if (!UnitOrder.Contains(Id)) UnitOrder.Add(Id); UnreadableIds.Remove(Id); Units.Add(Id, MoveTemp(U)); continue; }
 			// The browser stores any row (client/world-state.js). Keep the last good row for this id if there is one,
 			// else remember the id so the held check still agrees with the server.
 			double IdNum;
 			if (Row->Num() < 1 || !Num((*Row)[0], IdNum)) continue;
 			const int32 Id = NarrowInt(IdNum);
+			if (!UnitOrder.Contains(Id)) UnitOrder.Add(Id);
 			if (!Units.Contains(Id)) UnreadableIds.Add(Id);
 			bool bAlreadyWarned = false;
 			WarnedUnreadable.Add(Id, &bAlreadyWarned);
@@ -1022,3 +1023,30 @@ void FTCMatchState::LogExtrasTransitions()
 		UE_LOG(LogTC, Log, TEXT("match decided: %s; %s"), *Objectives.Epilogue().Word, *DescribeExtras());
 	}
 }
+
+#if WITH_DEV_AUTOMATION_TESTS
+#include "Misc/AutomationTest.h"
+#include "Serialization/JsonReader.h"
+#include "Serialization/JsonSerializer.h"
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCRecipientOrderTest, "ThreeCrossroads.Markers.RecipientOrder", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FTCRecipientOrderTest::RunTest(const FString&)
+{
+    FTCMatchState S; S.bHasMatch = true;
+    auto Apply = [&S](const TCHAR* Json) {
+        TSharedPtr<FJsonObject> M;
+        if (FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(FString(Json)), M)) S.ApplySnapshot(*M);
+    };
+    Apply(TEXT(R"({"held":[3,14],"units":[[9,"rifle",0,1,1,0,0,60,0,0,2,0,0,0,1],[2,"rifle",0,1,1,0,0,60,0,0,2,0,0,0,1],[5,"rifle",0,1,1,0,0,60,0,0,2,0,0,0,1]]})"));
+    TestTrue(TEXT("full recipient rows keep their received order"), S.UnitOrder == TArray<int32>({9,2,5}));
+    Apply(TEXT(R"({"held":[3,11],"gone":[2],"units":[[7,"rifle",0,1,1,0,0,60,0,0,2,0,0,0,1],[9,"rifle",0,1,1,0,0,59,0,0,2,0,0,0,1]]})"));
+    TestTrue(TEXT("replacement keeps its place, new row appends"), S.UnitOrder == TArray<int32>({9,5,7}));
+    Apply(TEXT(R"({"held":[4,9],"units":[[2,"rifle",0,1,1,0,0,60,0,0,2,0,0,0,1]]})"));
+    TestTrue(TEXT("return after gone appends rather than reusing the map slot"), S.UnitOrder == TArray<int32>({9,5,7,2}));
+    Apply(TEXT(R"({"all":true,"held":[2,2],"units":[[3,"rifle",0,1,1,0,0,60,0,0,2,0,0,0,1],[1,"rifle",0,1,1,0,0,60,0,0,2,0,0,0,1]]})"));
+    TestTrue(TEXT("all replaces the old insertion order"), S.UnitOrder == TArray<int32>({3,1}));
+    Apply(TEXT(R"({"units":[[4,"rifle",0,1,1,0,0,60,0,0,2,0,0,0,1],[2,"rifle",0,1,1,0,0,60,0,0,2,0,0,0,1]]})"));
+    TestTrue(TEXT("legacy full rows replace the old insertion order"), S.UnitOrder == TArray<int32>({4,2}));
+    S.ClearMatch(); TestTrue(TEXT("new matches forget recipient order"), S.UnitOrder.IsEmpty());
+    return true;
+}
+#endif

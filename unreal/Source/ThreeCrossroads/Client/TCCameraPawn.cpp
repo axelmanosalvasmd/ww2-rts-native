@@ -13,16 +13,70 @@
 #include "InputCoreTypes.h"
 #include "Widgets/SWindow.h"
 #include "GenericPlatform/GenericWindow.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
+#include "HAL/PlatformProcess.h"
+#include "Dom/JsonObject.h"
+#include "Serialization/JsonReader.h"
+#include "Serialization/JsonSerializer.h"
 #if PLATFORM_LINUX
 // ApplicationCore exports the SDL API it uses. A cursor rectangle alone does not enable SDL's native grab.
 struct SDL_Window;
+struct SDL_Rect { int x, y, w, h; };
 extern "C" SDL_Window* SDL_GetKeyboardFocus(void);
 extern "C" bool SDL_SetWindowMouseGrab(SDL_Window*, bool);
 extern "C" bool SDL_GetWindowMouseGrab(SDL_Window*);
+extern "C" bool SDL_SetWindowMouseRect(SDL_Window*, const SDL_Rect*);
+extern "C" bool SDL_GetWindowSize(SDL_Window*, int*, int*);
+extern "C" unsigned int SDL_GetWindowProperties(SDL_Window*);
+extern "C" void* SDL_GetPointerProperty(unsigned int, const char*, void*);
+extern "C" int64 SDL_GetNumberProperty(unsigned int, const char*, int64);
+extern "C" const char* SDL_GetCurrentVideoDriver(void);
 #endif
 
 namespace TCCaptureImpl
 {
+#if PLATFORM_LINUX
+	// SDL's X11 grab may report success while an external core-pointer warp escapes it. Query the native
+	// window on SDL's own display so this check sees the real pointer, including synthetic X11 motion.
+	class FX11Pointer
+	{
+		using FQuery = int (*)(void*, unsigned long, unsigned long*, unsigned long*, int*, int*, int*, int*, unsigned int*);
+		using FWarp = int (*)(void*, unsigned long, unsigned long, int, int, unsigned int, unsigned int, int, int);
+		using FDisplayCall = int (*)(void*);
+		using FLock = void (*)(void*);
+		void* Library = FPlatformProcess::GetDllHandle(TEXT("libX11.so.6"));
+		FQuery Query = Library ? reinterpret_cast<FQuery>(FPlatformProcess::GetDllExport(Library, TEXT("XQueryPointer"))) : nullptr;
+		FWarp Warp = Library ? reinterpret_cast<FWarp>(FPlatformProcess::GetDllExport(Library, TEXT("XWarpPointer"))) : nullptr;
+		FDisplayCall Flush = Library ? reinterpret_cast<FDisplayCall>(FPlatformProcess::GetDllExport(Library, TEXT("XFlush"))) : nullptr;
+		FLock Lock = Library ? reinterpret_cast<FLock>(FPlatformProcess::GetDllExport(Library, TEXT("XLockDisplay"))) : nullptr;
+		FLock Unlock = Library ? reinterpret_cast<FLock>(FPlatformProcess::GetDllExport(Library, TEXT("XUnlockDisplay"))) : nullptr;
+	public:
+		bool Confine(SDL_Window* Handle, FIntPoint Size) const
+		{
+			if (!Query || !Warp || !Flush || !Lock || !Unlock) return false;
+			const auto Properties = SDL_GetWindowProperties(Handle);
+			void* Display = SDL_GetPointerProperty(Properties, "SDL.window.x11.display", nullptr);
+			const auto Window = static_cast<unsigned long>(SDL_GetNumberProperty(Properties, "SDL.window.x11.window", 0));
+			if (!Display || !Window) return false;
+			Lock(Display);
+			unsigned long Root = 0, Child = 0; int RootX = 0, RootY = 0, X = 0, Y = 0; unsigned int Mask = 0;
+			const bool bSameScreen = Query(Display, Window, &Root, &Child, &RootX, &RootY, &X, &Y, &Mask) != 0;
+			if (bSameScreen)
+			{
+				const FVector2D Local(X,Y), Clamped = FTCMouseCapture::ConfinedPosition(Local, Size);
+				if (Clamped != Local)
+				{
+					Warp(Display, 0, Window, 0,0,0,0, int(Clamped.X), int(Clamped.Y));
+					Flush(Display);
+					if (FParse::Param(FCommandLine::Get(), TEXT("TCSessionLog"))) UE_LOG(LogTC, Log, TEXT("capture mouse: corrected escaped X11 cursor %d,%d to %.0f,%.0f"), X,Y,Clamped.X,Clamped.Y);
+				}
+			}
+			Unlock(Display);
+			return bSameScreen;
+		}
+	};
+#endif
 	// The arrow polygon and ink/chalk colours are pointer.js SPRITES.arrow, with its (3,2) hot spot.
 	class SSourceCursor : public SLeafWidget
 	{
@@ -57,6 +111,11 @@ namespace TCCaptureImpl
 FString FTCMouseCapture::ValidMode(const FString& V)
 {
 	return V == TEXT("always") || V == TEXT("off") ? V : FString(TEXT("fullscreen"));
+}
+
+FVector2D FTCMouseCapture::ConfinedPosition(FVector2D Position, FIntPoint Size)
+{
+	return FVector2D(FMath::Clamp(Position.X, 0., double(FMath::Max(0, Size.X - 1))), FMath::Clamp(Position.Y, 0., double(FMath::Max(0, Size.Y - 1))));
 }
 
 bool FTCMouseCapture::WindowFocused(const TSharedPtr<SWindow>& Window)
@@ -95,30 +154,47 @@ void FTCMouseCapture::Apply(APlayerController* PC)
 {
 	if (!PC || !PC->GetWorld() || !PC->GetWorld()->GetGameViewport()) return;
 	auto* V = PC->GetWorld()->GetGameViewport();
+	const bool bChanged = !bApplied || bAppliedCapture != bCaptured;
+	if (bChanged)
+	{
+		bApplied = true; bAppliedCapture = bCaptured;
+		if (!V->HasSoftwareCursor(EMouseCursor::Default)) V->SetSoftwareCursorWidget(EMouseCursor::Default, SNew(TCCaptureImpl::SSourceCursor));
+		V->SetUseSoftwareCursorWidgets(bCaptured);
+		PC->DefaultMouseCursor = bCaptured ? EMouseCursor::Default : EMouseCursor::Crosshairs;
+		FInputModeGameAndUI Input;
+		Input.SetHideCursorDuringCapture(false);
+		Input.SetLockMouseToViewportBehavior(bCaptured ? EMouseLockMode::LockAlways : EMouseLockMode::DoNotLock);
+		PC->SetInputMode(Input);
+		PC->bShowMouseCursor = true;
+		if (!bCaptured && V->Viewport) V->Viewport->CaptureMouse(false);
+	}
 #if PLATFORM_LINUX
 	const auto Window = V->GetWindow();
 	const auto Native = Window ? Window->GetNativeWindow() : nullptr;
 	if (auto* Handle = Native ? static_cast<SDL_Window*>(Native->GetOSWindowHandle()) : nullptr)
 	{
+		// SetInputMode and Slate's mouse capture can replace SDL's grab. Set confinement afterward, and retain
+		// an explicit window-relative barrier across focus, resize and UI capture changes.
+		SDL_Rect Rect{0,0,0,0};
+		SDL_GetWindowSize(Handle, &Rect.w, &Rect.h);
+		SDL_SetWindowMouseRect(Handle, bCaptured && Rect.w > 0 && Rect.h > 0 ? &Rect : nullptr);
 		if (SDL_GetWindowMouseGrab(Handle) != bCaptured && !SDL_SetWindowMouseGrab(Handle, bCaptured))
 		{
 			bCaptured = false;
 			UE_LOG(LogTC, Warning, TEXT("capture mouse: native window refused the mouse grab"));
 		}
+		// Wayland owns its global coordinates and uses its native barrier. The X11 fallback only acts on the
+		// focused captured window, after normal input-mode setup and SDL confinement.
+		const char* Driver = SDL_GetCurrentVideoDriver();
+		if (bChanged && bCaptured) UE_LOG(LogTC, Log, TEXT("capture backend: %s, focused %d, client %dx%d"), UTF8_TO_TCHAR(Driver ? Driver : "none"), SDL_GetKeyboardFocus() == Handle, Rect.w, Rect.h);
+		if (bCaptured && SDL_GetKeyboardFocus() == Handle && Driver && FCStringAnsi::Strcmp(Driver, "x11") == 0 && Rect.w > 0 && Rect.h > 0)
+		{
+			static const TCCaptureImpl::FX11Pointer Pointer;
+			if (!Pointer.Confine(Handle, FIntPoint(Rect.w,Rect.h)) && bChanged) UE_LOG(LogTC, Warning, TEXT("capture mouse: X11 pointer confinement is unavailable"));
+		}
 	}
 #endif
-	if (bApplied && bAppliedCapture == bCaptured) return;
-	bApplied = true; bAppliedCapture = bCaptured;
-	if (!V->HasSoftwareCursor(EMouseCursor::Default)) V->SetSoftwareCursorWidget(EMouseCursor::Default, SNew(TCCaptureImpl::SSourceCursor));
-	V->SetUseSoftwareCursorWidgets(bCaptured);
-	PC->DefaultMouseCursor = bCaptured ? EMouseCursor::Default : EMouseCursor::Crosshairs;
-	FInputModeGameAndUI Input;
-	Input.SetHideCursorDuringCapture(false);
-	Input.SetLockMouseToViewportBehavior(bCaptured ? EMouseLockMode::LockAlways : EMouseLockMode::DoNotLock);
-	PC->SetInputMode(Input);
-	PC->bShowMouseCursor = true;
-	if (!bCaptured && V->Viewport) V->Viewport->CaptureMouse(false);
-	UE_LOG(LogTC, Log, TEXT("capture mouse: mode %s, confined %d, drawn cursor %d, suspended %d"), *ModeValue, bCaptured, V->GetIsUsingSoftwareCursorWidgets(), bSuspended);
+	if (bChanged) UE_LOG(LogTC, Log, TEXT("capture mouse: mode %s, confined %d, drawn cursor %d, suspended %d"), *ModeValue, bCaptured, V->GetIsUsingSoftwareCursorWidgets(), bSuspended);
 }
 
 void FTCMouseCapture::Drive(APlayerController* PC, bool bPlaying)
@@ -239,6 +315,25 @@ bool TCSelectionBounds::Intersects(const FBox2D& A, const FBox2D& B)
 	return A.bIsValid && B.bIsValid && A.Max.X >= B.Min.X && A.Min.X <= B.Max.X && A.Max.Y >= B.Min.Y && A.Min.Y <= B.Max.Y;
 }
 
+FBox TCSelectionBounds::Blend(TArrayView<const FBox> Keys, TArrayView<const float> Data)
+{
+	if (Data.Num() < 8) return FBox(ForceInit);
+	FBox Result(FVector::ZeroVector, FVector::ZeroVector);
+	bool bUsed = false;
+	for (int32 I = 0; I < 4; I++)
+	{
+		if (!FMath::IsFinite(Data[I]) || !FMath::IsFinite(Data[I + 4])) return FBox(ForceInit);
+		const float Weight = Data[I + 4];
+		if (Weight == 0) continue;
+		const int32 K = FMath::RoundToInt(Data[I]);
+		if (!Keys.IsValidIndex(K) || !Keys[K].IsValid) return FBox(ForceInit);
+		Result.Min += (Weight >= 0 ? Keys[K].Min : Keys[K].Max) * Weight;
+		Result.Max += (Weight >= 0 ? Keys[K].Max : Keys[K].Min) * Weight;
+		bUsed = true;
+	}
+	return bUsed ? Result : FBox(ForceInit);
+}
+
 // The lead patch adds this declaration to the existing renderer history. Definitions stay in this scope.
 #include "Client/TCModelLibrary.h"
 #include "Client/TCUnitRenderer.h"
@@ -250,7 +345,14 @@ bool TCSelectionBounds::Intersects(const FBox2D& A, const FBox2D& B)
 void ATCUnitRenderer::SelectionBounds(int32 Id, const FTCPinhole& View, double W, double H, TArray<FBox2D>& Out) const
 {
 	History.SelectionBounds(Id, View, W, H, Out);
-	if (Crowd) Crowd->History.SelectionBounds(Id, View, W, H, Out);
+	if (Crowd)
+	{
+#if defined(TC_HAS_POSE_SELECTION)
+		Crowd->SelectionBounds(Id, View, W, H, Out);
+#else
+		Crowd->History.SelectionBounds(Id, View, W, H, Out);
+#endif
+	}
 }
 
 bool ATCPlayerController::ModelBounds(const FTCUnit& U, TArray<FBox2D>& Out) const
@@ -276,6 +378,152 @@ void FTCInstanceHistory::SelectionBounds(int32 UnitId, const FTCPinhole& View, d
 			if ((Key >> 60) != 1 || int32(uint32(Key >> 24)) != UnitId || (Key & 15) > 1) continue;
 			FBox2D Screen;
 			if (TCSelectionBounds::Project(Ism->GetStaticMesh()->GetBoundingBox(), Instance.Value, View, W, H, Screen)) Out.Add(Screen);
+		}
+	}
+}
+#endif
+
+#if defined(TC_HAS_POSE_SELECTION)
+namespace TCSelectionPose
+{
+	struct FVertex { FVector P; float J[4] = {}, W[4] = {}; };
+	// Read the existing reproducible GLB payload, including indexed visible sections. This also works in a cook
+	// whose static-mesh CPU buffers are stripped. Models/Infantry/Source is already staged as non-asset content.
+	const TArray<FVertex>& Source(const FString& Mesh)
+	{
+		static TMap<FString, TArray<FVertex>> Cache;
+		if (const auto* Found = Cache.Find(Mesh)) return *Found;
+		auto& Out = Cache.Add(Mesh);
+		const bool bBody = Mesh == TEXT("SM_InfantryCrowdBody") || Mesh == TEXT("SM_InfantryCrowdCrown");
+		const FString Relative = bBody ? Mesh : TEXT("Kit/") + Mesh.RightChop(15);
+		TArray<uint8> Bytes;
+		if (!FFileHelper::LoadFileToArray(Bytes, *FPaths::Combine(FPaths::ProjectContentDir(), TEXT("Models/Infantry/Source"), Relative + TEXT(".glb"))) || Bytes.Num() < 28) return Out;
+		auto U32 = [&](int32 At) { uint32 V = 0; if (At >= 0 && At + 4 <= Bytes.Num()) FMemory::Memcpy(&V, Bytes.GetData() + At, 4); return V; };
+		const uint32 JsonSize = U32(12);
+		if (U32(0) != 0x46546c67 || U32(4) != 2 || U32(16) != 0x4e4f534a || JsonSize > uint32(Bytes.Num() - 28)) return Out;
+		const int32 Bin = 28 + JsonSize;
+		if (U32(24 + JsonSize) != 0x004e4942) return Out;
+		const FUTF8ToTCHAR JsonText(reinterpret_cast<const ANSICHAR*>(Bytes.GetData() + 20), JsonSize);
+		TSharedPtr<FJsonObject> Json;
+		if (!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(FString(JsonText.Length(), JsonText.Get())), Json)) return Out;
+		const auto& Accessors = Json->GetArrayField(TEXT("accessors"));
+		const auto& Views = Json->GetArrayField(TEXT("bufferViews"));
+		auto Read = [&](int32 A, int32 Count, TArray<float>& Values) -> bool
+		{
+			if (!Accessors.IsValidIndex(A)) return false;
+			const auto O = Accessors[A]->AsObject();
+			const int32 B = O->GetIntegerField(TEXT("bufferView"));
+			if (!Views.IsValidIndex(B)) return false;
+			const auto V = Views[B]->AsObject();
+			const int32 Type = O->GetIntegerField(TEXT("componentType")), N = O->GetIntegerField(TEXT("count"));
+			const int32 Size = Type == 5126 || Type == 5125 ? 4 : Type == 5123 ? 2 : 0;
+			if (!Size || N < 0 || N > 1000000 || Count < 1 || Count > 4) return false;
+			double ViewOffset = 0, AccessorOffset = 0, StrideValue = Size * Count;
+			V->TryGetNumberField(TEXT("byteOffset"), ViewOffset); O->TryGetNumberField(TEXT("byteOffset"), AccessorOffset); V->TryGetNumberField(TEXT("byteStride"), StrideValue);
+			const int64 Start = int64(Bin) + ViewOffset + AccessorOffset;
+			const int64 Stride = StrideValue;
+			if (Start < Bin || Stride < Size * Count || Start + int64(N) * Stride > Bytes.Num()) return false;
+			Values.SetNum(N * Count);
+			for (int32 I = 0; I < N; I++) for (int32 C = 0; C < Count; C++)
+			{
+				const uint8* P = Bytes.GetData() + Start + I * Stride + C * Size;
+				if (Type == 5126) FMemory::Memcpy(&Values[I * Count + C], P, 4);
+				else if (Type == 5125) { uint32 X; FMemory::Memcpy(&X, P, 4); Values[I * Count + C] = X; }
+				else { uint16 X; FMemory::Memcpy(&X, P, 2); Values[I * Count + C] = X; }
+			}
+			return true;
+		};
+		const auto Primitive = Json->GetArrayField(TEXT("meshes"))[0]->AsObject()->GetArrayField(TEXT("primitives"))[0]->AsObject();
+		const auto Attributes = Primitive->GetObjectField(TEXT("attributes"));
+		TArray<float> Positions, Indices, J01, J23, W01, W23;
+		if (!Read(Attributes->GetIntegerField(TEXT("POSITION")), 3, Positions) || !Read(Primitive->GetIntegerField(TEXT("indices")), 1, Indices)) return Out;
+		if (bBody && (!Read(Attributes->GetIntegerField(TEXT("TEXCOORD_1")), 2, J01) || !Read(Attributes->GetIntegerField(TEXT("TEXCOORD_2")), 2, J23) ||
+			!Read(Attributes->GetIntegerField(TEXT("TEXCOORD_3")), 2, W01) || !Read(Attributes->GetIntegerField(TEXT("TEXCOORD_4")), 2, W23))) return Out;
+		TArray<bool> Used; Used.Init(false, Positions.Num() / 3);
+		for (const float Index : Indices)
+		{
+			const int32 I = int32(Index);
+			if (!Used.IsValidIndex(I)) { Out.Reset(); return Out; }
+			if (Used[I]) continue;
+			Used[I] = true;
+			FVertex Vertex; Vertex.P = FVector(Positions[I * 3], Positions[I * 3 + 2], Positions[I * 3 + 1]) * 100;
+			if (bBody)
+			{
+				if (!J01.IsValidIndex(I * 2 + 1) || !J23.IsValidIndex(I * 2 + 1) || !W01.IsValidIndex(I * 2 + 1) || !W23.IsValidIndex(I * 2 + 1)) { Out.Reset(); return Out; }
+				for (int32 C = 0; C < 4; C++) { Vertex.J[C] = (C < 2 ? J01 : J23)[I * 2 + C % 2]; Vertex.W[C] = (C < 2 ? W01 : W23)[I * 2 + C % 2]; }
+			}
+			Out.Add(Vertex);
+		}
+		return Out;
+	}
+	FTransform Pose(TArrayView<const float> D)
+	{
+		return FTransform(FQuat(FVector(0,1,0), -D[8]), FVector(D[10],0,D[11]), FVector(1,1,D[9] > 0 ? D[9] : 1));
+	}
+}
+
+void UTCSoldierCrowd::SelectionBounds(int32 UnitId, const FTCPinhole& View, double W, double H, TArray<FBox2D>& Out) const
+{
+	// Cache only the immutable per-keyframe local envelopes, never a unit's pose or camera projection.
+	static TMap<FString, TArray<FBox>> Envelopes;
+	for (const auto& Entry : Frame)
+	{
+		const auto* Ism = Entry.Key;
+		const auto& Batch = Entry.Value;
+		if (!Ism || !Ism->IsVisible() || !Ism->GetStaticMesh() || Batch.Floats < 12) continue;
+		const FNearFigure* Near = nullptr; const FFarShape* Far = nullptr; FString Figure; int32 Bone = -1;
+		for (const auto& F : NearFigures)
+		{
+			for (int32 L = 0; L < 2; L++)
+			{
+				if (F.Value.Body[L] == Ism || F.Value.Crown[L] == Ism) { Near = &F.Value; Figure = F.Key; }
+				for (const auto& K : F.Value.Kit[L]) if (K.Key == Ism) { Near = &F.Value; Figure = F.Key; Bone = int32(K.Value); }
+			}
+		}
+		if (!Near) for (const auto& F : FarFigures) if (F.Value.Draw[0] == Ism || F.Value.Draw[1] == Ism)
+		{ Far = FarData.Find(F.Key); Figure = F.Key; break; }
+		if (!Near && !Far) continue;
+		const FString CacheKey = Figure + TEXT("|") + Ism->GetStaticMesh()->GetName() + FString::FromInt(Bone);
+		const TArray<FBox>* Keys = Envelopes.Find(CacheKey);
+		for (int32 I = 0; I < Batch.Keys.Num(); I++)
+		{
+			const uint64 Key = Batch.Keys[I];
+			if ((Key >> 60) != 1 || int32(uint32(Key >> 24)) != UnitId || (Key & 15) != 1 || !Batch.Transforms.IsValidIndex(I) || Batch.Data.Num() < (I + 1) * Batch.Floats) continue;
+			if (!Keys)
+			{
+				TArray<FBox> Boxes; Boxes.Init(FBox(ForceInit), UTCInfantryRigLibrary::NumKeys);
+				if (Far)
+				{
+					for (int32 K = 0; K < Boxes.Num(); K++) for (int32 V = 0; V < Far->Vertices; V++)
+					{ const float* P = Far->Positions.GetData() + (K * Far->Vertices + V) * 3; Boxes[K] += FVector(P[0],P[2],P[1]) * 100; }
+				}
+				else
+				{
+					TArray<FString> Parts; Figure.ParseIntoArray(Parts, TEXT("|"));
+					TArray<FMatrix44f> Skin;
+					int32 Slot = 0;
+					if (Parts.Num() != 3) continue;
+					while (Slot < 16 && UTCInfantryRigLibrary::SoldierKit(Parts[0], Slot, FCString::Atoi(*Parts[1])) != Parts[2]) Slot++;
+					if (Slot == 16 || !UTCInfantryRigLibrary::BakeKeyframes(Parts[0], FCString::Atoi(*Parts[1]), Slot, Skin)) continue;
+					const auto& Vertices = TCSelectionPose::Source(Ism->GetStaticMesh()->GetName());
+					const int32 Bones = UTCInfantryRigLibrary::NumBones;
+					for (int32 K = 0; K < Boxes.Num(); K++) for (const auto& V : Vertices)
+					{
+						FVector3f P = FVector3f::ZeroVector;
+						for (int32 C = 0; C < (Bone >= 0 ? 1 : 4); C++)
+						{
+							const int32 B = Bone >= 0 ? Bone : int32(V.J[C]); const float Weight = Bone >= 0 ? 1 : V.W[C];
+							if (Weight > 0 && B >= 0 && B < Bones) P += FVector3f(Skin[K * Bones + B].TransformPosition(FVector3f(V.P))) * Weight;
+						}
+						Boxes[K] += FVector(P);
+						}
+				}
+				Keys = &Envelopes.Add(CacheKey, MoveTemp(Boxes));
+			}
+			const auto Data = MakeArrayView(Batch.Data).Slice(I * Batch.Floats, 12);
+			const FBox Local = TCSelectionBounds::Blend(*Keys, Data);
+			FBox2D Screen;
+			if (TCSelectionBounds::Project(Local, TCSelectionPose::Pose(Data) * Batch.Transforms[I], View, W, H, Screen)) Out.Add(Screen);
 		}
 	}
 }
@@ -468,6 +716,9 @@ bool FTCMouseCaptureTest::RunTest(const FString&)
 	FTCMouseCapture C;
 	TestFalse(TEXT("an offscreen viewport has no native focus"), FTCMouseCapture::WindowFocused(nullptr));
 	TestEqual(TEXT("unknown stored mode uses source default"), FTCMouseCapture::ValidMode(TEXT("bad")), FString(TEXT("fullscreen")));
+	TestTrue(TEXT("all client edges confine external warps"), FTCMouseCapture::ConfinedPosition(FVector2D(-30,750),FIntPoint(1280,720)) == FVector2D(0,719));
+	TestTrue(TEXT("right/top edges confine external warps"), FTCMouseCapture::ConfinedPosition(FVector2D(1400,-10),FIntPoint(1280,720)) == FVector2D(1279,0));
+	TestTrue(TEXT("an interior cursor stays exactly where it was"), FTCMouseCapture::ConfinedPosition(FVector2D(125.5,215.25),FIntPoint(1280,720)) == FVector2D(125.5,215.25));
 	TestFalse(TEXT("default mode leaves windowed pointer free"), C.Frame(true, false, true, true, false));
 	TestTrue(TEXT("fullscreen click captures"), C.Frame(true, true, true, true, false));
 	TestFalse(TEXT("Esc releases"), C.Frame(true, true, true, false, true));
@@ -487,6 +738,42 @@ bool FTCMouseCaptureTest::RunTest(const FString&)
 	TestTrue(TEXT("a new match resets Esc suspension"), C.Frame(true, false, true, true, false));
 	return true;
 }
+
+#if defined(TC_HAS_POSE_SELECTION)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCSelectionPoseTest, "ThreeCrossroads.Camera.SelectionPose", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)
+bool FTCSelectionPoseTest::RunTest(const FString&)
+{
+	const TArray<FBox> Keys = { FBox(FVector(0,0,0), FVector(10,20,30)), FBox(FVector(-20,-10,-5), FVector(30,5,8)) };
+	const TArray<float> Weights = {0,1,0,0, .25f,.75f,0,0};
+	const FBox Mixed = TCSelectionBounds::Blend(Keys, Weights);
+	TestTrue(TEXT("absolute morph envelope follows the rendered key weights"), Mixed.Min.Equals(FVector(-15,-7.5,-3.75)) && Mixed.Max.Equals(FVector(25,8.75,13.5)));
+	const TArray<float> Invalid = {0,99,0,0, 0,1,0,0};
+	TestFalse(TEXT("unknown key does not produce a rest-pose selection target"), TCSelectionBounds::Blend(Keys, Invalid).IsValid != 0);
+	auto* Crowd = NewObject<UTCSoldierCrowd>(); FString Error;
+	if (!TestTrue(TEXT("original near/far payloads load"), Crowd->Load(Error))) { AddError(Error); return false; }
+	const FTCPinhole View(FVector(0,0,60), 90, 0, 500, 1280.0/720);
+	for (const bool bFar : {false,true})
+	{
+		TArray<FBox2D> Boxes[2];
+		for (int32 Posture = 0; Posture < 2; Posture++)
+		{
+			Crowd->BeginFrame();
+			FTCSoldierDraw Man; Man.UnitId = 7; Man.ManIndex = 0; Man.FigureType = TEXT("rifle"); Man.Man = FTransform::Identity; Man.bFar = bFar;
+			FTCInfantryMotion Motion; Motion.PostureWeights = Posture ? FVector4(0,0,1,0) : FVector4(1,0,0,0);
+			Man.Blend = UTCInfantryRigLibrary::BlendFor(Man.FigureType, Motion);
+			TestTrue(TEXT("the actual native soldier draw is available"), Crowd->AddMan(Man));
+			Crowd->SelectionBounds(7, View, 1280,720,Boxes[Posture]);
+			TestTrue(TEXT("drawn posture supplies a projected selection envelope"), Boxes[Posture].Num() > 0);
+			TArray<FBox2D> Absent; Crowd->SelectionBounds(8,View,1280,720,Absent);
+			TestEqual(TEXT("another unit has no envelope"), Absent.Num(), 0);
+		}
+		FBox2D Union[2] = { FBox2D(ForceInit),FBox2D(ForceInit) };
+		for (int32 P = 0; P < 2; P++) for (const auto& B : Boxes[P]) { Union[P] += B.Min; Union[P] += B.Max; }
+		TestTrue(TEXT("prone picking follows the low drawn figure rather than its standing mesh"), Union[0].bIsValid && Union[1].bIsValid && Union[1].GetSize().Y < Union[0].GetSize().Y * .75);
+	}
+	return true;
+}
+#endif
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCCameraProjectionTest, "ThreeCrossroads.Camera.Projection", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)
 bool FTCCameraProjectionTest::RunTest(const FString&)

@@ -162,7 +162,7 @@ void FTCWater::Attach(UWorld* World)
 	// client/water.js: renderOrder -1, the first of the see-through pass (fog, smoke and effects draw over it)
 	Mesh->SetTranslucentSortPriority(-1);
 	Mesh->SetVisibility(false);
-	if (UMaterialInterface* M = LoadObject<UMaterialInterface>(nullptr, MaterialPath)) Material.Reset(M);
+	if (UMaterialInterface* M = LoadObject<UMaterialInterface>(nullptr, MaterialPath)) { TCFogLook::PrepareMaterial(M); Material.Reset(M); }
 	else { UE_LOG(LogTC, Error, TEXT("water: %s does not load (run unreal/Tools/water/make-water-materials.py); the water is not drawn"), MaterialPath); }
 	if (!NoiseTex.IsValid())
 	{

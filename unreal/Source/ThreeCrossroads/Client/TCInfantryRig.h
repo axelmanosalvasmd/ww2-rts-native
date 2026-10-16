@@ -226,9 +226,9 @@ struct THREECROSSROADS_API FTCInfantrySquadFrame
 	bool bVisible = true;                // root.visible: not riding a carrier
 	bool bDetailed = true;               // main.js animationInterest: on screen (25 m ball) or selected
 	bool bGarrisoned = false;            // v.garr
-	bool bTrench = false;                // v.trench: men seated in trench cells (the native ground is not carved yet)
-	// The reference draws a squad in a trench line (cover 2) 0.6 m down, on the floor its terrain carves there. The
-	// native terrain does not carve trenches yet, so the sink is off until it does (else the men stand in the ground).
+	bool bTrench = false;                // v.trench: men seated in carved trench cells
+	// The reference sinks an unseated squad in cover 2 by 0.6 m. Seated men use each carved floor's height.
+	// The renderer enables this with TCRelief's carved terrain; flat comparison fixtures may leave it off.
 	bool bCarvedTrenches = false;
 	float LodMetres = 110.f;             // unit-models.js LOD.high (LOD.low = 80 on Low graphics)
 	int32 Id = 0, Flags = 0, Cover = 0;
@@ -238,8 +238,16 @@ struct THREECROSSROADS_API FTCInfantrySquadFrame
 	// the ground height (cm) under a world point (cm); unset: flat at the root
 	TFunction<double(double X, double Y)> GroundCm;
 };
+
+// main.js manTrench: scan in row order, stable distance sort, one man per cell per pass, four spots per cell.
+struct THREECROSSROADS_API FTCInfantryTrenches
+{
+	static TArray<FVector2D> Claim(FVector2D Target, int32 Men, int32 Alive, int32 Cover, bool bGarrisoned,
+		TFunctionRef<uint8(int32 X, int32 Z)> Cell, TSet<FVector2D>& Taken);
+};
 struct THREECROSSROADS_API FTCInfantryManPose
 {
+	int32 FigureSlot = 0;                // the model's original kit/index, retained when a casualty trades places
 	bool bVisible = true;                // man.visible: alive (index below the alive count) and not garrisoned
 	FVector Local = FVector::ZeroVector; // man.position in the root's frame (Unreal cm, includes the muzzle offset)
 	double LocalYaw = 0;                 // man.rotation.y in the root's frame, reference sign
@@ -263,6 +271,12 @@ public:
 	bool IsSetUp(const FString& UnitType, int32 Faction, int32 Men) const;
 	// main.js: man.visible = i < alive && !garrisoned
 	void SetAlive(int32 Alive);
+	// main.js shotMen: swap the hit model with the last living one, keeping each numbered formation slot fixed.
+	// Returns the last living index that was swapped, or INDEX_NONE. Call before SetAlive and the next frame.
+	int32 HitMan(int32 Shot, int32 Alive);
+	void SetOperative(bool bOperative);
+	// main.js seatTrench at the drawn position and rotation; an empty list restores the original formation slots.
+	void SeatTrench(const TArray<FVector2D>& WorldSpots, FVector2D PositionMetres, double Rotation);
 	// One frame. False while suspended (Men() keeps the last pose).
 	bool Animate(const FTCInfantrySquadFrame& In, float DeltaSeconds);
 	bool IsFar() const;

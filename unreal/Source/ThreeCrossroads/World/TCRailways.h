@@ -331,9 +331,9 @@ class UMaterialInterface;
 class UStaticMesh;
 class UTexture2D;
 
-// The fog of war on a map's cells as one texel each (G8, nearest): 1 in sight, 0.55 explored, 0.32 never seen, nothing
-// once an authored match is decided: ATCTerrain::CellColor's dimming, the texture the world materials' FogMap reads
-// (FTCWorldObjectsView::WriteFog keeps its own of the same bytes). Railways and the atmosphere each hold one.
+// Raw fog.js alpha, one G8 texel per cell, bilinear and clamped. Reads the active frontier's faded bytes;
+// world materials blend lit radiance toward the source shade with surfaces.js's drifting mist.
+// Railways and FTCWorldObjectsView each hold a map. A lifted authored match uploads zero alpha.
 struct THREECROSSROADS_API FTCCellFogMap
 {
 	// Rewrites the texels that changed; makes the texture when the map size changes. True when the texture is new.

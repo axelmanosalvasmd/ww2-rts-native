@@ -171,8 +171,8 @@ struct FTCAlertViewInput
 	float MinimapTop = 0.f;   // the minimap's top edge (the box sits 13 px above it)
 	float ViewW = 1280.f, ViewH = 720.f;
 	float UiScale = 1.f;      // CSS zoom, for device-pixel borders and 1/64 px line boxes
-	bool bCompactHistory = false; // a crowded loss burst retains the summary before expanding history
-	// Native presentation correction: keep whole cards inside the viewport and clear of existing HUD panels.
+	bool bCompactHistory = false; // retained for call compatibility; source history never narrows
+	// Retained for caller compatibility. Source alerts intentionally overlay other panels.
 	TArray<FBox2D> Avoid;
 	bool bMouse = false;
 	FVector2D Mouse = FVector2D::ZeroVector; // :hover

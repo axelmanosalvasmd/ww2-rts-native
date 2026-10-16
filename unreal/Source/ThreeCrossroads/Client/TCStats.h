@@ -111,6 +111,10 @@ public:
 	static FTCMeasure Measure();
 	// CSS font-weight 700 (loss heading/detail and the boss name).
 	static FTCMeasure HeavyMeasure();
+    // Source browser symbols missing from Barlow/Droid are converted into the shared HUD atlas.
+    static float HudSymbolAdvance(uint32 CodePoint); // em advance, -1 when not in the atlas
+    static bool DrawHudSymbol(uint32 CodePoint, UCanvas* Canvas, FVector2D Pos, float Px, FLinearColor Colour);
+    static bool HasGlyph(uint32 CodePoint, bool bBold = false);
 	// Paint P on the canvas: every item as FTCPaint::Draw does, texts in this face at the measured glyph positions.
 	// Oversample: the canvas's scale (the UI scale inside BeginUi), so the glyphs are made at the size they show.
 	static void Draw(const FTCPaint& P, UCanvas* Canvas, UFont* Fallback, float Oversample = 1.f, bool bTabular = true);

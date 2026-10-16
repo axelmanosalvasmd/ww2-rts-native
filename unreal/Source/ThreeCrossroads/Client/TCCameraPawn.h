@@ -21,6 +21,7 @@ class THREECROSSROADS_API FTCMouseCapture
 public:
 	static FString ValidMode(const FString& Value);
 	static bool WindowFocused(const TSharedPtr<SWindow>& Window);
+	static FVector2D ConfinedPosition(FVector2D ClientPosition, FIntPoint ClientSize);
 	FString Mode() const { return ModeValue; }
 	FString Label() const;
 	void SetMode(const FString& Value) { ModeValue = ValidMode(Value); bSuspended = false; if (ModeValue == TEXT("off")) bCaptured = false; }
@@ -75,6 +76,8 @@ namespace TCSelectionBounds
 	THREECROSSROADS_API bool Project(const FBox& Local, const FTransform& Model, const FTCPinhole& View, double W, double H, FBox2D& Out, double Near = 10, double Far = 1.e9);
 	THREECROSSROADS_API double Distance(const FBox2D& Bounds, FVector2D Point);
 	THREECROSSROADS_API bool Intersects(const FBox2D& Bounds, const FBox2D& Box);
+	// selection-view.js blends absolute morph envelopes before projecting each visible mesh.
+	THREECROSSROADS_API FBox Blend(TArrayView<const FBox> Keys, TArrayView<const float> Data);
 }
 
 namespace TCCameraFeel

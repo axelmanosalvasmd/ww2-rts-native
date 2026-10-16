@@ -983,7 +983,7 @@ void ATCGameMode::Tick(float DeltaSeconds)
 	State.Objectives.Tick();
 	const float ScreenDt = EpilogueFrame(DeltaSeconds, PC);
 	if (Units && Effects) Units->NoteKilled(Effects->Fx.TakeKilledGone()); // main.js v.killed: a squad killed outright leaves bodies
-	if (Units && State.bHasMatch) Units->Draw(State, UnitTable, Terrain, PC ? PC->Selected : TSet<int32>(), ScreenDt);
+	if (Units && State.bHasMatch) Units->Draw(State, UnitTable, Terrain, PC ? PC->Selected : TSet<int32>(), ScreenDt, &State.UnitOrder);
 	AudioFrame(ScreenDt, PC);
 	TutorialFrame(ScreenDt); // round 14: objectives.js frame (banner, smoke), Tutorial captures and switches
 	RunVerificationSwitches(Now);

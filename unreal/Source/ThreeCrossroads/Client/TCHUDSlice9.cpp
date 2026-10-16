@@ -568,6 +568,7 @@ void ATCHUD::DrawHealthBars()
 		// round 17: not under the score strip's card (last frame's, screen pixels); the stars alone neither
 		if (StripCard.bIsValid && StripCard.Intersect(FBox2D(FVector2D(C.X - BgW / 2, C.Y - BgH / 2), FVector2D(C.X + BgW / 2, C.Y + BgH / 2)))) continue;
 		TCMarkersHud::DrawBadge(Canvas, U.Type, U.Owner, FVector2D(C.X, C.Y), BadgePxPerM);
+		TCMarkersHud::DrawCoverShield(Canvas, FVector2D(C.X, C.Y), BadgePxPerM, U.Cover, bGarr, W);
 		if (!bBar) { TCMarkersHud::DrawStars(Canvas, FVector2D(C.X, C.Y), PxPerM, U.Stars); continue; }
 		DrawRect(FLinearColor(FColor(0x11, 0x11, 0x11)), C.X - BgW / 2, C.Y - BgH / 2, BgW, BgH);
 		const FLinearColor HpC = Frac > 0.5f ? ATCUnitRenderer::SeatColor(U.Owner) : Frac > 0.25f ? FLinearColor(FColor(0xe0, 0x8a, 0x2a)) : FLinearColor(FColor(0xd0, 0x2a, 0x1a));
@@ -599,6 +600,23 @@ namespace
     }
 }
 
+namespace
+{
+    double AlertPresentationTime(const FTCAlerts& Feed)
+    {
+        // Verification uses the same alerts-only clock for the cards and minimap pulses.
+        static const double Age=[]
+        {
+            double Value=-1;
+            if (FParse::Value(FCommandLine::Get(),TEXT("TCHudAlertAge="),Value))
+                UE_LOG(LogTC,Log,TEXT("hud: verification holds the latest loss presentation at age %.3f seconds"),Value);
+            return Value;
+        }();
+        if (Age>=0) for (const FTCAlertLine& L : Feed.Lines()) if (L.IsLoss()) return L.Born+Age;
+        return FPlatformTime::Seconds();
+    }
+}
+
 void ATCHUD::DrawAlertFeed(UFont* Font)
 {
 	// round 15: client/alerts.css and alerts.js as FTCAlerts::Layout draws them (Client/TCAlerts.h): the loss column,
@@ -619,19 +637,11 @@ void ATCHUD::DrawAlertFeed(UFont* Font)
         }
         UE_LOG(LogTC,Log,TEXT("hud: synthetic presentation fixture, eight simultaneous losses at tick %d, history %d"),M->State.Tick,M->AlertFeed.History().Entries().Num());
     }
-    // Verification only, matching the browser's held presentation clock on archived seated input.
-    static bool Parsed=false; static double AlertAge=-1;
-    if (!Parsed)
-    {
-        Parsed=true;
-        if (FParse::Value(FCommandLine::Get(),TEXT("TCHudAlertAge="),AlertAge))
-            UE_LOG(LogTC,Log,TEXT("hud: verification holds the latest loss presentation at age %.3f seconds"),AlertAge);
-    }
-    if (AlertAge>=0) for (const FTCAlertLine& L : M->AlertFeed.Lines()) if (L.IsLoss()) { In.Now=L.Born+AlertAge; break; }
+    In.Now=AlertPresentationTime(M->AlertFeed);
 	In.Right = Minimap.Rect().bIsValid ? ToUi((float)Minimap.Rect().Max.X) : Canvas->ClipX - 8.f;
 	In.MinimapTop = Minimap.Rect().bIsValid ? ToUi((float)Minimap.Rect().Min.Y) : Canvas->ClipY - 200.f;
 	In.ViewW = Canvas->ClipX; In.ViewH = Canvas->ClipY; In.UiScale = UiNow;
-	// Native bounded placement keeps the pinned anchor where free and docks whole cards elsewhere when crowded.
+	// Retained collision metadata is diagnostic only. The source alert column keeps its bottom/right anchors.
 	for (const FBox2D& B : Panels) In.Avoid.Add(FBox2D(B.Min/UiNow,B.Max/UiNow));
 	if (Minimap.Rect().bIsValid) In.Avoid.Add(FBox2D(Minimap.Rect().Min/UiNow-FVector2D(5,5),Minimap.Rect().Max/UiNow+FVector2D(5,5)));
 	if (RecruitBox.bIsValid) In.Avoid.Add(FBox2D(RecruitBox.Min/UiNow,RecruitBox.Max/UiNow));
@@ -833,23 +843,14 @@ void ATCHUD::DrawMinimapAlertRings()
 {
  ATCGameMode* M=GetWorld()->GetAuthGameMode<ATCGameMode>();
  if (!M || !Minimap.Rect().bIsValid || !Canvas) return;
- FVector2D Px;
 	// round 15: client/alerts.js drawPings: each alert line's mark, a spreading ring and a steady one, dark under the
 	// kind's colour (4 px, then 2 px)
 	const FLinearColor Ink(FColor(0x15, 0x16, 0x0f));
-	for (const FTCAlertRing& R : M->AlertFeed.MinimapRings(FPlatformTime::Seconds()))
+	for (const FTCAlertRing& R : M->AlertFeed.MinimapRings(AlertPresentationTime(M->AlertFeed)))
 	{
-		if (R.Alpha <= 0.f || !Minimap.WorldToPixel(R.At, Px)) continue;
-		constexpr int32 Segs = 24;
-		for (int32 Pass = 0; Pass < 2; Pass++)
-			for (int32 K = 0; K < Segs; K++)
-			{
-				const double A0 = 2 * PI * K / Segs, A1 = 2 * PI * (K + 1) / Segs;
-				const FVector2D B0 = Px + FVector2D(FMath::Cos(A0), FMath::Sin(A0)) * R.RadiusPx, B1 = Px + FVector2D(FMath::Cos(A1), FMath::Sin(A1)) * R.RadiusPx;
-				FLinearColor C = Pass == 0 ? Ink : R.Colour;
-				C.A = R.Alpha;
-				DrawLine(B0.X, B0.Y, B1.X, B1.Y, C, Pass == 0 ? 4.f : 2.f);
-			}
+        FLinearColor Under=Ink, Over=R.Colour; Under.A=Over.A=R.Alpha;
+        Minimap.DrawRing(Canvas,R.At,R.RadiusPx,4,Under);
+        Minimap.DrawRing(Canvas,R.At,R.RadiusPx,2,Over);
 	}
 }
 

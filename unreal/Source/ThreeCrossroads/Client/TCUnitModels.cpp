@@ -24,6 +24,8 @@
 #include "Materials/Material.h"
 #endif
 #include "Engine/StaticMesh.h"
+#include "Engine/World.h"
+#include "Engine/Engine.h"
 #include "Engine/Texture2D.h"
 #include "MeshDescription.h"
 #include "StaticMeshAttributes.h"
@@ -196,6 +198,7 @@ void ATCUnitRenderer::Reset()
 	TwinHistory.Reset();
 	Shown.Reset();
 	Squads.Reset();
+	TrenchTaken.Reset(); TrenchSnapshot = -1;
 	UnitMotion.Reset();
 	KilledIds.Reset();
 	if (Crowd)
@@ -217,9 +220,9 @@ FString ATCUnitRenderer::ModelStatusLine() const
 		Stats.PartInstances, Stats.CrowdMen, Stats.FarMen, Stats.FadedMen, Stats.Corpses, Stats.Rings, Stats.Riders, Stats.AircraftShadows, Stats.MovingHulls, Stats.WheelHulls, Stats.Components, Stats.Figures, Stats.Matched, Stats.Moving);
 }
 
-UInstancedStaticMeshComponent* ATCUnitRenderer::PartComponent(const FTCModelPart& Part, bool bFaded)
+UInstancedStaticMeshComponent* ATCUnitRenderer::PartComponent(const FTCModelPart& Part, bool bFaded, bool bCastShadow)
 {
-	FString Key = Part.Mesh.ToString();
+	FString Key = Part.Mesh.ToString() + (bCastShadow ? TEXT("|caster") : TEXT("|no-shadow"));
 	for (const FSoftObjectPath& M : bFaded ? Part.FadedMaterials : Part.Materials) Key += TEXT("|") + M.ToString();
 	if (const TObjectPtr<UInstancedStaticMeshComponent>* Found = PartBatches.Find(Key)) return *Found;
 	UInstancedStaticMeshComponent* Ism = NewObject<UInstancedStaticMeshComponent>(this);
@@ -231,6 +234,9 @@ UInstancedStaticMeshComponent* ATCUnitRenderer::PartComponent(const FTCModelPart
 	}
 	// a tracked hull takes its copy with the reference's wheel and track data (Client/TCUnitRenderer.h ApplyWheelTracks)
 	ApplyWheelTracks(Ism, Part, bFaded);
+	// aircraft.js instance() leaves castShadow false on body, blades and blur discs.
+	// Its only ground shadow is the original soft canvas silhouette, not a projected hull as well.
+	Ism->SetCastShadow(bCastShadow);
 	Ism->SetupAttachment(RootComponent);
 	// the reference's unit models cast the sun's shadow but never receive it (TCLook::UnitChannel): with the units' own
 	// sun in the world the part is drawn on channel 1, and a hidden twin on channel 0 casts its shadow
@@ -535,7 +541,7 @@ bool ATCUnitRenderer::DrawModel(const FTCMatchState& State, const FTCUnit& U, co
 		const FTransform PartTransform = FTCUnitMotion::PartTransform(*Entry, I, Root, Turns, Motion);
 		FTCModelPart Part = Entry->Parts[I];
 		if (Def && Def->bBuilding && !BuildingBreaches.PartFor(Part, U.Id, State, PartTransform, this, Part)) continue;
-		UInstancedStaticMeshComponent* Ism = PartComponent(Part, bFaded);
+		UInstancedStaticMeshComponent* Ism = PartComponent(Part, bFaded, !(Def && Def->bAir));
 		if (!Ism) return false;
 		Parts.Add({ Ism, PartTransform, I });
 	}
@@ -610,6 +616,43 @@ void ATCUnitRenderer::DrawRiders(const FTCModelEntry& Entry, const FTCUnit& U, i
 	}
 }
 
+void ATCUnitRenderer::PrepareTrenchSeats(const FTCMatchState& State, const FTCUnitTable& Table, const TArray<int32>* SnapshotOrder)
+{
+	if (TrenchSnapshot == State.Snapshots) return;
+	TrenchSnapshot = State.Snapshots;
+	TrenchTaken.Reset();
+	TArray<int32> Fallback;
+	if (!SnapshotOrder) { State.Units.GenerateKeyArray(Fallback); SnapshotOrder = &Fallback; }
+	// main.js claims before visibility filtering, in world-state.js Map insertion order.
+	for (int32 Id : *SnapshotOrder)
+	{
+		const FTCUnit* U = State.Units.Find(Id);
+		if (!U) continue;
+		const int32 Faction = State.Factions.IsValidIndex(U->Owner) ? State.Factions[U->Owner] : U->Owner < 0 ? 0 : U->Owner % 3;
+		const FTCModelEntry* Entry = Library.Resolve({U->Type, Faction, FString()});
+		if (!Entry) continue;
+		int32 Men = 0;
+		for (const FTCModelPart& P : Entry->Parts)
+		{
+			int32 Man; bool bNear;
+			if (TCUnitModelsImpl::ParseMan(P.Name.ToString(), Man, bNear)) Men = FMath::Max(Men, Man + 1);
+		}
+		if (!Men) continue;
+		const FTCUnitDef* Def = Table.Find(U->Type);
+		const int32 Alive = UTCInfantryRigLibrary::MenDrawn(U->Hp, Men, Def ? Def->Models * Def->HpPer : 0, (U->Flags & TCFlags::Operative) != 0);
+		FSquad& Sq = Squads.FindOrAdd(Id);
+		Sq.TrenchSnapshot = State.Snapshots;
+		Sq.ShotMan = -1;
+		for (const FTCShot& Shot : State.Shots) if (Shot.bHasTarget && Shot.T == Id && Shot.M >= 0) Sq.ShotMan = Shot.M;
+		Sq.TrenchSpots = FTCInfantryTrenches::Claim({U->X, U->Z}, Men, Alive, U->Cover, (U->Flags & TCFlags::Garrisoned) != 0,
+			[&State](int32 X, int32 Z) -> uint8
+			{
+				const int32 Cell = Z * State.Map.W + X;
+				return X >= 0 && Z >= 0 && X < State.Map.W && Z < State.Map.H && State.Map.Chars.IsValidIndex(Cell) ? State.Map.Chars[Cell] : 0;
+			}, TrenchTaken);
+	}
+}
+
 bool ATCUnitRenderer::AnimateSquad(const FTCModelEntry& Entry, const FTCUnit& U, const FTCUnitDef* Def, int32 Faction, FShown& S, const FTransform& Root, const ATCTerrain* Terrain, float Dt, const FVector& Eye, FSquadMen& Out)
 {
 	using namespace TCUnitModelsImpl;
@@ -641,7 +684,17 @@ bool ATCUnitRenderer::AnimateSquad(const FTCModelEntry& Entry, const FTCUnit& U,
 		}
 		Sq.Anim.Setup(U.Type, Faction, Slots, Scale > 0.f ? Scale : 1.1f);
 	}
+	Sq.Anim.SetOperative((U.Flags & TCFlags::Operative) != 0);
+	if (Sq.AppliedSnapshot != Sq.TrenchSnapshot)
+	{
+		Sq.AppliedSnapshot = Sq.TrenchSnapshot;
+		const int32 Last = Sq.Anim.HitMan(Sq.ShotMan, Out.Alive);
+		if (Crowd && Last != INDEX_NONE) Crowd->SwapMen(U.Id, Sq.ShotMan, Last);
+		// Bodies must use the previous frame's standing men, before AddMan writes this frame's survivors.
+		if (Crowd) Crowd->SquadAlive(U.Id, Out.Alive);
+	}
 	Sq.Anim.SetAlive(Out.Alive);
+	Sq.Anim.SeatTrench(Sq.TrenchSpots, FVector2D(S.X, S.Z), S.Rot);
 	FTCInfantrySquadFrame F;
 	F.Root = Root.GetLocation();
 	F.Yaw = -S.Rot; // three's root.rotation.y
@@ -650,6 +703,8 @@ bool ATCUnitRenderer::AnimateSquad(const FTCModelEntry& Entry, const FTCUnit& U,
 	F.Id = U.Id; F.Flags = U.Flags; F.Cover = U.Cover; F.Suppression = U.Supp;
 	F.bHasTarget = U.Target != 0; F.bMoveFire = MovesFiring(U.Type); F.Aim = S.Aim;
 	F.bGarrisoned = (U.Flags & TCFlags::Garrisoned) != 0;
+	F.bTrench = !Sq.TrenchSpots.IsEmpty();
+	F.bCarvedTrenches = Terrain != nullptr;
 	if (Terrain) F.GroundCm = [Terrain](double X, double Y) { return Terrain->HeightAt(X / 100.0, Y / 100.0) * 100.0; };
 	Sq.Anim.Animate(F, Dt);
 	S.bFar = Sq.Anim.IsFar();
@@ -669,7 +724,7 @@ void ATCUnitRenderer::DrawSquadMen(const FTCModelEntry& Entry, const FTCUnit& U,
 	{
 		if (!Posed[K].bVisible) continue;
 		FTCSoldierDraw D;
-		D.FigureType = Men.FigureType; D.Faction = Faction; D.Slot = K;
+		D.FigureType = Men.FigureType; D.Faction = Faction; D.Slot = Posed[K].FigureSlot;
 		D.Man = Anim.ManTransform(K, Root);
 		D.Blend = Posed[K].Blend;
 		D.Owner = Library.SeatColor(U.Owner);
@@ -684,7 +739,8 @@ void ATCUnitRenderer::DrawSquadMen(const FTCModelEntry& Entry, const FTCUnit& U,
 			continue;
 		}
 		// the crowd has no figure for him: the catalog's figure in its rest pose, where animate() put him
-		const int32 PartIndex = S.bFar ? (Men.Far.IsValidIndex(K) ? Men.Far[K] : INDEX_NONE) : Men.Near[K];
+		const int32 FigureSlot = Posed[K].FigureSlot;
+		const int32 PartIndex = S.bFar ? (Men.Far.IsValidIndex(FigureSlot) ? Men.Far[FigureSlot] : INDEX_NONE) : Men.Near[FigureSlot];
 		if (PartIndex == INDEX_NONE) continue;
 		if (UInstancedStaticMeshComponent* Ism = PartComponent(Entry.Parts[PartIndex], bFaded))
 		{
@@ -782,6 +838,26 @@ bool FTCAircraftShadowMeshTest::RunTest(const FString&)
 		const FVector2f UV = Lod.VertexBuffers.StaticMeshVertexBuffer.GetVertexUV(I, 0);
 		TestTrue(TEXT("source canvas top is source negative Z, with matching horizontal orientation"), UV.Equals(FVector2f((P.X + 50) / 100, (P.Y + 50) / 100), 1e-6f));
 	}
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, TEXT("TCAircraftCasters"));
+	if (!TestNotNull(TEXT("aircraft test world"), World)) return false;
+	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+	World->SpawnActor<ATCLighting>();
+	ATCUnitRenderer* Renderer = World->SpawnActor<ATCUnitRenderer>();
+	FTCUnitTable Table; FString Error;
+	if (TestTrue(TEXT("original unit table"), Table.Load(Error)) && Renderer)
+	{
+		FTCMatchState State; State.bHasMatch = true; State.Factions.Add(0);
+		FTCUnit Plane; Plane.Id = 1; Plane.Type = TEXT("fighter"); Plane.Owner = 0; Plane.X = Plane.Z = 20; Plane.Hp = 100;
+		State.Units.Add(Plane.Id, Plane);
+		Renderer->SetViewPoint(FVector(2000,2000,5000));
+		Renderer->Draw(State,Table,nullptr,{},0);
+		TestEqual(TEXT("aircraft uses original model"),Renderer->ModelStats().ModelUnits,1);
+		TestEqual(TEXT("one original ground silhouette"),Renderer->ModelStats().AircraftShadows,1);
+		TArray<UInstancedStaticMeshComponent*> Components; Renderer->GetComponents(Components);
+		for (const auto* C : Components) if (C->GetInstanceCount()>0)
+			TestFalse(TEXT("aircraft body, blades, discs and silhouette never cast a second sun shadow"),C->CastShadow);
+	}
+	GEngine->DestroyWorldContext(World); World->DestroyWorld(false);
 	return true;
 }
 #endif

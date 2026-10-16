@@ -18,6 +18,7 @@
 // Axes: reference (x, y, z) metres -> Unreal (x, z, y) * 100. A three.js turn of a about axis (ax, ay, az) is an Unreal
 // FQuat about (ax, az, ay) by -a (the axis swap is a reflection), so rotation.y = -rot is an Unreal yaw of rot.
 #pragma once
+#define TC_HAS_POSE_SELECTION 1
 
 #include "CoreMinimal.h"
 #include "Components/SceneComponent.h"
@@ -233,6 +234,8 @@ public:
 	// main.js: the men past the squad's new alive count fall where they stood (the last AddMan of each). The first call
 	// for a squad only records its count. Reinforcements (a higher count) come back without bodies.
 	void SquadAlive(int32 UnitId, int32 Alive);
+	// Keep the previous standing records attached to the same models when an operative hits a specific man.
+	void SwapMen(int32 UnitId, int32 A, int32 B);
 	// A squad left the snapshot; when it was killed (main.js removeUnit, v.killed) its men still standing fall.
 	void SquadGone(int32 UnitId, bool bKilled);
 	// unit-models.js bodies.add: a body without a squad (a man given by figure, place and facing).
@@ -243,6 +246,7 @@ public:
 	void EndFrame(float Dt, const FVector& Eye, TFunctionRef<double(double X, double Y)> GroundCm, float LodMetres = 110.f,
 		TFunction<bool(double X, double Z, double& OutX, double& OutZ, double& OutSize)> BlastNear = nullptr);
 	void ClearCorpses();
+	void SelectionBounds(int32 UnitId, const FTCPinhole& View, double W, double H, TArray<FBox2D>& Out) const;
 
 	// Verification: every far figure's keyframe matrices applied to its standing build, against the exported morph
 	// targets (positions in cm, normals as the angle between them in radians). False without far figures.

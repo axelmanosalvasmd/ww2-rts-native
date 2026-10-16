@@ -63,6 +63,8 @@ static TAutoConsoleVariable<float> CVarLookExposure(TEXT("tc.Look.Exposure"), 1.
 static TAutoConsoleVariable<int32> CVarLookNeutral(TEXT("tc.Look.Neutral"), 0, TEXT("Diagnostic: use the reference lobby's Neutral curve instead of the match's ACES curve."));
 static TAutoConsoleVariable<float> CVarLookIndirect(TEXT("tc.Look.Indirect"), 1.f, TEXT("Hemisphere and environment intensity multiplier."));
 static TAutoConsoleVariable<float> CVarLookShadow(TEXT("tc.Look.Shadow"), 1.f, TEXT("Reference sun shadow strength multiplier."));
+static TAutoConsoleVariable<int32> CVarLookShadowView(TEXT("tc.Look.ShadowView"), 1, TEXT("Follow the reference shadow footprint; 0 retains the old fixed-distance cascades for comparison."));
+static TAutoConsoleVariable<int32> CVarLookShadowFilter(TEXT("tc.Look.ShadowFilter"), 1, TEXT("Map the reference PCF radius to the native filter footprint; 0 retains the old 3x3 filter for comparison."));
 
 // ------------------------------------------------------------------------------------------------- color and moods
 
@@ -107,6 +109,52 @@ namespace TCLook
 	}
 
 	FLinearColor ToneMapped(const FLinearColor& Linear, float Exposure) { return ToDisplay(ACESFilmic(Linear, Exposure)); }
+
+	FLinearColor BillboardColour(const FLinearColor& Linear, float Depth, float Near, float Far,
+		const FLinearColor& Haze, float Exposure, bool bBeforeTone)
+	{
+		const float T = Far > Near ? FMath::Clamp((Depth - Near) / (Far - Near), 0.f, 1.f) : 0.f;
+		const float Fog = T * T * (3.f - 2.f * T);
+		FLinearColor C;
+		if (bBeforeTone) C = ACESFilmic(FMath::Lerp(Linear, Haze, Fog), Exposure);
+		else
+		{
+			// Direct rendering applies fog after tone mapping and the sRGB output transfer.
+			C = FMath::Lerp(ToneMapped(Linear, Exposure), ToDisplay(Haze), Fog);
+			C = FLinearColor(SrgbToLinear(C.R), SrgbToLinear(C.G), SrgbToLinear(C.B), C.A);
+		}
+		C.A = Linear.A;
+		return C;
+	}
+
+	FShadowView ShadowView(const FVector& Eye, const FVector& Forward, const FVector& Right, const FVector& Up,
+		double TanX, double TanY, double Ground, int32 MapSize, double FilterRadius, bool bSoft)
+	{
+		FVector Foot[4], Centre = FVector::ZeroVector;
+		FShadowView V;
+		for (int32 I = 0; I < 4; I++)
+		{
+			const FVector Dir = (Forward + Right * ((I & 1 ? 1 : -1) * TanX) + Up * ((I & 2 ? 1 : -1) * TanY)).GetSafeNormal();
+			const double T = Dir.Z < -0.02 ? FMath::Min(600.0, (Ground - Eye.Z) / Dir.Z) : 600.0;
+			Foot[I] = Eye + Dir * T;
+			Centre += Foot[I];
+			V.FarDepth = FMath::Max(V.FarDepth, FVector::DotProduct(Foot[I] - Eye, Forward));
+		}
+		Centre *= 0.25;
+		for (const FVector& P : Foot) V.Radius = FMath::Max(V.Radius, FVector::Distance(P, Centre));
+		V.Radius = FMath::CeilToDouble((V.Radius + 10.0) / 8.0) * 8.0;
+		V.Texel = 2.0 * V.Radius / MapSize;
+		// Native CSM bounds a view subfrustum with a sphere. Keep all four ground corners inside it and map its
+		// world-space texel/filter width to the reference square. The native 5x5 PCF approximates three 0.186.1's
+		// five rotated Vogel samples, each using hardware bilinear PCF. It is not the same sampling kernel.
+		V.FarDepth += 10.0;
+		const double Near = 0.1, Far = V.FarDepth, D = FMath::Square(TanX) + FMath::Square(TanY);
+		const double C = FMath::Clamp(Far - ((Near * Near - Far * Far) * D / (2.0 * (Far - Near)) + (Far - Near) * 0.5), Near, Far);
+		V.CascadeRadius = FMath::Sqrt(FMath::Max(Near * Near * D + FMath::Square(C - Near), Far * Far * D + FMath::Square(Far - C)));
+		const double FilterScale = bSoft ? 2.0 / FilterRadius : 1.0;
+		V.Resolution = FMath::Clamp(FMath::RoundToInt(MapSize * V.CascadeRadius / V.Radius * FilterScale), 32, 8192);
+		return V;
+	}
 
 	static FTCMood Row(const TCHAR* Name, float SunUp, uint32 Sun, float SunI, uint32 Top, uint32 Bottom, float HemiI, uint32 Haze, float HazeK, float Shadow, float Soft, float Exposure, float Clouds, bool bMist = false, const TCHAR* Weather = nullptr)
 	{
@@ -696,7 +744,46 @@ void ATCLighting::Tick(float Dt)
 	if (HazeScale > 0.f) { LastFogNear /= HazeScale; LastFogFar /= HazeScale; }
 	else { LastFogNear = LastFogFar = 0.f; }
 	TCLook::SetPost(PostMaterial, Look.Exposure * FMath::Max(0.f, CVarLookExposure.GetValueOnGameThread()), LastFogNear, LastFogFar, Look.Haze, bHazeBeforeTone, CVarLookNeutral.GetValueOnGameThread() != 0);
+	FollowShadowView();
 	if (FParse::Param(FCommandLine::Get(), TEXT("TCLookAudit"))) Audit();
+}
+
+void ATCLighting::FollowShadowView()
+{
+	const APlayerController* PC = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr;
+	if (!PC || !PC->PlayerCameraManager || !Sun) return;
+	const FTCGraphicsBudget& G = FTCGraphics::Get().Budget();
+	const bool Follow = CVarLookShadowView.GetValueOnGameThread() != 0;
+	const bool Filter = CVarLookShadowFilter.GetValueOnGameThread() != 0 && G.bSoftShadows;
+	int32 Resolution = G.ShadowMapSize;
+	float Distance = 40000.f;
+	if (Follow)
+	{
+		const APlayerCameraManager& Camera = *PC->PlayerCameraManager;
+		const FRotationMatrix Axes(Camera.GetCameraRotation());
+		double Aspect = 16.0 / 9.0;
+		int32 W, H; PC->GetViewportSize(W, H);
+		if (W > 0 && H > 0) Aspect = double(W) / H;
+		const double TanX = FMath::Tan(FMath::DegreesToRadians(Camera.GetFOVAngle()) * 0.5);
+		const double Radius = G.bSoftShadows ? G.ShadowRadiusPerSoft * Look.Soft : G.ShadowRadius;
+		const TCLook::FShadowView V = TCLook::ShadowView(Camera.GetCameraLocation() / 100.0, Axes.GetUnitAxis(EAxis::X),
+			Axes.GetUnitAxis(EAxis::Y), Axes.GetUnitAxis(EAxis::Z), TanX, TanX / Aspect, GroundZ / 100.0, G.ShadowMapSize, Radius, Filter);
+		Resolution = V.Resolution;
+		Distance = float(V.FarDepth * 100.0);
+	}
+	Sun->SetDynamicShadowCascades(Follow ? 1 : 3);
+	Sun->SetDynamicShadowDistanceMovableLight(Distance);
+	Sun->SetCascadeTransitionFraction(Follow ? 0.f : 0.1f);
+	Sun->ShadowDistanceFadeoutFraction = Follow ? 0.f : 0.1f;
+	auto Set = [](IConsoleVariable* C, int32 Value)
+	{
+		if (C && C->GetInt() != Value) C->Set(Value, ECVF_SetByCode);
+	};
+	// MaxResolution alone does not size directional cascades. Low must resize the CSM map as well.
+	static IConsoleVariable* Csm = IConsoleManager::Get().FindConsoleVariable(TEXT("r.Shadow.MaxCSMResolution"));
+	static IConsoleVariable* Quality = IConsoleManager::Get().FindConsoleVariable(TEXT("r.ShadowQuality"));
+	Set(Csm, Resolution);
+	Set(Quality, G.bSoftShadows ? (Filter ? 4 : 3) : 1);
 }
 
 void ATCLighting::Audit()
@@ -709,6 +796,12 @@ void ATCLighting::Audit()
 		if (It->GetWorld() == World && It->IsRegistered() && It->IsVisible()) ++HeightFogs;
 	UE_LOG(LogTCLook, Log, TEXT("look audit passes: AO %.4f static fraction %.4f sky intensity %.4f engine height fogs %d neutral curve %d"),
 		Post->Settings.AmbientOcclusionIntensity, Post->Settings.AmbientOcclusionStaticFraction, Sky->Intensity, HeightFogs, CVarLookNeutral.GetValueOnGameThread());
+	static const IConsoleVariable* Csm = IConsoleManager::Get().FindConsoleVariable(TEXT("r.Shadow.MaxCSMResolution"));
+	static const IConsoleVariable* Quality = IConsoleManager::Get().FindConsoleVariable(TEXT("r.ShadowQuality"));
+	UE_LOG(LogTCLook, Log, TEXT("look shadow audit: follow %d filter %d cascades %d distance %.4f m CSM resolution %d quality %d strength %.4f"),
+		CVarLookShadowView.GetValueOnGameThread(), CVarLookShadowFilter.GetValueOnGameThread(), Sun->DynamicShadowCascades,
+		Sun->DynamicShadowDistanceMovableLight / 100.f, Csm ? Csm->GetInt() : -1, Quality ? Quality->GetInt() : -1,
+		Look.Shadow * FMath::Max(0.f, CVarLookShadow.GetValueOnGameThread()));
 	if (auto* Collection = LoadObject<UMaterialParameterCollection>(nullptr, TCLook::CollectionPath))
 		if (auto* Instance = World->GetParameterCollectionInstance(Collection))
 		{
@@ -1554,6 +1647,51 @@ bool FTCLookHazeTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("mood and weather rows off the reference"), Off, 0);
 	TestEqual(TEXT("rows"), (int32)UE_ARRAY_COUNT(Rows), 30);
 	return true;
+}
+
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCLookBillboardFogTest, "ThreeCrossroads.Look.BillboardFog", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FTCLookBillboardFogTest::RunTest(const FString&)
+{
+    using namespace TCLook;
+    const FLinearColor Haze = HexLinear(0xc9cbc6);
+    FLinearColor Ink = HexLinear(0x16191b); Ink.A = .88f;
+    for (const bool High : {false,true})
+    {
+        const auto Near = BillboardColour(Ink, 20, 20, 100, Haze, .9f, High);
+        const auto Far = BillboardColour(Ink, 100, 20, 100, Haze, .9f, High);
+        TestTrue(TEXT("near sprite keeps source tone mapping"), Near.Equals(ACESFilmic(Ink,.9f), 2e-5f));
+        FLinearColor Expected = High ? ACESFilmic(Haze,.9f) : Haze; Expected.A = Ink.A;
+        TestTrue(TEXT("distant sprite reaches the same haze as the world"), Far.Equals(Expected,2e-5f));
+        TestEqual(TEXT("source fog changes colour, not opacity"), Far.A,.88f);
+    }
+    const auto High = ToDisplay(BillboardColour(Ink,60,20,100,Haze,.9f,true));
+    const auto Low = ToDisplay(BillboardColour(Ink,60,20,100,Haze,.9f,false));
+    const auto WantHigh = ToneMapped(FMath::Lerp(Ink,Haze,.5f),.9f);
+    const auto WantLow = FMath::Lerp(ToneMapped(Ink,.9f),ToDisplay(Haze),.5f);
+    TestTrue(TEXT("High fog mixes in linear light before OutputPass"), FVector(High.R,High.G,High.B).Equals(FVector(WantHigh.R,WantHigh.G,WantHigh.B),2e-5));
+    TestTrue(TEXT("Low fog mixes after tone mapping and output transfer"), FVector(Low.R,Low.G,Low.B).Equals(FVector(WantLow.R,WantLow.G,WantLow.B),2e-5));
+    TestTrue(TEXT("High and Low do not collapse to an alpha fade"), FMath::Abs(High.R-Low.R)>.1f);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCLookShadowViewTest, "ThreeCrossroads.Look.ShadowView", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FTCLookShadowViewTest::RunTest(const FString&)
+{
+    const double S = FMath::Sin(.95), C = FMath::Cos(.95), TanY = FMath::Tan(21.0*PI/180), TanX = TanY*16/9;
+    for (const auto D : {25.0,40.0,140.0})
+    {
+        const auto V = TCLook::ShadowView({0,D*C,D*S}, {0,-C,-S}, {1,0,0}, {0,-S,C}, TanX,TanY,0,2048,4,true);
+        const double Expected = D == 25 ? 40 : D == 40 ? 56 : 160;
+        TestEqual(TEXT("source followView pad and radius quantization"), V.Radius, Expected);
+        TestEqual(TEXT("source texel is square width over map size"), V.Texel, 2*Expected/2048);
+        TestTrue(TEXT("native cascade includes the ground footprint"), V.FarDepth>D && V.CascadeRadius>0 && V.Resolution>=32);
+        const auto Hard = TCLook::ShadowView({0,D*C,D*S}, {0,-C,-S}, {1,0,0}, {0,-S,C}, TanX,TanY,0,1024,1,false);
+        TestEqual(TEXT("Low and day High use the same world footprint with Basic versus PCF filter"), Hard.Resolution,V.Resolution);
+        const auto Soft = TCLook::ShadowView({0,D*C,D*S}, {0,-C,-S}, {1,0,0}, {0,-S,C}, TanX,TanY,0,2048,7,true);
+        TestTrue(TEXT("overcast soft 2.8 widens the filter without changing source strength"), Soft.Resolution<V.Resolution);
+    }
+    return true;
 }
 
 #endif // WITH_DEV_AUTOMATION_TESTS

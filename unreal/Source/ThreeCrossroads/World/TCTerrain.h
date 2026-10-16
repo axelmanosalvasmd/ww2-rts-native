@@ -12,6 +12,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "World/TCRelief.h"
+#include "World/TCFogFrontier.h"
 #include "Client/TCGraphics.h"
 
 // round 15 (gfxlow glue): ATCTerrain follows the Graphics level (ReliefLow); the tests check it when this is defined
@@ -33,6 +34,7 @@ class THREECROSSROADS_API ATCTerrain : public AActor
 
 public:
 	ATCTerrain();
+	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 
 	// A start arrived: the relief is rebuilt from it and every chunk is queued for upload. A start for a different match,
 	// room, seat, map or size clears the ground first; a reconnect to the same match keeps the drawn chunks up while they
@@ -90,16 +92,19 @@ private:
 	void Queue_(int32 Chunk, bool bShape);
 	void CopyInputs(const FTCMatchState& State, bool bFrozen, std::vector<int>* RoadChanges = nullptr);
 	void EnsureMaterial(bool bLow);
+	void UploadFrontierSeal(int32 Chunk);
 
 	UPROPERTY() TObjectPtr<UProceduralMeshComponent> Mesh;
 	UPROPERTY() TObjectPtr<UMaterialInterface> Material;
 	UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> MaterialMid;
+	UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> FrontierSealMid;
 public:
 	// Slice 13 (paint): the ground's dynamic material, for FTCGroundPaint::Bind (its MF_TCGroundPaint parameters).
 	UMaterialInstanceDynamic* GroundMaterialInstance() const { return MaterialMid; }
 private:
 
 	TCRelief::FRelief ReliefCore;
+	FTCFogOverlay FogOverlay;
 	FTCGraphicsWatch GfxWatch;        // round 15: relief.js subscribes rebuildGeometry to gfx.onChange
 	int32 ReliefSwitches = 0;
 	const FTCWorldObjects* CellSource = nullptr;

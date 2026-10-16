@@ -30,6 +30,9 @@
 #include "Misc/Paths.h"
 #include "Misc/App.h"
 #include "UnrealClient.h"
+#include "ShaderCompiler.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 
 void ATCGameMode::RunSlice13Switches(double Now)
 {
@@ -51,6 +54,21 @@ void ATCGameMode::RunSlice13Switches(double Now)
 	if (TourStep >= Tour.Num()) { TourDone = true; UE_LOG(LogTC, Log, TEXT("tour: done (%d shots)"), TourShots); if (AHUD* Hud = PC->GetHUD()) Hud->bShowHUD = true; return; }
 	const double InMatch = State.bHasMatch && State.Snapshots > 0 ? State.Tick / 20.0 : -1; // shared/sim.js: 20 ticks a second
 	FTourPose& P = Tour[TourStep];
+#if WITH_EDITOR
+    if (InMatch >= 0 && FParse::Param(FCommandLine::Get(), TEXT("TCTourWaitShaders")) && GShaderCompilingManager && GShaderCompilingManager->IsCompiling())
+    {
+        UE_LOG(LogTC,Log,TEXT("tour: waiting for generated shaders before a diagnostic shot"));
+        GShaderCompilingManager->FinishAllCompilation();
+        TourShotAt = -1;
+        return;
+    }
+#endif
+	// Diagnostic captures must include the completed region queue on large maps.
+	if (InMatch >= 0 && FParse::Param(FCommandLine::Get(), TEXT("TCTourWaitWorld")) && WorldView.Queued() > 0)
+	{
+		TourShotAt = -1;
+		return;
+	}
 	if (TourShotAt < 0)
 	{
 		if (InMatch < P.At || FScreenshotRequest::IsScreenshotRequested()) return;

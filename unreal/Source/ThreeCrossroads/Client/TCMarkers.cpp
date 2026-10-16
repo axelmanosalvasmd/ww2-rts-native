@@ -12,6 +12,7 @@
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "SceneView.h"
+#include "SceneInterface.h"
 #include "Client/TCGameMode.h"
 #include "Client/TCLocale.h"
 #include "Client/TCStats.h"
@@ -19,6 +20,9 @@
 #include "Client/TCObjectives.h"
 #include "Client/TCCoverPreview.h"
 #include "Client/TCUnitRenderer.h"
+#include "Client/TCLighting.h"
+#include "Camera/PlayerCameraManager.h"
+#include "Engine/World.h"
 #include "Net/TCMatchState.h"
 #include "World/TCTerrain.h"
 #include "Client/TCMarkers.Ranges.inl"
@@ -129,6 +133,13 @@ namespace
 	const FLinearColor TagHairline = SrgbA(176, 164, 122, 0.55f); // rgba(176, 164, 122, 0.55)
 	const FLinearColor TagText = FLinearColor(FColor(0xe2, 0xdf, 0xd3));
 	FBox2D MarkerHudExclusion(ForceInit);
+
+	const UWorld* MarkerWorld(const UCanvas* Canvas)
+	{
+		// HUD canvases have a transient outer, so UObject::GetWorld() returns null. The rendered view owns the scene.
+		const FSceneView* View = Canvas ? Canvas->SceneView : nullptr;
+		return View && View->Family && View->Family->Scene ? View->Family->Scene->GetWorld() : nullptr;
+	}
 
 	bool JsonNumber(const TSharedPtr<FJsonValue>& V, double& Out)
 	{
@@ -470,6 +481,7 @@ bool FTCMarkerPainter::Tag(UFont* Font, const FString& Text, double X, double Z,
 	auto Rect = [&](double Cx0, double Cy0, double Cw0, double Ch0, FLinearColor C)
 	{
 		C.A *= Alpha;
+		C = TCMarkersHud::WorldColour(Canvas, C, W);
 		FCanvasTileItem T(Origin + FVector2D(Cx0, Cy0) * K, GWhiteTexture, FVector2D(Cw0, Ch0) * K, C);
 		T.BlendMode = SE_BLEND_Translucent;
 		Canvas->DrawItem(T);
@@ -486,10 +498,12 @@ bool FTCMarkerPainter::Tag(UFont* Font, const FString& Text, double X, double Z,
 		const FColor C = Swatch->ToFColor(true);
 		const double Lum = (C.R * 0.2126 + C.G * 0.7152 + C.B * 0.0722) / 255.0;
 		FLinearColor Ink(FColor(Lum > 0.6 ? 0x1a1d1f : 0xf2efe6)); Ink.A = Alpha;
+		Ink = TCMarkersHud::WorldColour(Canvas, Ink, W);
 		TCMarkerIcons::Hq(Canvas, Origin + FVector2D(X0 + 11 + Sw * 0.07, (St.H - Sw * 0.86) / 2) * K, Sw * 0.86 * K, Ink);
 	}
 	FLinearColor TC = TagText;
 	TC.A *= Alpha;
+	TC = TCMarkersHud::WorldColour(Canvas, TC, W);
 	const double TextCx = X0 + LeadIn + (Bw - LeadIn) / 2, TextCy = St.H / 2 + 2;
 	if (bBarlow)
 	{
@@ -770,6 +784,38 @@ void TCMarkersHud::Verify(ATCGameMode& M, TSet<int32>& Selected)
 	Stats() = FFrameStats();
 }
 
+FLinearColor TCMarkersHud::WorldColour(UCanvas* Canvas, const FLinearColor& Colour, const FVector& World)
+{
+	const UWorld* W = MarkerWorld(Canvas);
+	const ATCGameMode* M = W ? W->GetAuthGameMode<ATCGameMode>() : nullptr;
+	if (!M || !M->Lighting) return Colour;
+	const ATCLighting& L = *M->Lighting;
+	const FSceneView& View = *Canvas->SceneView;
+	const float Depth = FVector::DotProduct(World - View.ViewLocation, View.ViewRotation.Vector()) / 100.0;
+	return TCLook::BillboardColour(Colour, Depth, L.FogNear(), L.FogFar(), L.Shown().Haze, L.Shown().Exposure, L.HazeBeforeTone());
+}
+
+void TCMarkersHud::DrawCoverShield(UCanvas* Canvas, FVector2D Centre, float Scale, int32 Cover, bool bGarrisoned, const FVector& World)
+{
+	const MC::FCoverShield Look = MC::CoverShield(Cover, bGarrisoned);
+	if (!Canvas || Look.Alpha <= 0) return;
+	const FLinearColor Colour = WorldColour(Canvas, FTCMarkerPainter::Colour(Look.Hex, Look.Alpha), World);
+	FVector2D Vertices[5];
+	for (int32 I = 0; I < 5; I++)
+		Vertices[I] = FVector2D(Centre.X + (1.55 + MC::ShieldPoints[I][0] * 0.5) * Scale,
+			Centre.Y - MC::ShieldPoints[I][1] * 0.5 * Scale);
+	TArray<FCanvasUVTri> Triangles;
+	for (int32 I = 1; I < 4; I++)
+	{
+		FCanvasUVTri& T = Triangles.AddDefaulted_GetRef();
+		T.V0_Pos = Vertices[0]; T.V1_Pos = Vertices[I]; T.V2_Pos = Vertices[I + 1];
+		T.V0_Color = T.V1_Color = T.V2_Color = Colour;
+	}
+	FCanvasTriangleItem Item(Triangles, GWhiteTexture);
+	Item.BlendMode = SE_BLEND_Translucent;
+	Canvas->DrawItem(Item);
+}
+
 void TCMarkersHud::DrawBadge(UCanvas* Canvas, const FString& Type, int32 Owner, FVector2D Centre, float Scale)
 {
 	if (!Canvas) return;
@@ -805,6 +851,49 @@ void TCMarkersHud::DrawStars(UCanvas* Canvas, FVector2D BarCentre, float PxPerMe
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
 #include "Client/TCMarkers.Oracle.inl"
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCMarkersWorldTagContextTest, "ThreeCrossroads.Markers.WorldTagContext", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FTCMarkersWorldTagContextTest::RunTest(const FString&)
+{
+	// Exercise the actual transient HUD canvas. Numeric fog tests alone cannot catch a skipped world lookup.
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, TEXT("TCWorldTagContext"));
+	if (!TestNotNull(TEXT("transient scene world"), World)) return false;
+	{
+		FSceneViewFamilyContext Family(FSceneViewFamily::ConstructionValues(nullptr, World->Scene, FEngineShowFlags(ESFIM_Game)));
+		FSceneViewInitOptions Options;
+		Options.ViewFamily = &Family;
+		Options.SetViewRectangle(FIntRect(0, 0, 1280, 720));
+		Options.ViewRotationMatrix = FMatrix::Identity;
+		Options.ProjectionMatrix = FMatrix::Identity;
+		FSceneView View(Options);
+		TStrongObjectPtr<UCanvas> Canvas(NewObject<UCanvas>());
+		Canvas->SceneView = &View;
+		TestNull(TEXT("a HUD canvas is not a world object"), Canvas->GetWorld());
+		TestTrue(TEXT("world tags resolve the rendered scene for weather fog"), MarkerWorld(Canvas.Get()) == World);
+		Canvas->SceneView = nullptr;
+		TestNull(TEXT("screen-only canvases have no world tag fog"), MarkerWorld(Canvas.Get()));
+	}
+	World->DestroyWorld(false);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCMarkersCoverShieldTest, "ThreeCrossroads.Markers.CoverShield", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FTCMarkersCoverShieldTest::RunTest(const FString&)
+{
+	// main.js COVER_LOOK and GEO.shield at e4e579a. A shield shows even without a health bar.
+	for (int32 Cover = 0; Cover <= 4; Cover++)
+	{
+		const auto S = MC::CoverShield(Cover, false);
+		TestEqual(TEXT("only cover states 1, 2 and 3 show a shield"), S.Alpha > 0, Cover >= 1 && Cover <= 3);
+		TestEqual(TEXT("garrison hides every cover shield"), MC::CoverShield(Cover, true).Alpha, 0.0);
+	}
+	TestEqual(TEXT("cover is source gold"), MC::CoverShield(1, false).Hex, uint32_t(0xe2b850));
+	TestEqual(TEXT("trench is source green"), MC::CoverShield(2, false).Hex, uint32_t(0xb2de92));
+	TestEqual(TEXT("one-sided cover is 45 percent"), MC::CoverShield(3, false).Alpha, 0.45);
+	TestEqual(TEXT("shield point after 0.5 scale, relative to bar"), 1.55 + MC::ShieldPoints[3][0] * 0.5, 1.55);
+	TestEqual(TEXT("shield point is 0.3 m below bar"), -MC::ShieldPoints[3][1] * 0.5, 0.3);
+	return true;
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCMarkersUnicodeTest, "ThreeCrossroads.Markers.UnicodeLabels", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FTCMarkersUnicodeTest::RunTest(const FString&)

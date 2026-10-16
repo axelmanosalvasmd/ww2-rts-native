@@ -212,6 +212,7 @@ TArray<FString> FTCGraphics::ApplyEngine(double DevicePixelRatio) const
 	};
 	SetVar(TEXT("r.ScreenPercentage"), FString::SanitizeFloat(B.ScreenPercentage(DevicePixelRatio)));
 	SetVar(TEXT("r.Shadow.MaxResolution"), FString::FromInt(B.ShadowMapSize));
+	SetVar(TEXT("r.Shadow.MaxCSMResolution"), FString::FromInt(B.ShadowMapSize));
 	SetVar(TEXT("r.ShadowQuality"), B.bSoftShadows ? TEXT("3") : TEXT("1"));
 	UE_LOG(LogTCGraphics, Log, TEXT("graphics %s: %s"), LexToString(Current), *FString::Join(Lines, TEXT(", ")));
 	return Lines;

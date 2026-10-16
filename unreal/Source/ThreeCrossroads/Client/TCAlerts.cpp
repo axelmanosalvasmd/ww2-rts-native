@@ -481,40 +481,13 @@ FTCPaint FTCAlerts::Layout(const FTCAlertViewInput& In, const FTCMeasure& Measur
 	// the Alert history box: the summary always, the nav buttons and the list when open
 	{
 		float W = FMath::Min(HistoryW, In.ViewW - BoxSide);
-		if (In.bCompactHistory && !bHistoryOpen) W=FMath::Min(W,80.f);
-        // Measure free vertical intervals at each possible column edge. Prefer the source width, then narrow it.
-        auto FreeHeight=[&](float Width)
-        {
-            const float Bottom=FMath::Min(In.ViewH-8,In.MinimapTop-MinimapFrame-MinimapGap);
-            TArray<float> Xs={Right-Width,8.f};
-            for (const FBox2D& B : In.Avoid) if (B.bIsValid) { Xs.Add(B.Min.X-Width-6); Xs.Add(B.Max.X+6); }
-            float Largest=0;
-            for (float X : Xs)
-            {
-                if (X<8 || X+Width>In.ViewW-8+.01f) continue;
-                TArray<FVector2D> Intervals;
-                for (const FBox2D& A : In.Avoid)
-                    if (A.bIsValid && X<A.Max.X+.01 && X+Width>A.Min.X-.01 && A.Min.Y<Bottom && A.Max.Y>8)
-                        Intervals.Add(FVector2D(A.Min.Y-6,A.Max.Y+6));
-                Intervals.Sort([](FVector2D A,FVector2D B) { return A.X<B.X; });
-                float Top=8;
-                for (FVector2D Interval : Intervals) { Largest=FMath::Max(Largest,float(Interval.X-Top)); Top=FMath::Max(Top,float(Interval.Y)); }
-                Largest=FMath::Max(Largest,Bottom-Top);
-            }
-            return Largest;
-        };
-        const float Minimum=2*Border+2*HistoryPadY+LineBox;
-        const float EntryMinimum=2*ListPad+2*EntryMargin+2*Border+2*EntryPad+LineBox;
-        float Available=FreeHeight(W);
-        bool Found=false;
-        for (float Extra : {bHistoryOpen?EntryMinimum:0.f,0.f})
-        {
-            for (float Width : {W,280.f,240.f,200.f,176.f}) if (Width<=W && FreeHeight(Width)>=Minimum+Extra)
-            { W=Width; Available=FreeHeight(Width); Found=true; break; }
-            if (Found) break;
-        }
-        const bool Expand=bHistoryOpen && Available>=Minimum+EntryMinimum;
-		const TArray<FString> Summary=FTCPaint::Wrap(TC_T(FString(TEXT("Alert history"))),W-2*Border-2*HistoryPadX-FontPx*.95f,FontPx,false,Measure);
+        // alerts.css keeps the history at the right edge beneath the entire loss/routine stack.
+        // Limit only the expanded list, never the source card typography or the single-line summary.
+        float Before = 0;
+        for (const FBlock& Block : Blocks) Before += Block.H + Gap;
+        const float Available = FMath::Max(0.f, In.MinimapTop - MinimapFrame - MinimapGap - 8 - Before);
+        const bool Expand = bHistoryOpen;
+        const TArray<FString> Summary = { TC_T(FString(TEXT("Alert history"))) };
 		const float SumH = Border + HistoryPadY + Summary.Num()*LineBox + HistoryPadY;
 		const float ButtonH = LineBox + 2 * ButtonPadY + 2 * Border;
 		float NavH = 2 * NavPad + ButtonH;
@@ -522,7 +495,7 @@ FTCPaint FTCAlerts::Layout(const FTCAlertViewInput& In, const FTCMeasure& Measur
         if (NavW>W) NavH=0;
 		const TArray<FTCAlertHistoryEntry>& Entries = Hist.Entries();
         // A short interval retains a readable entry through Alt+Left/Right; the nav buttons give way first.
-        if (Available-SumH-NavH-Border<EntryMinimum) NavH=0;
+        if (Available-SumH-NavH-Border<2*ListPad+2*EntryMargin+2*Border+2*EntryPad+LineBox) NavH=0;
         const float Room=FMath::Max(0.f,Available-SumH-NavH-2*ListPad-Border);
 		const float ListMaxH = FMath::Min3(ListMax,ListVh*In.ViewH,Room);
 		struct FEntry { const FTCAlertHistoryEntry* E; TArray<FString> Lines; float H; };
@@ -630,112 +603,13 @@ FTCPaint FTCAlerts::Layout(const FTCAlertViewInput& In, const FTCMeasure& Measur
 		};
 		Blocks.Add(MoveTemp(B));
 	}
-	// Keep the pinned anchor whenever it fits. Overflow is retained in history, never painted offscreen or over controls.
-	const float Bottom=FMath::Min(In.ViewH-8,In.MinimapTop-MinimapFrame-MinimapGap);
-	auto Intersects=[](const FBox2D& A,const FBox2D& B) { return A.bIsValid && B.bIsValid && A.Min.X<B.Max.X+.01 && A.Max.X>B.Min.X-.01 && A.Min.Y<B.Max.Y+.01 && A.Max.Y>B.Min.Y-.01; };
-	TArray<FBox2D> Used=In.Avoid;
-	auto Clear=[&](const FBox2D& B)
-	{
-	 if (B.Min.X<8 || B.Min.Y<8 || B.Max.X>In.ViewW-8+.01 || B.Max.Y>In.ViewH-8+.01) return false;
-	 return !Used.ContainsByPredicate([&](const FBox2D& A) { return Intersects(B,A); });
-	};
-	float Total=0;
-	for (int32 I=0; I<Blocks.Num(); I++) Total+=(I?Gap:0)+Blocks[I].H;
-	float Y=Bottom-Total;
-	bool Original=true;
-	for (const FBlock& B : Blocks)
-	{
-	 if (!Clear(FBox2D(FVector2D(Right-B.W,Y),FVector2D(Right,Y+B.H)))) { Original=false; break; }
-	 Y+=B.H+Gap;
-	}
-	if (Original)
-	{
-	 Y=Bottom-Total;
-	 for (const FBlock& B : Blocks) { B.Paint(P,Right-B.W,Y); Y+=B.H+Gap; }
-	}
-	else
-	{
-	 // Preserve both source loss cards and a reachable history summary as one placement problem.
-	 if (Losses.Num() && !In.bCompactHistory)
-	 { FTCAlertViewInput Compact=In; Compact.bCompactHistory=true; return Layout(Compact,Measure,HeavyMeasure); }
-	 struct FPlace { int32 Index; float X,Y,Fit; };
-	 auto Positions=[&](float W,float H)
-	 {
-	  TArray<float> Xs={Right-W,8.f}, Ys={FMath::Max(8.f,Bottom-Total),8.f,Bottom-H,In.ViewH-8-H};
-	  for (const FBox2D& A : Used) if (A.bIsValid) { Xs.AddUnique(A.Min.X-W-1); Xs.AddUnique(A.Max.X+1); Ys.AddUnique(A.Min.Y-H-1); Ys.AddUnique(A.Max.Y+1); }
-	  Ys.Sort(); TArray<FVector2D> Out;
-	  for (float X : Xs) for (float Top : Ys)
-	   if (Clear(FBox2D(FVector2D(X,Top),FVector2D(X+W,Top+H)))) Out.AddUnique(FVector2D(X,Top));
-	  return Out;
-	 };
-	 auto PaintAt=[&](const FPlace& At)
-	 {
-	  const FBlock& B=Blocks[At.Index];
-	  if (At.Fit==1.f) B.Paint(P,At.X,At.Y);
-	  else
-	  {
-	   // A crowded small viewport scales a whole source card, retaining all text and matching hit bounds.
-	   FTCPaint Small; B.Paint(Small,0,0);
-	   for (FTCPaintItem& Item : Small.Items)
-	   {
-	    // Painting at the local origin must not interpret an offscreen mouse at (0,0) as hovering this card.
-	    const float Alpha=Item.Colour.A;
-	    if (Item.Role==TEXT("alert:loss")) Item.Colour=TCCss::Rgba(73,24,21,.97f);
-	    if (Item.Role==TEXT("alert:loss-frame")) Item.Colour=TCCss::Hex(0xc66a57);
-	    if (Item.Role==TEXT("alert:loss-edge")) Item.Colour=TCCss::Hex(0xff9a76);
-	    Item.Colour.A=Alpha;
-	    Item.Pos*=At.Fit; Item.Size*=At.Fit; Item.FontPx*=At.Fit; Item.Tracking*=At.Fit; Item.Thickness*=At.Fit;
-	   }
-	   Small.Shift(0,FVector2D(At.X,At.Y));
-	   for (FTCPaintHit& Hit : Small.Hits) Hit.Rect=FBox2D(Hit.Rect.Min*At.Fit+FVector2D(At.X,At.Y),Hit.Rect.Max*At.Fit+FVector2D(At.X,At.Y));
-	   for (FBox2D& Panel : Small.Panels) Panel=FBox2D(Panel.Min*At.Fit+FVector2D(At.X,At.Y),Panel.Max*At.Fit+FVector2D(At.X,At.Y));
-	   P.Append(Small);
-	  }
-	 };
-	 TArray<int32> Core;
-	 for (int32 I=0; I<Losses.Num(); I++) Core.Add(I);
-	 if (Blocks.Num()) { if (bHistoryOpen) Core.Insert(Blocks.Num()-1,0); else Core.Add(Blocks.Num()-1); }
-	 TArray<FPlace> Places;
-	 bool Packed=false;
-	 for (float LossFit : {1.f,.9f,.8f,.7f,.6f,.5f,.45f,.4f})
-	 {
-	  Used=In.Avoid; Places.Reset();
-	  TFunction<bool(int32)> Pack;
-	  Pack=[&](int32 At)
-	  {
-	   if (At==Core.Num()) return true;
-	   const int32 I=Core[At]; const FBlock& B=Blocks[I]; const float Fit=I<Losses.Num()?LossFit:1.f;
-	   const float W=B.W*Fit,H=B.H*Fit;
-	   for (const FVector2D& Pos : Positions(W,H))
-	   {
-	    Used.Add(FBox2D(Pos,Pos+FVector2D(W,H))); Places.Add({I,float(Pos.X),float(Pos.Y),Fit});
-	    if (Pack(At+1)) return true;
-	    Places.Pop(); Used.Pop();
-	   }
-	   return false;
-	  };
-	  if (Pack(0)) { Packed=true; break; }
-	 }
-	 if (Packed) for (const FPlace& At : Places) PaintAt(At);
-	 else
-	 {
-	  Used=In.Avoid;
-	  // Extremely constrained content stays in history. Its button has first claim on the last free space.
-	  for (int32 I=Core.Num()-1; I>=0; I--)
-	  {
-	   const FBlock& B=Blocks[Core[I]]; const TArray<FVector2D> Free=Positions(B.W,B.H);
-	   if (Free.IsEmpty()) continue;
-	   PaintAt({Core[I],float(Free[0].X),float(Free[0].Y),1.f}); Used.Add(FBox2D(Free[0],Free[0]+FVector2D(B.W,B.H)));
-	  }
-	 }
-	 for (int32 I=Losses.Num(); I<Blocks.Num()-1; I++)
-	 {
-	  const FBlock& B=Blocks[I]; const TArray<FVector2D> Free=Positions(B.W,B.H);
-	  if (Free.IsEmpty()) continue;
-	  PaintAt({I,float(Free[0].X),float(Free[0].Y),1.f}); Used.Add(FBox2D(Free[0],Free[0]+FVector2D(B.W,B.H)));
-	 }
-
-	}
+    // alerts.js place(): one bottom-anchored column, newest loss first. The browser intentionally
+    // overlays economy/score cards in a crowded viewport. Do not split, suppress or shrink these notices.
+    const float Bottom = In.MinimapTop - MinimapFrame - MinimapGap;
+    float Total = 0;
+    for (int32 I = 0; I < Blocks.Num(); I++) Total += (I ? Gap : 0) + Blocks[I].H;
+    float Y = Bottom - Total;
+    for (const FBlock& Block : Blocks) { Block.Paint(P, Right - Block.W, Y); Y += Block.H + Gap; }
 
     for (FTCPaintItem& Item : P.Items) if (Item.Role==TEXT("alert:loss-shadow"))
     {
@@ -1462,11 +1336,17 @@ bool FTCAlertsCrowdedTest::RunTest(const FString&)
   {
    const FBox2D& B=P.Panels[I];
    TestTrue(Case+TEXT("whole panel in viewport"),B.Min.X>=0 && B.Min.Y>=0 && B.Max.X<=View.X+.1 && B.Max.Y<=View.Y+.1);
-   for (const FBox2D& Other : In.Avoid) TestFalse(Case+TEXT("clear of controls"),Overlap(B,Other));
+   TestTrue(Case+TEXT("source right edge"),FMath::IsNearlyEqual(B.Max.X,double(In.Right),.01));
    for (int32 J=I+1; J<P.Panels.Num(); J++) TestFalse(Case+TEXT("cards clear of each other"),Overlap(B,P.Panels[J]));
   }
-  for (const FTCPaintItem& I : P.Items) if (I.Role==TEXT("alert:loss-heading"))
-   TestTrue(Case+TEXT("unclipped translated header"),I.Pos.Y>=8 && I.Pos.Y+I.Size.Y<=View.Y-8);
+  TestEqual(Case+TEXT("history summary never wraps"),P.TextsOf(TEXT("alert:history-summary")).Num(),1);
+  float LastLossY=-1;
+  for (const FTCPaintItem& I : P.Items)
+  {
+   if (I.Role==TEXT("alert:loss-detail")) TestEqual(Case+TEXT("source 20 CSS pixel loss text"),I.FontPx,20.f);
+   if (I.Role==TEXT("alert:loss"))
+   { TestEqual(Case+TEXT("source 380 CSS pixel card"),I.Size.X,380.); TestTrue(Case+TEXT("one ordered stack"),I.Pos.Y>LastLossY); LastLossY=I.Pos.Y; }
+  }
  }
  return !HasAnyErrors();
 }

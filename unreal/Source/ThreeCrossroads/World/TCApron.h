@@ -398,6 +398,7 @@ namespace TCApronCore
 #include "CoreMinimal.h"
 #include "UObject/StrongObjectPtr.h"
 #include "World/TCWater.h" // FTCCellFog
+#include "World/TCFogFrontier.h"
 
 class AActor;
 class UWorld;
@@ -480,6 +481,7 @@ private:
 
 	TWeakObjectPtr<AActor> Actor;
 	TStrongObjectPtr<UProceduralMeshComponent> Mesh;
+	FTCFogOverlay FogOverlay;
 	TStrongObjectPtr<UMaterialInterface> Material;
 	TStrongObjectPtr<UMaterialInstanceDynamic> MID;
 	TStrongObjectPtr<UTexture2D> CellTex, NoiseTex;

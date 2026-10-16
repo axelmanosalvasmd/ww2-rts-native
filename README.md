@@ -58,7 +58,7 @@ git lfs install --local
 
 You need Rust (stable) for `rust/`, Node.js to run the reference game and its tests, Git LFS, and Unreal Engine 5.8 only for `unreal/`.
 
-## Unreal client (slices 1a to 1v)
+## Unreal client (slices 1a to 1w)
 
 Built and run on Linux with the installed Unreal 5.8.3; Windows and Mac are not built yet. The project uses the engine's empty Entry map and spawns everything from C++.
 
@@ -212,3 +212,19 @@ Before cooking, generate the original aircraft assets with [the aircraft exporte
 The integrated Linux editor passes 154 Vulkan automation tests. Eight Node harness tests, seven executable Rust TCP tests, 165 lobby-preview cases and four Great Bridge decoder streams of 4,200 snapshots pass. The private Rust-host rerun uses the ordinary CLI from main f7c51b1a, with 13,145 adopted/agreeing snapshots over six lifecycle lanes and all 33 maps (32 start, No Man's Land refuses start/scenario). The decoder library remains pinned to ABI 2 revision 9e618217. These checks do not imply whole-match rules parity or visual acceptance. Portrait lighting, crowd occlusion, collapse faces/dust, water brightness and crowded UI150 legibility remain open. No parity row is accepted.
 
 Final slice 1v verification also completes all sixteen explicit-Graphics mode rows (11 natural decisions), the Linux Development package with verified hashes and headless/rendered seated pairs, and a Low cooked building-breach replay. Fresh live/package counters total 159,545 adopted/agreeing across 124 final logs; failed tries and recorded presentations are excluded. Forty-six curated browser/native pairs document the remaining visual differences. See DESIGN.md for the measured results and limits.
+
+## Unreal slice 1w assets
+
+The HUD atlas keeps the original index.html and source glyph art. Regenerate it from an isolated reference server with `node unreal/Tools/hudfit/export-icons.mjs "$TC_ORIGIN" "$TC_SCRATCH/icon-profile" reference/ww2-rts unreal/Source/ThreeCrossroads/Client/TCHUD.Icons.inl` (TC_ORIGIN is its loopback HTTP URL; TC_SCRATCH is your scratch folder). The world fog materials reuse the original relief, scenery and water materials, so run the existing world, relief, ground, water and look generators first, then run the fog generator:
+
+```sh
+"$UE/Engine/Binaries/Linux/UnrealEditor-Cmd" "$PWD/unreal/ThreeCrossroads.uproject" \
+  -run=pythonscript -EnablePlugins=PythonScriptPlugin -nullrhi -unattended \
+  -script="$PWD/unreal/Tools/world/make-fog-materials.py"
+```
+
+The generated Fog assets are cooked by DefaultGame.ini. The new raw-alpha masters and shared scenery binding must ship together. Their source remains text; generated binary assets stay build outputs. FPS and map editor remain deferred.
+
+Slice 1w integration verification: required-FFI Build.sh and all 165 Vulkan automation cases pass (163 clean, two successful-warning outcomes), plus eight Node harness tests, 165 original lobby-preview cases and four Great Bridge streams of 4,200 adopted/agreeing snapshots. All sixteen reference-host mode rows complete with explicit Graphics (fifteen High, one Low), including 11 natural decisions; host-ended caps stay separate. Fresh integrated live/package counters total 140,144 adopted/agreeing across 38 final logs, zero decoder errors. All -try logs, console duplicates and recorded presentations are excluded from fresh totals.
+
+Linux Development package hashes pass before and after runtime. The headless and High rendered pairs total 2,008 adopted/agreeing snapshots; a cooked Low World frontier/Barracks recording adds 85 separately. Forty-one original browser/native pairs document HUD, shadows, weather, World and water differences. Current-main Rust fd714e36 fails to compile on EliminationState serde, so the requested fresh Rust lifecycle and 33-map lanes are blocked and unrun. ABI 2 pin/header are unchanged. Packaged physical input, other platforms, visual acceptance, ghosted Low HQ rings, camp/shadow/portrait differences and crowded-scene missing-versus-occluded soldiers remain open. No parity row is accepted.

@@ -33,12 +33,13 @@ FTCApron::~FTCApron() = default;
 
 void FTCApron::Attach(UWorld* World)
 {
+	FogOverlay.Attach(World);
 	if (Actor.IsValid() || !World) return;
 	AActor* A = TCWaterView::SpawnHolder(World, TEXT("Apron"), Mesh);
 	if (!A) return;
 	Actor = A;
 	Mesh->SetVisibility(false);
-	if (UMaterialInterface* M = LoadObject<UMaterialInterface>(nullptr, MaterialPath)) Material.Reset(M);
+	if (UMaterialInterface* M = LoadObject<UMaterialInterface>(nullptr, MaterialPath)) { TCFogLook::PrepareMaterial(M); Material.Reset(M); }
 	else { UE_LOG(LogTC, Error, TEXT("apron: %s does not load (run unreal/Tools/water/make-water-materials.py); the land past the map edge is not drawn"), MaterialPath); }
 	if (!NoiseTex.IsValid())
 	{
@@ -51,6 +52,7 @@ void FTCApron::Attach(UWorld* World)
 
 void FTCApron::Detach()
 {
+	FogOverlay.Detach();
 	if (AActor* A = Actor.Get()) A->Destroy();
 	Actor.Reset(); Mesh.Reset(); MID.Reset(); CellTex.Reset();
 	Core = TCApronCore::FApron();
@@ -208,6 +210,10 @@ void FTCApron::SendMesh(bool bCreate)
 	TArray<FVector> Verts, Normals;
 	Verts.SetNumUninitialized(NV); Normals.SetNumUninitialized(NV);
 	for (int32 V = 0; V < NV; V++) { Verts[V] = TCApronView::ToUnreal(&Core.Position[(size_t)V * 3]); Normals[V] = TCApronView::NormalToUnreal(&Core.Normal[(size_t)V * 3]); }
+	TArray<int32> FogIndices;
+	// The apron overlay includes its narrow strip under the playable edge and its skirt, as apron.js does.
+	for (const uint32_t I : Core.Index) FogIndices.Add((int32)I);
+	FogOverlay.SetSection(0, Verts, FogIndices, Normals);
 	if (!bCreate && Mesh->GetNumSections() > 0)
 	{
 		Mesh->UpdateMeshSection_LinearColor(0, Verts, Normals, TArray<FVector2D>(), TArray<FLinearColor>(), TArray<FProcMeshTangent>());
@@ -276,6 +282,7 @@ void FTCApron::MarkCells(const FTCMatchState& State, const TSet<int32>& Shaped, 
 
 void FTCApron::Flush(const FTCMatchState& State, bool bRevealAll)
 {
+	FogOverlay.Flush(State, true);
 	if (W <= 0 || State.Map.W != W || State.Map.H != H) return;
 	if (bRevealAll != bLastReveal) { bLastReveal = bRevealAll; bFogAll = true; }
 	if (bFogAll) { Fog.Update(State, bRevealAll, nullptr); bFogAll = false; FogCells.Reset(); }

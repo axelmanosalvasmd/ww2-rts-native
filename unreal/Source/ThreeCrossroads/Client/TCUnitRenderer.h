@@ -63,7 +63,7 @@ class THREECROSSROADS_API ATCUnitRenderer : public AActor
 public:
 	ATCUnitRenderer();
 
-	void Draw(const FTCMatchState& State, const FTCUnitTable& Table, const ATCTerrain* Terrain, const TSet<int32>& Selected, float DeltaSeconds);
+	void Draw(const FTCMatchState& State, const FTCUnitTable& Table, const ATCTerrain* Terrain, const TSet<int32>& Selected, float DeltaSeconds, const TArray<int32>* SnapshotOrder = nullptr);
 	// Forget every unit (a new match or the lobby): eased positions, squads, motion and the bodies on the ground.
 	void Reset();
 	// main.js v.killed: units a delivered kill shot named that then left the snapshot (FTCCombatEffects::TakeKilledGone).
@@ -139,7 +139,13 @@ private:
 	struct FSquad
 	{
 		FTCInfantrySquadAnimation Anim;
+		TArray<FVector2D> TrenchSpots;
+		int32 TrenchSnapshot = -1;
+		int32 AppliedSnapshot = -1, ShotMan = -1;
 	};
+	TSet<FVector2D> TrenchTaken;
+	int32 TrenchSnapshot = -1;
+	void PrepareTrenchSeats(const FTCMatchState& State, const FTCUnitTable& Table, const TArray<int32>* SnapshotOrder);
 	// One squad's frame, between its animation (before the parts, so a crew gun and its crew swap level of detail
 	// together) and drawing its men.
 	struct FSquadMen
@@ -162,7 +168,7 @@ private:
 	// ring's color is the ACES pre-image of its color at the light's exposure (ATCLighting), redone when it changes
 	void UpdateRingLooks();
 	FLinearColor RingColorFor(const FLinearColor& Display) const;
-	UInstancedStaticMeshComponent* PartComponent(const FTCModelPart& Part, bool bFaded);
+	UInstancedStaticMeshComponent* PartComponent(const FTCModelPart& Part, bool bFaded, bool bCastShadow = true);
 	// A new part component (PartComponent, before its shadow twin is made): a catalog hull with wheels takes its copy
 	// carrying the reference's wheel and track data and the moving master, with the path table bound and two more
 	// floats of custom data (travel, turn). False when the part keeps the catalog's mesh (no copy, faded, or the

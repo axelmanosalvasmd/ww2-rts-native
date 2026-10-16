@@ -302,9 +302,18 @@ void FTCMinimap::DrawUnits(UCanvas* Canvas, const FTCMatchState& State, const FT
 		if (!Basis.InSquare(PX, PY)) continue;
 		FLinearColor Seat = ATCUnitRenderer::SeatColor(U.Owner);
 		Seat.A = 1.f;
-		FCanvasNGonItem Dot(FVector2D(PX, PY), FVector2D(R, R), 10, Seat);
-		Dot.BlendMode = SE_BLEND_Opaque;
-		Canvas->DrawItem(Dot);
+        TArray<FCanvasUVTri> Disc;
+        for (int32 Segment=0; Segment<16; Segment++)
+        {
+            FCanvasUVTri T;
+            T.V0_Pos=FVector2D(PX,PY);
+            T.V1_Pos=FVector2D(PX+R*FMath::Cos(Segment*UE_DOUBLE_PI/8),PY+R*FMath::Sin(Segment*UE_DOUBLE_PI/8));
+            T.V2_Pos=FVector2D(PX+R*FMath::Cos((Segment+1)*UE_DOUBLE_PI/8),PY+R*FMath::Sin((Segment+1)*UE_DOUBLE_PI/8));
+            T.V0_UV=T.V1_UV=T.V2_UV=FVector2D::ZeroVector;
+            T.V0_Color=T.V1_Color=T.V2_Color=Seat; Disc.Add(T);
+        }
+        FCanvasTriangleItem Dot(Disc,GWhiteTexture);
+        Dot.BlendMode=SE_BLEND_Translucent; Canvas->DrawItem(Dot);
 		Units++;
 		if (Selected.Contains(U.Id))
 		{
@@ -325,6 +334,31 @@ void FTCMinimap::DrawUnits(UCanvas* Canvas, const FTCMatchState& State, const FT
 	}
 
  LastStats.UnitsDrawn=Units; LastStats.SelectedDrawn=Ringed;
+}
+
+void FTCMinimap::DrawRing(UCanvas* Canvas, FVector2D Ground, float CanvasRadius, float CanvasWidth, FLinearColor Colour)
+{
+    FVector2D Centre;
+    if (!Canvas || !Canvas->Canvas || Colour.A<=0 || !WorldToPixel(Ground,Centre)) return;
+    const double K=Basis.CanvasScale(), Radius=CanvasRadius*K, Half=CanvasWidth*K/2;
+    const double Inner=FMath::Max(0.,Radius-Half), Outer=Radius+Half;
+    constexpr int32 Segments=48;
+    TArray<FCanvasUVTri> Tris;
+    for (int32 Segment=0; Segment<Segments; Segment++)
+    {
+        const double A=Segment*2*UE_DOUBLE_PI/Segments, B=(Segment+1)*2*UE_DOUBLE_PI/Segments;
+        const FVector2D D0(FMath::Cos(A),FMath::Sin(A)), D1(FMath::Cos(B),FMath::Sin(B));
+        const FVector2D P[]={Centre+D0*Inner,Centre+D0*Outer,Centre+D1*Outer,Centre+D1*Inner};
+        for (int32 Face=0; Face<2; Face++)
+        {
+            FCanvasUVTri T;
+            T.V0_Pos=P[0]; T.V1_Pos=P[Face+1]; T.V2_Pos=P[Face+2];
+            T.V0_UV=T.V1_UV=T.V2_UV=FVector2D::ZeroVector;
+            T.V0_Color=T.V1_Color=T.V2_Color=Colour; Tris.Add(T);
+        }
+    }
+    // FCanvasLineItem forces opaque blending. Triangles retain the alert pulse's alpha.
+    FCanvasTriangleItem Item(Tris,GWhiteTexture); Item.BlendMode=SE_BLEND_Translucent; Canvas->DrawItem(Item);
 }
 
 bool FTCMinimap::DrawViewOutline(UCanvas* Canvas, const FTCMinimapView& View)
@@ -353,6 +387,7 @@ bool FTCMinimap::DrawViewOutline(UCanvas* Canvas, const FTCMinimapView& View)
 		T0.V0_Pos = A2 + N; T0.V1_Pos = B2 + N; T0.V2_Pos = B2 - N;
 		T1.V0_Pos = A2 + N; T1.V1_Pos = B2 - N; T1.V2_Pos = A2 - N;
 		T0.V0_Color = T0.V1_Color = T0.V2_Color = T1.V0_Color = T1.V1_Color = T1.V2_Color = FLinearColor(MinimapViewOutline);
+        T0.V0_UV=T0.V1_UV=T0.V2_UV=T1.V0_UV=T1.V1_UV=T1.V2_UV=FVector2D::ZeroVector;
 		for (FCanvasUVTri* T : { &T0, &T1 })
 		{
 			// the winding TCWarMap's flat triangles use
@@ -377,7 +412,8 @@ bool FTCMinimap::ViewFromCanvas(const UCanvas* Canvas, const ATCTerrain* Terrain
 	FVector O, D;
 	Canvas->Deproject(FVector2D(Canvas->ClipX * 0.5f, Canvas->ClipY * 0.5f), O, D);
 	if (FVector2D(D.X, D.Y).SizeSquared() < 1e-8) return false; // looking straight down: no heading to read
-	Out.YawDegrees = (float)FMath::RadiansToDegrees(FMath::Atan2(D.Y, D.X));
+	// The HUD canvas deprojection can retain a preceding view. Use the rendered view rotation.
+	Out.YawDegrees = Canvas->SceneView->ViewRotation.Yaw;
 	Out.Corners.Reset();
 	const FSceneView* SV = Canvas->SceneView;
 	const FString NewKey = FString::Printf(TEXT("%s|%s|%g|%g|%d|%d|%d|%d"), *SV->ViewLocation.ToString(), *SV->ViewRotation.ToString(), Canvas->ClipX, Canvas->ClipY,

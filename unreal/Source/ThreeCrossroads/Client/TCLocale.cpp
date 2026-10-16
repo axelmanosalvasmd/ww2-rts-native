@@ -1,3 +1,4 @@
+#include "Client/TCStats.h"
 // See TCLocale.h. Ported from client/i18n.js at FTCLocale::ReferencePin; the dictionary is client/es.js as exported by
 // unreal/Tools/export-locale.mjs.
 #include "Client/TCLocale.h"
@@ -976,12 +977,17 @@ bool FTCLocaleHudStringsTest::RunTest(const FString&)
    { FTCLocale::FScopedLanguage Es(ETCLanguage::Spanish); Shown=TC_T(Text); }
    if (const FString* Expected=Entries.Find(Text))
    { TestEqualSensitive(TEXT("HUD literal uses its es.js key: ")+Text,Shown,*Expected); Exact++; }
+   for (const FString& Rendered : {Text,Shown}) for (TCHAR C : Rendered)
+    TestTrue(FString::Printf(TEXT("HUD glyph U+%04X in %s"),uint32(C),*Rendered),FTCType::HasGlyph(C) && FTCType::HasGlyph(C,true));
    if (Shown.Equals(Text,ESearchCase::CaseSensitive)) Kept++;
    TSharedRef<FJsonObject> Row=MakeShared<FJsonObject>(); Row->SetStringField(TEXT("source"),FPaths::GetCleanFilename(File));
    Row->SetStringField(TEXT("english"),Text); Row->SetStringField(TEXT("spanish"),Shown); Row->SetBoolField(TEXT("exactReferenceKey"),Entries.Contains(Text));
    Rows.Add(MakeShared<FJsonValueObject>(Row));
   }
  }
+ for (const TPair<FString,FString>& Pair : Entries) for (const FString& Rendered : {Pair.Key,Pair.Value}) for (TCHAR C : Rendered)
+  TestTrue(FString::Printf(TEXT("dictionary glyph U+%04X"),uint32(C)),FTCType::HasGlyph(C) && FTCType::HasGlyph(C,true));
+ for (TCHAR C : FString(TEXT("▸▾⌄⇧ Shift+H"))) TestTrue(TEXT("all source menu, group and key glyphs render"),FTCType::HasGlyph(C));
  TestTrue(TEXT("the walk includes the actual HUD"),Seen.Contains(TEXT("Move to group")) && Seen.Contains(TEXT("Munitions: support calls and abilities. Hold points to earn them")));
  TestTrue(TEXT("the walk includes refusal/fault presentation"),Seen.Contains(TEXT("The Rust host refused to restart this match. A match stopped by a server fault cannot restart.")));
  TestTrue(TEXT("a broad HUD inventory was exercised"),Rows.Num()>500 && Exact>100);

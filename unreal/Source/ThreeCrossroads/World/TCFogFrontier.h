@@ -13,8 +13,8 @@
 // The engine-free part (namespace TCFogFrontierCore) compiles alone with TC_FOG_FRONTIER_CORE_ONLY defined; the
 // standalone harness and ThreeCrossroads.World.FogFrontier hold it to a Node oracle that runs the unmodified fog.js
 // (TCFogFrontier.Oracle.inl). The engine part (FTCFogFrontier) feeds it from FTCMatchState and draws what the
-// reference's overlay draws, in the multiplier convention the native fog consumers use (FTCCellFog: 255 seen, 140
-// explored, 82 never seen), as a G8 texture any ground material can read, plus, on World Conquest, the unknown ground
+// reference's overlay draws, as a raw G8 alpha texture with LinearFilter and the source mist shader. The legacy
+// multiplier texture remains for native consumers outside this renderer. On World Conquest it also draws unknown ground
 // itself: an opaque plane at level 0 in the overlay's colour (fog.js SHADE, 10 / 255), as the browser draws its
 // placeholder ground under the opaque overlay.
 //
@@ -36,6 +36,49 @@ namespace TCFogFrontierCore
 	inline constexpr int Frontier = 4;           // World: cells over which explored ground darkens toward unseen ground
 	inline constexpr double Cell = 2.0;          // shared/sim.js CELL
 	inline double JsRound(double V) { return std::floor(V + 0.5); }
+	// surfaces.js MIST and fogOverlayShader, in reference metres. Texture coordinates in the native
+	// upload run north to south, so x / (w * CELL), z / (h * CELL) samples the same texel as three.
+	inline double Saturate(double V) { return std::min(1.0, std::max(0.0, V)); }
+	inline double Fract(double V) { return V - std::floor(V); }
+	inline double Mix(double A, double B, double T) { return A + (B - A) * T; }
+	inline double MistHash(double X, double Z)
+	{
+		X = Fract(X * 0.1031); Z = Fract(Z * 0.1030);
+		const double D = X * (Z + 33.33) + Z * (X + 33.33);
+		X += D; Z += D;
+		return Fract((X + Z) * X);
+	}
+	inline double MistNoise(double X, double Z)
+	{
+		const double I = std::floor(X), J = std::floor(Z), U = Fract(X), V = Fract(Z);
+		const double S = U * U * (3 - 2 * U), T = V * V * (3 - 2 * V);
+		return Mix(Mix(MistHash(I, J), MistHash(I + 1, J), S), Mix(MistHash(I, J + 1), MistHash(I + 1, J + 1), S), T);
+	}
+	inline double Mist(double Alpha, double X, double Z, double Time)
+	{
+		const double M = MistNoise(X * .05 + Time * .04, Z * .05 + Time * .015) * .65
+			+ MistNoise(X * .13 - Time * .02, Z * .13 - Time * .05) * .35;
+		return Saturate(Alpha + (M - .5) * 1.4 * Alpha * (1 - Alpha));
+	}
+	inline double OuterAlpha(double Alpha, double Distance)
+	{
+		const double T = Saturate((Distance - 6) / (32 - 6));
+		return Mix(Alpha, Dark / 255.0, T * T * (3 - 2 * T));
+	}
+	// The overlay blends after lighting in linear space. Objects use surfaces.js's literal 0.0392.
+	inline double Composite(double Lit, double Alpha, bool bPiece = false)
+	{
+		return Mix(Lit, bPiece ? .0392 : Shade / 255.0, Alpha);
+	}
+	inline double SampleAlpha(const uint8_t* Bytes, int W, int H, double X, double Z)
+	{
+		if (!Bytes || W <= 0 || H <= 0) return 0;
+		// LinearFilter + ClampToEdge: integer texel centres at half a cell, no nearest-cell lookup.
+		const double U = X / Cell - .5, V = Z / Cell - .5;
+		const int I = (int)std::floor(U), J = (int)std::floor(V);
+		auto At = [&](int A, int B) { return Bytes[std::clamp(B, 0, H - 1) * W + std::clamp(A, 0, W - 1)] / 255.0; };
+		return Mix(Mix(At(I, J), At(I + 1, J), Fract(U)), Mix(At(I, J + 1), At(I + 1, J + 1), Fract(U)), Fract(V));
+	}
 
 	// fog.js snapshot: the cells a unit lights, x0 / y0 its footprint's first cell and Size its side (1 for anything
 	// but a building). Air units and types the client does not know are not passed in.
@@ -227,8 +270,32 @@ class UWorld;
 class UTexture2D;
 class UProceduralMeshComponent;
 class UMaterialInstanceDynamic;
+class UMaterialInterface;
+class UMaterialParameterCollection;
 class FTCMatchState;
 class FTCUnitTable;
+
+// main.js fogMesh / apron.js fogMesh: the same ground geometry, translucent, drawn after water.
+// A tiny normal offset substitutes for WebGL's polygonOffset without changing picking or relief heights.
+class THREECROSSROADS_API FTCFogOverlay
+{
+public:
+	FTCFogOverlay();
+	~FTCFogOverlay();
+	void Attach(UWorld* World);
+	void Detach();
+	void Clear();
+	void ClearSection(int32 Section);
+	void SetSection(int32 Section, const TArray<FVector>& Positions, const TArray<int32>& Indices, const TArray<FVector>& Normals);
+	void Flush(const FTCMatchState& State, bool bOuter = false);
+	bool Ready() const { return Mid.IsValid(); }
+	UProceduralMeshComponent* MeshComponent() const { return Mesh.Get(); }
+	static const TCHAR* const MaterialPath;
+private:
+	TWeakObjectPtr<AActor> Actor;
+	TStrongObjectPtr<UProceduralMeshComponent> Mesh;
+	TStrongObjectPtr<UMaterialInstanceDynamic> Mid;
+};
 
 // The fog of war for this client, fed from FTCMatchState: Start at each start, Snapshot after each snapshot was taken
 // (before FogDirtyCells is reset), Frame every frame. Other fog consumers read Look / MultiplierByte (the target look)
@@ -274,12 +341,18 @@ public:
 	bool Opaque() const { return Core.bOpaque; }
 	TSet<int32> TakeChanged();
 	UTexture2D* Texture() const { return Tex.Get(); }
+	// The exact fog.js alpha bytes. Keep Texture() for legacy multiplier consumers outside this scope.
+	UTexture2D* AlphaTexture() const { return AlphaTex.Get(); }
+	double PresentationTime() const { return FixedTime >= 0 ? FixedTime : Clock; }
 	int32 LitCells() const { return Core.LitList.size(); }
 	int32 FrontierCells() const;
 	int32 UnknownCovered() const { return CoverCells; }
 	FString StatusLine() const;
 	// for tests
 	const TCFogFrontierCore::FFog& CoreState() const { return Core; }
+#if WITH_DEV_AUTOMATION_TESTS
+	UProceduralMeshComponent* UnknownOverlayForTests() const { return CoverOverlay.MeshComponent(); }
+#endif
 
 	// The unknown ground (World Conquest): drawn when true and a holder is attached.
 	bool bDrawUnknown = true;
@@ -287,11 +360,15 @@ public:
 private:
 	TCFogFrontierCore::FFog Core;
 	TStrongObjectPtr<UTexture2D> Tex;
+	TStrongObjectPtr<UTexture2D> AlphaTex;
+	TStrongObjectPtr<UMaterialParameterCollection> ClockCollection;
+	double Clock = 0, FixedTime = -1;
 	TArray<uint8> TexBytes;
 	int32 Rx0 = 0, Ry0 = 0, Rx1 = -1, Ry1 = -1;
 	TWeakObjectPtr<AActor> Actor;
 	TStrongObjectPtr<UProceduralMeshComponent> CoverMesh;
 	TStrongObjectPtr<UMaterialInstanceDynamic> CoverMid;
+	FTCFogOverlay CoverOverlay;
 	TBitArray<> CoverKnown;
 	bool bCoverDirty = false;
 	int32 CoverCells = 0, Snapshots = 0;
@@ -308,11 +385,15 @@ private:
 // match is decided" flag (every cell clear).
 namespace TCFogLook
 {
+	// Uncooked editor games must finish generated surfaces before drawing the first match frame.
+	THREECROSSROADS_API void PrepareMaterial(UMaterialInterface* Material);
 	// the game's frontier (one fog per client); null: the three looks from FTCMatchState
 	THREECROSSROADS_API void SetActive(const FTCFogFrontier* Frontier);
 	THREECROSSROADS_API const FTCFogFrontier* Active();
 	// 255 seen (or lit), 140 explored, 82 never seen, and between them on World's frontier (FTCCellFog's bytes)
 	THREECROSSROADS_API uint8 Byte(const FTCMatchState& State, bool bReveal, int32 C);
+	// Raw fog.js alpha, including the in-progress fade. New materials sample this, never Byte's legacy multiplier.
+	THREECROSSROADS_API uint8 AlphaByte(const FTCMatchState& State, bool bReveal, int32 C);
 	// the same as a multiplier: exactly 1, 0.55 and 0.32 for the three looks (ATCTerrain, FTCGroundPaint), the byte
 	// over 255 between them
 	THREECROSSROADS_API float Multiplier(const FTCMatchState& State, bool bReveal, int32 C);
