@@ -1,8 +1,8 @@
-# Native match save format, version 1
+# Native match save format, versions 1 and 2
 
 This implements owner group I as recorded in [issue #5, comment 6217590741](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6217590741). The compatibility source is `reference/ww2-rts` at `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`. Hermes' exact-head implementation acknowledgement remains a merge requirement. This document does not mark another draft contract agreed.
 
-The envelope carries the prototype's game, local defender, raw map, seats, settings and planner-memory content. JSON with a version field replaces Node's V8 binary serialization. Existing Node `.save` files are not imported. Version 1 binds this native state schema and its compiled rules; incompatible schema or rules changes require a format-version increment. Files and credentials remain server-private. The deterministic core encodes and decodes in-memory state and performs no file I/O.
+The envelope carries the prototype's game, local defender, raw map, seats, settings and planner-memory content. JSON with a version field replaces Node's V8 binary serialization. Existing Node `.save` files are not imported. Each version binds its native state schema and compiled rules; incompatible schema or rules changes require a format-version increment. Files and credentials remain server-private. The deterministic core encodes and decodes in-memory state and performs no file I/O.
 
 ## Files and summaries
 
@@ -33,7 +33,7 @@ The root has these seven required keys. The six content owners correspond to `se
 
 | Key | Value and source |
 | --- | --- |
-| `version` | Integer `1`. Any other value is refused before native state restoration. |
+| `version` | Integer `1` for existing non-authored matches, or `2` for authored objective missions. Other versions are refused before native state restoration. Version 1 carrying authored state is refused. |
 | `g` | Lossless native `Match` checkpoint, described below. It owns every implemented authoritative ordinary-match component. The prototype stores the whole `g` at `server/saves.js:18`. |
 | `guard` | Separate local-defender player, corresponding to the non-enumerable `g.players[-1]` at `server/saves.js:15-26`. Currently `null`; a non-null guard is refused by room admission while World is closed. |
 | `map` | Full raw authored map, including private layers and triggers. It is never replaced with `mapForClient`. The prototype uses `null` in World (`server.js:426`); native World restoration is refused. |
@@ -97,6 +97,7 @@ The `state` struct field keys are listed below. These are native component bound
 | `capture_ticks`, `tick_state`, `ordinary_snapshot_only` | Capture clocks, tick phase state and the existing delivery capability restriction. |
 | `story`, `fallen`, `finish`, `timeline`, `next_unit_id` | Match statistics, fall locations, terminal decision, result samples and the canonical actor allocator. |
 | `assault`, `horde`, `tutorial`, `scenario`, `companions`, `rail_runs` | Existing mode and operative owners. Inactive records are retained; their presence does not grant room admission. |
+| `authored_scenario` | Optional bounded ordinary mission owner: `data`, `executions`, insertion-ordered `objectives`, `next_execution`. Absent in older checkpoints; defaults to `None`. See [scenario objectives](scenario-objectives.md). |
 | `elimination` | Optional Annihilation/Classic owner: `teams`, `bunkers`, `time_left`, `sudden_death`, `nodes`. Each resource node retains `cell`, `at` (`x`, `z`), `depot`, `rate`, `fuel`. |
 | `rules` | Omitted and reconstructed from compiled rules. Saving modified rules is refused. |
 | `world_runtime` | Omitted; saving or loading a World runtime is refused. |
@@ -106,6 +107,8 @@ The `state` struct field keys are listed below. These are native component bound
 Version remains 1. The hotfix completes serialization of the existing `Match.elimination` field and documents its nested keys; it adds no envelope or socket keys. Main `57ebeb8e`, which combined elimination modes and versioned saves, could not compile and therefore could not write a v1 checkpoint. A checkpoint from another build that omits `elimination` still deserializes that optional owner as `None`, so otherwise compatible non-elimination v1 saves remain loadable. Missing state is not reconstructed for Annihilation or Classic: their validators reject it. A present elimination record must contain its required typed fields; incomplete records are refused.
 
 Annihilation and Classic remain excluded by ordinary recipient snapshot admission, including the room save/load path. Their full Match checkpoint codec is tested independently, including Classic sudden death, resource nodes and next-tick continuation. Serializing their owners does not open room admission.
+
+Authored objective missions use envelope version 2 because older binaries ignore unknown struct fields and could otherwise silently discard the new mission owner. Non-authored matches continue writing version 1. This binary accepts both versions, but refuses authored state inside a version 1 envelope. The prototype game content remains represented by the same six owners; only the already-native envelope version changes. Pending authored announcements use the new `TickEvent.AuthoredScenario` variant, and the optional owner is serialized through the existing tagged codec.
 
 ## Admission and delivery
 
