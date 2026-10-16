@@ -170,6 +170,22 @@ function run(authored){
   const row={name:authored.name,startup,frames:[],completed:0,assertions:[],routeCalls:[],inputReceipt:null,failure:null};
   row.frames.push(snapshot(g,[...g.units.keys()],[],[],roles,arrived));
   const assertion=(label,pass)=>{row.assertions.push({tick:g.tick,label,passed:!!pass});if(!pass)throw Error(`original predicate/precondition: ${label}`);};
+  // Private observation only. No terrain, path, traffic or recipient provider is called.
+  const coverOperands = stage => {
+    const fields=['id','owner','type','x','z','hp','supp','path','worldGoal','routeEnd','moveResult','moveOutcome',
+      'holdPos','holdFire','autoRetreat','auto','follow','drift','build','dig','entrench','garrison','riding',
+      'retreating','attackId','targetId','amove','face','reverse','repath','stuck','vx','vz','traffic',
+      'trafficWait','trafficEntered','trafficTrail','queuedBehind','hitAt','hitFrom'];
+    const units=[...g.units.values()].map(u=>{
+      const x=Math.floor(u.x/sim.CELL),z=Math.floor(u.z/sim.CELL);
+      const cell=x<0||z<0||x>=g.w||z>=g.h?-1:z*g.w+x;
+      return {fields:Object.fromEntries(fields.map(key=>[key,encode(u[key])])),
+        infantry:scalar(sim.UNITS[u.type].infantry),cell,
+        char:scalar(cell<0?undefined:g.chars[cell]),flags:scalar(cell<0?undefined:g.flags[cell]),
+        inCover:scalar(sim.inCover(g,u))};
+    });
+    (row.coverOperands??=[]).push({stage,tick:g.tick,roles:[...roles],units});
+  };
   const dist=(u,p)=>Math.hypot(u.x-p.x,u.z-p.z);
   const buySlots=authored.kind==='bridge'?roles.map((id,index)=>id===null?index:null).filter(i=>i!==null):[];
   try {
@@ -215,7 +231,9 @@ function run(authored){
         if(authored.variant==='deferred'&&(tick===3101||tick===3301)){g.pathBudget=tick===3101?0:4096;inputs.push({op:'pathBudget',value:g.pathBudget});}
       } else if(authored.kind==='cover'){
         if(tick===2)move(roles,[{x:21.81,z:20.1894},{x:23.1,z:20.1994}]);
+        if(tick===401)coverOperands('before-command');
         if(tick===401){assertion('protected cover before true move',sim.inCover(g,g.units.get(roles[0])));move(roles,[{x:40,z:2},{x:41.29,z:2.01}]);}
+        if(tick===401)coverOperands('after-command');
       } else if(authored.kind==='naval'){
         if(tick===2)for(const owner of [0,1])issue(owner,{t:'tech',kind:'tier'});
         if(tick===1220)for(const owner of [0,1])issue(owner,{t:'build',ids:mobile.filter(id=>g.units.get(id).owner===owner),kind:'shipyard',x:45,z:owner===0?17:111});
@@ -228,6 +246,7 @@ function run(authored){
         if(authored.variant==='deferred'&&g.pathBudget===0)assertion('zero budget performs no actual findPath calls',pathCalls===callStart);
         for(const id of roles){const u=g.units.get(id),cell=Math.floor(u.z/sim.CELL)*g.w+Math.floor(u.x/sim.CELL);assertion('no river displacement',g.chars[cell]!=='W');assertion('reachable order not abandoned',u.moveOutcome!=='unreachable');const goal=destinations.get(id);if(dist(u,goal)<(authored.variant==='attack-move'?2.5:0.5)&&!u.path.length&&!u.worldGoal&&!u.orders.length&&!arrived.has(id)){arrived.add(id);issue(0,{t:'stance',ids:[id],key:'holdPos',on:true});}}
       }
+      if(authored.kind==='cover'&&tick===401)coverOperands('before-post-step-assertion');
       if(authored.kind==='cover'&&tick===401)assertion('friendly bridge traffic retains protected cover',sim.inCover(g,g.units.get(roles[0])));
       row.frames.push(snapshot(g,[...g.units.keys()].filter(id=>!before.has(id)),[...before].filter(id=>!g.units.has(id)),inputs,roles,arrived));
       row.pendingInputs=[];

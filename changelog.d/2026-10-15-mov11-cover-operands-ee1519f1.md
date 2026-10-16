@@ -1,0 +1,1 @@
+- Add unexecuted, read-only MOV11 cover operands around the unchanged failing Move and assertion. Preserve the failed 2e050 Source result: 19 cases complete, protected-cover fails at tick 401, naval unrun, 98,001 steps and 98,020 retained frames. No input, runtime or parity change.

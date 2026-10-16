@@ -1,5 +1,16 @@
 # Three Crossroads Native: design decisions
 
+## MOV11 protected-cover operand receipt (2026-10-15, source only)
+
+The actual Source generation at `2e050e156859046c4358140ab2b1ecc03bfbdc36` stopped at the unchanged protected-cover predicate after accepted Move and step 401. Movement and all eighteen full bridge cases completed first: 19 cases complete, protected-cover failed, naval-backing unrun, 98,001 completed steps and 98,020 retained frames. The 9,820 derived N10 positions are not native comparisons. No tick-401 snapshot was appended, so that receipt proves no post-step pose, HP, terrain flag or specific actor cause. The full 21-case check did not pass.
+
+Pinned original `test-bridge-groups.mjs:56-74` injects two direct routes with holdPos=false. This genuine-command adaptation retains constructor actors, stages through Move, and has holdPos=true at its last retained frame. Ordinary admission resolves destinations through endSpots and findPath; local traffic excludes infantry pairs, while separation checks the actual displacement against protected cover. Those differences do not establish which operation caused the observed failure. No input fix is proposed or applied.
+
+Add only a private read-only operand receipt before and after the unchanged tick-401 Move and immediately before the unchanged post-step assertion. It records actual unit fields, physical cell/flag operands and the pure inCover result. It invokes no path, traffic, terrain-memory, recipient or snapshot provider, consumes no random input and writes only recorder-owned JSON. Every original action, tick, assertion, order, scenario and loaded-source transformation stays exact. Removing the three additive insertions reproduces the entire failed-parent harness byte for byte. See [the bounded diagnostic](docs/testing/mov11-cover-operands.md).
+
+This diagnostic child has no Source, Node, Cargo, rustc, native, formatter, lint, discovery or CI result. The parent failure, both outer-launch logs, wrapper, input bindings and historical failures remain immutable at their producing heads. Required backing, blocked-keep, multi-leg and reached-yield events remain unwitnessed; Source byte-check and native alignment remain UNRUN. Rust tree `4ff2939d6841de3f3ea6e85fde9fb65c9ce726ca`, all 939 parity IDs and Acceptance cells, fixtures, registries, contracts, FFI and wire bytes remain exact. MOV28 stays UNAPPLIED and MOV29 stays held. Only a new Root literal-head, selection and slot grant can authorize future execution; no old grant transfers.
+
+
 ## Six MOV reader bindings on main f7c51b1a (2026-10-15, source only)
 
 Start a fresh private branch from fetched main `f7c51b1a0ebf850c5c22b560a595e4095ce39fdc` and integrate only owned `c6fdc1d7` changes. Preserve the complete incoming typed registry, logistics history, fixtures, every parity cell and all historical raw failures. Resolve DESIGN additively. The old 2a13/c0/a545/650/960 checkpoints remain preserved. No result transfers from those heads or from c875.
