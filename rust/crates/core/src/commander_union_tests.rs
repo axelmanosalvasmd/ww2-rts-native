@@ -215,6 +215,16 @@ fn repair_outputs(kind: &str) -> Vec<Value> {
     complete_base(&mut input);
     input.manpower = 1000.0;
     protect_wallet(&mut input);
+    // The completed lookout sees the full repair stamp, including the crater
+    // and its banks. A ground squad alone can lose LOS across the lowered cell.
+    input.units.push(unit(60004, "tower", 0, 47.0, 31.0));
+    input.runtime.as_mut().unwrap().units.insert(
+        60004,
+        UnitFacts {
+            built: 1.0,
+            ..UnitFacts::default()
+        },
+    );
     // No facility needs construction, and no finished HQ fortification is due.
     let cell = 20 * 80 + 23;
     match kind {
@@ -468,6 +478,9 @@ fn ai13_union_contains_every_ordinary_command_family_and_engineering_variant() {
 // These four cases use real ordinary human packets, canonical queued commands,
 // unrestricted live projectile clocks and every seat's actual recipient encoder.
 fn projectile_lifecycle(kind: &str) -> Vec<Value> {
+    projectile_lifecycle_approach(kind, false)
+}
+fn projectile_lifecycle_approach(kind: &str, approach: bool) -> Vec<Value> {
     use crate::{
         match_firing::LaunchEvent,
         match_human_observation::HumanObservationMemory,
@@ -482,7 +495,14 @@ fn projectile_lifecycle(kind: &str) -> Vec<Value> {
     let mut m = scene_rows(rows);
     m.world.game.reveal = true;
     m.start.win_vp = 3.0;
-    let shooter = spawn(&mut m, kind, 0, point(40.0, 41.0));
+    // Satchel range is six metres. Start within it so this flight witness does
+    // not depend on walking a held squad into a house doorway.
+    let shooter_x = if kind == "ranger" && !approach {
+        46.0
+    } else {
+        40.0
+    };
+    let shooter = spawn(&mut m, kind, 0, point(shooter_x, 41.0));
     let enemy = spawn(&mut m, "mg", 1, point(51.0, 41.0));
     m.world.game.units.get_mut(&enemy).unwrap().garrison = Some(20 * 64 + 25);
     let capture = m.start.points[0].at;
@@ -498,6 +518,9 @@ fn projectile_lifecycle(kind: &str) -> Vec<Value> {
     }
     for u in m.world.game.units.values_mut() {
         u.hold_pos = true;
+    }
+    if approach {
+        m.world.game.units.get_mut(&shooter).unwrap().hold_pos = false;
     }
     m.grid.rebuild(&m.world.game.units);
     let visible = m.world.game.units.keys().copied().collect::<Vec<_>>();
@@ -539,6 +562,7 @@ fn projectile_lifecycle(kind: &str) -> Vec<Value> {
     let mut delivered_flights = BTreeSet::new();
     let mut applied = false;
     let mut terminal = 0;
+    let mut pending_approach = 0;
     for _ in 0..1600 {
         let report = m.advance_tick().unwrap();
         if !report.commands.is_empty() {
@@ -569,6 +593,12 @@ fn projectile_lifecycle(kind: &str) -> Vec<Value> {
                 _ => {}
             }
         }
+        pending_approach += usize::from(
+            m.commands
+                .units
+                .get(&shooter)
+                .is_some_and(|u| u.nade.is_some()),
+        );
         retained |= m
             .firing
             .flights
@@ -639,6 +669,12 @@ fn projectile_lifecycle(kind: &str) -> Vec<Value> {
         }
     }
     assert!(applied && !emitted_commands.is_empty(), "{kind}");
+    if approach {
+        assert!(
+            pending_approach > 0,
+            "the aimed order must survive ordinary weapon turns while approaching"
+        );
+    }
     assert!(
         !launched.is_empty() && retained,
         "{kind}: live flights must launch and persist"
@@ -676,4 +712,9 @@ fn ai13_union_ability_grenade_satchel_barrage_execute_live_flights_and_finish() 
 #[test]
 fn ai13_union_fireat_executes_live_flights_every_seat_delivery_and_finish() {
     projectile_lifecycle("tank");
+}
+
+#[test]
+fn ai13_pending_aimed_approach_survives_weapon_turns_delivery_and_finish() {
+    projectile_lifecycle_approach("ranger", true);
 }

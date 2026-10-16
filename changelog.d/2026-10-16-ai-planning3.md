@@ -1,3 +1,5 @@
 - Feed Classic, Assault and Horde commander tactics from recipient-delivered roles, plans, cooldowns, mine knowledge and wall work, and enable aimed ground abilities with the integrated projectile receiver.
 - Cover hidden-state AI privacy through actual mode snapshots and exercise the ordinary command union, live projectiles and every-seat match delivery.
-- Remove the obsolete queued-aircraft attachment refusal after integrating aviation delivery. The Horde projectile lifecycle keeps all assertions and drops its call to the removed aircraft weapon restriction method.
+- Remove the obsolete queued-aircraft attachment refusal after integrating aviation delivery. The Horde projectile lifecycle keeps all assertions and drops its call to the removed aircraft weapon restriction method. Replace the queued-aircraft binding refusal test with successful binding and every-seat tick delivery.
+- Keep ordinary firing valid while an aimed ability is approaching its target, matching the prototype, instead of faulting the match on the pending ability flag.
+- Let bound Classic rooms queue and complete aircraft after aviation receiver integration. Replace the aircraft purchase/training refusal test with paid-once publication and recipient ticks, while retaining placement and future-birth validation.

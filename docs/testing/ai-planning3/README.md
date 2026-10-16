@@ -9,12 +9,12 @@ Owner decision L is addressed by detached recipient packets. AI policies receive
 no Match/Game handle. Roles use the delivered mode object and seat team. Public
 starting terrain is retained separately from later delivered changes; the
 existing owner work rows provide wall-work knowledge. World and Tutorial remain
-outside this delivery adapter. No wire or FFI fields are added.
+outside this delivery adapter. No wire or FFI fields are added. Ordinary firing also accepts a pending aimed ability while it approaches, as the prototype targeting/firing block does at `shared/sim.js:5557-5593`. Air, rail and operative firing guards remain unchanged.
 
 ## Literal row mapping
 
 - AI-64: `ai_privacy_modes_tests::ai64_all_modes_all_seats_and_levels_ignore_hidden_state_in_complete_recipient_frames`; `ai64_visible_own_health_wallet_and_horde_stance_change_actual_commands`; `ai64_real_mode_policy_orders_and_all_recipient_adapters_survive_ticks_and_ending`.
-- AI-13 (ordinary R1): `commander_union_tests::ai13_union_contains_every_ordinary_command_family_and_engineering_variant`; `ai13_union_ability_grenade_satchel_barrage_execute_live_flights_and_finish`; `ai13_union_fireat_executes_live_flights_every_seat_delivery_and_finish`.
+- AI-13 (ordinary R1): `commander_union_tests::ai13_union_contains_every_ordinary_command_family_and_engineering_variant`; `ai13_union_ability_grenade_satchel_barrage_execute_live_flights_and_finish`; `ai13_union_fireat_executes_live_flights_every_seat_delivery_and_finish`; `ai13_pending_aimed_approach_survives_weapon_turns_delivery_and_finish`.
 
 AI-64 constructs real Conquest with houses, house-free Conquest, Classic,
 Assault and Horde. Both seats, two seeds, two delivery ticks and all three
@@ -47,8 +47,9 @@ mission planning remains AI-43 and is not promoted by this command-kind union.
 
 ## Validation
 
-Execution is pending. The final PR body will name the producing head, focused
-selection, actual results, format and strict workspace Clippy. Shared Cargo
+The PR body records the final producing head, focused selection, actual results,
+format and strict workspace Clippy. Earlier failed runs remain diagnostics and
+do not establish row completion. Shared Cargo
 slots use matching targets, Rust 1.99.0, 6 GiB memory, zero swap and `-j4`.
 No Source recorder or full-workspace nextest run is used. Hermes' exact-head
 runtime acknowledgment, hosted CI and integration belong to the orchestrator.

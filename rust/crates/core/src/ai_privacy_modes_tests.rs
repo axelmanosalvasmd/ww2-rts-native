@@ -452,6 +452,7 @@ fn ai64_real_mode_policy_orders_and_all_recipient_adapters_survive_ticks_and_end
         }
         assert!(submitted > 0);
         let mut consumed = 0;
+        let mut accepted = 0;
         let mut ending = 0;
         for index in 0..100 {
             if index == 12 {
@@ -475,6 +476,11 @@ fn ai64_real_mode_policy_orders_and_all_recipient_adapters_survive_ticks_and_end
             }
             let report = state.advance_tick().unwrap();
             consumed += report.commands.len();
+            accepted += report
+                .commands
+                .iter()
+                .filter(|c| c.denial.is_none())
+                .count();
             let shots = report
                 .events
                 .iter()
@@ -508,6 +514,10 @@ fn ai64_real_mode_policy_orders_and_all_recipient_adapters_survive_ticks_and_end
             }
         }
         assert_eq!(consumed, submitted, "{mode:?}");
+        assert!(
+            accepted > 0,
+            "at least one policy command must actuate in {mode:?}"
+        );
         assert!(ending >= 60, "{mode:?} ending={ending}");
         assert_eq!(
             state.world.game.tick,

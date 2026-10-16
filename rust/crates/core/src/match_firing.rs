@@ -1594,8 +1594,8 @@ impl Match {
             .units
             .get(&id)
             .ok_or("missing canonical unit control")?;
-        if kind.air || kind.rail || control.operative || control.nade.is_some() {
-            return Err("air, rail, operative and aimed ability firing are unsupported".into());
+        if kind.air || kind.rail || control.operative {
+            return Err("air, rail and operative firing are unsupported".into());
         }
         if u.riding {
             return Ok(());
