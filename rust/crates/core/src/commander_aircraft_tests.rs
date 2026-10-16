@@ -15,6 +15,23 @@ fn ready(input: &mut crate::commander_ai::Input, id: u32) {
 }
 
 #[test]
+fn intent_ai43_offmap_aircraft_are_finite_but_ground_and_paths_remain_bounded() {
+    use crate::commander_ai::PolicyError;
+    let mut input = fixture(vec![unit(1, "fighter", -28.3)]);
+    assert!(Observation::new(input.clone()).is_ok());
+    input.units[0].kind = "rifle".into();
+    assert_eq!(Observation::new(input.clone()), Err(PolicyError::Position));
+    input.units[0].kind = "fighter".into();
+    input.units[0].at.x = f64::NAN;
+    assert_eq!(Observation::new(input.clone()), Err(PolicyError::Position));
+    input.units[0].at.x = f64::INFINITY;
+    assert_eq!(Observation::new(input.clone()), Err(PolicyError::Position));
+    input.units[0].at.x = -28.3;
+    input.units[0].path.push(Point { x: -1.0, z: 20.0 });
+    assert_eq!(Observation::new(input), Err(PolicyError::Position));
+}
+
+#[test]
 fn intent_ai43_attackers_choose_nearest_visible_vehicle_or_gun_from_ground_army() {
     for kind in ["tank", "at", "flak", "mortar", "howitzer"] {
         let mut input = fixture(vec![
@@ -162,6 +179,7 @@ fn intent_ai43_recipient_readiness_and_emitted_patrol_survive_ordinary_ticks_all
     .unwrap();
     let fighter = m.spawn_aircraft(0, "fighter").unwrap();
     let enemy = m.spawn_aircraft(1, "fighter").unwrap();
+    assert!(m.world.game.units[&fighter].x < 0.0 || m.world.game.units[&fighter].z < 0.0);
     for c in m.commands.units.values_mut() {
         c.hold_fire = true;
         c.auto_cast = false;
@@ -264,7 +282,8 @@ fn intent_ai43_recipient_readiness_and_emitted_patrol_survive_ordinary_ticks_all
     let full_seats: Vec<_> = (0..2).map(|slot| SelectedSeat { slot, full: true, omit: false }).collect();
     let mut retained_flight = false;
     let mut full_snapshots = 0;
-    for _ in 0..16 {
+    // The off-map home is about 60 m from the target; allow the real ingress flight.
+    for _ in 0..120 {
         let report = m.advance_tick().unwrap();
         retained_flight |= m.firing.flights.values().any(|flight| flight.shooter == attacker);
         let frame = delivery.capture_selected_with_tick_events(&mut m, &full_seats, &report.events).unwrap();
@@ -276,5 +295,5 @@ fn intent_ai43_recipient_readiness_and_emitted_patrol_survive_ordinary_ticks_all
     }
     assert!(retained_flight, "the policy-issued attacker mission must fire a retained flight");
     assert!(m.aviation.planes[&attacker].ammo < ammo_before);
-    assert_eq!(full_snapshots, 16);
+    assert_eq!(full_snapshots, 120);
 }

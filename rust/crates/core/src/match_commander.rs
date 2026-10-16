@@ -902,7 +902,11 @@ impl Match {
             })
             || g.units.values().any(|u| {
                 u.id == 0
-                    || !within(u.at())
+                    || !u.x.is_finite()
+                    || !u.z.is_finite()
+                    || !self.rules.kinds.get(u.kind).is_some_and(|kind| {
+                        kind.air || within(u.at())
+                    })
                     || u.hp < 0.0
                     || !u.supp.is_finite()
                     || u.supp < 0.0
