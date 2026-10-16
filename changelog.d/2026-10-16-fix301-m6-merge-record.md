@@ -1,0 +1,1 @@
+- Preserve the #301 mode guards when merging current main, including refusal of convoy Retreat in Assault, Annihilation and Classic. Extend the existing convoy atomicity regression and record all seven hand-edited merge hunks. Tutorial building repair stays refused.

@@ -156,13 +156,13 @@ impl Match {
             self.options.mode,
             crate::economy::Mode::Default
                 | crate::economy::Mode::Conquest
+                | crate::economy::Mode::Assault
+                | crate::economy::Mode::Annihilation
                 | crate::economy::Mode::Classic
                 | crate::economy::Mode::Tutorial
                 | crate::economy::Mode::World
         ) {
-            return Err(
-                "abilities currently require represented Conquest, Classic, Tutorial or World state".into(),
-            );
+            return Err("abilities require a represented ordinary or World state".into());
         }
         self.validate_actor_mode()?;
         if self.world.game.tick < 0

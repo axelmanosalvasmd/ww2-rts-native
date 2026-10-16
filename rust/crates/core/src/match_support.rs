@@ -1,9 +1,9 @@
-//! Off-map support on canonical Conquest wallets, cooldowns and terrain.
+//! Off-map support on canonical ordinary-mode wallets, cooldowns and terrain.
 //! Strike geometry/timing, flak, payloads and drops share canonical Game, combat and publication state.
 
 use crate::{
     catalog::{Catalog, Value},
-    economy::{self, Mode},
+    economy::{self, Currency, Mode},
     environment,
     game::{CELL, Point, Smoke, Strike, StrikeKind},
     match_combat::{DamageWorld, ExplosionSource},
@@ -43,6 +43,7 @@ pub enum SupportDenial {
     Blocked,
     Cooldown,
     Manpower,
+    Munitions,
     Unseen,
     Population,
 }
@@ -147,7 +148,7 @@ impl Match {
     pub(crate) fn validate_support(&self) -> Result<(), SupportError> {
         if !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode) {
             return Err(SupportError::Unsupported(
-                "support currently requires Conquest",
+                "support requires a matching ordinary mode",
             ));
         }
         let n = self.world.game.players.len();
@@ -164,7 +165,12 @@ impl Match {
                 .players
                 .iter()
                 .any(|p| p.support.values().any(|v| !v.is_finite()))
-            || self.start.economy.players.iter().any(|p| !p.mp.is_finite())
+            || self
+                .start
+                .economy
+                .players
+                .iter()
+                .any(|p| !p.mp.is_finite() || !p.mun.is_finite())
             || self.world.game.strikes.iter().any(|s| {
                 s.owner >= n
                     || ![s.x, s.z, s.dir].iter().all(|v| v.is_finite())
@@ -226,11 +232,15 @@ impl Match {
         if cooldown > 0.0 {
             return Ok(Some(SupportDenial::Cooldown));
         }
-        let cost = economy::sup_cost(Mode::Conquest, name)
-            .map_err(|e| SupportError::Actuation(e.to_string()))?
-            .cost;
-        if player.mp < cost {
-            return Ok(Some(SupportDenial::Manpower));
+        let price = economy::sup_cost(self.options.mode, name)
+            .map_err(|e| SupportError::Actuation(e.to_string()))?;
+        let cost = price.cost;
+        let (balance, denial) = match price.currency {
+            Currency::Manpower => (player.mp, SupportDenial::Manpower),
+            Currency::Munitions => (player.mun, SupportDenial::Munitions),
+        };
+        if balance < cost {
+            return Ok(Some(denial));
         }
         if self.world.game.strikes.len() == 4096 {
             return Err(SupportError::Invalid("support strike capacity exhausted"));
@@ -322,26 +332,26 @@ impl Match {
             }),
             live: false,
         };
-        let new_mp = player.mp - cost;
+        let new_balance = balance - cost;
         let cd = number(def, "cd")?;
-        let story = prepare_story_updates(
-            &mut self.story,
-            self.finish.is_some(),
-            &[
-                StoryChange {
-                    slot: Some(owner),
-                    key: StoryKey::SupportCalls,
-                    amount: 1.0,
-                },
-                StoryChange {
-                    slot: Some(owner),
-                    key: StoryKey::MpSpent,
-                    amount: cost,
-                },
-            ],
-        )
-        .map_err(SupportError::Actuation)?;
-        self.start.economy.players[owner].mp = new_mp;
+        let mut changes = vec![StoryChange {
+            slot: Some(owner),
+            key: StoryKey::SupportCalls,
+            amount: 1.0,
+        }];
+        if price.currency == Currency::Manpower {
+            changes.push(StoryChange {
+                slot: Some(owner),
+                key: StoryKey::MpSpent,
+                amount: cost,
+            });
+        }
+        let story = prepare_story_updates(&mut self.story, self.finish.is_some(), &changes)
+            .map_err(SupportError::Actuation)?;
+        match price.currency {
+            Currency::Manpower => self.start.economy.players[owner].mp = new_balance,
+            Currency::Munitions => self.start.economy.players[owner].mun = new_balance,
+        }
         self.start.players[owner].support.insert(name.into(), cd);
         self.world.game.strikes.push(strike);
         story.commit();

@@ -1,9 +1,9 @@
-//! Ability payments are core components in Classic and World. Their room admissions stay guarded.
+//! Ability payments run in Classic; World recipient admission stays guarded.
 use crate::{
     catalog::{Catalog, Value},
     economy::{self, AbilityCost, Faction, Mode},
     economy_state::ArmySize,
-    game::{ModeKind, Point},
+    game::Point,
     map::AuthoritativeMap,
     match_commands::{Denial, UnitControl},
     match_runtime::{Match, MatchOptions, PlayerConfig},
@@ -42,7 +42,7 @@ fn scene(mode: Mode) -> Match {
     let map = AuthoritativeMap::from_json(&serde_json::to_vec(&raw).unwrap()).unwrap();
     let options = MatchOptions {
         seed: 701,
-        mode: if world { Mode::World } else { Mode::Conquest },
+        mode,
         players: vec![
             PlayerConfig {
                 name: "A".into(),
@@ -66,17 +66,13 @@ fn scene(mode: Mode) -> Match {
         logistics: false,
         sandbox: false,
     };
-    let mut m = if world {
+    if world {
         Match::new_world(&map, options, MatchRandom::new(701)).unwrap()
+    } else if mode == Mode::Classic {
+        Match::new_classic(&map, options).unwrap()
     } else {
         Match::new(&map, options).unwrap()
-    };
-    if mode == Mode::Classic {
-        // An explicit component boundary, without admitting a Classic room or runner.
-        m.options.mode = mode;
-        m.world.game.mode = Some(ModeKind::Classic);
     }
-    m
 }
 
 fn actor(m: &mut Match, name: &str) -> u32 {
@@ -252,17 +248,18 @@ fn cmb112_classic_and_world_charge_on_use_and_aimed_arrival() {
         assert_eq!(m.firing.flights.len(), flights);
         assert_eq!(m.abilities.get(id).unwrap().cooldown, 0.);
 
-        // Paid components cannot enter a recipient room before its mode adapter exists.
+        // Classic ticks are represented; its recipient adapter and World hosting stay guarded.
         assert!(matches!(
             SnapshotCache::new(&m),
             Err(SnapshotError::UnsupportedMode)
         ));
         if mode == Mode::Classic {
-            assert!(
-                m.validate_tick_state()
-                    .unwrap_err()
-                    .contains("represented ordinary or World mode")
-            );
+            m.firing.take_events();
+            m.validate_tick_state().unwrap();
+            for _ in 0..4 {
+                m.advance_tick().unwrap();
+                assert!(m.tick_state.fault().is_none());
+            }
         }
     }
 }

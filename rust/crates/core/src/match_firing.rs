@@ -357,27 +357,7 @@ fn dist(a: Point, b: Point) -> f64 {
 
 impl Match {
     fn supported_firing_mode(&self) -> Result<(), String> {
-        if !matches!(
-            (self.options.mode, self.world.game.mode),
-            (
-                crate::economy::Mode::Default | crate::economy::Mode::Conquest,
-                None
-            ) | (
-                crate::economy::Mode::Classic,
-                Some(crate::game::ModeKind::Classic)
-            ) | (
-                crate::economy::Mode::Tutorial,
-                Some(crate::game::ModeKind::Tutorial)
-            ) | (
-                crate::economy::Mode::World,
-                Some(crate::game::ModeKind::World)
-            ) | (
-                crate::economy::Mode::Horde,
-                Some(crate::game::ModeKind::Horde)
-            )
-        ) {
-            return Err("weapon execution requires ordinary Conquest mode".into());
-        }
+        crate::match_actor::checked_game_mode(&self.world.game, self.options.mode)?;
         self.validate_actor_mode()
     }
     /// Capture poses before the tick advances and before weather or environment movement.

@@ -1015,7 +1015,7 @@ impl crate::match_runtime::Match {
             if kind == "worldbase" {
                 return Ok(Some(Denial::Blocked));
             }
-            if self.options.mode == Mode::World {
+            if self.options.mode.is_construction() {
                 if Catalog::compiled()
                     .and_then(|catalog| catalog.table("UNITS"))
                     .map_err(|e| e.to_string())?
@@ -1029,7 +1029,10 @@ impl crate::match_runtime::Match {
                     Err(crate::match_runtime::ProductionStepError::Production(
                         crate::production::Error::Denied(d),
                     )) => Ok(Some(d.into())),
-                    Err(e) => Err(format!("recorded World buy: {e:?}")),
+                    Err(crate::match_runtime::ProductionStepError::Placement(
+                        crate::produced_units::Error::UnsupportedAir,
+                    )) => Ok(Some(Denial::Unsupported)),
+                    Err(e) => Err(format!("recorded construction-mode buy: {e:?}")),
                 };
             }
             return match self.recorded_buy(owner, kind, *from) {
@@ -1054,6 +1057,7 @@ impl crate::match_runtime::Match {
                     crate::match_support::SupportDenial::Blocked => Denial::Blocked,
                     crate::match_support::SupportDenial::Cooldown => Denial::Cooldown,
                     crate::match_support::SupportDenial::Manpower => Denial::Manpower,
+                    crate::match_support::SupportDenial::Munitions => Denial::Munitions,
                     crate::match_support::SupportDenial::Unseen => Denial::Unseen,
                     crate::match_support::SupportDenial::Population => Denial::Population,
                 })),
