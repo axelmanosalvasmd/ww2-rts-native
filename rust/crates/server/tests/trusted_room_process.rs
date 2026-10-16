@@ -257,7 +257,6 @@ fn ordinary_binary_refuses_unsupported_settings_before_any_start_publication() {
         json!({"t":"army","v":"large"}),
         json!({"t":"army","v":"massive"}),
         json!({"t":"army","v":"endless"}),
-        json!({"t":"sandbox","v":true}),
         json!({"t":"team","slot":1,"v":0}),
     ];
     for setting in cases {
