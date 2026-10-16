@@ -57,6 +57,24 @@ impl Match {
         }
     }
 
+    /// Claims belong to the canonical mode node owner and only to this exact depot.
+    pub(crate) fn release_depot_claim(&mut self, id: UnitId) {
+        if let Some(state) = self.elimination.as_mut() {
+            for node in &mut state.nodes {
+                if node.depot == Some(id) {
+                    node.depot = None;
+                }
+            }
+        }
+        if let Some(state) = self.world_runtime.as_mut() {
+            for node in &mut state.nodes {
+                if node.depot == Some(id) {
+                    node.depot = None;
+                }
+            }
+        }
+    }
+
     /// Tear down an owned unfinished site for the original 75 percent MP refund.
     /// This administrative removal creates no death, bounty, rubble or built counter.
     pub fn cancel_construction(
@@ -177,15 +195,9 @@ impl Match {
         self.building_rallies.remove(&id);
         self.recruit_metadata.remove(&id);
         self.aviation.remove(id);
-        if let Some(world) = self.world_runtime.as_mut() {
-            for node in &mut world.nodes {
-                if node.depot == Some(id) {
-                    node.depot = None;
-                }
-            }
-        }
         self.start.economy.players[owner].mp = wallet;
         story.commit();
+        self.release_depot_claim(id);
         Ok(None)
     }
     fn validate_construction_actor(&self, id: UnitId) -> Result<(), String> {
@@ -924,9 +936,8 @@ impl Match {
 }
 
 impl Match {
-    /// Pay and stamp an admitted static site before computing any crew route.
-    /// Depot nodes, coastal producers, caches and construction modes require their
-    /// canonical providers and are refused explicitly by this ordinary caller.
+    /// Pay and stamp an admitted site before computing any crew route.
+    /// Classic depots claim their canonical resource node only after site publication.
     pub fn execute_build(
         &mut self,
         owner: usize,
@@ -958,9 +969,6 @@ impl Match {
             .contains(&name)
         {
             return Ok(Some(Denial::Blocked));
-        }
-        if name == "depot" {
-            return Ok(Some(Denial::Unsupported));
         }
         let types = crate::economy::builder_types(self.options.mode).map_err(|e| e.to_string())?;
         let builders = selected
@@ -1050,19 +1058,69 @@ impl Match {
             return self.construction_denial(&selected, Denial::Blocked);
         }
         let size = number(definition, "size")? as usize;
-        let x = math::round(at.x / CELL - size as f64 / 2.0);
-        let z = math::round(at.z / CELL - size as f64 / 2.0);
+        let node_index = if name == "depot" {
+            let nodes = &self
+                .elimination
+                .as_ref()
+                .ok_or("depot placement requires canonical Classic nodes")?
+                .nodes;
+            let nearest = nodes
+                .iter()
+                .enumerate()
+                .filter(|(_, node)| {
+                    node.depot.is_none() && math::hypot(node.at.x - at.x, node.at.z - at.z) <= 8.0
+                })
+                .min_by(|(a, left), (b, right)| {
+                    math::hypot(left.at.x - at.x, left.at.z - at.z)
+                        .total_cmp(&math::hypot(right.at.x - at.x, right.at.z - at.z))
+                        .then(a.cmp(b))
+                })
+                .map(|(index, _)| index);
+            if nearest.is_none() {
+                let nearby = nodes
+                    .iter()
+                    .filter(|node| math::hypot(node.at.x - at.x, node.at.z - at.z) <= 8.0)
+                    .map(|node| foot_center(&self.world.game, node.cell, size))
+                    .collect::<Vec<_>>();
+                for center in nearby {
+                    if !self.recipient_sees(owner, center)? {
+                        return self.construction_denial(&selected, Denial::NotVisible);
+                    }
+                }
+                return self.construction_denial(&selected, Denial::Blocked);
+            }
+            nearest
+        } else {
+            None
+        };
+        let cell = if let Some(index) = node_index {
+            self.elimination.as_ref().unwrap().nodes[index].cell
+        } else {
+            let x = math::round(at.x / CELL - size as f64 / 2.0);
+            let z = math::round(at.z / CELL - size as f64 / 2.0);
+            if x < 0.0 || z < 0.0 || x >= self.world.game.w as f64 || z >= self.world.game.h as f64
+            {
+                return self.construction_denial(&selected, Denial::Blocked);
+            }
+            z as usize * self.world.game.w + x as usize
+        };
         let g = &self.world.game;
-        if x < 0.0 || z < 0.0 || x >= g.w as f64 || z >= g.h as f64 {
-            return self.construction_denial(&selected, Denial::Blocked);
-        }
-        let cell = z as usize * g.w + x as usize;
         let Some(cells) = footprint(g, cell, size) else {
             return self.construction_denial(&selected, Denial::Blocked);
         };
         let center = foot_center(g, cell, size);
         if !self.recipient_sees(owner, center)? {
             return self.construction_denial(&selected, Denial::NotVisible);
+        }
+        if name != "depot"
+            && self.elimination.as_ref().is_some_and(|state| {
+                state.nodes.iter().any(|node| {
+                    footprint(&self.world.game, node.cell, 2)
+                        .is_some_and(|reserved| cells.iter().any(|cell| reserved.contains(cell)))
+                })
+            })
+        {
+            return self.construction_denial(&selected, Denial::Blocked);
         }
         self.world
             .preflight_cell_rows(&cells)
@@ -1243,6 +1301,9 @@ impl Match {
             owner,
             cost,
         )?;
+        if let Some(index) = node_index {
+            self.elimination.as_mut().unwrap().nodes[index].depot = Some(id);
+        }
         Ok(None)
     }
 }
@@ -1254,3 +1315,11 @@ mod tests;
 #[cfg(test)]
 #[path = "base_native_intent_tests.rs"]
 mod native_intent;
+
+#[cfg(test)]
+#[path = "match_construction_logistics_tests.rs"]
+mod logistics_intent;
+
+#[cfg(test)]
+#[path = "base_construction_runtime_tests.rs"]
+mod construction_runtime;

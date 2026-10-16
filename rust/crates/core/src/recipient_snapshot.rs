@@ -16,12 +16,17 @@ mod aircraft;
 mod composition;
 #[path = "recipient_snapshot/delivery.rs"]
 mod delivery;
+#[cfg(test)]
+#[path = "recipient_snapshot/elimination_tests.rs"]
+mod elimination_tests;
 #[path = "recipient_snapshot/engineering.rs"]
 mod engineering;
 #[path = "recipient_snapshot/falling.rs"]
 mod falling;
 #[path = "recipient_snapshot/flights.rs"]
 mod flights;
+#[path = "recipient_snapshot/logistics.rs"]
+mod logistics;
 #[path = "recipient_snapshot/modes.rs"]
 mod modes;
 #[path = "recipient_snapshot/owners.rs"]
@@ -122,13 +127,35 @@ pub struct SnapshotCache<'a> {
 }
 impl<'a> SnapshotCache<'a> {
     pub fn new(state: &'a Match) -> Result<Self, SnapshotError> {
-        if !matches!(state.options.mode, Mode::Default | Mode::Conquest)
-            || state.world.game.mode.is_some()
+        let ordinary = matches!(
+            (state.options.mode, state.world.game.mode),
+            (Mode::Default | Mode::Conquest, None)
+                | (Mode::Classic, Some(crate::game::ModeKind::Classic))
+                | (
+                    Mode::Annihilation,
+                    Some(crate::game::ModeKind::Annihilation)
+                )
+                | (Mode::Assault, Some(crate::game::ModeKind::Assault))
+        );
+        if !ordinary
             || state.world.geography().is_some()
-            || state.assault.is_some()
             || state.world_runtime.is_some()
+            || (state.options.mode == Mode::Assault) != state.assault.is_some()
         {
             return Err(SnapshotError::UnsupportedMode);
+        }
+        if matches!(state.options.mode, Mode::Classic | Mode::Annihilation) {
+            state
+                .validate_elimination_state()
+                .map_err(|_| SnapshotError::Rules)?;
+        }
+        if let Some(assault) = state.assault
+            && (!(0..6).contains(&assault.defender_team)
+                || !(-1..6).contains(&assault.attacker_team)
+                || assault.defender_team == assault.attacker_team
+                || !assault.time_left.is_finite())
+        {
+            return Err(SnapshotError::Rules);
         }
         let g = &state.world.game;
         let cells = g.w.checked_mul(g.h).ok_or(SnapshotError::Rules)?;
@@ -217,6 +244,9 @@ impl<'a> SnapshotCache<'a> {
         fields.extend(self.public[slot].clone());
         fields.insert("falling".into(), falling::project(self.state, slot)?);
         fields.insert("flights".into(), flights::project(self.state, slot)?);
+        if let Some(logistics) = logistics::project(self.state, slot)? {
+            fields.insert("logistics".into(), logistics);
+        }
         Ok(RecipientProjection {
             fields,
             missing: vec![
@@ -225,7 +255,6 @@ impl<'a> SnapshotCache<'a> {
                 SnapshotCapability::Fog,
                 SnapshotCapability::ShotsAndFlights,
                 SnapshotCapability::TeamEffects,
-                SnapshotCapability::Logistics,
             ],
         })
     }
@@ -478,6 +507,10 @@ fn economy_fields(state: &Match, slot: usize) -> Result<Map<String, Value>, Snap
     for (key, value) in [("mp", p.mp.floor()), ("inc", r(p.inc))] {
         fields.insert(key.into(), json!(value));
     }
+    if state.options.mode == Mode::Classic {
+        fields.insert("mun".into(), json!(p.mun.floor()));
+        fields.insert("fuel".into(), json!(p.fuel.floor()));
+    }
     for (key, value) in [("fuelInc", p.fuel_inc), ("upkeep", p.upkeep)] {
         if let Some(value) = value {
             finite(&[value])?;
@@ -589,6 +622,20 @@ impl Match {
     /// Bind hosted purchases to the current ordinary snapshot capabilities.
     pub fn restrict_to_ordinary_snapshots(&mut self) -> Result<(), SnapshotError> {
         self.preflight_ordinary_snapshot()?;
+        // A queued plane can later emit AntiAir or PlaneDown. Keep hosted
+        // training closed until the aviation event adapter is integrated.
+        for (id, building) in self.production.buildings() {
+            if building.jobs().iter().any(|job| {
+                self.rules
+                    .kind(&job.kind)
+                    .is_some_and(|kind| self.rules.kinds[kind].air)
+            }) {
+                return Err(SnapshotError::Unsupported {
+                    unit: id,
+                    capability: SnapshotCapability::Air,
+                });
+            }
+        }
         self.ordinary_snapshot_only = true;
         Ok(())
     }
@@ -1127,3 +1174,7 @@ mod map_house_selected_tests;
 #[cfg(test)]
 #[path = "recipient_snapshot/net52_tests.rs"]
 mod net52_tests;
+
+#[cfg(test)]
+#[path = "recipient_snapshot/production_state_tests.rs"]
+mod production_state_tests;

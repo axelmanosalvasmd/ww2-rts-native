@@ -52,6 +52,24 @@ pub(super) fn scene(mode: Mode, teams: &[i32]) -> Match {
     }
     .unwrap()
 }
+#[test]
+fn classic_and_annihilation_initialize_requested_physical_logistics() {
+    for mode in [Mode::Classic, Mode::Annihilation] {
+        let mut m = scene(mode, &[0, 1]);
+        m.options.logistics = true;
+        m.initialize_logistics().unwrap();
+        assert!(m.convoys.is_some());
+        assert!(
+            m.world
+                .game
+                .units
+                .values()
+                .any(|u| { !m.rules.kinds[u.kind].structure && m.logistics.get(u.id).is_some() })
+        );
+        m.validate_tick_state().unwrap();
+    }
+}
+
 pub(super) fn ids(m: &Match, owner: usize, name: &str) -> Vec<u32> {
     m.world
         .game

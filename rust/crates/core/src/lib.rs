@@ -70,6 +70,7 @@ pub mod recipient_availability;
 
 #[cfg(test)]
 use crate as core_api;
+pub mod authored_scenario;
 #[cfg(test)]
 #[path = "../tests/support/human_commander_facts.rs"]
 mod human_commander_test_facts;
@@ -78,6 +79,7 @@ pub mod legacy_scenario_runtime;
 pub mod match_companion_effects;
 mod match_companion_tick;
 pub mod match_companions;
+mod scenario_actuators;
 pub mod scenario_validation;
 pub mod seat_commander;
 
@@ -214,6 +216,14 @@ mod mov_intent_batch;
 #[cfg(test)]
 mod bases_runtime_construction_tests;
 
+mod logistics_support_tests;
+
+#[cfg(test)]
+mod logistics_network_depot_tests;
+
+#[cfg(test)]
+mod logistics_runtime_tests;
+
 #[cfg(test)]
 mod misc_bridge_tests;
 
@@ -243,3 +253,6 @@ pub mod authoring_queries;
 pub mod commander_field_policy;
 pub mod commander_world_policy;
 pub mod recipient_placement;
+
+#[cfg(test)]
+mod production_lifecycle_intent_tests;

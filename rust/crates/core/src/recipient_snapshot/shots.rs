@@ -21,6 +21,7 @@ pub enum ShotRef<'a> {
     Support(&'a SupportEvent),
     Environment(&'a Effect),
     Scenario(&'a SayAction),
+    AuthoredScenario(&'a crate::authored_scenario::ScenarioSay),
 }
 
 impl<'a> TryFrom<&'a TickEvent> for ShotRef<'a> {
@@ -33,6 +34,7 @@ impl<'a> TryFrom<&'a TickEvent> for ShotRef<'a> {
             TickEvent::Environment(value) => Ok(Self::Environment(value)),
             TickEvent::Scenario(value) => Ok(Self::Scenario(value)),
             TickEvent::Aviation(value) => Ok(Self::Aviation(value)),
+            TickEvent::AuthoredScenario(value) => Ok(Self::AuthoredScenario(value)),
         }
     }
 }
@@ -204,6 +206,10 @@ fn event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
 
 fn raw_event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
     match shot {
+        ShotRef::AuthoredScenario(value) => {
+            value.validate(state).map_err(|_| SnapshotError::Rules)?;
+            Ok(value.shot_json())
+        }
         ShotRef::Scenario(value) => {
             validate_public_say(value).map_err(|_| SnapshotError::Rules)?;
             if state.scenario.is_none()
@@ -492,7 +498,14 @@ pub(super) fn project_shots_perspective(
     let events = shots
         .iter()
         .copied()
-        .map(|shot| event(state, shot).map(|row| (matches!(shot, ShotRef::Scenario(_)), row)))
+        .map(|shot| {
+            event(state, shot).map(|row| {
+                (
+                    matches!(shot, ShotRef::Scenario(_) | ShotRef::AuthoredScenario(_)),
+                    row,
+                )
+            })
+        })
         .collect::<Result<Vec<_>, _>>()?;
     state
         .routing_fog
@@ -508,10 +521,18 @@ pub(super) fn project_shots_perspective(
         let visible = &fog.team(g, &state.rules, g.players[seat.slot].team).vis;
         let mut rows = Vec::new();
         for (public_say, event) in &events {
-            // Migrated legacy Say is public to each selected commander seat.
-            // It has no geometry and bypasses ordinary identity redaction.
+            // Scenario recipient policy applies independently of fog and reveal.
             if *public_say {
-                rows.push(event.clone());
+                if crate::authored_scenario::permitted(
+                    state,
+                    event["scenarioRecipients"]
+                        .as_str()
+                        .ok_or(SnapshotError::Rules)?,
+                    event["scenarioSide"].as_u64().ok_or(SnapshotError::Rules)? as usize,
+                    seat.slot,
+                ) {
+                    rows.push(event.clone());
+                }
                 continue;
             }
             let at = Point {

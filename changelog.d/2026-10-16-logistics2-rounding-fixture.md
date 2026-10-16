@@ -1,0 +1,1 @@
+- Keep the Classic snapshot rounding fixture compatible with strict Clippy while preserving its expected one-decimal result. Document where LOGISTICS-2 execution results are recorded.

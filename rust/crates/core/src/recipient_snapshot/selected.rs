@@ -52,7 +52,7 @@ impl DeliveryState {
                 .results()
                 .iter()
                 .zip(&owners)
-                .any(|((slot, lists), owner)| slot != owner || lists.nodes.is_some())
+                .any(|((slot, _), owner)| slot != owner)
         {
             return Err(SnapshotError::UnsupportedMode);
         }

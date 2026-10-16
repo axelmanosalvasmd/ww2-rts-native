@@ -1,7 +1,7 @@
 use std::{env, net::IpAddr};
 use tokio::net::TcpListener;
 use ww2_server::shards::{serve_sharded, shard_count};
-use ww2_server::{Config, TrustedRoomConfig, serve, serve_trusted_room};
+use ww2_server::{Config, MapEditor, TrustedRoomConfig, serve, serve_trusted_room};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -18,7 +18,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "--seed" if seed.is_none() => seed = Some(args.next().ok_or("--seed requires U64")?),
             "--help" | "-h" => {
                 println!(
-                    "ww2-server [--bind HOST:PORT] [--trusted-room CODE --seed U64]\nAddress priority: --bind, WW2_BIND, HOST/PORT, 127.0.0.1:3000. Port 0 selects a free port.\nWW2_SHARDS: 1-64 isolated game threads (default 1).\nTrusted mode: one private two-human Conquest room, named armies, sandbox off, logistics off (temporary). Seeds/receipts stay host-private."
+                    "ww2-server [--bind HOST:PORT] [--trusted-room CODE --seed U64]\nAddress priority: --bind, WW2_BIND, HOST/PORT, 127.0.0.1:3000. Port 0 selects a free port.\nWW2_SHARDS: 1-64 isolated game threads (default 1).\nTrusted mode: one private two-human ordinary room, named armies, sandbox off, mode-selected logistics. Seeds/receipts stay host-private."
                 );
                 return Ok(());
             }
@@ -39,6 +39,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let listener = TcpListener::bind(&address).await?;
     println!("LISTENING http://{}", listener.local_addr()?);
     let config = Config {
+        map_editor: Some(MapEditor::from_password_file(
+            "maps".into(),
+            env::var("EDIT_PASSWORD").ok().as_deref(),
+            std::path::Path::new(".edit-password"),
+        )?),
         saves_dir: env::var_os("SAVES_DIR")
             .map(Into::into)
             .unwrap_or_else(|| "saves".into()),
