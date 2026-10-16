@@ -82,6 +82,7 @@ impl Match {
                         | Command::Ability { at: Some(at), .. }
                         | Command::Attack { at: Some(at), .. }
                         | Command::Assist { at: Some(at), .. }
+                        | Command::Dig { at, .. }
                         | Command::Entrench {
                             order: crate::field_works::ProjectOrder::Join { at: Some(at), .. },
                             ..
