@@ -93,11 +93,6 @@ impl Match {
                     "aircraft turn conflicts with another actor owner",
                 ));
             }
-            if !control.orders.is_empty() {
-                return Err(AviationError::Unsupported(
-                    "queued aircraft turns are unavailable",
-                ));
-            }
             self.validate_aircraft_step(id, dt)?;
         }
         Ok(())
@@ -131,11 +126,6 @@ impl Match {
         if c.operative || u.riding {
             return Err(AviationError::Unsupported(
                 "aircraft turn conflicts with another actor owner",
-            ));
-        }
-        if !c.orders.is_empty() {
-            return Err(AviationError::Unsupported(
-                "queued aircraft turns are unavailable",
             ));
         }
         self.step_aircraft(id, dt)?;

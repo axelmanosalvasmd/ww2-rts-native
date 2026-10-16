@@ -32,8 +32,10 @@ pub enum RidingOutcome {
     OnFoot,
     /// Source early-unit-loop continuation: skip ordinary timers, movement and fire.
     Riding,
-    /// A missing/dead carrier needs the unimplemented thrown exit, not ordinary unload.
-    UnsupportedEjection,
+    /// A wreck threw the rider out. The caller may publish a hurt effect.
+    Ejected {
+        killed: bool,
+    },
 }
 fn view(m: &Match) -> TerrainView<'_> {
     let g = &m.world.game;
@@ -127,7 +129,7 @@ impl Match {
     pub(crate) fn carrier_boundary(&self, id: UnitId) -> bool {
         let u = &self.world.game.units[&id];
         let k = &self.rules.kinds[u.kind];
-        k.naval || k.rail || k.air || u.rail || u.air.is_some() || u.garrison.is_some()
+        k.rail || k.air || u.rail || u.air.is_some() || u.garrison.is_some()
     }
     fn carrier_command_open(&self, owner: usize, winner_decided: bool) -> bool {
         self.start
@@ -354,9 +356,23 @@ impl Match {
             .and_then(|v| v.number())
             .ok_or("missing boarding reach")?;
         let at = c.at();
-        let reachable = self.world.game.flags[self.world.game.cell_of(u.x, u.z).unwrap()] & MOVE
-            == 0
-            && crate::pathfinding::walkable(view(self), u.at(), at, MOVE, 0.15);
+        let g = &self.world.game;
+        let reachable = g.flags[g.cell_of(u.x, u.z).unwrap()] & MOVE == 0
+            && if self.rules.kinds[c.kind].naval {
+                crate::terrain::segment_cliff_clear(g, u.at(), at)
+                    && crate::projectiles::crossed_cells(
+                        crate::projectiles::BodyPosition { x: u.x, z: u.z },
+                        crate::projectiles::BodyPosition { x: c.x, z: c.z },
+                        CELL,
+                        g.w,
+                        g.h,
+                    )
+                    .map_err(|e| format!("boat boarding line: {e:?}"))?
+                    .into_iter()
+                    .all(|cell| g.flags[cell] & MOVE == 0 || g.physical(cell) == b'W')
+            } else {
+                crate::pathfinding::walkable(view(self), u.at(), at, MOVE, 0.15)
+            };
         if math::hypot(u.x - c.x, u.z - c.z) <= reach && reachable {
             u.path_gen
                 .checked_add(1)
@@ -382,8 +398,7 @@ impl Match {
             Ok(BoardingOutcome::Idle)
         }
     }
-    /// Source early riding branch. Caller skips the remaining unit turn on Riding;
-    /// dead-carrier ejection must be handled by the future drop/effect actuator.
+    /// Source early riding branch. Caller skips the remaining unit turn on Riding.
     pub fn apply_unit_riding(&mut self, id: UnitId, dt: f64) -> Result<RidingOutcome, String> {
         self.validate_carrier_world()?;
         if self.world.game.units.contains_key(&id) {
@@ -425,11 +440,11 @@ impl Match {
             return Ok(RidingOutcome::OnFoot);
         };
         let Some(c) = self.world.game.units.get(&carrier) else {
-            return Ok(RidingOutcome::UnsupportedEjection);
+            return self.eject_wrecked_rider(id, carrier);
         };
         self.validate_carrier_unit(carrier)?;
         if c.hp <= 0. {
-            return Ok(RidingOutcome::UnsupportedEjection);
+            return self.eject_wrecked_rider(id, carrier);
         }
         if self.carrier_boundary(id) || self.carrier_boundary(carrier) {
             return Err("unsupported riding actor/carrier".into());
@@ -455,6 +470,72 @@ impl Match {
         self.abilities.get_mut(id).unwrap().cooldown -= dt;
         self.grid.update(id, u);
         Ok(RidingOutcome::Riding)
+    }
+    fn eject_wrecked_rider(
+        &mut self,
+        id: UnitId,
+        carrier: UnitId,
+    ) -> Result<RidingOutcome, String> {
+        let u = &self.world.game.units[&id];
+        let origin = u.at();
+        let kind = &self.rules.kinds[u.kind];
+        let definition = Catalog::compiled()
+            .map_err(|e| e.to_string())?
+            .unit(&kind.name)
+            .map_err(|e| e.to_string())?;
+        let full = definition
+            .get("models")
+            .and_then(|v| v.number())
+            .zip(definition.get("hpPer").and_then(|v| v.number()))
+            .map(|(models, hp)| models * hp)
+            .ok_or("missing rider full strength")?;
+        let cfg = Catalog::compiled()
+            .map_err(|e| e.to_string())?
+            .table("CFG")
+            .map_err(|e| e.to_string())?;
+        let reach = cfg
+            .get("shoreReach")
+            .and_then(|v| v.number())
+            .ok_or("missing shore reach")?;
+        let evict = cfg
+            .get("aid")
+            .and_then(|v| v.get("evict"))
+            .and_then(|v| v.number())
+            .ok_or("missing rider ejection damage")?;
+        if !full.is_finite()
+            || full <= 0.
+            || !reach.is_finite()
+            || reach < 0.
+            || !evict.is_finite()
+            || !(0. ..=1.).contains(&evict)
+        {
+            return Err("invalid rider ejection rules".into());
+        }
+        let cell = SpawnPlacer::new()
+            .nearest_free(view(self), origin, kind.block(), None)
+            .map_err(|e| format!("rider ejection: {e:?}"))?;
+        let at = Point {
+            x: (cell % self.world.game.w) as f64 * CELL + CELL * 0.5,
+            z: (cell / self.world.game.w) as f64 * CELL + CELL * 0.5,
+        };
+        let drowned = math::hypot(origin.x - at.x, origin.z - at.z) > reach;
+        let new_hp = if drowned { 0. } else { u.hp - full * evict };
+        if !new_hp.is_finite() {
+            return Err("invalid rider ejection health".into());
+        }
+        if let Some(c) = self.combat.get_mut(carrier) {
+            c.cargo.retain(|other| *other != id);
+        }
+        self.combat.get_mut(id).unwrap().carrier = None;
+        let u = self.world.game.units.get_mut(&id).unwrap();
+        u.riding = false;
+        u.x = at.x;
+        u.z = at.z;
+        u.hp = new_hp;
+        self.grid.update(id, u);
+        Ok(RidingOutcome::Ejected {
+            killed: new_hp <= 0.,
+        })
     }
     /// Manual ground unload. Full ordered placements are staged before relations change;
     /// no thrown damage, shore landing or rail drop is silently substituted.
@@ -482,7 +563,9 @@ impl Match {
             .copied()
             .filter(|id| !self.combat.get(*id).unwrap().cargo.is_empty())
             .collect();
-        if carriers.iter().any(|id| self.carrier_boundary(*id)) {
+        if carriers.iter().any(|id| {
+            self.carrier_boundary(*id) || self.rules.kinds[self.world.game.units[id].kind].naval
+        }) {
             return Ok(Some(Denial::Unsupported));
         }
         let mut placer = SpawnPlacer::new();

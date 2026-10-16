@@ -1071,7 +1071,12 @@ impl Match {
         }
         Ok(best)
     }
-    fn fire_weapon(&mut self, id: UnitId, target: UnitId, moving: bool) -> Result<(), String> {
+    pub(crate) fn fire_weapon(
+        &mut self,
+        id: UnitId,
+        target: UnitId,
+        moving: bool,
+    ) -> Result<(), String> {
         let g = &self.world.game;
         let u = &g.units[&id];
         let t = &g.units[&target];
@@ -1180,7 +1185,13 @@ impl Match {
         let from = projectiles::Point3::new(
             u.x,
             f64::from(g.level_at(u.x, u.z)) * level_height
-                + if u.garrison.is_some() { 3.5 } else { 1.2 },
+                + if u.air.is_some() {
+                    20.0
+                } else if u.garrison.is_some() {
+                    3.5
+                } else {
+                    1.2
+                },
             u.z,
         );
         let profile = projectiles::projectile_profile(
@@ -1800,7 +1811,7 @@ impl Match {
         row.retarget -= dt;
         Ok(())
     }
-    fn pick_firing_target(&self, id: UnitId) -> Result<UnitId, String> {
+    pub(crate) fn pick_firing_target(&self, id: UnitId) -> Result<UnitId, String> {
         let g = &self.world.game;
         let u = &g.units[&id];
         let w = self.weapon(u)?.ok_or("unarmed target selection")?;
@@ -2039,7 +2050,7 @@ impl Match {
             return Ok(false);
         }
         if u.air.is_some() {
-            return Err("air weapon firing is unsupported".into());
+            return Ok(true);
         }
         Ok(if flag(w, "salvo") {
             dist(u.at(), self.hull_point(u.at(), t)) >= n(w, "minRange", f64::NAN)
@@ -2166,8 +2177,7 @@ impl Match {
             || self.combat.get(id).is_none()
             || self.firing.get(id).is_none()
             || self.logistics.get(id).is_some_and(|r| !r.ammo.is_finite())
-            || u.air.is_some()
-            || flag(self.definition(u)?, "air")
+            || (u.air.is_some() != flag(self.definition(u)?, "air"))
             || u.riding
             || ![at.x, at.z].iter().all(|v| v.is_finite())
             || !(0.0..=self.world.game.w as f64 * CELL).contains(&at.x)
@@ -2225,7 +2235,14 @@ impl Match {
         let height = n(self.firing_config()?, "levelHeight", 2.5);
         let from = projectiles::Point3::new(
             u.x,
-            f64::from(g.level_at(u.x, u.z)) * height + if u.garrison.is_some() { 3.5 } else { 1.2 },
+            f64::from(g.level_at(u.x, u.z)) * height
+                + if u.air.is_some() {
+                    20.0
+                } else if u.garrison.is_some() {
+                    3.5
+                } else {
+                    1.2
+                },
             u.z,
         );
         let end = projectiles::Point3::new(

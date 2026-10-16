@@ -132,6 +132,304 @@ fn prime(m: &mut Match, id: u32, v: &Value) {
         }
     }
 }
+
+#[test]
+fn intent_mov76_wreck_throws_rider_out_hurts_it_and_deep_water_drowns_it() {
+    let fixture = fixture();
+    let case = &fixture["traces"][0];
+    let mut landed = make(case);
+    prime(&mut landed, 1, &json!({"riding": 2}));
+    landed.combat.get_mut(2).unwrap().cargo.push(1);
+    let before = landed.world.game.units[&1].hp;
+    landed.world.game.units.get_mut(&2).unwrap().hp = 0.;
+    assert_eq!(
+        landed.apply_unit_riding(1, 0.05).unwrap(),
+        RidingOutcome::Ejected { killed: false }
+    );
+    let rifle = Catalog::compiled().unwrap().unit("rifle").unwrap();
+    let full = rifle.get("models").unwrap().number().unwrap()
+        * rifle.get("hpPer").unwrap().number().unwrap();
+    assert_eq!(landed.world.game.units[&1].hp, before - full * 0.3);
+    assert!(!landed.world.game.units[&1].riding);
+    assert_eq!(landed.combat.get(1).unwrap().carrier, None);
+    assert!(landed.combat.get(2).unwrap().cargo.is_empty());
+
+    let mut drowned = make(case);
+    prime(&mut drowned, 1, &json!({"riding": 2}));
+    drowned.combat.get_mut(2).unwrap().cargo.push(1);
+    drowned.world.game.units.get_mut(&2).unwrap().hp = 0.;
+    let block = drowned.rules.kinds[drowned.world.game.units[&1].kind].block();
+    drowned.world.game.flags.fill(block);
+    let far = drowned.world.game.flags.len() - 1;
+    drowned.world.game.flags[far] = 0;
+    assert_eq!(
+        drowned.apply_unit_riding(1, 0.05).unwrap(),
+        RidingOutcome::Ejected { killed: true }
+    );
+    assert_eq!(drowned.world.game.units[&1].hp, 0.);
+    assert!(!drowned.world.game.units[&1].riding);
+}
+
+#[test]
+fn intent_mov74_rider_follows_carrier_pose_and_skips_ordinary_turn() {
+    let fixture = fixture();
+    let mut m = make(&fixture["traces"][0]);
+    prime(&mut m, 1, &json!({"riding": 2, "supp": 70.}));
+    m.combat.get_mut(2).unwrap().cargo.push(1);
+    {
+        let carrier = m.world.game.units.get_mut(&2).unwrap();
+        carrier.x = 26.;
+        carrier.z = 24.;
+        carrier.rot = 1.25;
+    }
+    m.firing.get_mut(1).unwrap().target_id = 2;
+    m.abilities.get_mut(1).unwrap().cooldown = 3.;
+    let previous_repath = m.world.game.units[&1].repath;
+    assert_eq!(
+        m.execute_command(0, &Command::Stop { ids: vec![1] }, false)
+            .unwrap(),
+        Some(Denial::Needs)
+    );
+    assert_eq!(m.apply_unit_riding(1, 0.05).unwrap(), RidingOutcome::Riding);
+    let rider = &m.world.game.units[&1];
+    assert_eq!(rider.pose(), m.world.game.units[&2].pose());
+    assert_eq!(rider.supp, 0.);
+    assert_eq!(rider.repath, previous_repath);
+    assert_eq!(m.firing.get(1).unwrap().target_id, 0);
+    assert_eq!(m.abilities.get(1).unwrap().cooldown, 2.95);
+}
+
+#[test]
+fn intent_mov77_enemy_hit_on_tank_or_deck_rider_forces_shaken_disembark() {
+    use crate::match_combat::{DamageWorld, ExplosionSource, RetargetSink};
+    struct NoRetarget;
+    impl RetargetSink for NoRetarget {
+        fn reset_retarget(&mut self, _: UnitId) {}
+    }
+    let fixture = fixture();
+    let case = fixture["traces"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|case| case["name"] == "own-seat-reservations")
+        .unwrap();
+    for target in [1, 4] {
+        let mut m = make(case);
+        prime(&mut m, 1, &json!({"riding": 4}));
+        m.combat.get_mut(4).unwrap().cargo.push(1);
+        let profile = ExplosionSource {
+            infantry: 1.,
+            vehicle: 1.,
+            terrain: None,
+            suppression: 0.,
+            scar: 0.,
+            anti_garrison: None,
+            weapon_kind: None,
+            off_map_support: false,
+        };
+        let order: Vec<_> = m.world.game.units.keys().copied().collect();
+        let mut damage = DamageWorld {
+            world: &mut m.world,
+            combat: &mut m.combat,
+            grid: &mut m.grid,
+            rules: &m.rules,
+            logistics: &m.logistics,
+            production: &m.production,
+            mode: m.options.mode,
+            tech_enabled: m.options.tech,
+            environment: &mut m.environment,
+            environment_seed: &mut m.start.environment_seed,
+            next_id: &mut m.next_unit_id,
+            unit_order: &order,
+            wind_angle: m.start.wind.0,
+            wind_strength: m.start.wind.1,
+        };
+        damage
+            .hurt(target, profile, 1., 1, &mut NoRetarget)
+            .unwrap();
+        assert!(!m.world.game.units[&1].riding);
+        assert_eq!(m.combat.get(1).unwrap().carrier, None);
+        assert!(m.combat.get(4).unwrap().cargo.is_empty());
+        assert!(m.world.game.units[&1].supp >= 60.);
+    }
+}
+
+#[test]
+fn intent_mov77_blast_reaches_tank_deck_rider() {
+    use crate::match_combat::{DamageWorld, ExplosionSource};
+    let fixture = fixture();
+    let case = fixture["traces"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|case| case["name"] == "own-seat-reservations")
+        .unwrap();
+    let mut m = make(case);
+    prime(&mut m, 1, &json!({"riding": 4}));
+    m.combat.get_mut(4).unwrap().cargo.push(1);
+    let at = m.world.game.units[&1].at();
+    let before = m.world.game.units[&1].hp;
+    let order: Vec<_> = m.world.game.units.keys().copied().collect();
+    let profile = ExplosionSource {
+        infantry: 10.,
+        vehicle: 0.,
+        terrain: None,
+        suppression: 0.,
+        scar: 0.,
+        anti_garrison: None,
+        weapon_kind: None,
+        off_map_support: false,
+    };
+    let mut damage = DamageWorld {
+        world: &mut m.world,
+        combat: &mut m.combat,
+        grid: &mut m.grid,
+        rules: &m.rules,
+        logistics: &m.logistics,
+        production: &m.production,
+        mode: m.options.mode,
+        tech_enabled: m.options.tech,
+        environment: &mut m.environment,
+        environment_seed: &mut m.start.environment_seed,
+        next_id: &mut m.next_unit_id,
+        unit_order: &order,
+        wind_angle: m.start.wind.0,
+        wind_strength: m.start.wind.1,
+    };
+    damage
+        .explosion(at, 2., profile, 1, None, None, None, &mut m.firing)
+        .unwrap();
+    assert!(m.world.game.units[&1].hp < before);
+    assert!(m.world.game.units[&1].supp >= 60.);
+    assert!(!m.world.game.units[&1].riding);
+}
+
+#[test]
+fn intent_mov70_squad_enters_house_at_door_then_exits_to_free_cell() {
+    let fixture = fixture();
+    let mut m = make(&fixture["traces"][0]);
+    let door = m.world.game.cell_of(21., 21.).unwrap();
+    m.world.game.chars[door] = b'B';
+    m.world.game.flags[door] |= MOVE;
+    assert_eq!(
+        m.execute_enter_command(0, &[1], Point { x: 21., z: 21. }, true)
+            .unwrap(),
+        None
+    );
+    assert_eq!(m.commands.units[&1].orders.len(), 1);
+    m.start_queued_orders(1, false).unwrap();
+    assert_eq!(m.commands.units[&1].enter, Some(door));
+    m.apply_unit_entry_with_routes(1).unwrap();
+    assert_eq!(m.world.game.units[&1].garrison, Some(door));
+    assert_eq!(m.world.game.units[&1].at(), Point { x: 21., z: 21. });
+    m.execute_command(
+        0,
+        &Command::Move {
+            control_ids: None,
+            orders: vec![crate::match_commands::MoveOrder {
+                unit: 1,
+                at: Point { x: 29., z: 21. },
+            }],
+            attack_move: false,
+            queue: false,
+            together: false,
+            face: None,
+        },
+        false,
+    )
+    .unwrap();
+    assert_eq!(m.world.game.units[&1].garrison, None);
+    let exit = m
+        .world
+        .game
+        .cell_of(m.world.game.units[&1].x, m.world.game.units[&1].z)
+        .unwrap();
+    assert_eq!(m.world.game.flags[exit] & MOVE, 0);
+}
+
+#[test]
+fn intent_mov70_destroyed_door_cancels_entry_and_setup_escapes_blocked_cell() {
+    let fixture = fixture();
+    let mut m = make(&fixture["traces"][0]);
+    let door = m.world.game.cell_of(21., 21.).unwrap();
+    m.world.game.chars[door] = b'B';
+    m.world.game.flags[door] |= MOVE;
+    m.execute_enter_command(0, &[1], Point { x: 21., z: 21. }, false)
+        .unwrap();
+    m.world.game.chars[door] = b'.';
+    m.apply_unit_entry_with_routes(1).unwrap();
+    assert_eq!(m.commands.units[&1].enter, None);
+    assert_eq!(m.world.game.units[&1].garrison, None);
+
+    let trapped = m.world.game.cell_of(20., 20.).unwrap();
+    m.world.game.flags[trapped] |= MOVE;
+    m.relocate_trapped_setup_units().unwrap();
+    let u = &m.world.game.units[&1];
+    let free = m.world.game.cell_of(u.x, u.z).unwrap();
+    assert_eq!(m.world.game.flags[free] & MOVE, 0);
+    assert!(
+        m.grid
+            .in_order(&m.world.game.units, (u.x, u.z), 1., |_, _| true)
+            .contains(&1)
+    );
+}
+
+#[test]
+fn intent_mov73_boat_needs_explicit_target_and_boards_from_clear_bank() {
+    let fixture = fixture();
+    let mut m = make(&fixture["traces"][0]);
+    m.world.game.units.get_mut(&2).unwrap().kind = m.rules.kind("lcvp").unwrap();
+    for x in [23., 25.] {
+        let cell = m.world.game.cell_of(x, 21.).unwrap();
+        m.world.game.ground.as_mut().unwrap()[cell] = b'W';
+        m.world.game.chars[cell] = b'W';
+        m.world.game.flags[cell] |= MOVE;
+    }
+    assert_eq!(
+        m.carrier_board_command(0, &[1, 2], None, false).unwrap(),
+        Some(Denial::Needs)
+    );
+    assert_eq!(
+        m.carrier_board_command(0, &[1], Some(2), false).unwrap(),
+        None
+    );
+    assert_eq!(
+        m.apply_unit_boarding(1).unwrap(),
+        BoardingOutcome::Boarded { carrier: 2 }
+    );
+    assert!(m.world.game.units[&1].riding);
+    assert_eq!(m.combat.get(2).unwrap().cargo, [1]);
+}
+
+#[test]
+fn intent_mov73_nearest_pairs_reserve_seats_and_exclude_retreating_squads() {
+    let fixture = fixture();
+    let case = fixture["traces"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|case| case["name"] == "nearest-pairs-recorded-ties")
+        .unwrap();
+    let mut m = make(case);
+    assert_eq!(
+        m.carrier_board_command(0, &[2, 1, 4, 3], None, false)
+            .unwrap(),
+        None
+    );
+    assert_eq!(m.world.game.units[&2].board, 4);
+    assert_eq!(m.world.game.units[&1].board, 3);
+
+    let mut retreat = make(case);
+    retreat.world.game.units.get_mut(&2).unwrap().retreating = true;
+    assert_eq!(
+        retreat
+            .carrier_board_command(0, &[2, 1, 4, 3], None, false)
+            .unwrap(),
+        None
+    );
+    assert_eq!(retreat.world.game.units[&2].board, 0);
+    assert_ne!(retreat.world.game.units[&1].board, 0);
+}
 fn snapshot(m: &Match) -> Value {
     let units=m.world.game.units.values().map(|u| {
         let c=&m.commands.units[&u.id];let meta=m.combat.get(u.id).unwrap();let f=m.firing.get(u.id).unwrap();
@@ -305,13 +603,12 @@ fn invalid_or_unavailable_carrier_work_preserves_canonical_state() {
         );
         assert_eq!(atomic(&m), before, "{guard}");
     }
-    for field in ["garrison", "build", "entrench", "boat", "rail"] {
+    for field in ["garrison", "build", "entrench", "rail"] {
         let mut m = make(c);
         match field {
             "garrison" => m.world.game.units.get_mut(&1).unwrap().garrison = Some(0),
             "build" => m.world.game.units.get_mut(&1).unwrap().build = true,
             "entrench" => m.world.game.units.get_mut(&1).unwrap().entrench = true,
-            "boat" => m.world.game.units.get_mut(&2).unwrap().kind = m.rules.kind("lcvp").unwrap(),
             "rail" => m.world.game.units.get_mut(&2).unwrap().rail = true,
             _ => unreachable!(),
         }
@@ -327,12 +624,12 @@ fn invalid_or_unavailable_carrier_work_preserves_canonical_state() {
     m.carrier_board_command(0, &[1], Some(2), false).unwrap();
     m.apply_unit_boarding(1).unwrap();
     m.world.game.units.get_mut(&2).unwrap().hp = 0.;
-    let before = atomic(&m);
     assert_eq!(
         m.apply_unit_riding(1, 0.05).unwrap(),
-        RidingOutcome::UnsupportedEjection
+        RidingOutcome::Ejected { killed: false }
     );
-    assert_eq!(atomic(&m), before);
+    assert!(!m.world.game.units[&1].riding);
+    assert!(m.combat.get(2).unwrap().cargo.is_empty());
 }
 
 #[test]

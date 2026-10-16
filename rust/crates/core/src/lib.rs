@@ -21,6 +21,8 @@ extern crate self as ww2_core;
 #[cfg(test)]
 mod aligned_replay;
 #[cfg(test)]
+mod mov_runtime_batch;
+#[cfg(test)]
 mod native_order_intent_tests;
 
 pub mod assault_runtime;
@@ -77,6 +79,7 @@ pub mod match_cover;
 mod match_destroy;
 pub mod match_end;
 pub mod match_firing;
+pub mod match_garrison;
 pub mod match_ground_contact;
 pub mod match_ground_orders;
 pub mod match_ground_support;

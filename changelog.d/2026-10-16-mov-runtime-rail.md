@@ -1,0 +1,1 @@
+- Added native World rail departures, route selection, train movement, bridge and territory cut checks, passenger carriage, and unloading. Rail orders use the existing internal command queue; station and cut denial names still need an agreed interface contract.

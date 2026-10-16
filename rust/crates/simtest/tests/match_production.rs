@@ -887,3 +887,78 @@ fn ordinary_training_refusal_precedes_research_progress() {
     );
     assert_eq!(unchanged(&m), before);
 }
+
+#[test]
+fn mov02_live_tick_steps_newborn_in_id_order_and_skips_dead_actor() {
+    use ww2_core::match_commands::Command;
+    let (mut m, _) = world_barracks_scene();
+    let cell = 20 * m.world.game.w + 30;
+    let producer = finished_building(&mut m, 0, cell, "motorpool");
+    let at = m.world.game.units[&producer].at();
+    m.building_rallies.insert(
+        producer,
+        Some(Point {
+            x: at.x + 24.,
+            z: at.z,
+        }),
+    );
+    let dead = m
+        .world
+        .game
+        .units
+        .values()
+        .find(|u| u.owner == 0 && !m.rules.kinds[u.kind].structure)
+        .unwrap()
+        .id;
+    m.world.game.units.get_mut(&dead).unwrap().hp = 0.;
+    let before_dead = m.world.game.units[&dead].clone();
+    assert_eq!(
+        m.execute_command(
+            0,
+            &Command::Buy {
+                kind: "tank".into(),
+                from: Some(producer)
+            },
+            false
+        )
+        .unwrap(),
+        None
+    );
+    let time = Catalog::compiled()
+        .unwrap()
+        .unit("tank")
+        .unwrap()
+        .get("train")
+        .unwrap()
+        .number()
+        .unwrap();
+    assert!(
+        m.step_training(producer, time - m.rules.movement.tick)
+            .unwrap()
+            .is_none()
+    );
+    let newborn = m.next_unit_id;
+    let report = m.advance_tick().unwrap();
+    assert_eq!(m.next_unit_id, newborn + 1);
+    let u = &m.world.game.units[&newborn];
+    assert!(
+        u.vx.unwrap_or(0.).abs() + u.vz.unwrap_or(0.).abs() > 0.,
+        "newborn must perform actual movement on its birth tick"
+    );
+    assert!(
+        u.repath < 0.,
+        "newborn must pass through its ordinary timer block"
+    );
+    assert!(report.unit_order.windows(2).all(|ids| ids[0] < ids[1]));
+    let retired = &report
+        .retired
+        .iter()
+        .find(|r| r.unit.id == dead)
+        .unwrap()
+        .unit;
+    assert_eq!(retired.pose(), before_dead.pose());
+    assert_eq!(
+        retired.repath, before_dead.repath,
+        "dead actors skip their unit turn"
+    );
+}

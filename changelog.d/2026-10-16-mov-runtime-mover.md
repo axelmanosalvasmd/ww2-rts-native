@@ -1,0 +1,1 @@
+- Added movement intent checks for delivered rotated vehicle hulls, an engaged short retreat command and reverse travel, bounded escape and sideways slide from blocked turns, World road march eligibility and movement, boat routes, weather, land boundaries and contact separation, and a tank death that becomes a settled wreck with terrain and cover effects.

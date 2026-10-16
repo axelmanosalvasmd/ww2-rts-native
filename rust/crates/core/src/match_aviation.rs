@@ -390,31 +390,19 @@ impl Match {
         if u.air == Some(PlaneState::Rearm) || a.fuel <= 0.0 || a.ammo <= 0.0 {
             return Ok(false);
         }
-        if mission.kind == MissionKind::Area {
-            return Err(AviationError::Unsupported(
-                "aircraft area-salvo actuator is unavailable",
-            ));
-        }
-        if !self.commands.units[&id].hold_fire {
-            return Err(AviationError::Unsupported(
-                "aircraft automatic ground-fire actuator is unavailable",
-            ));
+        if mission.kind == MissionKind::Area && self.rules.kinds[u.kind].name != "bomber" {
+            return Ok(false);
         }
         if mission.kind == MissionKind::Attack {
             let target = mission
                 .target
                 .and_then(|target| self.world.game.units.get(&target));
-            if self.rules.kinds[u.kind].name != "fighter"
-                || target.is_none_or(|t| {
-                    t.air.is_none()
-                        || t.hp <= 0.0
-                        || self.world.game.allied(owner, t.owner)
-                        || !self.world.game.players[owner].sees(t.id)
-                })
-            {
-                return Err(AviationError::Unsupported(
-                    "aircraft ground-attack weapon actuator is unavailable",
-                ));
+            if target.is_none_or(|t| {
+                t.hp <= 0.0
+                    || self.world.game.allied(owner, t.owner)
+                    || !self.world.game.players[owner].sees(t.id)
+            }) {
+                return Ok(false);
             }
         }
         if mission.kind == MissionKind::Escort {
@@ -499,7 +487,7 @@ impl Match {
         let base = self.aircraft_base(u.owner, at)?;
         firing.cooldown -= dt;
         firing.retarget -= dt;
-        firing.target_id = 0;
+        // Retain the automatic choice until its half-second retarget window expires.
         if matches!(state, PlaneState::Base | PlaneState::Rearm) {
             at = base;
             if state == PlaneState::Rearm {
@@ -541,32 +529,33 @@ impl Match {
             {
                 state = PlaneState::Home;
             }
-            if state != PlaneState::Home {
-                if !self.commands.units[&id].hold_fire {
-                    return Err(AviationError::Unsupported(
-                        "aircraft automatic ground-fire actuator is unavailable",
-                    ));
-                }
-                if let Some(m) = a.mission {
-                    if m.kind == MissionKind::Area {
-                        return Err(AviationError::Unsupported(
-                            "aircraft area-salvo actuator is unavailable",
-                        ));
-                    }
-                    if m.kind == MissionKind::Attack
-                        && m.target
-                            .and_then(|target| self.world.game.units.get(&target))
-                            .is_some_and(|t| {
-                                t.air.is_none() && !self.world.game.allied(u.owner, t.owner)
-                            })
+            let mission_center = a.mission.map_or(base, |m| m.at);
+            let mut center = mission_center;
+            if def.get("role").and_then(Value::string) == Some("fighter")
+                && !self.commands.units[&id].hold_fire
+                && state != PlaneState::Home
+            {
+                let mut nearest = number(rules, "seek")?;
+                let mut chosen = None;
+                for (&other_id, other) in &self.world.game.units {
+                    if !other.air.is_some_and(airborne)
+                        || other.hp <= 0.0
+                        || self.world.game.allied(u.owner, other.owner)
+                        || !self.world.game.players[u.owner].sees(other_id)
                     {
-                        return Err(AviationError::Unsupported(
-                            "aircraft ground-attack weapon actuator is unavailable",
-                        ));
+                        continue;
                     }
+                    let distance =
+                        math::hypot(other.x - mission_center.x, other.z - mission_center.z);
+                    if distance < nearest {
+                        nearest = distance;
+                        chosen = Some(other.at());
+                    }
+                }
+                if let Some(at) = chosen {
+                    center = at;
                 }
             }
-            let center = a.mission.map_or(base, |m| m.at);
             let radius = if a
                 .mission
                 .is_some_and(|m| matches!(m.kind, MissionKind::Attack | MissionKind::Area))
@@ -644,6 +633,81 @@ impl Match {
         self.aviation.planes.insert(id, next.runtime);
         self.firing.units.insert(id, next.firing);
         self.grid.update(id, &self.world.game.units[&id]);
+        self.act_aircraft_weapon(id)?;
+        Ok(())
+    }
+    fn act_aircraft_weapon(&mut self, id: UnitId) -> Result<(), AviationError> {
+        let u = &self.world.game.units[&id];
+        if u.hp <= 0.0
+            || u.air == Some(PlaneState::Home)
+            || matches!(u.air, Some(PlaneState::Base | PlaneState::Rearm))
+            || self.aviation.planes[&id].ammo <= 0.0
+        {
+            return Ok(());
+        }
+        let mission = self.aviation.planes[&id].mission;
+        let def = catalog()?
+            .unit(&self.rules.kinds[u.kind].name)
+            .map_err(|e| AviationError::Actuation(e.to_string()))?;
+        let weapon = def
+            .get("w")
+            .ok_or(AviationError::Invalid("aircraft has no weapon"))?;
+        if mission.is_some_and(|m| m.kind == MissionKind::Area)
+            && weapon.get("salvo").and_then(Value::boolean) == Some(true)
+        {
+            if u.air == Some(PlaneState::Station) && self.firing.get(id).unwrap().cooldown <= 0.0 {
+                let at = mission.unwrap().at;
+                self.launch_weapon_salvo(id, at, None)
+                    .map_err(AviationError::Actuation)?;
+                self.firing.get_mut(id).unwrap().cooldown = number(weapon, "interval")?;
+                self.aviation.planes.get_mut(&id).unwrap().ammo -= 1.0;
+            }
+            return Ok(());
+        }
+        let explicit = mission
+            .filter(|m| m.kind == MissionKind::Attack)
+            .and_then(|m| m.target);
+        let explicit = match explicit {
+            Some(target)
+                if self
+                    .can_shoot_target(id, target)
+                    .map_err(AviationError::Actuation)? =>
+            {
+                Some(target)
+            }
+            _ => None,
+        };
+        if self.commands.units[&id].hold_fire && explicit.is_none() {
+            return Ok(());
+        }
+        let target = if let Some(target) = explicit {
+            target
+        } else if self.firing.get(id).unwrap().retarget <= 0.0 {
+            let target = self
+                .pick_firing_target(id)
+                .map_err(AviationError::Actuation)?;
+            self.firing.get_mut(id).unwrap().retarget = 0.5;
+            target
+        } else {
+            self.firing.get(id).unwrap().target_id
+        };
+        if target != 0
+            && self
+                .can_shoot_target(id, target)
+                .map_err(AviationError::Actuation)?
+        {
+            let t = &self.world.game.units[&target];
+            let aim = math::atan2(t.z - u.z, t.x - u.x);
+            self.firing.get_mut(id).unwrap().target_id = target;
+            self.commands.units.get_mut(&id).unwrap().aim = aim;
+            if self.firing.get(id).unwrap().cooldown <= 0.0 {
+                self.fire_weapon(id, target, true)
+                    .map_err(AviationError::Actuation)?;
+                self.aviation.planes.get_mut(&id).unwrap().ammo -= 1.0;
+            }
+        } else {
+            self.firing.get_mut(id).unwrap().target_id = 0;
+        }
         Ok(())
     }
     fn prepare_aircraft_anti_air(
@@ -858,5 +922,549 @@ impl Match {
         self.aviation.events.extend(events);
         story.commit();
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod intent_tests {
+    use super::*;
+    use crate::{
+        economy::{Faction, Mode},
+        economy_state::ArmySize,
+        map::AuthoritativeMap,
+        match_commands::Command,
+        match_runtime::{MatchOptions, PlayerConfig},
+        weather::WeatherChoice,
+    };
+    use serde_json::json;
+
+    fn scene() -> Match {
+        let map = AuthoritativeMap::from_json(
+            &serde_json::to_vec(&json!({
+                "name":"Aircraft intent", "w":64, "h":64,
+                "rows":vec![".".repeat(64);64], "heights":vec!["0".repeat(64);64],
+                "spawns":[{"x":8,"y":8},{"x":48,"y":48}],
+                "points":[{"x":32,"y":32,"vp":0,"mp":0}]
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        Match::new(
+            &map,
+            MatchOptions {
+                seed: 318,
+                mode: Mode::Conquest,
+                players: vec![
+                    PlayerConfig {
+                        name: "A".into(),
+                        team: 0,
+                        faction: Faction::Usa,
+                    },
+                    PlayerConfig {
+                        name: "B".into(),
+                        team: 1,
+                        faction: Faction::Germany,
+                    },
+                ],
+                shuffle: false,
+                army: ArmySize::Endless,
+                weather: WeatherChoice::Map,
+                weather_seed: Some(9),
+                living_weather: false,
+                map_key: None,
+                tech: false,
+                supply: true,
+                logistics: false,
+                sandbox: false,
+            },
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn mov85_sortie_flies_stations_returns_and_rearms() {
+        let mut m = scene();
+        let id = m.spawn_aircraft(0, "fighter").unwrap();
+        m.commands.units.get_mut(&id).unwrap().hold_fire = true;
+        assert_eq!(m.world.game.units[&id].air, Some(PlaneState::Base));
+        let at = Point { x: 76.0, z: 76.0 };
+        assert!(
+            m.send_aircraft_mission(
+                0,
+                id,
+                PlaneMission {
+                    kind: MissionKind::Patrol,
+                    target: None,
+                    at,
+                }
+            )
+            .unwrap()
+        );
+        let mut station = false;
+        let mut home = false;
+        let mut rearm = false;
+        for _ in 0..2000 {
+            m.step_aircraft(id, 0.05).unwrap();
+            match m.world.game.units[&id].air.unwrap() {
+                PlaneState::Station => station = true,
+                PlaneState::Home => home = true,
+                PlaneState::Rearm => rearm = true,
+                PlaneState::Base if rearm => break,
+                _ => {}
+            }
+        }
+        assert!(station && home && rearm);
+        assert_eq!(m.world.game.units[&id].air, Some(PlaneState::Base));
+        assert_eq!(m.aviation.planes[&id].mission, None);
+    }
+
+    #[test]
+    fn mov87_fighter_seeks_nearest_visible_enemy_near_mission() {
+        let mut m = scene();
+        let fighter = m.spawn_aircraft(0, "fighter").unwrap();
+        let near = m.spawn_aircraft(1, "fighter").unwrap();
+        let far = m.spawn_aircraft(1, "fighter").unwrap();
+        let hidden = m.spawn_aircraft(1, "fighter").unwrap();
+        for (id, at) in [
+            (fighter, Point { x: 60.0, z: 60.0 }),
+            (near, Point { x: 80.0, z: 60.0 }),
+            (far, Point { x: 95.0, z: 100.0 }),
+            (hidden, Point { x: 80.0, z: 78.0 }),
+        ] {
+            let u = m.world.game.units.get_mut(&id).unwrap();
+            u.x = at.x;
+            u.z = at.z;
+            u.air = Some(PlaneState::Out);
+            m.grid.update(id, u);
+        }
+        m.world.game.players[0].visible = vec![near, far];
+        m.aviation.planes.get_mut(&fighter).unwrap().mission = Some(PlaneMission {
+            kind: MissionKind::Patrol,
+            target: None,
+            at: Point { x: 80.0, z: 80.0 },
+        });
+        m.commands.units.get_mut(&fighter).unwrap().hold_fire = false;
+        m.step_aircraft(fighter, 0.05).unwrap();
+        let to_near = math::hypot(
+            m.world.game.units[&fighter].x - 80.0,
+            m.world.game.units[&fighter].z - 60.0,
+        );
+        assert!(to_near < 20.0);
+        assert!(m.world.game.units[&fighter].z < 60.1);
+    }
+
+    #[test]
+    fn mov89_visible_aircraft_takes_continuous_anti_air_damage() {
+        let mut m = scene();
+        let shooter = m.spawn_aircraft(0, "fighter").unwrap();
+        let target = m.spawn_aircraft(1, "fighter").unwrap();
+        for (id, x) in [(shooter, 70.0), (target, 75.0)] {
+            let u = m.world.game.units.get_mut(&id).unwrap();
+            u.x = x;
+            u.z = 70.0;
+            u.air = Some(PlaneState::Station);
+            m.grid.update(id, u);
+        }
+        let hp = m.world.game.units[&target].hp;
+        m.step_aircraft_anti_air(&[shooter, target], 0.05).unwrap();
+        assert_eq!(m.world.game.units[&target].hp, hp, "unseen plane is safe");
+        m.world.game.players[0].visible = vec![target];
+        m.commands.units.get_mut(&shooter).unwrap().hold_fire = true;
+        m.step_aircraft_anti_air(&[shooter, target], 0.05).unwrap();
+        assert_eq!(
+            m.world.game.units[&target].hp, hp,
+            "hold fire suppresses free AA"
+        );
+        m.commands.units.get_mut(&shooter).unwrap().hold_fire = false;
+        m.step_aircraft_anti_air(&[shooter, target], 0.05).unwrap();
+        assert!(m.world.game.units[&target].hp < hp);
+        assert!(
+            m.aviation.events.iter().any(|event| matches!(event,
+            AviationEvent::AntiAir { shooter: s, target: t, .. } if *s == shooter && *t == target))
+        );
+    }
+
+    #[test]
+    fn mov88_attack_plane_fires_at_visible_ground_target_and_spends_sortie_ammo() {
+        let mut m = scene();
+        let attacker = m.spawn_aircraft(0, "attacker").unwrap();
+        let target = m
+            .world
+            .game
+            .units
+            .values()
+            .find(|u| u.owner == 1 && !m.rules.kinds[u.kind].structure)
+            .unwrap()
+            .id;
+        {
+            let u = m.world.game.units.get_mut(&attacker).unwrap();
+            u.x = 60.0;
+            u.z = 70.0;
+            u.air = Some(PlaneState::Station);
+            m.grid.update(attacker, u);
+        }
+        {
+            let u = m.world.game.units.get_mut(&target).unwrap();
+            u.x = 70.0;
+            u.z = 70.0;
+            m.grid.update(target, u);
+        }
+        m.world.game.players[0].visible = vec![target];
+        m.aviation.planes.get_mut(&attacker).unwrap().mission = Some(PlaneMission {
+            kind: MissionKind::Attack,
+            target: Some(target),
+            at: Point { x: 70.0, z: 70.0 },
+        });
+        let ammo = m.aviation.planes[&attacker].ammo;
+        m.step_aircraft(attacker, 0.05).unwrap();
+        assert!(
+            m.firing
+                .flights
+                .values()
+                .any(|flight| flight.shooter == attacker && flight.intended == Some(target))
+        );
+        assert_eq!(m.aviation.planes[&attacker].ammo, ammo - 1.0);
+        let flights = m.firing.flights.len();
+        m.step_aircraft(attacker, 0.05).unwrap();
+        assert_eq!(
+            m.firing.flights.len(),
+            flights,
+            "weapon cooldown limits launches"
+        );
+    }
+
+    #[test]
+    fn mov88_bomber_area_order_launches_one_salvo_stick_on_station() {
+        let mut m = scene();
+        let bomber = m.spawn_aircraft(0, "bomber").unwrap();
+        {
+            let u = m.world.game.units.get_mut(&bomber).unwrap();
+            u.x = 60.0;
+            u.z = 70.0;
+            u.air = Some(PlaneState::Station);
+            m.grid.update(bomber, u);
+        }
+        m.aviation.planes.get_mut(&bomber).unwrap().mission = Some(PlaneMission {
+            kind: MissionKind::Area,
+            target: None,
+            at: Point { x: 70.0, z: 70.0 },
+        });
+        let ammo = m.aviation.planes[&bomber].ammo;
+        m.step_aircraft(bomber, 0.05).unwrap();
+        assert_eq!(m.aviation.planes[&bomber].ammo, ammo - 1.0);
+        assert_eq!(m.firing.salvos.len(), 1);
+        assert_eq!(
+            m.firing
+                .flights
+                .values()
+                .filter(|f| f.shooter == bomber)
+                .count(),
+            4
+        );
+        m.step_aircraft(bomber, 0.05).unwrap();
+        assert_eq!(
+            m.firing.salvos.len(),
+            1,
+            "second stick waits for its interval"
+        );
+    }
+
+    #[test]
+    fn mov88_sortie_projectile_damages_ground_target_in_normal_ticks() {
+        let mut m = scene();
+        let attacker = m.spawn_aircraft(0, "attacker").unwrap();
+        let target = m
+            .world
+            .game
+            .units
+            .values()
+            .find(|u| u.owner == 1 && !m.rules.kinds[u.kind].structure)
+            .unwrap()
+            .id;
+        {
+            let u = m.world.game.units.get_mut(&attacker).unwrap();
+            u.x = 60.0;
+            u.z = 70.0;
+            u.air = Some(PlaneState::Station);
+            m.grid.update(attacker, u);
+        }
+        {
+            let u = m.world.game.units.get_mut(&target).unwrap();
+            u.x = 70.0;
+            u.z = 70.0;
+            m.grid.update(target, u);
+        }
+        m.world.game.players[0].visible = vec![target];
+        m.aviation.planes.get_mut(&attacker).unwrap().mission = Some(PlaneMission {
+            kind: MissionKind::Attack,
+            target: Some(target),
+            at: Point { x: 70.0, z: 70.0 },
+        });
+        let hp = m.world.game.units[&target].hp;
+        let mut launched = false;
+        let mut damaged = false;
+        for _ in 0..400 {
+            let report = m.advance_tick().unwrap();
+            launched |= report.events.iter().any(|event| {
+                matches!(event,
+                crate::match_tick::TickEvent::Firing(
+                    crate::match_firing::LaunchEvent::Flight { shooter, .. }
+                ) if *shooter == attacker)
+            });
+            damaged |= m.world.game.units.get(&target).is_none_or(|u| u.hp < hp);
+            if damaged {
+                break;
+            }
+        }
+        assert!(
+            launched,
+            "sortie fires a physical shot during the normal tick"
+        );
+        assert!(
+            damaged,
+            "the physical shot reaches and harms its ground target"
+        );
+    }
+
+    #[test]
+    fn mov86_recorded_aircraft_orders_change_missions_and_respect_readiness() {
+        let mut m = scene();
+        let plane = m.spawn_aircraft(0, "attacker").unwrap();
+        let friendly = m
+            .world
+            .game
+            .units
+            .values()
+            .find(|u| u.owner == 0 && !m.rules.kinds[u.kind].structure)
+            .unwrap()
+            .id;
+        let enemy = m
+            .world
+            .game
+            .units
+            .values()
+            .find(|u| u.owner == 1 && !m.rules.kinds[u.kind].structure)
+            .unwrap()
+            .id;
+        m.world.game.players[0].visible = vec![enemy];
+        fn issue(m: &mut Match, raw: serde_json::Value) {
+            let command = Command::from_json(&raw).unwrap();
+            assert_eq!(m.execute_command(0, &command, false), Ok(None), "{raw}");
+        }
+        issue(
+            &mut m,
+            json!({"t":"stance","ids":[plane],"key":"holdFire","on":false}),
+        );
+        issue(&mut m, json!({"t":"move","orders":[[plane,74.0,74.0]]}));
+        assert_eq!(
+            m.aviation.planes[&plane].mission.unwrap().kind,
+            MissionKind::Patrol
+        );
+        issue(&mut m, json!({"t":"attack","ids":[plane],"target":enemy}));
+        assert_eq!(
+            m.aviation.planes[&plane].mission.unwrap().target,
+            Some(enemy)
+        );
+        issue(
+            &mut m,
+            json!({"t":"escort","ids":[plane],"target":friendly}),
+        );
+        assert_eq!(
+            m.aviation.planes[&plane].mission.unwrap().kind,
+            MissionKind::Escort
+        );
+        issue(&mut m, json!({"t":"stop","ids":[plane]}));
+        assert_eq!(
+            m.aviation.planes[&plane].mission.unwrap().at,
+            m.world.game.units[&plane].at()
+        );
+        issue(&mut m, json!({"t":"retreat","ids":[plane]}));
+        assert_eq!(m.world.game.units[&plane].air, Some(PlaneState::Home));
+        let bomber = m.spawn_aircraft(0, "bomber").unwrap();
+        issue(
+            &mut m,
+            json!({"t":"fireat","ids":[bomber,friendly],"x":76.0,"z":76.0,"queue":true}),
+        );
+        assert_eq!(
+            m.aviation.planes[&bomber].mission.unwrap().kind,
+            MissionKind::Area
+        );
+        assert!(m.commands.units[&bomber].orders.is_empty());
+        m.aviation.planes.get_mut(&plane).unwrap().fuel = 0.0;
+        let before = m.aviation.planes[&plane].mission;
+        assert!(
+            !m.send_aircraft_mission(
+                0,
+                plane,
+                PlaneMission {
+                    kind: MissionKind::Patrol,
+                    target: None,
+                    at: Point { x: 80.0, z: 80.0 },
+                }
+            )
+            .unwrap()
+        );
+        assert_eq!(m.aviation.planes[&plane].mission, before);
+    }
+
+    #[test]
+    fn mov90_plane_crosses_blocked_ground_and_death_leaves_no_wreck() {
+        let mut m = scene();
+        let plane = m.spawn_aircraft(0, "fighter").unwrap();
+        let start = Point { x: 60.0, z: 60.0 };
+        {
+            let u = m.world.game.units.get_mut(&plane).unwrap();
+            u.x = start.x;
+            u.z = start.z;
+            u.air = Some(PlaneState::Out);
+            m.grid.update(plane, u);
+        }
+        let wall = m.world.game.cell_of(70.0, 60.0).unwrap();
+        m.world.game.chars[wall] = b'#';
+        m.world.game.cell_hp[wall] = 500.0;
+        m.commands.units.get_mut(&plane).unwrap().hold_fire = true;
+        m.aviation.planes.get_mut(&plane).unwrap().mission = Some(PlaneMission {
+            kind: MissionKind::Patrol,
+            target: None,
+            at: Point { x: 90.0, z: 60.0 },
+        });
+        let hp = m.world.game.units[&plane].hp;
+        m.step_aircraft(plane, 1.0).unwrap();
+        assert!(m.world.game.units[&plane].x > 70.0);
+        assert_eq!(m.world.game.units[&plane].hp, hp);
+        assert!(m.world.game.units[&plane].path.is_empty());
+        m.world.game.units.get_mut(&plane).unwrap().hp = 0.0;
+        let death = m.retire_dead(&[plane]).unwrap();
+        assert_eq!(death.retired.len(), 1);
+        assert!(
+            death.shots.is_empty(),
+            "aircraft destruction creates no ground wreck"
+        );
+    }
+
+    #[test]
+    fn mov45_aircraft_waiting_order_starts_only_when_sortie_is_idle_and_ready() {
+        let mut m = scene();
+        let plane = m.spawn_aircraft(0, "fighter").unwrap();
+        assert!(
+            m.aircraft_queue_ready(plane).unwrap(),
+            "ready aircraft at base"
+        );
+        m.aviation.planes.get_mut(&plane).unwrap().mission = Some(PlaneMission {
+            kind: MissionKind::Patrol,
+            target: None,
+            at: Point { x: 70.0, z: 70.0 },
+        });
+        m.world.game.units.get_mut(&plane).unwrap().air = Some(PlaneState::Out);
+        assert!(
+            !m.aircraft_queue_ready(plane).unwrap(),
+            "active sortie owns its turn"
+        );
+        m.world.game.units.get_mut(&plane).unwrap().air = Some(PlaneState::Rearm);
+        m.aviation.planes.get_mut(&plane).unwrap().mission = None;
+        assert!(
+            !m.aircraft_queue_ready(plane).unwrap(),
+            "rearming blocks waiting order"
+        );
+        m.world.game.units.get_mut(&plane).unwrap().air = Some(PlaneState::Base);
+        m.aviation.planes.get_mut(&plane).unwrap().fuel = 0.0;
+        assert!(
+            !m.aircraft_queue_ready(plane).unwrap(),
+            "empty fuel blocks waiting order"
+        );
+        m.aviation.planes.get_mut(&plane).unwrap().fuel = 1.0;
+        m.aviation.planes.get_mut(&plane).unwrap().ammo = 0.0;
+        assert!(
+            !m.aircraft_queue_ready(plane).unwrap(),
+            "empty ammo blocks waiting order"
+        );
+    }
+
+    #[test]
+    fn mov45_recorded_aircraft_queue_waits_starts_and_replaces() {
+        let mut m = scene();
+        let plane = m.spawn_aircraft(0, "fighter").unwrap();
+        m.commands.units.get_mut(&plane).unwrap().hold_fire = true;
+        fn order(m: &mut Match, raw: serde_json::Value) -> Option<crate::match_commands::Denial> {
+            m.execute_command(0, &Command::from_json(&raw).unwrap(), false)
+                .unwrap()
+        }
+        assert_eq!(
+            order(
+                &mut m,
+                json!({"t":"move","orders":[[plane,50.0,50.0]],"queue":true})
+            ),
+            None
+        );
+        assert_eq!(m.commands.units[&plane].orders.len(), 1);
+        m.advance_tick().unwrap();
+        assert_eq!(m.commands.units[&plane].orders.len(), 0);
+        assert_eq!(
+            m.aviation.planes[&plane].mission.unwrap().at,
+            Point { x: 50.0, z: 50.0 }
+        );
+        for index in 0..8 {
+            assert_eq!(
+                order(
+                    &mut m,
+                    json!({"t":"move","orders":[[plane,70.0 + index as f64,70.0]],"queue":true})
+                ),
+                None
+            );
+        }
+        assert_eq!(m.commands.units[&plane].orders.len(), 8);
+        assert_eq!(
+            order(
+                &mut m,
+                json!({"t":"move","orders":[[plane,99.0,99.0]],"queue":true})
+            ),
+            Some(crate::match_commands::Denial::QueueFull)
+        );
+        m.advance_tick().unwrap();
+        assert_eq!(
+            m.commands.units[&plane].orders.len(),
+            8,
+            "active mission holds queue"
+        );
+        m.world.game.units.get_mut(&plane).unwrap().air = Some(PlaneState::Rearm);
+        m.aviation.planes.get_mut(&plane).unwrap().mission = None;
+        m.aviation.planes.get_mut(&plane).unwrap().timer = 30.0;
+        m.advance_tick().unwrap();
+        assert_eq!(
+            m.commands.units[&plane].orders.len(),
+            8,
+            "rearm holds queue"
+        );
+        m.world.game.units.get_mut(&plane).unwrap().air = Some(PlaneState::Base);
+        m.aviation.planes.get_mut(&plane).unwrap().fuel = 0.0;
+        m.advance_tick().unwrap();
+        assert_eq!(
+            m.commands.units[&plane].orders.len(),
+            8,
+            "empty fuel holds queue"
+        );
+        m.aviation.planes.get_mut(&plane).unwrap().fuel = 1.0;
+        m.aviation.planes.get_mut(&plane).unwrap().ammo = 0.0;
+        m.advance_tick().unwrap();
+        assert_eq!(
+            m.commands.units[&plane].orders.len(),
+            8,
+            "empty ammo holds queue"
+        );
+        m.aviation.planes.get_mut(&plane).unwrap().ammo = 1.0;
+        m.advance_tick().unwrap();
+        assert_eq!(m.commands.units[&plane].orders.len(), 7);
+        assert_eq!(
+            m.aviation.planes[&plane].mission.unwrap().at,
+            Point { x: 70.0, z: 70.0 }
+        );
+        assert_eq!(
+            order(&mut m, json!({"t":"move","orders":[[plane,100.0,100.0]]})),
+            None
+        );
+        assert!(
+            m.commands.units[&plane].orders.is_empty(),
+            "replacement clears waiting orders"
+        );
     }
 }

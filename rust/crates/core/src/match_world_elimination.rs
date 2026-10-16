@@ -207,6 +207,12 @@ impl Match {
     /// All fallible preparation has succeeded. This is metadata removal, not combat death.
     pub(crate) fn retire_world_metadata(&mut self, removed: &[Unit]) {
         for unit in removed {
+            for &train in self.rail_runs.keys() {
+                if let Some(metadata) = self.combat.get_mut(train) {
+                    metadata.cargo.retain(|&id| id != unit.id);
+                }
+            }
+            self.rail_runs.remove(&unit.id);
             self.field_works.cancel(unit.id);
             self.commands.units.remove(&unit.id);
             self.commands.requests.retire_unit(unit.id);
