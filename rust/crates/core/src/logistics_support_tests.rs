@@ -188,7 +188,10 @@ fn log11_reinforcement_and_vehicle_repair_pay_from_actual_recovery() {
     let repaired = match_state.world.game.units[&vehicle].hp - (vehicle_full - 10.0);
     assert!(repaired > 0.0);
     // Measuring the HP delta introduces another subtraction and rounding.
-    assert!((8.0 - match_state.logistics.get(vehicle).unwrap().provisions - repaired / 5.0).abs() < 1e-12);
+    assert!(
+        (8.0 - match_state.logistics.get(vehicle).unwrap().provisions - repaired / 5.0).abs()
+            < 1e-12
+    );
 }
 
 #[test]
@@ -257,5 +260,8 @@ fn log11_engineer_repair_spends_engineers_own_provisions() {
     let repaired = match_state.world.game.units[&hq].hp - before;
     assert!(repaired > 0.0);
     // Measuring the HP delta introduces another subtraction and rounding.
-    assert!((1.0 - match_state.logistics.get(engineer).unwrap().provisions - repaired / 5.0).abs() < 1e-12);
+    assert!(
+        (1.0 - match_state.logistics.get(engineer).unwrap().provisions - repaired / 5.0).abs()
+            < 1e-12
+    );
 }

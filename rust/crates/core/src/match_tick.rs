@@ -773,7 +773,7 @@ impl crate::match_runtime::Match {
         }
         if self.options.logistics {
             let beat = crate::supply_network::SupplyRules::compiled()?.network_ticks;
-            if beat > 0 && tick as u64 % beat == 0 {
+            if beat > 0 && (tick as u64).is_multiple_of(beat) {
                 self.refresh_supply_network(&unit_order)?;
                 phases.push(TickPhase::SupplyNetwork);
             }
