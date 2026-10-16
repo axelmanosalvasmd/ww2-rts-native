@@ -21,15 +21,32 @@ fn center(width: usize, cell: usize) -> Point {
 
 impl Match {
     fn validate_garrison_unit(&self, id: UnitId) -> Result<(), String> {
-        let unit = self.world.game.units.get(&id).ok_or("missing garrison unit")?;
-        let control = self.commands.units.get(&id).ok_or("missing garrison control")?;
+        let unit = self
+            .world
+            .game
+            .units
+            .get(&id)
+            .ok_or("missing garrison unit")?;
+        let control = self
+            .commands
+            .units
+            .get(&id)
+            .ok_or("missing garrison control")?;
         if unit.id != id
             || unit.kind >= self.rules.kinds.len()
-            || ![unit.x, unit.z, unit.hp, unit.repath].iter().all(|v| v.is_finite())
-            || control.enter.is_some_and(|c| c >= self.world.game.chars.len())
+            || ![unit.x, unit.z, unit.hp, unit.repath]
+                .iter()
+                .all(|v| v.is_finite())
+            || control
+                .enter
+                .is_some_and(|c| c >= self.world.game.chars.len())
             || control.enter.is_some() && unit.path_gen == u64::MAX
-            || unit.garrison.is_some_and(|c| c >= self.world.game.chars.len())
-            || control.garrison_entry.is_some_and(|at| !at.x.is_finite() || !at.z.is_finite())
+            || unit
+                .garrison
+                .is_some_and(|c| c >= self.world.game.chars.len())
+            || control
+                .garrison_entry
+                .is_some_and(|at| !at.x.is_finite() || !at.z.is_finite())
             || unit.dig != self.field_works.is_active(id)
             || unit.entrench != self.field_works.membership(id).is_some()
             || self.firing.get(id).is_none()
@@ -109,27 +126,48 @@ impl Match {
                 Denial::NotVisible
             }));
         }
-        let command = Command::Garrison { ids: ids.to_vec(), at, queue: queued };
-        let selected: Vec<_> = ids.iter().take(50.max(self.world.game.units.len()))
-            .filter_map(|id| self.eligible_command_unit(*id, owner, &command)).collect();
+        let command = Command::Garrison {
+            ids: ids.to_vec(),
+            at,
+            queue: queued,
+        };
+        let selected: Vec<_> = ids
+            .iter()
+            .take(50.max(self.world.game.units.len()))
+            .filter_map(|id| self.eligible_command_unit(*id, owner, &command))
+            .collect();
         for &id in &selected {
             self.validate_garrison_unit(id)?;
             if self.world.game.units[&id].path_gen.checked_add(1).is_none() {
                 return Err("garrison path identity exhausted".into());
             }
         }
-        let mut taken: BTreeSet<_> = self.world.game.units.values().filter_map(|u| u.garrison)
-            .chain(self.commands.units.values().filter_map(|c| c.enter)).collect();
+        let mut taken: BTreeSet<_> = self
+            .world
+            .game
+            .units
+            .values()
+            .filter_map(|u| u.garrison)
+            .chain(self.commands.units.values().filter_map(|c| c.enter))
+            .collect();
         let mut accepted = false;
         let mut reason = Denial::Needs;
         for id in selected {
             self.commands.units.get_mut(&id).unwrap().follow = 0;
             let unit = &self.world.game.units[&id];
-            let allowed = Catalog::compiled().map_err(|e| e.to_string())?
-                .unit(&self.rules.kinds[unit.kind].name).map_err(|e| e.to_string())?
-                .get("garrisons").and_then(|v| v.boolean()).unwrap_or(false);
+            let allowed = Catalog::compiled()
+                .map_err(|e| e.to_string())?
+                .unit(&self.rules.kinds[unit.kind].name)
+                .map_err(|e| e.to_string())?
+                .get("garrisons")
+                .and_then(|v| v.boolean())
+                .unwrap_or(false);
             if !allowed || unit.retreating {
-                reason = if unit.retreating { Denial::Retreating } else { Denial::Needs };
+                reason = if unit.retreating {
+                    Denial::Retreating
+                } else {
+                    Denial::Needs
+                };
                 continue;
             }
             if queued {
@@ -137,7 +175,11 @@ impl Match {
                 if orders.len() >= 8 {
                     reason = Denial::QueueFull;
                 } else {
-                    orders.push_back(Command::Garrison { ids: vec![i64::from(id)], at: Some(point), queue: false });
+                    orders.push_back(Command::Garrison {
+                        ids: vec![i64::from(id)],
+                        at: Some(point),
+                        queue: false,
+                    });
                     accepted = true;
                 }
                 continue;
@@ -149,12 +191,24 @@ impl Match {
             let mut unit = unit.clone();
             if unit.garrison.is_some() {
                 let g = &self.world.game;
-                let free = SpawnPlacer::new().nearest_free(
-                    TerrainView { width: g.w, height: g.h, flags: &g.flags,
-                        heights: g.height.as_deref(), world_known: false, knowledge_id: 0,
-                        versions: Versions::default(), changed: None, changes: &[] },
-                    unit.at(), MOVE, None,
-                ).map_err(|e| format!("garrison exit: {e:?}"))?;
+                let free = SpawnPlacer::new()
+                    .nearest_free(
+                        TerrainView {
+                            width: g.w,
+                            height: g.h,
+                            flags: &g.flags,
+                            heights: g.height.as_deref(),
+                            world_known: false,
+                            knowledge_id: 0,
+                            versions: Versions::default(),
+                            changed: None,
+                            changes: &[],
+                        },
+                        unit.at(),
+                        MOVE,
+                        None,
+                    )
+                    .map_err(|e| format!("garrison exit: {e:?}"))?;
                 let at = center(g.w, free);
                 unit.x = at.x;
                 unit.z = at.z;
@@ -198,20 +252,35 @@ impl Match {
             taken.insert(entry);
             accepted = true;
         }
-        Ok(if accepted { None } else if self.recipient_sees(owner, point)? { Some(reason) } else { Some(Denial::NotVisible) })
+        Ok(if accepted {
+            None
+        } else if self.recipient_sees(owner, point)? {
+            Some(reason)
+        } else {
+            Some(Denial::NotVisible)
+        })
     }
 
     pub(crate) fn current_enter_goal(&self, id: UnitId) -> Result<Option<Point>, String> {
-        let Some(unit) = self.world.game.units.get(&id) else { return Ok(None); };
+        let Some(unit) = self.world.game.units.get(&id) else {
+            return Ok(None);
+        };
         self.validate_garrison_unit(id)?;
-        let Some(cell) = self.commands.units[&id].enter else { return Ok(None); };
+        let Some(cell) = self.commands.units[&id].enter else {
+            return Ok(None);
+        };
         let at = center(self.world.game.w, cell);
-        Ok((unit.hp > 0.0 && self.world.game.chars[cell] == b'B' && unit.path.is_empty()
-            && math::hypot(unit.x - at.x, unit.z - at.z) > CELL * 1.6).then_some(at))
+        Ok((unit.hp > 0.0
+            && self.world.game.chars[cell] == b'B'
+            && unit.path.is_empty()
+            && math::hypot(unit.x - at.x, unit.z - at.z) > CELL * 1.6)
+            .then_some(at))
     }
 
     pub(crate) fn apply_unit_enter(&mut self, id: UnitId) -> Result<(), String> {
-        let Some(cell) = self.commands.units.get(&id).and_then(|c| c.enter) else { return Ok(()); };
+        let Some(cell) = self.commands.units.get(&id).and_then(|c| c.enter) else {
+            return Ok(());
+        };
         self.validate_garrison_unit(id)?;
         if self.world.game.chars[cell] != b'B' {
             self.commands.units.get_mut(&id).unwrap().enter = None;
@@ -227,7 +296,10 @@ impl Match {
             unit.garrison = Some(cell);
             unit.board = 0;
             unit.path.clear();
-            unit.path_gen = unit.path_gen.checked_add(1).ok_or("garrison path identity exhausted")?;
+            unit.path_gen = unit
+                .path_gen
+                .checked_add(1)
+                .ok_or("garrison path identity exhausted")?;
             let control = self.commands.units.get_mut(&id).unwrap();
             control.enter = None;
             control.garrison_entry = Some(entry);

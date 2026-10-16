@@ -704,14 +704,16 @@ impl DamageWorld<'_> {
             x: (cell % self.world.game.w) as f64 * crate::game::CELL + 1.,
             z: (cell / self.world.game.w) as f64 * crate::game::CELL + 1.,
         };
-        self.world.mutate_cell(
-            cell,
-            crate::world::CellChange {
-                mine: Some(false),
-                ground: Some(b'+'),
-                ..Default::default()
-            },
-        ).map_err(environment::EnvironmentError::from)?;
+        self.world
+            .mutate_cell(
+                cell,
+                crate::world::CellChange {
+                    mine: Some(false),
+                    ground: Some(b'+'),
+                    ..Default::default()
+                },
+            )
+            .map_err(environment::EnvironmentError::from)?;
         self.explosion_emitting(at, radius, profile, owner, None, None, None, retarget, emit)
     }
 

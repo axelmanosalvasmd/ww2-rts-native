@@ -211,7 +211,10 @@ impl Match {
         if self.world.game.units[&id].garrison.is_some() && !self.uses_world_routes() {
             let owner = self.world.game.units[&id].owner;
             if let Some(denial) = self.ground_retreat_command(owner, &[i64::from(id)])? {
-                return Err(format!("automatic garrison retreat refused: {}", denial.name()));
+                return Err(format!(
+                    "automatic garrison retreat refused: {}",
+                    denial.name()
+                ));
             }
             return Ok(true);
         }

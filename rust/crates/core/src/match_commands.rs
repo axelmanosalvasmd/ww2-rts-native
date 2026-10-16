@@ -468,8 +468,16 @@ impl Command {
             Some("unload") => Ok(Self::Unload { ids }),
             Some("garrison") => Ok(Self::Garrison {
                 ids,
-                at: object.get("x").and_then(|v| v.as_f64()).filter(|v| v.is_finite())
-                    .zip(object.get("z").and_then(|v| v.as_f64()).filter(|v| v.is_finite()))
+                at: object
+                    .get("x")
+                    .and_then(|v| v.as_f64())
+                    .filter(|v| v.is_finite())
+                    .zip(
+                        object
+                            .get("z")
+                            .and_then(|v| v.as_f64())
+                            .filter(|v| v.is_finite()),
+                    )
                     .map(|(x, z)| Point { x, z }),
                 queue: object.get("queue").and_then(|v| v.as_bool()) == Some(true),
             }),
@@ -686,7 +694,9 @@ impl Command {
     }
     fn valid(&self) -> bool {
         match self {
-            Self::Attack { at, .. } | Self::Garrison { at, .. } => at.is_none_or(|p| p.x.is_finite() && p.z.is_finite()),
+            Self::Attack { at, .. } | Self::Garrison { at, .. } => {
+                at.is_none_or(|p| p.x.is_finite() && p.z.is_finite())
+            }
             Self::Dig {
                 ids, at, direction, ..
             } => {
@@ -1839,7 +1849,12 @@ impl crate::path_requests::PathRequestContext for RequestContext<'_> {
                 crate::path_requests::RequestKind::Amove => u.amove = None,
                 crate::path_requests::RequestKind::Board => u.board = 0,
                 crate::path_requests::RequestKind::Enter => {
-                    self.match_state.commands.units.get_mut(&u.id).unwrap().enter = None;
+                    self.match_state
+                        .commands
+                        .units
+                        .get_mut(&u.id)
+                        .unwrap()
+                        .enter = None;
                 }
                 crate::path_requests::RequestKind::AttackId => {
                     u.attack = false;
