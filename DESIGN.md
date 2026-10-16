@@ -4353,3 +4353,18 @@ Restore this task's39 parity edits to exactdcf84cd6; retain the full literal
 row/test/prototype map and actual compile outcome in the normal testing doc.
 Rust stays exact to the compile-only fixec8fcc54. Root owns the separate
 proven-row ledger and later status PR after merged tests and intent review.
+
+### Executed native combat window and CMB53 witness correction
+
+At27b29fe6 / Rust61e73ff0 one focused batch completed39 tests:38PASS,
+1FAIL,290skipped, exit100. All seven retained comparisons passed;31 of32 new
+tests passed. Terminal and inherited-slot release were confirmed before row
+reporting. The original0335 log/result remains unchanged.
+
+CMB53 reduced the sandbag HP, then failed the authored ground-wear assertion.
+Pinned sim.js:4274-4283 calls0.25-scaled HP damage bounded contact wear; the
+separate wear array belongs to road/crater/trench state, not sandbags on soil.
+Correct only this witness: exact22.5 contact plus90 terminal shell HP damage,
+and unchanged ground wear. Keep runtime/providers/guards intact. CMB53 stays
+held for remaining FireAt/section coverage. Any successor run needs a new
+literal Root grant; the old failure remains attributed to27b29fe6.

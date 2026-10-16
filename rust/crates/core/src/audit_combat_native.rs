@@ -707,8 +707,10 @@ fn cmb53_direct_terrain_contact_wears_the_contacted_solid() {
         )
         .unwrap()
     );
-    assert!(m.world.game.cell_hp[cell] < before);
-    assert!(m.world.game.wear.as_ref().unwrap()[cell] > 0.0);
+    // sim.js:4274-4283 calls bounded HP damage contact wear. The separate
+    // road/crater/trench wear array does not grow under a sandbag on soil.
+    close(f64::from(before - m.world.game.cell_hp[cell]), 22.5 + 90.0);
+    close(f64::from(m.world.game.wear.as_ref().unwrap()[cell]), 0.0);
 }
 
 #[test]
