@@ -118,7 +118,8 @@ impl StartPlan {
         )
     }
 
-    pub(crate) fn prepare_elimination(
+    /// Rebuild the bound Classic or Annihilation startup layout.
+    pub fn prepare_elimination(
         map: &crate::map::AuthoritativeMap,
         options: &MatchOptions,
         rules: &Rules,
@@ -164,7 +165,8 @@ impl StartPlan {
         )
     }
 
-    pub(crate) fn prepare_assault(
+    /// Rebuild the bound Assault layout with the selected defender team.
+    pub fn prepare_assault(
         map: &crate::map::AuthoritativeMap,
         options: &MatchOptions,
         rules: &Rules,

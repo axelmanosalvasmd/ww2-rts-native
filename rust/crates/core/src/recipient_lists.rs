@@ -184,7 +184,9 @@ impl crate::match_runtime::Match {
             .collect();
         match (self.options.mode, g.mode) {
             (crate::economy::Mode::Default | crate::economy::Mode::Conquest, None)
-            | (crate::economy::Mode::Classic, Some(ModeKind::Classic)) => {
+            | (crate::economy::Mode::Classic, Some(ModeKind::Classic))
+            | (crate::economy::Mode::Assault, Some(ModeKind::Assault))
+            | (crate::economy::Mode::Annihilation, Some(ModeKind::Annihilation)) => {
                 let nodes = self.classic_snapshot_nodes()?;
                 let wrecks = self.observed_wreck_rows(owner)?;
                 Ok(RecipientLists {
@@ -339,8 +341,13 @@ impl crate::match_runtime::Match {
                 crate::economy::Mode::Default | crate::economy::Mode::Conquest,
                 None
             ) | (crate::economy::Mode::Classic, Some(ModeKind::Classic))
+                | (crate::economy::Mode::Assault, Some(ModeKind::Assault))
+                | (
+                    crate::economy::Mode::Annihilation,
+                    Some(ModeKind::Annihilation)
+                )
         ) {
-            return Err("global ordinary lists require absent Game mode".into());
+            return Err("global ordinary lists require a represented ordinary mode".into());
         }
         let mut ids = std::collections::BTreeSet::new();
         let mut rows = Vec::with_capacity(game.wrecks.len());

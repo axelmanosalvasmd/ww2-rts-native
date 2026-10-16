@@ -1,0 +1,3 @@
+- Let trusted R1 hosts start, restart, save and load Classic, Annihilation and Assault within the existing two-human room profile. Preserve mode fields, Classic resource nodes and results through every seat's snapshots and the ending hold. World, Tutorial/Sandbox and hosted Horde remain with their separate streams.
+- Replace the binary tests' old non-Conquest refusals with ordinary mode startup, snapshot and restart coverage. Keep the World, Horde, Tutorial, Sandbox and roster refusals.
+- Restore authored houses from ordinary saves. Their existing `house` structure kind was missing from the fixed save vocabulary, causing loads on the default map to fail.

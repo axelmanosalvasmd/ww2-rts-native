@@ -117,21 +117,35 @@ pub struct SnapshotCache<'a> {
 }
 impl<'a> SnapshotCache<'a> {
     pub fn new(state: &'a Match) -> Result<Self, SnapshotError> {
-        let classic = state.options.mode == Mode::Classic
-            && state.world.game.mode == Some(crate::game::ModeKind::Classic);
-        if !(classic
-            || matches!(state.options.mode, Mode::Default | Mode::Conquest)
-                && state.world.game.mode.is_none())
+        let ordinary = matches!(
+            (state.options.mode, state.world.game.mode),
+            (Mode::Default | Mode::Conquest, None)
+                | (Mode::Classic, Some(crate::game::ModeKind::Classic))
+                | (
+                    Mode::Annihilation,
+                    Some(crate::game::ModeKind::Annihilation)
+                )
+                | (Mode::Assault, Some(crate::game::ModeKind::Assault))
+        );
+        if !ordinary
             || state.world.geography().is_some()
-            || state.assault.is_some()
             || state.world_runtime.is_some()
+            || (state.options.mode == Mode::Assault) != state.assault.is_some()
         {
             return Err(SnapshotError::UnsupportedMode);
         }
-        if classic {
+        if matches!(state.options.mode, Mode::Classic | Mode::Annihilation) {
             state
                 .validate_elimination_state()
                 .map_err(|_| SnapshotError::Rules)?;
+        }
+        if let Some(assault) = state.assault
+            && (!(0..6).contains(&assault.defender_team)
+                || !(-1..6).contains(&assault.attacker_team)
+                || assault.defender_team == assault.attacker_team
+                || !assault.time_left.is_finite())
+        {
+            return Err(SnapshotError::Rules);
         }
         let g = &state.world.game;
         let cells = g.w.checked_mul(g.h).ok_or(SnapshotError::Rules)?;

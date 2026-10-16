@@ -923,6 +923,12 @@ impl Hub {
         {
             return Err("native match seats disagree with the room roster".into());
         }
+        if state
+            .assault
+            .is_some_and(|assault| assault.defender_team != room.defender as i32)
+        {
+            return Err("native Assault defender disagrees with the room".into());
+        }
         let epoch = self
             .next_epoch
             .checked_add(1)
@@ -1601,8 +1607,9 @@ impl Hub {
                 "start requires one through capacity players and both Assault sides".into(),
             );
         }
-        if room.listed || room.mode != "conquest" || room.sandbox {
-            return Err("R1 requires private Conquest and sandbox off".into());
+        let mode = crate::native_startup::ordinary_mode(&room.mode);
+        if room.listed || mode.is_none() || room.sandbox {
+            return Err("R1 requires a private ordinary mode and sandbox off".into());
         }
         if room.players.len() != 2
             || !room.spectators.is_empty()
@@ -1638,25 +1645,29 @@ impl Hub {
                 })
             })
             .collect::<Result<Vec<_>, String>>()?;
-        let state = crate::authoritative_maps::create_match(
-            &room.map,
-            MatchOptions {
-                seed: trusted.seed,
-                mode: Mode::Conquest,
-                players,
-                shuffle: true,
-                army: ArmySize::from_key(&room.army),
-                weather: WeatherChoice::from_reference(Some(&room.weather)),
-                weather_seed: None,
-                living_weather: true,
-                map_key: Some(room.map.clone()),
-                tech: true,
-                supply: true,
-                logistics: false,
-                sandbox: false,
-            },
-        )
-        .map_err(|e| e.to_string())?;
+        let options = MatchOptions {
+            seed: trusted.seed,
+            mode: mode.unwrap(),
+            players,
+            shuffle: true,
+            army: ArmySize::from_key(&room.army),
+            weather: WeatherChoice::from_reference(Some(&room.weather)),
+            weather_seed: None,
+            living_weather: true,
+            map_key: Some(room.map.clone()),
+            tech: true,
+            supply: true,
+            logistics: false,
+            sandbox: false,
+        };
+        let map = crate::authoritative_maps::load(&room.map).map_err(|e| e.to_string())?;
+        let state = match options.mode {
+            Mode::Assault => Match::new_assault(map, options, room.defender as i32),
+            Mode::Classic => Match::new_classic(map, options),
+            Mode::Annihilation => Match::new_annihilation(map, options),
+            Mode::Default | Mode::Conquest => Match::new(map, options),
+            _ => return Err("R1 ordinary mode is unsupported".into()),
+        }?;
         let mut prepared = self.prepare_native(code, state, now, restart)?;
         prepared.attached.receipt =
             Some(trusted.receipt(prepared.attached.runtime.state(), prepared.attached.epoch));
@@ -2038,12 +2049,16 @@ fn result_number(value: f64) -> Value {
     if value == 0.0 { json!(0) } else { json!(value) }
 }
 fn result_message(result: MatchResult, names: Vec<String>) -> Result<Value, String> {
-    if result.mode != "conquest" {
+    if crate::native_startup::ordinary_mode(result.mode).is_none() {
         return Err("result serializer requires represented ordinary mode".into());
     }
+    let conquest = result.mode == "conquest";
     let timeline = result.timeline.into_iter().map(|sample| match sample {
-        MatchSample::Conquest { t, vp } => Ok(json!({"t":result_number(t), "vp":vp.into_iter().map(result_number).collect::<Vec<_>>()})),
-        MatchSample::Territories { .. } => Err("ordinary result cannot serialize a territory timeline".to_owned()),
+        MatchSample::Conquest { t, vp } if conquest => Ok(json!({"t":result_number(t), "vp":vp.into_iter().map(result_number).collect::<Vec<_>>()})),
+        MatchSample::Territories { t, points, structures } if !conquest => Ok(json!({"t":result_number(t),
+            "points":points.into_iter().map(result_number).collect::<Vec<_>>(),
+            "structures":structures.into_iter().map(result_number).collect::<Vec<_>>()})),
+        _ => Err("ordinary result timeline disagrees with its mode".to_owned()),
     }).collect::<Result<Vec<_>, _>>()?;
     let story = result
         .story
@@ -2464,3 +2479,7 @@ mod save_load_tests;
 
 #[path = "lobby_saves.rs"]
 mod save_runtime;
+
+#[cfg(test)]
+#[path = "mode_hosting_tests.rs"]
+mod mode_hosting_tests;
