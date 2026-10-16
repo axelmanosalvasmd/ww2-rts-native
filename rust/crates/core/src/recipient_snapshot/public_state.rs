@@ -66,14 +66,13 @@ pub(super) fn capture(state: &Match) -> Result<Vec<Map<String, Value>>, Snapshot
     for slot in 0..g.players.len() {
         let mut fields = Map::new();
         // Reuse Source's six-field ghost rows. Never consult a hidden live building here.
-        if matches!(state.options.mode, Mode::Classic | Mode::World)
-            && let Some((_, rows)) = state
+        if matches!(state.options.mode, Mode::Classic | Mode::World) {
+            let ghosts = state
                 .classic_known_buildings
                 .iter()
                 .find(|(team, _)| *team == g.players[slot].team)
-        {
-            let ghosts = rows
-                .iter()
+                .into_iter()
+                .flat_map(|(_, rows)| rows)
                 .filter(|row| !seen_by(state, slot, row.id))
                 .map(|row| {
                     let kind = state

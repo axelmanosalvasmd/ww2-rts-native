@@ -1,4 +1,4 @@
-//! Internal Conquest projections and an explicitly admitted quiet seat envelope.
+//! Internal ordinary-match projections and an explicitly admitted quiet seat envelope.
 //! Unsupported canonical actors remain explicit. No transport contract is added.
 use crate::{
     catalog::Catalog,
@@ -16,6 +16,9 @@ mod aircraft;
 mod composition;
 #[path = "recipient_snapshot/delivery.rs"]
 mod delivery;
+#[cfg(test)]
+#[path = "recipient_snapshot/elimination_tests.rs"]
+mod elimination_tests;
 #[path = "recipient_snapshot/engineering.rs"]
 mod engineering;
 #[path = "recipient_snapshot/falling.rs"]
@@ -112,13 +115,24 @@ pub struct SnapshotCache<'a> {
 }
 impl<'a> SnapshotCache<'a> {
     pub fn new(state: &'a Match) -> Result<Self, SnapshotError> {
-        if !matches!(state.options.mode, Mode::Default | Mode::Conquest)
-            || state.world.game.mode.is_some()
-            || state.world.geography().is_some()
+        if !matches!(
+            (state.options.mode, state.world.game.mode),
+            (Mode::Default | Mode::Conquest, None)
+                | (Mode::Classic, Some(crate::game::ModeKind::Classic))
+                | (
+                    Mode::Annihilation,
+                    Some(crate::game::ModeKind::Annihilation)
+                )
+        ) || state.world.geography().is_some()
             || state.assault.is_some()
             || state.world_runtime.is_some()
         {
             return Err(SnapshotError::UnsupportedMode);
+        }
+        if matches!(state.options.mode, Mode::Classic | Mode::Annihilation) {
+            state
+                .validate_elimination_state()
+                .map_err(|_| SnapshotError::Rules)?;
         }
         let g = &state.world.game;
         let cells = g.w.checked_mul(g.h).ok_or(SnapshotError::Rules)?;
@@ -468,6 +482,31 @@ fn economy_fields(state: &Match, slot: usize) -> Result<Map<String, Value>, Snap
     // Canonical accounting zeros do not make those wire fields present.
     for (key, value) in [("mp", p.mp.floor()), ("inc", r(p.inc))] {
         fields.insert(key.into(), json!(value));
+    }
+    if state.options.mode == Mode::Classic {
+        fields.insert("mun".into(), json!(p.mun.floor()));
+        fields.insert("fuel".into(), json!(p.fuel.floor()));
+    }
+    if matches!(state.options.mode, Mode::Classic | Mode::Annihilation) {
+        let mode = state.elimination.as_ref().ok_or(SnapshotError::Rules)?;
+        let mut row = json!({
+            "kind": if state.options.mode == Mode::Classic { "classic" } else { "annihilation" },
+            "suddenDeath": mode.sudden_death
+        });
+        if let Some(time) = mode.time_left {
+            finite(&[time])?;
+            row["timeLeft"] = json!(math::max(0., time.ceil()));
+        }
+        if state.options.mode == Mode::Annihilation {
+            row["bunkers"] = json!(mode.bunkers);
+        }
+        fields.insert("mode".into(), row);
+    }
+    if let Some(nodes) = state
+        .ordinary_snapshot_nodes()
+        .map_err(|_| SnapshotError::Rules)?
+    {
+        fields.insert("nodes".into(), json!(nodes));
     }
     for (key, value) in [("fuelInc", p.fuel_inc), ("upkeep", p.upkeep)] {
         if let Some(value) = value {

@@ -48,6 +48,28 @@ pub struct MatchOptions {
     pub sandbox: bool,
 }
 
+impl MatchOptions {
+    /// Resolve headless opt-ins against the prototype mode switches (sim.js:729,746,799).
+    /// Authored-map logistics selection belongs to the server, before these mode guards.
+    pub fn resolve_mode_features(&mut self) {
+        self.logistics &= matches!(
+            self.mode,
+            Mode::Default | Mode::Conquest | Mode::Classic | Mode::Annihilation | Mode::World
+        );
+        self.tech &= matches!(
+            self.mode,
+            Mode::Default
+                | Mode::Conquest
+                | Mode::Assault
+                | Mode::Annihilation
+                | Mode::Horde
+                | Mode::Classic
+                | Mode::World
+        );
+        self.supply &= !matches!(self.mode, Mode::Horde | Mode::Tutorial | Mode::World);
+    }
+}
+
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct PlayerStart {
     pub config: PlayerConfig,
@@ -814,10 +836,11 @@ impl Match {
 
     pub(crate) fn skirmish_shell(
         map: &crate::map::AuthoritativeMap,
-        options: MatchOptions,
+        mut options: MatchOptions,
         rules: Rules,
         start: StartPlan,
     ) -> Result<Self, String> {
+        options.resolve_mode_features();
         let mut world = World::from_map(map).map_err(|e| e.to_string())?;
         if options.mode == Mode::Tutorial {
             world.game.mode = Some(crate::game::ModeKind::Tutorial);

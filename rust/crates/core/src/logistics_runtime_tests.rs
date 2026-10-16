@@ -235,30 +235,39 @@ fn logistics_runtime_log12_stranded_retries_and_nearby_handoff_needs_no_path() {
     assert!(!near.logistics.get(id).unwrap().stranded);
 }
 #[test]
-fn logistics_runtime_log13_player_hold_escape_stance_refusal_and_recovery() {
+fn logistics_runtime_log13_player_hold_escape_stances_and_recovery() {
     let (mut m, id) = scene(true);
     force(&mut m, id, Point { x: 65., z: 45. });
     withdrawal_turn(&mut m, id);
     let ids = vec![i64::from(id)];
-    let control = m.commands.units[&id].clone();
-    let hold_position = m.world.game.units[&id].hold_pos;
-    for stance in [Stance::HoldFire, Stance::HoldPosition, Stance::AutoRetreat] {
-        assert_eq!(
-            m.execute_command(
-                0,
-                &Command::Stance {
-                    ids: ids.clone(),
-                    stance,
-                    on: true
-                },
-                false,
-            )
-            .unwrap(),
-            Some(Denial::Needs),
-        );
-        assert_eq!(m.commands.units[&id], control);
-        assert_eq!(m.world.game.units[&id].hold_pos, hold_position);
+    for stranded in [false, true] {
+        m.logistics.get_mut(id).unwrap().stranded = stranded;
+        for on in [true, false] {
+            for stance in [Stance::HoldFire, Stance::HoldPosition, Stance::AutoRetreat] {
+                assert_eq!(
+                    m.execute_command(
+                        0,
+                        &Command::Stance {
+                            ids: ids.clone(),
+                            stance,
+                            on
+                        },
+                        false
+                    )
+                    .unwrap(),
+                    None
+                );
+                match stance {
+                    Stance::HoldFire => assert_eq!(m.commands.units[&id].hold_fire, on),
+                    Stance::HoldPosition => assert_eq!(m.world.game.units[&id].hold_pos, on),
+                    Stance::AutoRetreat => assert_eq!(m.commands.units[&id].auto_retreat, on),
+                }
+            }
+            m.advance_tick().unwrap();
+            assert_deliverable(&mut m);
+        }
     }
+    m.commands.units.get_mut(&id).unwrap().hold_fire = true;
     assert_eq!(
         m.execute_command(0, &Command::Stop { ids: ids.clone() }, false)
             .unwrap(),
@@ -286,8 +295,10 @@ fn logistics_runtime_log13_player_hold_escape_stance_refusal_and_recovery() {
         m.execute_command(0, &go(true), false).unwrap(),
         Some(Denial::Blocked)
     );
-    withdrawal_turn(&mut m, id);
-    assert_deliverable(&mut m);
+    for _ in 0..3 {
+        m.advance_tick().unwrap();
+        assert_deliverable(&mut m);
+    }
     m.execute_command(0, &Command::Stop { ids: ids.clone() }, false)
         .unwrap();
     m.execute_command(0, &Command::Retreat { ids }, false)
@@ -300,6 +311,10 @@ fn logistics_runtime_log13_player_hold_escape_stance_refusal_and_recovery() {
     assert!(!m.logistics.get(id).unwrap().forced);
     let c = &m.commands.units[&id];
     assert!(!c.supply_started && !c.supply_hold && !c.supply_escape);
+    for _ in 0..3 {
+        m.advance_tick().unwrap();
+        assert_deliverable(&mut m);
+    }
 }
 fn add_actor(m: &mut Match, kind: &str, at: Point) -> u32 {
     let id = m.next_unit_id;
@@ -492,4 +507,186 @@ fn logistics_runtime_convoy_adapter_keeps_full_ticks_and_snapshots_supported() {
         assert_deliverable(&mut m);
     }
     assert!(m.tick_state.fault().is_none());
+}
+
+#[test]
+fn log13_forced_command_matrix_keeps_only_escape_controls_and_stranded_defense() {
+    let (mut m, id) = scene(true);
+    force(&mut m, id, Point { x: 65., z: 45. });
+    withdrawal_turn(&mut m, id);
+    let ids = vec![i64::from(id)];
+    let at = Point { x: 85., z: 45. };
+    let go = |attack_move| Command::Move {
+        orders: vec![MoveOrder {
+            unit: i64::from(id),
+            at,
+        }],
+        control_ids: None,
+        attack_move,
+        queue: false,
+        together: false,
+        face: None,
+    };
+    let permitted = [
+        go(false),
+        Command::Stop { ids: ids.clone() },
+        Command::Retreat { ids: ids.clone() },
+        Command::Stance {
+            ids: ids.clone(),
+            stance: Stance::HoldFire,
+            on: true,
+        },
+        Command::Stance {
+            ids: ids.clone(),
+            stance: Stance::HoldPosition,
+            on: true,
+        },
+        Command::Stance {
+            ids: ids.clone(),
+            stance: Stance::AutoRetreat,
+            on: true,
+        },
+    ];
+    let defense = [
+        Command::Attack {
+            ids: ids.clone(),
+            target: 1,
+            queue: false,
+            at: None,
+        },
+        Command::Ability {
+            ids: ids.clone(),
+            at: Some(at),
+            queue: false,
+            automatic: false,
+        },
+    ];
+    let denied = [
+        go(true),
+        Command::Build {
+            ids: ids.clone(),
+            kind: "cache".into(),
+            at: Some(at),
+            direction: None,
+            queue: false,
+        },
+        Command::Assist {
+            ids: ids.clone(),
+            target: 1,
+            at: None,
+            queue: false,
+        },
+        Command::Board {
+            ids: ids.clone(),
+            target: Some(1),
+        },
+        Command::Unload { ids: ids.clone() },
+        Command::Rail {
+            ids: ids.clone(),
+            at,
+        },
+        Command::Enter {
+            ids: ids.clone(),
+            at,
+            queue: false,
+        },
+        Command::FireAt {
+            ids: ids.clone(),
+            at,
+            queue: false,
+        },
+        Command::Dig {
+            ids: ids.clone(),
+            kind: crate::field_works::FortKind::Trench,
+            at,
+            direction: None,
+            queue: false,
+        },
+        Command::Cover {
+            ids: ids.clone(),
+            queue: false,
+            at: None,
+        },
+        Command::Escort {
+            ids: ids.clone(),
+            target: 1,
+        },
+        Command::Autocast { ids, on: true },
+    ];
+    for stranded in [false, true] {
+        m.logistics.get_mut(id).unwrap().stranded = stranded;
+        for command in &permitted {
+            assert_eq!(
+                m.eligible_command_unit(i64::from(id), 0, command),
+                Some(id),
+                "{command:?}"
+            );
+            assert_eq!(m.eligible_command_unit(i64::from(id), 1, command), None);
+        }
+        for command in &defense {
+            assert_eq!(
+                m.eligible_command_unit(i64::from(id), 0, command),
+                stranded.then_some(id),
+                "{command:?}"
+            );
+        }
+        for command in &denied {
+            assert_eq!(
+                m.eligible_command_unit(i64::from(id), 0, command),
+                None,
+                "{command:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn log13_unroutable_direct_escape_stays_stranded_and_stop_holds_across_full_ticks() {
+    let (mut m, id) = scene(true);
+    force(&mut m, id, Point { x: 65., z: 45. });
+    withdrawal_turn(&mut m, id);
+    // A destination at the current cell needs no path, even on open terrain.
+    let at = m.world.game.units[&id].at();
+    assert_eq!(
+        m.execute_command(
+            0,
+            &Command::Move {
+                orders: vec![MoveOrder {
+                    unit: i64::from(id),
+                    at
+                }],
+                control_ids: None,
+                attack_move: false,
+                queue: false,
+                together: false,
+                face: None,
+            },
+            false
+        )
+        .unwrap(),
+        None
+    );
+    assert!(m.commands.units[&id].supply_escape);
+    assert!(m.logistics.get(id).unwrap().stranded);
+    assert!(!m.world.game.units[&id].retreating);
+    assert_eq!(
+        m.execute_command(
+            0,
+            &Command::Stop {
+                ids: vec![i64::from(id)]
+            },
+            false
+        )
+        .unwrap(),
+        None
+    );
+    let start = m.world.game.units[&id].at();
+    for _ in 0..4 {
+        m.advance_tick().unwrap();
+        assert!(m.commands.units[&id].supply_hold);
+        assert!(m.logistics.get(id).unwrap().stranded);
+        assert!(m.world.game.units[&id].path.is_empty());
+        assert_eq!(m.world.game.units[&id].at(), start);
+        assert_deliverable(&mut m);
+    }
 }

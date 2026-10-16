@@ -842,6 +842,7 @@ impl crate::match_runtime::Match {
                     ..
                 } | Command::Stop { .. }
                     | Command::Retreat { .. }
+                    | Command::Stance { .. }
             ) || matches!(command, Command::Attack { .. } | Command::Ability { .. })
                 && self.logistics.get(id).is_some_and(|r| r.stranded);
         (u.owner == owner

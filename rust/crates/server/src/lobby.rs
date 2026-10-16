@@ -241,6 +241,8 @@ struct Room {
     mode: String,
     map: String,
     loaded_spawns: Option<Value>,
+    loaded_logistics: Option<bool>,
+    loaded_tech: Option<bool>,
     world_size: String,
     army: String,
     weather: String,
@@ -1629,25 +1631,8 @@ impl Hub {
             })
             .collect::<Result<Vec<_>, String>>()?;
         let map = crate::authoritative_maps::load(&room.map).map_err(|e| e.to_string())?;
-        let state = crate::authoritative_maps::create_match(
-            &room.map,
-            MatchOptions {
-                seed: trusted.seed,
-                mode: Mode::Conquest,
-                players,
-                shuffle: true,
-                army: ArmySize::Standard,
-                weather: WeatherChoice::from_reference(Some(&room.weather)),
-                weather_seed: None,
-                living_weather: true,
-                map_key: Some(room.map.clone()),
-                tech: true,
-                supply: true,
-                logistics: logistics_enabled_for(&room.mode, map.source()),
-                sandbox: false,
-            },
-        )
-        .map_err(|e| e.to_string())?;
+        let options = room.native_match_options(trusted.seed, players, map.source())?;
+        let state = room.create_native_match(map, options)?;
         let mut prepared = self.prepare_native(code, state, now, restart)?;
         prepared.attached.receipt =
             Some(trusted.receipt(prepared.attached.runtime.state(), prepared.attached.epoch));
@@ -1813,6 +1798,8 @@ impl Hub {
                 mode: if tutorial { "tutorial" } else { "conquest" }.into(),
                 map: if tutorial { "tutorial" } else { "default" }.into(),
                 loaded_spawns: None,
+                loaded_logistics: None,
+                loaded_tech: None,
                 world_size: "huge".into(),
                 army: "standard".into(),
                 weather: "map".into(),
@@ -2451,3 +2438,9 @@ mod save_load_tests;
 
 #[path = "lobby_saves.rs"]
 mod save_runtime;
+
+#[path = "lobby_options.rs"]
+mod lobby_options;
+#[cfg(test)]
+#[path = "mode_options_tests.rs"]
+mod mode_options_tests;
