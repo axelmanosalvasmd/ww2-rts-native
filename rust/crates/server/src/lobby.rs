@@ -1589,8 +1589,8 @@ impl Hub {
         } else if room.native.is_some() {
             return Err("start requires lobby state".into());
         }
-        if room.listed || room.mode != "conquest" || room.army != "standard" || room.sandbox {
-            return Err("R1 requires private Conquest, standard army and sandbox off".into());
+        if room.listed || room.mode != "conquest" || room.sandbox {
+            return Err("R1 requires private Conquest and sandbox off".into());
         }
         if room.players.len() != 2
             || !room.spectators.is_empty()
@@ -1599,6 +1599,12 @@ impl Hub {
             || room.players[0].token == room.players[1].token
         {
             return Err("R1 requires exactly two human commander tokens on opposing teams".into());
+        }
+        if !matches!(
+            room.army.as_str(),
+            "standard" | "large" | "massive" | "endless"
+        ) {
+            return Err("R1 army choice is unsupported".into());
         }
         if !matches!(
             room.weather.as_str(),
@@ -1627,7 +1633,7 @@ impl Hub {
                 mode: Mode::Conquest,
                 players,
                 shuffle: true,
-                army: ArmySize::Standard,
+                army: ArmySize::from_key(&room.army),
                 weather: WeatherChoice::from_reference(Some(&room.weather)),
                 weather_seed: None,
                 living_weather: true,
