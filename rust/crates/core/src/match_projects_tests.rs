@@ -467,6 +467,7 @@ fn actual_match_project_phases_match_original_source() {
                 }
                 op => panic!("unrepresented Match project action {op}"),
             }
+            crate::unit_placement::tests::assert_current(&m.world.game, &m.grid);
             m.grid.rebuild(&m.world.game.units);
             assert_eq!(
                 result, case["results"][index],

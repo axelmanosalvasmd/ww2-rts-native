@@ -716,6 +716,9 @@ fn conquest_abilities_match_original_source_phases() {
                 }
                 op => panic!("unrepresented ability action {op}"),
             }
+            if a["op"] != "prime" {
+                crate::unit_placement::tests::assert_current(&m.world.game, &m.grid);
+            }
             m.grid.rebuild(&m.world.game.units);
             let shots = m
                 .firing

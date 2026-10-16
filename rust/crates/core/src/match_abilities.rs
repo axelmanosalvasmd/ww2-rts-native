@@ -746,10 +746,11 @@ impl Match {
                     if u.garrison.is_some() {
                         let at = exits[&id];
                         let unit = self.world.game.units.get_mut(&id).unwrap();
-                        unit.x = at.x;
-                        unit.z = at.z;
-                        unit.garrison = None;
-                        self.grid.update(id, unit);
+                        crate::unit_placement::place_unit(&mut self.grid, unit, |unit| {
+                            unit.x = at.x;
+                            unit.z = at.z;
+                            unit.garrison = None;
+                        });
                     }
                     self.cancel_field_work(id)?;
                     let u = self.world.game.units.get_mut(&id).unwrap();

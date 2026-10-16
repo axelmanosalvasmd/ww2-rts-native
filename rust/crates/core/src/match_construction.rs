@@ -663,11 +663,12 @@ impl Match {
                         None,
                     )
                     .map_err(|e| format!("construction garrison exit: {e:?}"))?;
-                unit.x = (cell % game.w) as f64 * crate::game::CELL + crate::game::CELL / 2.0;
-                unit.z = (cell / game.w) as f64 * crate::game::CELL + crate::game::CELL / 2.0;
-                unit.garrison = None;
+                crate::unit_placement::place_unit(&mut preview.grid, &mut unit, |unit| {
+                    unit.x = (cell % game.w) as f64 * crate::game::CELL + crate::game::CELL / 2.0;
+                    unit.z = (cell / game.w) as f64 * crate::game::CELL + crate::game::CELL / 2.0;
+                    unit.garrison = None;
+                });
                 preview.physical.world.game.units.insert(id, unit.clone());
-                preview.grid.update(id, &unit);
             }
             preview.routed = true;
             let receipt = crate::match_routing::refresh_recipient_parts(

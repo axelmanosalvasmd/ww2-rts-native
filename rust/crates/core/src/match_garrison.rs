@@ -55,9 +55,10 @@ impl Match {
                 .map_err(|e| format!("setup relocation: {e:?}"))?;
             let at = center(self.world.game.w, free);
             let u = self.world.game.units.get_mut(&id).unwrap();
-            u.x = at.x;
-            u.z = at.z;
-            self.grid.update(id, u);
+            crate::unit_placement::place_unit(&mut self.grid, u, |u| {
+                u.x = at.x;
+                u.z = at.z;
+            });
         }
         Ok(())
     }
@@ -74,10 +75,11 @@ impl Match {
             .map_err(|e| format!("garrison exit: {e:?}"))?;
         let at = center(self.world.game.w, cell);
         let unit = self.world.game.units.get_mut(&id).unwrap();
-        unit.garrison = None;
-        unit.x = at.x;
-        unit.z = at.z;
-        self.grid.update(id, unit);
+        crate::unit_placement::place_unit(&mut self.grid, unit, |unit| {
+            unit.garrison = None;
+            unit.x = at.x;
+            unit.z = at.z;
+        });
         Ok(())
     }
     fn garrison_entry_cell(
@@ -246,17 +248,19 @@ impl Match {
         let u = g.units.get(&id).ok_or("missing garrison actor")?;
         if math::hypot(u.x - at.x, u.z - at.z) <= CELL * 1.6 {
             let u = self.world.game.units.get_mut(&id).unwrap();
-            u.garrison = Some(cell);
-            u.x = at.x;
-            u.z = at.z;
-            u.board = 0;
-            u.path.clear();
-            u.path_gen = u
+            let path_gen = u
                 .path_gen
                 .checked_add(1)
                 .ok_or("garrison path identity exhausted")?;
+            crate::unit_placement::place_unit(&mut self.grid, u, |u| {
+                u.garrison = Some(cell);
+                u.x = at.x;
+                u.z = at.z;
+                u.board = 0;
+                u.path.clear();
+                u.path_gen = path_gen;
+            });
             self.commands.units.get_mut(&id).unwrap().enter = None;
-            self.grid.update(id, u);
         } else if u.path.is_empty() && u.repath <= 0. {
             self.request_command_path(id, at, RequestKind::Enter)?;
         }

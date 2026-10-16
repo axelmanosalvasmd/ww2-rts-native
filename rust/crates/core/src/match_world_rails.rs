@@ -87,6 +87,18 @@ pub struct WorldRailLine {
     pub bridges: Vec<usize>,
 }
 
+impl WorldRailLine {
+    /// A line carries this team's trains only while every region belongs to it
+    /// and every original bridge cell still has a deck (`railOpen` at the pin).
+    /// Read live terrain so collapse and repair cannot leave cached connectivity.
+    pub fn is_open(&self, chars: &[u8], region_teams: &[i32], team: i32) -> bool {
+        self.regions
+            .iter()
+            .all(|&id| region_teams.get(id) == Some(&team))
+            && self.bridges.iter().all(|&c| chars.get(c) == Some(&b'='))
+    }
+}
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct WorldRails {
     pub stations: Vec<WorldStation>,

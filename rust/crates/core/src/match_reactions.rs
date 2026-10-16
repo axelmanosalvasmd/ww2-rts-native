@@ -2,11 +2,14 @@
 use crate::{
     catalog::{Catalog, Value},
     command_destinations::{self, Context},
-    game::{Point, Unit},
+    economy::Mode,
+    game::{Player, Point, Unit},
     grid::UnitId,
     match_commands::MoveOutcome,
     match_runtime::Match,
-    math, terrain,
+    math,
+    rules::Rules,
+    terrain,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -18,6 +21,59 @@ fn number(v: &Value, key: &str) -> Result<f64, String> {
 }
 fn distance(a: Point, b: Point) -> f64 {
     math::hypot(a.x - b.x, a.z - b.z)
+}
+
+// World has its own region-aware home selector. These modes use local buildings.
+fn ground_home(
+    mode: Mode,
+    unit: &Unit,
+    units: &BTreeMap<UnitId, Unit>,
+    rules: &Rules,
+    spawn: Point,
+    players: &[Player],
+    horde_slot: Option<usize>,
+) -> Result<Point, String> {
+    if !mode.is_skirmish() && mode != Mode::Classic {
+        return Ok(spawn);
+    }
+    let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
+    let mut home = spawn;
+    let mut best = f64::INFINITY;
+    for building in units.values() {
+        let shared_horde_home = mode == Mode::Horde
+            && horde_slot.is_some_and(|slot| unit.owner != slot && building.owner != slot)
+            && players
+                .get(unit.owner)
+                .zip(players.get(building.owner))
+                .is_some_and(|(actor, owner)| actor.team == owner.team);
+        if (building.owner != unit.owner && !shared_horde_home)
+            || building.hp <= 0.0
+            || !building.built.is_some_and(|b| b >= 1.0)
+        {
+            continue;
+        }
+        let kind = rules
+            .kinds
+            .get(building.kind)
+            .ok_or("unknown retreat building")?;
+        let eligible = if mode == Mode::Classic {
+            catalog
+                .unit(&kind.name)
+                .map_err(|e| e.to_string())?
+                .get("produces")
+                .is_some_and(|p| !matches!(p, Value::Bool(false) | Value::Null))
+        } else {
+            kind.name == "hq"
+        };
+        if eligible {
+            let d = distance(unit.at(), building.at());
+            if d < best {
+                best = d;
+                home = building.at();
+            }
+        }
+    }
+    Ok(home)
 }
 
 impl Match {
@@ -39,7 +95,7 @@ impl Match {
         Ok(())
     }
 
-    /// Conquest returns to the nearest living, finished owned HQ, then the spawn.
+    /// Select the mode's finished home, including shared allied Horde HQs.
     pub fn reaction_home(&self, id: UnitId) -> Result<Point, String> {
         let unit = self
             .world
@@ -54,35 +110,21 @@ impl Match {
         if self.uses_world_routes() {
             return self.world_ground_home_for(unit);
         }
-        let mut home = self
+        let spawn = self
             .start
             .players
             .get(unit.owner)
             .ok_or("missing retreat owner")?
             .spawn;
-        let mut best = f64::INFINITY;
-        for building in self.world.game.units.values() {
-            if building.owner != unit.owner
-                || building.hp <= 0.0
-                || !building.built.is_some_and(|b| b >= 1.0)
-            {
-                continue;
-            }
-            let kind = self
-                .rules
-                .kinds
-                .get(building.kind)
-                .ok_or("unknown retreat building")?;
-            if kind.name != "hq" {
-                continue;
-            }
-            let d = distance(unit.at(), building.at());
-            if d < best {
-                best = d;
-                home = building.at();
-            }
-        }
-        Ok(home)
+        ground_home(
+            self.options.mode,
+            unit,
+            &self.world.game.units,
+            &self.rules,
+            spawn,
+            &self.world.game.players,
+            self.horde.as_ref().map(|horde| horde.slot),
+        )
     }
 
     /// Ground retreat reset, sharing the command's staged house exit when needed.
