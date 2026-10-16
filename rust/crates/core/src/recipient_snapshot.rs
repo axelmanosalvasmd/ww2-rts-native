@@ -32,6 +32,7 @@ pub use composition::{GroundListDeliveryFrame, QuiescentDeliveryFrame, Supported
 pub use delivery::{DeliveryFrame, DeliveryState};
 pub use selected::{SelectedDeliveryFrame, SelectedGroundListFrame, SelectedSeat};
 pub use shots::{SelectedGroundShotFrame, ShotRef};
+pub use support::SUPPORTED_SUPPORT_KINDS;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SnapshotCapability {
@@ -230,9 +231,6 @@ fn unit_row(state: &Match, u: &Unit) -> Result<Value, SnapshotError> {
     if u.air.is_some() || k.air {
         return Err(unsupported(SnapshotCapability::Air));
     }
-    if u.build {
-        return Err(unsupported(SnapshotCapability::Engineering));
-    }
     let def = Catalog::compiled()
         .map_err(|_| SnapshotError::Rules)?
         .unit(&k.name)
@@ -248,6 +246,8 @@ fn unit_row(state: &Match, u: &Unit) -> Result<Value, SnapshotError> {
             unit: u.id,
             owner: "control",
         })?;
+    crate::match_construction::validate_build_activity(u, control)
+        .map_err(|_| unsupported(SnapshotCapability::Engineering))?;
     if control.operative {
         return Err(unsupported(SnapshotCapability::Operatives));
     }
@@ -323,6 +323,9 @@ fn unit_row(state: &Match, u: &Unit) -> Result<Value, SnapshotError> {
     }
     if u.amove.is_some() {
         flags |= 64;
+    }
+    if u.build {
+        flags |= 128;
     }
     if k.camo
         && u.still.is_some_and(|v| v >= 3.0)
@@ -1054,6 +1057,15 @@ pub(crate) mod tests {
             })
         ));
         m.abilities.initialize(1);
+        m.world.game.units.get_mut(&1).unwrap().build = true;
+        assert!(matches!(
+            SnapshotCache::new(&m),
+            Err(SnapshotError::Unsupported {
+                unit: 1,
+                capability: SnapshotCapability::Engineering
+            })
+        ));
+        m.world.game.units.get_mut(&1).unwrap().build = false;
         m.world.game.units.get_mut(&1).unwrap().dig = true;
         assert!(matches!(
             SnapshotCache::new(&m),

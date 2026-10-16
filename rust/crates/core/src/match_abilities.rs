@@ -159,6 +159,7 @@ impl Match {
                 | crate::economy::Mode::Assault
                 | crate::economy::Mode::Annihilation
                 | crate::economy::Mode::Classic
+                | crate::economy::Mode::Tutorial
                 | crate::economy::Mode::World
         ) {
             return Err("abilities require a represented ordinary or World state".into());

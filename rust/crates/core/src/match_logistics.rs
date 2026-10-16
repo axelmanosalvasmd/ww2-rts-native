@@ -62,6 +62,20 @@ fn facts<'a>(u: &Unit, rules: &'a Rules) -> UnitFacts<'a> {
     }
 }
 impl Match {
+    #[cfg(test)]
+    pub(crate) fn test_supply_truck(&mut self, owner: usize) -> u32 {
+        self.with_supply_world(|_, state, _, world| {
+            let source = state
+                .stores
+                .iter()
+                .find(|store| store.source && store.owner == owner)
+                .unwrap()
+                .clone();
+            Ok(state.add_truck(owner, &source, world))
+        })
+        .unwrap()
+    }
+
     /// Initialize after troop/base/scenario setup and metadata registration. The constructor invokes this after base and recipient setup.
     pub fn initialize_logistics(&mut self) -> Result<(), String> {
         if !self.options.logistics {
@@ -95,7 +109,8 @@ impl Match {
             && self.world.game.mode == Some(crate::game::ModeKind::Horde)
             && self.start.shared_defenders.is_some()
             && !self.options.logistics;
-        if !(crate::match_actor::ordinary_mode(&self.world.game, self.options.mode) || horde_spawn)
+        if !(crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode)
+            || horde_spawn)
         {
             return Err("new reserves require ordinary Conquest or no-logistics Horde".into());
         }
@@ -353,7 +368,7 @@ impl Match {
         self.validate_supply_context()
     }
     fn validate_supply_context(&self) -> Result<(), String> {
-        if !crate::match_actor::ordinary_mode(&self.world.game, self.options.mode) {
+        if !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode) {
             return Err("supply adapter supports ordinary Conquest only".into());
         }
         let g = &self.world.game;

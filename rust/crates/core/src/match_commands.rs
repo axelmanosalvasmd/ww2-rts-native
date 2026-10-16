@@ -84,6 +84,11 @@ pub enum Command {
         ids: Vec<i64>,
         id: Option<i64>,
     },
+    Rally {
+        ids: Vec<i64>,
+        id: Option<i64>,
+        at: Option<Point>,
+    },
     Board {
         ids: Vec<i64>,
         target: Option<i64>,
@@ -321,6 +326,7 @@ pub enum Denial {
     NotWaiting,
     NoBuilders,
     NotVisible,
+    Coast,
 }
 impl Denial {
     pub fn name(self) -> &'static str {
@@ -344,6 +350,7 @@ impl Denial {
             Self::NotWaiting => "notWaiting",
             Self::NoBuilders => "noBuilders",
             Self::NotVisible => "notVisible",
+            Self::Coast => "coast",
         }
     }
 }
@@ -450,6 +457,15 @@ impl Command {
                 }
             }
 
+            Some("rally") => Ok(Self::Rally {
+                ids,
+                id: object.get("id").map(|value| safe_id(value).unwrap_or(-1)),
+                at: object
+                    .get("x")
+                    .and_then(|v| v.as_f64())
+                    .zip(object.get("z").and_then(|v| v.as_f64()))
+                    .map(|(x, z)| Point { x, z }),
+            }),
             Some("destroy") => Ok(Self::Destroy {
                 ids,
                 id: object.get("id").and_then(safe_id),
@@ -826,6 +842,9 @@ impl crate::match_runtime::Match {
             return Ok(Some(Denial::Unsupported));
         }
         self.validate_building_activity_rows()?;
+        if let Command::Rally { ids, id, at } = command {
+            return self.set_rally(owner, ids, *id, *at);
+        }
         if let Command::Build {
             ids,
             kind,
@@ -890,7 +909,7 @@ impl crate::match_runtime::Match {
         } = command
         {
             if *queue {
-                return Ok(Some(Denial::Unsupported));
+                return self.queue_dig(owner, ids, *kind, *at, *direction, winner_decided);
             }
             return self.execute_dig(owner, ids, *kind, *at, *direction, winner_decided);
         }
@@ -981,6 +1000,7 @@ impl crate::match_runtime::Match {
             Command::Build { .. }
             | Command::Assist { .. }
             | Command::Destroy { .. }
+            | Command::Rally { .. }
             | Command::Board { .. }
             | Command::Unload { .. }
             | Command::Entrench { .. }
@@ -1337,6 +1357,7 @@ impl crate::match_runtime::Match {
             Command::Build { .. }
             | Command::Assist { .. }
             | Command::Destroy { .. }
+            | Command::Rally { .. }
             | Command::Board { .. }
             | Command::Unload { .. }
             | Command::Entrench { .. }
@@ -2296,6 +2317,11 @@ impl crate::match_runtime::Match {
         let kind = unit.kind;
         let before = unit.at();
         let dt = self.rules.movement.tick;
+        let limit_travel = self.logistics.get(id).is_some()
+            || self
+                .convoys
+                .as_ref()
+                .is_some_and(|state| state.trucks.contains_key(&id));
         let fuel_speed = self.logistics.get(id).and_then(|r| {
             r.fuel.map(|fuel| {
                 let available = fuel
@@ -2330,7 +2356,7 @@ impl crate::match_runtime::Match {
         )
         .map_err(|e| format!("movement recipient traffic: {e:?}"))?;
         // The final multiplier applies after retreat/sprint select their speed.
-        let moved = crate::movement::move_unit_with_march(
+        let moved = crate::movement::move_unit_with_march_and_limit(
             &mut self.world.game,
             &self.rules,
             &mut self.grid,
@@ -2388,6 +2414,7 @@ impl crate::match_runtime::Match {
             },
             &traffic_knowledge,
             fuel_speed.unwrap_or(1.0),
+            limit_travel,
         )
         .map_err(|e| format!("movement recipient traffic: {e:?}"))?;
         if fuel_speed.is_some()

@@ -53,6 +53,7 @@ pub enum TickPhase {
     WorldRegions,
     Convoys,
     Victory,
+    Tutorial,
 }
 
 /// Persistent simulation state, never wall-clock state. A phase failure poisons
@@ -121,6 +122,7 @@ impl std::error::Error for TickFailure {}
 
 #[derive(Clone, Debug)]
 pub struct TickReport {
+    pub tutorial_lines: Vec<crate::match_tutorial::TutorialLine>,
     pub tick: i64,
     /// Positions from before the increment, used by swept flight contacts.
     pub prior: BTreeMap<UnitId, Pose>,
@@ -287,7 +289,7 @@ impl crate::match_runtime::Match {
         }
         let world = self.options.mode == crate::economy::Mode::World
             && game.mode == Some(crate::game::ModeKind::World);
-        if !(world || crate::match_actor::ordinary_mode(game, self.options.mode)) {
+        if !(world || crate::match_actor::ordinary_ground_mode(game, self.options.mode)) {
             return Err("tick execution requires represented ordinary or World mode".into());
         }
         if matches!(
@@ -295,6 +297,9 @@ impl crate::match_runtime::Match {
             crate::economy::Mode::Classic | crate::economy::Mode::Annihilation
         ) {
             self.validate_elimination_state()?;
+        }
+        if self.options.mode == crate::economy::Mode::Tutorial {
+            self.validate_tutorial_state()?;
         }
         if self.options.logistics || self.convoys.is_some() {
             return Err("reserve and convoy tick phases are not connected".into());
@@ -590,8 +595,8 @@ impl crate::match_runtime::Match {
             let result = self.step_aimed_ability(id);
             self.take_firing_tick_events(events);
             result?;
-            // Entry-building execution remains excluded. Boarding uses its live
-            // owner-view goal and the one already-started path scheduler.
+            self.apply_tutorial_garrison(id)?;
+            // Boarding uses its live owner-view goal and the existing path scheduler.
             if self.options.mode != crate::economy::Mode::World
                 && matches!(
                     self.apply_unit_boarding_with_routes(id)?,
@@ -614,6 +619,9 @@ impl crate::match_runtime::Match {
                 events.push(TickEvent::Environment(effect));
             })?;
             let unit = &self.world.game.units[&id];
+            if unit.hp <= 0.0 {
+                continue;
+            }
             let moving = !unit.path.is_empty()
                 || crate::math::hypot(unit.x - before.x, unit.z - before.z) > 0.001;
             let result = self.apply_unit_firing(id, moving, dt);
@@ -792,13 +800,23 @@ impl crate::match_runtime::Match {
                     events.extend(eliminated.effects.into_iter().map(TickEvent::Environment));
                     world_removed.extend(eliminated.removed);
                 }
+                crate::economy::Mode::Tutorial => {}
                 _ => {
                     self.apply_conquest_victory()?;
                 }
             }
-            phases.push(TickPhase::Victory);
+            if self.options.mode != crate::economy::Mode::Tutorial {
+                phases.push(TickPhase::Victory);
+            }
         }
+        let tutorial_lines = if self.options.mode == crate::economy::Mode::Tutorial {
+            phases.push(TickPhase::Tutorial);
+            self.step_tutorial()?
+        } else {
+            Vec::new()
+        };
         Ok(TickReport {
+            tutorial_lines,
             tick,
             prior,
             unit_order,

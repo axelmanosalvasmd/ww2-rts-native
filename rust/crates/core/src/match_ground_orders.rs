@@ -14,7 +14,7 @@ use std::collections::BTreeMap;
 
 impl Match {
     fn ground_orders_open(&self) -> Result<(), String> {
-        if !crate::match_actor::ordinary_mode(&self.world.game, self.options.mode) {
+        if !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode) {
             return Err("ground orders require a matching ordinary mode".into());
         }
         Ok(())

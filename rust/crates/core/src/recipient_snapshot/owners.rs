@@ -85,6 +85,32 @@ pub(super) fn capture(state: &Match) -> Result<Vec<Map<String, Value>>, Snapshot
                             .filter(|t| state.world.game.players[u.owner].sees(t.id));
                         (4, target.map_or(*at, Unit::at))
                     }
+                    Command::Assist {
+                        ids,
+                        target,
+                        at: Some(at),
+                        queue: false,
+                    } if ids.as_slice() == [i64::from(u.id)]
+                        && (1..=i64::from(u32::MAX)).contains(target) =>
+                    {
+                        (8, *at)
+                    }
+                    Command::Cover {
+                        ids,
+                        at: Some(at),
+                        queue: false,
+                    } if ids.as_slice() == [i64::from(u.id)] => (1, *at),
+                    Command::Dig {
+                        ids,
+                        at,
+                        direction,
+                        queue: false,
+                        ..
+                    } if ids.as_slice() == [i64::from(u.id)]
+                        && direction.is_none_or(f64::is_finite) =>
+                    {
+                        (7, *at)
+                    }
                     Command::Entrench {
                         ids,
                         order:
@@ -197,7 +223,9 @@ fn plan(state: &Match, u: &Unit) -> Result<(u8, Point), SnapshotError> {
     if let Some(at) = state.project_goal(u.id).map_err(|_| SnapshotError::Rules)? {
         return Ok((7, at));
     }
-    // Building-site identity is not represented by this engineering slice.
+    if let Some(site) = c.build_target.and_then(|id| g.units.get(&id)) {
+        return Ok((8, site.at()));
+    }
     if let Some(cell) = c.enter {
         return Ok((9, center(state, cell)?));
     }
@@ -208,6 +236,10 @@ fn plan(state: &Match, u: &Unit) -> Result<(u8, Point), SnapshotError> {
         .or_else(|| u.path.last().copied())
         .map_or((0, Point { x: 0., z: 0. }), |at| (1, at)))
 }
+
+#[cfg(test)]
+#[path = "owners_tests.rs"]
+mod queued_tests;
 
 #[cfg(test)]
 mod movement_tests {

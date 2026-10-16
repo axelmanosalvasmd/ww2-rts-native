@@ -9,7 +9,7 @@ use std::{
     io::Write,
     sync::{
         Arc,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
     },
     time::Instant,
 };
@@ -32,6 +32,7 @@ pub(crate) struct Connection {
     pub id: u64,
     pub tx: mpsc::Sender<Output>,
     pub cancel: watch::Sender<bool>,
+    buffered: Option<Arc<AtomicU64>>,
 }
 
 #[derive(Debug)]
@@ -51,7 +52,51 @@ pub(crate) enum Output {
     Close(u16, &'static str),
 }
 
+impl Output {
+    pub(crate) fn diagnostic_bytes(&self) -> u64 {
+        match self {
+            Self::Json(value) => value.to_string().len() as u64,
+            Self::Snapshot(write) => write.json.len() as u64,
+            Self::Close(_, reason) => 2 + reason.len() as u64,
+        }
+    }
+}
 impl Connection {
+    pub(crate) fn new(id: u64, tx: mpsc::Sender<Output>, cancel: watch::Sender<bool>) -> Self {
+        Self {
+            id,
+            tx,
+            cancel,
+            buffered: None,
+        }
+    }
+    pub(crate) fn enable_diagnostics(&mut self) {
+        self.buffered = Some(Arc::new(AtomicU64::new(0)));
+    }
+    fn reserve_bytes(&self, bytes: u64) {
+        if let Some(buffered) = &self.buffered {
+            let _ = buffered.try_update(Ordering::Relaxed, Ordering::Relaxed, |n| {
+                Some(n.saturating_add(bytes))
+            });
+        }
+    }
+    pub(crate) fn complete_bytes(&self, bytes: u64) {
+        if let Some(buffered) = &self.buffered {
+            let _ = buffered.try_update(Ordering::Relaxed, Ordering::Relaxed, |n| {
+                Some(n.saturating_sub(bytes))
+            });
+        }
+    }
+    pub(crate) fn clear_bytes(&self) {
+        if let Some(buffered) = &self.buffered {
+            buffered.store(0, Ordering::Relaxed);
+        }
+    }
+    fn buffered_bytes(&self) -> u64 {
+        self.buffered
+            .as_ref()
+            .map_or(0, |n| n.load(Ordering::Relaxed))
+    }
     fn ready(&self) -> bool {
         !self.tx.is_closed() && !*self.cancel.borrow()
     }
@@ -62,9 +107,16 @@ impl Connection {
         self.output(Output::Close(code, reason));
     }
     fn snapshot(&self, write: SnapshotWrite) -> Result<(), SnapshotWrite> {
+        let bytes = if self.buffered.is_some() {
+            write.json.len() as u64
+        } else {
+            0
+        };
+        self.reserve_bytes(bytes);
         match self.tx.try_send(Output::Snapshot(write)) {
             Ok(()) => Ok(()),
             Err(error) => {
+                self.complete_bytes(bytes);
                 let _ = self.cancel.send(true);
                 let Output::Snapshot(write) = error.into_inner() else {
                     unreachable!()
@@ -74,7 +126,14 @@ impl Connection {
         }
     }
     fn output(&self, msg: Output) {
+        let bytes = if self.buffered.is_some() {
+            msg.diagnostic_bytes()
+        } else {
+            0
+        };
+        self.reserve_bytes(bytes);
         if self.tx.try_send(msg).is_err() {
+            self.complete_bytes(bytes);
             // A stalled client cannot make every other room wait or grow an unbounded queue.
             let _ = self.cancel.send(true);
         }
@@ -126,6 +185,7 @@ struct Person {
     disconnected: Option<u64>,
     denies: Vec<u64>,
     rtt: Option<f64>,
+    diagnostics: crate::diagnostics::PlayerDiagnostics,
     last_match: Option<Value>,
 }
 
@@ -148,6 +208,7 @@ struct AttachedRuntime {
     startup: crate::native_startup::NativeStartup,
     // Complete R1 options/seeds are a host receipt, never a client envelope.
     receipt: Option<Value>,
+    diagnostics: crate::diagnostics::RoomDiagnostics,
 }
 
 struct PreparedNative {
@@ -387,7 +448,7 @@ impl Room {
         }
         v
     }
-    fn command(&mut self, id: u64, msg: &Value, maps: &Value, now: u64) -> bool {
+    fn command(&mut self, id: u64, msg: &Value, maps: &Value, now: u64, diagnostics: bool) -> bool {
         let Some(t) = msg["t"].as_str() else {
             return false;
         };
@@ -413,6 +474,10 @@ impl Room {
             if msg.get("x").is_none() && msg.get("z").is_none() {
                 if let Some(rtt) = msg["rtt"].as_f64().filter(|v| v.is_finite()) {
                     me.rtt = Some(rtt.round().clamp(0.0, 9999.0));
+                }
+                if diagnostics {
+                    me.diagnostics.at = Some(now);
+                    me.diagnostics.client = crate::diagnostics::clean_client(&msg["d"]);
                 }
                 let mut pong = json!({"t":"pong"});
                 if let Some(c) = msg.get("c") {
@@ -501,6 +566,7 @@ impl Room {
                     disconnected: None,
                     denies: Vec::new(),
                     rtt: None,
+                    diagnostics: crate::diagnostics::PlayerDiagnostics::default(),
                     last_match: None,
                 });
             }
@@ -726,6 +792,8 @@ pub(crate) struct Hub {
     clock: CatchUpClock,
     stopped: Arc<AtomicBool>,
     trusted: Option<crate::TrustedRoomConfig>,
+    diagnostics: Option<crate::diagnostics::Recorder>,
+    tick_log: bool,
 }
 impl Hub {
     pub fn new(max_rooms: usize, public_url: String) -> Self {
@@ -740,7 +808,21 @@ impl Hub {
             clock: CatchUpClock::new(0),
             stopped: Arc::new(AtomicBool::new(false)),
             trusted: None,
+            diagnostics: None,
+            tick_log: false,
         }
+    }
+    pub(crate) fn diagnostics_enabled(&self) -> bool {
+        self.diagnostics.is_some()
+    }
+    pub(crate) fn configure_diagnostics(
+        &mut self,
+        dir: Option<std::path::PathBuf>,
+        tick_log: bool,
+    ) -> std::io::Result<()> {
+        self.diagnostics = dir.map(crate::diagnostics::Recorder::new).transpose()?;
+        self.tick_log = tick_log;
+        Ok(())
     }
     pub fn attach_native(&mut self, code: &str, state: Match, now: u64) -> Result<u64, String> {
         let prepared = self.prepare_native(code, state, now, false)?;
@@ -830,6 +912,7 @@ impl Hub {
                 runtime,
                 startup,
                 receipt: None,
+                diagnostics: crate::diagnostics::RoomDiagnostics::default(),
             },
             starts,
             resume,
@@ -1193,6 +1276,9 @@ impl Hub {
                 return;
             }
         };
+        if let Some(recorder) = &mut self.diagnostics {
+            recorder.observe_poll(now_ns, poll.lateness_ns);
+        }
         for _ in 0..poll.ticks {
             if self.is_stopped() {
                 return;
@@ -1361,6 +1447,7 @@ impl Hub {
                 if let Err(error) = native.runtime.record_timing(sample, now_ms) {
                     native.runtime.fault_stop(error);
                 }
+                Self::record_diagnostics(room, &mut self.diagnostics, self.tick_log, now_ms);
             }
             // Expected socket losses are applied after every due callback and
             // before another tick, without interrupting healthy peer output.
@@ -1368,6 +1455,54 @@ impl Hub {
                 self.disconnected(&code, id, now_ms);
             }
         }
+    }
+    fn record_diagnostics(
+        room: &mut Room,
+        recorder: &mut Option<crate::diagnostics::Recorder>,
+        tick_log: bool,
+        now: u64,
+    ) {
+        let native = room.native.as_mut().expect("playing room");
+        if recorder.is_none() && !tick_log {
+            return;
+        }
+        let log_due = tick_log && native.diagnostics.phase_due(now);
+        for player in &mut room.players {
+            let buffered = player
+                .connection
+                .as_ref()
+                .map_or(0, Connection::buffered_bytes);
+            player.diagnostics.buffered = player.diagnostics.buffered.max(buffered);
+        }
+        let state = native.runtime.state();
+        let tps = recorder
+            .as_ref()
+            .and_then(|_| native.diagnostics.due(now, state.world.game.tick));
+        if !log_due && tps.is_none() {
+            return;
+        }
+        let stats = native.runtime.timing_stats();
+        let cadence = native.runtime.snapshot_cadence();
+        if log_due {
+            let line = crate::diagnostics::phase_log(&room.code, &stats, cadence);
+            let _ = writeln!(std::io::stderr().lock(), "{line}");
+        }
+        let (Some(recorder), Some(tps)) = (recorder, tps) else {
+            return;
+        };
+        let players = room.players.iter_mut().enumerate().map(|(slot, p)| {
+            let buffered = std::mem::take(&mut p.diagnostics.buffered);
+            if p.ai { return json!({"slot":slot,"ai":true}); }
+            json!({"slot":slot,"name":p.name,"on":p.connection.as_ref().is_some_and(Connection::ready),
+                "rtt":p.rtt,"quiet":p.diagnostics.at.map(|at| now.saturating_sub(at)),
+                "bufMax":buffered,"client":p.diagnostics.client})
+        }).collect::<Vec<_>>();
+        recorder.record(
+            &room.code,
+            json!({"tick":state.world.game.tick,"tps":tps,
+            "tickP50":stats.phases[0].p50,"tickP95":stats.phases[0].p95,
+            "snapEvery":cadence,"units":state.world.game.units.len(),"players":players}),
+        );
     }
     pub fn directory(&self) -> Value {
         json!({"rooms":self.room_order.iter().filter_map(|code| self.rooms.get(code)).filter(|r| r.listed && r.players.iter().any(|p| !p.ai && p.connection.is_some()))
@@ -1564,7 +1699,13 @@ impl Hub {
                 return;
             }
             if let Some(room) = self.rooms.get_mut(code)
-                && room.command(connection.id, &msg, &self.maps, now)
+                && room.command(
+                    connection.id,
+                    &msg,
+                    &self.maps,
+                    now,
+                    self.diagnostics.is_some(),
+                )
             {
                 room.broadcast(&self.maps, &self.public_url);
             }
@@ -1694,6 +1835,7 @@ impl Hub {
                 disconnected: None,
                 denies: Vec::new(),
                 rtt: None,
+                diagnostics: crate::diagnostics::PlayerDiagnostics::default(),
                 last_match: None,
             };
             if room.has_seat(&self.maps) && msg["spectate"] != true {
@@ -1861,7 +2003,7 @@ mod tests {
     fn client(id: u64) -> (Connection, mpsc::Receiver<Output>) {
         let (tx, rx) = mpsc::channel(64);
         let (cancel, _) = watch::channel(false);
-        (Connection { id, tx, cancel }, rx)
+        (Connection::new(id, tx, cancel), rx)
     }
     fn join(h: &mut Hub, c: &Connection, token: &str, spectate: bool, now: u64) {
         h.message("ABC",c,&mut false,json!({"t":"hello","token":token,"name":token,"spectate":spectate,"listing":{"public":true}}),now);
@@ -2229,6 +2371,10 @@ mod net83_followup_tests;
 #[cfg(test)]
 #[path = "mode_runtime_a_tests.rs"]
 mod mode_runtime_a_tests;
+
+#[cfg(test)]
+#[path = "net_runtime3_tests.rs"]
+mod net_runtime3;
 
 #[cfg(test)]
 #[path = "net_runtime2_tests.rs"]

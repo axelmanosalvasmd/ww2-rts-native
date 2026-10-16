@@ -652,16 +652,19 @@ impl Match {
             && !flag(d, "air")
             && u.hp > 0.
             && u.hp < full
-            && (frame.bases.iter().any(|base| {
-                let b = &self.world.game.units[base];
-                (if self.options.mode.is_construction() {
-                    self.world.game.allied(b.owner, u.owner)
-                } else {
-                    b.owner == u.owner
-                }) && dist(u.at(), b.at()) <= home_radius
-            }) || frame.depots.iter().any(|(owner, at)| {
-                self.world.game.allied(*owner, u.owner) && dist(u.at(), *at) <= home_radius
-            }));
+            && ((self.options.mode == crate::economy::Mode::Tutorial
+                && dist(u.at(), self.start.players[u.owner].spawn) <= home_radius)
+                || frame.bases.iter().any(|base| {
+                    let b = &self.world.game.units[base];
+                    (if self.options.mode.is_construction() {
+                        self.world.game.allied(b.owner, u.owner)
+                    } else {
+                        b.owner == u.owner
+                    }) && dist(u.at(), b.at()) <= home_radius
+                })
+                || frame.depots.iter().any(|(owner, at)| {
+                    self.world.game.allied(*owner, u.owner) && dist(u.at(), *at) <= home_radius
+                }));
         Ok(home)
     }
     /// Run after point supply and network refresh, using the earlier captured base/aid membership.
@@ -711,6 +714,13 @@ impl Match {
         for &id in &frame.units {
             let u = &self.world.game.units[&id];
             if self.commands.units[&id].operative {
+                continue;
+            }
+            if self
+                .tutorial_state()
+                .is_some_and(|state| state.enemy() == u.owner)
+            {
+                self.recovery.get_mut(id).unwrap().reinforcement = 0.0;
                 continue;
             }
             let d = def(self, id)?;

@@ -146,7 +146,7 @@ fn strip(s: &Strike, along: f64, side: f64) -> Point {
 }
 impl Match {
     pub(crate) fn validate_support(&self) -> Result<(), SupportError> {
-        if !crate::match_actor::ordinary_mode(&self.world.game, self.options.mode) {
+        if !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode) {
             return Err(SupportError::Unsupported(
                 "support requires a matching ordinary mode",
             ));

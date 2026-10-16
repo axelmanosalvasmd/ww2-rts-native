@@ -51,7 +51,7 @@ fn view(m: &Match) -> TerrainView<'_> {
 impl Match {
     pub(crate) fn validate_carrier_world(&self) -> Result<(), String> {
         let g = &self.world.game;
-        if !crate::match_actor::ordinary_mode(g, self.options.mode) {
+        if !crate::match_actor::ordinary_ground_mode(g, self.options.mode) {
             return Err("carrier execution requires a matching ordinary mode".into());
         }
         if g.w == 0

@@ -14,7 +14,12 @@ impl Lobby {
         let mut join = |id, name| {
             let (tx, rx) = mpsc::channel(64);
             let (cancel, _) = watch::channel(false);
-            let connection = Connection { id, tx, cancel };
+            let connection = Connection {
+                id,
+                tx,
+                cancel,
+                buffered: None,
+            };
             hub.message(
                 "MODE",
                 &connection,

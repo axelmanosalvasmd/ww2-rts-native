@@ -341,6 +341,8 @@ impl FieldWorksRuntime {
                 front: Some(segment.front),
                 reach,
                 from: None,
+                waits: 0,
+                step_back: None,
             },
         }))
     }
@@ -493,6 +495,7 @@ pub fn line_fort(kind: FortKind) -> bool {
             | FortKind::Mines
             | FortKind::Demine
             | FortKind::Fill
+            | FortKind::Wall
     )
 }
 

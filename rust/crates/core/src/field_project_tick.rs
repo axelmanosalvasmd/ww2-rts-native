@@ -64,6 +64,11 @@ impl FieldWorksRuntime {
                 || !job.direction.is_finite()
                 || !job.elapsed.is_finite()
                 || job.elapsed < 0.0
+                || job.waits > 23
+                || job.kind != FortKind::Wall && job.waits != 0
+                || job
+                    .step_back
+                    .is_some_and(|p| !position(p) || job.kind != FortKind::Wall)
                 || !(job.elapsed + dt).is_finite()
                 || job.front.is_some_and(|n| !n.is_finite())
                 || job.reach.is_some_and(|n| !n.is_finite() || n < 0.0)
@@ -124,7 +129,7 @@ impl Match {
     /// This reads only project-owned facts. It does not refresh sight, spend, recount or sort turns.
     /// Common terrain, combat and runner admission remain the caller's responsibility.
     pub fn validate_field_project_tick(&self, current_order: &[UnitId]) -> Result<(), String> {
-        if !crate::match_actor::ordinary_mode(&self.world.game, self.options.mode) {
+        if !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode) {
             return Err("field-project tick requires a matching ordinary mode".into());
         }
         let game = &self.world.game;

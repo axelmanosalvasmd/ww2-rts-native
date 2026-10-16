@@ -1,7 +1,9 @@
 //! Main-supported native checks under owner decision 6206861267.
+#[path = "bases_runtime2_tests.rs"]
+mod runtime2;
 use super::*;
 use crate::{
-    economy::{self, Faction, TechState, Technology},
+    economy::{self, Faction, Mode, TechState, Technology},
     economy_state::{ArmySize, EconomyState, ModeContext, PlayerEconomy},
     map::AuthoritativeMap,
     match_commands::Command,
@@ -718,4 +720,93 @@ fn base57_ordinary_retreat_selects_living_hq_then_spawn() {
     );
     m.world.game.units.get_mut(&hq).unwrap().hp = 0.;
     assert_eq!(m.reaction_home(rifle).unwrap(), m.start.players[0].spawn);
+}
+
+#[test]
+fn base03_army_keys_scale_population_income_and_starting_wallets() {
+    // Values from pinned CFG.armies; unknown names select Standard, case sensitively.
+    for (key, army, pop, income) in [
+        ("standard", ArmySize::Standard, 1.0, 1.0),
+        ("large", ArmySize::Large, 2.5, 3.0),
+        ("massive", ArmySize::Massive, 5.0, 6.0),
+        ("endless", ArmySize::Endless, 5.0, 20.0),
+        ("", ArmySize::Standard, 1.0, 1.0),
+        ("unknown", ArmySize::Standard, 1.0, 1.0),
+        ("Large", ArmySize::Standard, 1.0, 1.0),
+    ] {
+        assert_eq!(ArmySize::from_key(key), army);
+        let mut opts = options(Mode::Conquest, false);
+        opts.army = ArmySize::from_key(key);
+        let mut m = Match::new(&map(), opts).unwrap();
+        assert_eq!(m.start.economy.players[0].mp, 150.0 * income, "{key}");
+        assert_eq!(m.start.economy.players[1].mp, 150.0 * income, "{key}");
+        let context = crate::economy_state::Context {
+            mode: Default::default(),
+            army: m.options.army,
+            units: &[],
+            drops: &[],
+            points: &[],
+            nodes: &[],
+            world: None,
+        };
+        assert_eq!(
+            m.start.economy.population_cap(&context, 0).unwrap(),
+            12.0 * pop,
+            "{key}"
+        );
+        m.start
+            .economy
+            .advance_income(&context, 1.0, false)
+            .unwrap();
+        assert_eq!(m.start.economy.players[0].inc, 4.0 * income, "{key}");
+        assert_eq!(m.start.economy.players[0].mp, 154.0 * income, "{key}");
+    }
+}
+
+#[test]
+fn base02_available_startup_profiles_scale_wallets_by_army_income() {
+    let source = map();
+    let mut json = source.source().clone();
+    json["defend"] = json!([0]);
+    let map = AuthoritativeMap::from_json(&serde_json::to_vec(&json).unwrap()).unwrap();
+    let rules = crate::rules::Rules::compiled().unwrap();
+    for (army, income) in [
+        (ArmySize::Standard, 1.0),
+        (ArmySize::Large, 3.0),
+        (ArmySize::Massive, 6.0),
+        (ArmySize::Endless, 20.0),
+    ] {
+        let mut opts = options(Mode::Conquest, false);
+        opts.army = army;
+        let plan = crate::match_runtime::StartPlan::prepare(&map, &opts, &rules).unwrap();
+        assert_eq!(
+            plan.economy
+                .players
+                .iter()
+                .map(|p| p.mp)
+                .collect::<Vec<_>>(),
+            vec![150.0 * income; 2]
+        );
+        opts.mode = Mode::Assault;
+        let plan =
+            crate::match_runtime::StartPlan::prepare_assault(&map, &opts, &rules, 1).unwrap();
+        assert_eq!(
+            plan.economy
+                .players
+                .iter()
+                .map(|p| p.mp)
+                .collect::<Vec<_>>(),
+            vec![320.0 * income, 250.0 * income]
+        );
+        opts.mode = Mode::Horde;
+        let plan = crate::match_runtime::StartPlan::prepare_horde(&map, &opts, &rules).unwrap();
+        assert_eq!(
+            plan.economy
+                .players
+                .iter()
+                .map(|p| p.mp)
+                .collect::<Vec<_>>(),
+            vec![250.0 * income, 0.0]
+        );
+    }
 }

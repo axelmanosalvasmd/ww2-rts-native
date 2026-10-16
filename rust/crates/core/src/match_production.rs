@@ -121,6 +121,7 @@ impl Match {
             Mode::Assault => self.world.game.mode == Some(ModeKind::Assault),
             Mode::Annihilation => self.world.game.mode == Some(ModeKind::Annihilation),
             Mode::Classic => self.world.game.mode == Some(ModeKind::Classic),
+            Mode::Tutorial => self.validate_tutorial_state().is_ok(),
             Mode::World => {
                 self.world.game.mode == Some(ModeKind::World) && self.world_runtime.is_some()
             }
@@ -306,6 +307,55 @@ impl Match {
         story.commit();
         Ok(job)
     }
+    /// Cancel a waiting job through the canonical wallet and story owners.
+    /// Network command admission remains a separate caller.
+    pub fn cancel_training(
+        &mut self,
+        slot: usize,
+        building: u32,
+        job: u64,
+    ) -> Result<crate::economy::Price, ProductionStepError> {
+        if self.finish.is_some()
+            || self
+                .start
+                .economy
+                .players
+                .get(slot)
+                .is_none_or(|p| p.away || p.out)
+        {
+            return Err(production::Error::Denied(production::Denial::Blocked).into());
+        }
+        self.validate_match_finish_state()
+            .map_err(ProductionStepError::Control)?;
+        let count = self.production_step_context()?;
+        let regions = self.production_regions()?;
+        let units = units(&self.world.game, &self.rules, count)?;
+        let context = context(
+            &self.options,
+            self.world.game.naval,
+            &units,
+            regions.as_deref(),
+            self.elimination_sudden_death(),
+        );
+        // Queue and wallet drafts are small. A rejected refund must leave both owners intact.
+        let mut production = self.production.clone();
+        let mut economy = self.start.economy.clone();
+        let refund = production.cancel(&context, &mut economy, slot, building, job)?;
+        let story = crate::match_story::prepare_story_updates(
+            &mut self.story,
+            false,
+            &[crate::match_story::StoryChange {
+                slot: Some(slot),
+                key: crate::match_story::StoryKey::MpSpent,
+                amount: -refund.mp,
+            }],
+        )
+        .map_err(ProductionStepError::Control)?;
+        self.production = production;
+        self.start.economy = economy;
+        story.commit();
+        Ok(refund)
+    }
     /// Typed source `tech` admission. Global command gates precede the research
     /// denials. Wallet, lab and canonical MP-spent story publish together.
     pub fn request_research(
@@ -351,37 +401,6 @@ impl Match {
         Ok(cost)
     }
 
-    /// Cancel a waiting construction-mode training job through canonical wallet admission.
-    pub fn cancel_training(
-        &mut self,
-        slot: usize,
-        building: u32,
-        job: u64,
-    ) -> Result<crate::economy::Price, ProductionStepError> {
-        if self.finish.is_some()
-            || self
-                .start
-                .economy
-                .players
-                .get(slot)
-                .is_none_or(|p| p.away || p.out)
-        {
-            return Err(production::Error::Denied(production::Denial::Blocked).into());
-        }
-        let count = self.production_step_context()?;
-        let regions = self.production_regions()?;
-        let units = units(&self.world.game, &self.rules, count)?;
-        let context = context(
-            &self.options,
-            self.world.game.naval,
-            &units,
-            regions.as_deref(),
-            self.elimination_sudden_death(),
-        );
-        Ok(self
-            .production
-            .cancel(&context, &mut self.start.economy, slot, building, job)?)
-    }
     /// Called at the source early lab phase, before the per-unit loop. Existing
     /// research continues after a winner and for away seats; out seats pause.
     pub fn step_research(
