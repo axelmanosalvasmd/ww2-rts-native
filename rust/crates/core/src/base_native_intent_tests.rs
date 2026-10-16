@@ -419,6 +419,7 @@ fn base29_actual_engineer_completes_site_before_it_becomes_prerequisite() {
     ticks(&mut m, 1000, true);
     assert_eq!(m.world.game.units[&id].built, Some(1.));
     assert_eq!(m.world.game.units[&id].hp, 1500.);
+    assert_eq!(m.story[0].built, 1.);
     assert_eq!(
         dispatch(&mut m, 0, json!({"t":"buy","unit":"mg","from":id})),
         None

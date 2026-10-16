@@ -423,7 +423,16 @@ impl Match {
             if built < 1.0 {
                 self.world.game.units.get_mut(&id).unwrap().built = Some(progress);
                 if progress >= 1.0 {
-                    self.record_built(self.world.game.units[&id].owner)?;
+                    crate::match_story::prepare_story_updates(
+                        &mut self.story,
+                        self.finish.is_some(),
+                        &[crate::match_story::StoryChange {
+                            slot: Some(self.world.game.units[&id].owner),
+                            key: crate::match_story::StoryKey::Built,
+                            amount: 1.0,
+                        }],
+                    )?
+                    .commit();
                 }
             }
             let mut repaired = self.repair_building_sections(id, amount)?;

@@ -4879,3 +4879,25 @@ The separate earlier launch rejected duplicate thread arguments before compilati
 Both launchers are terminal and their inherited slot locks are released. Their
 normal logs remain in the original Root-owned paths. No rerun is authorized by
 this source fix; Root must issue a new literal grant for the resulting head.
+
+
+## Classic construction completion tally (2026-10-16, successor unrun)
+
+The granted grouped nextest job on 309f02bc ran all 27 selected native checks:
+25 passed, BASE-29 and BASE-30 failed, and none remained unrun. Both failures
+were the same actual completion error: record_built calls the general finish
+validator, which excludes Classic. Construction had already preflighted its
+Built story changes on a clone, then published progress before calling this
+inapplicable general-mode guard. The pinned prototype's crew loop at sim.js
+5597-5603 increments Built on completion in Classic too.
+
+Keep the general finish/story mode gate unchanged. At the construction
+completion position, publish the same Built increment through the existing
+prepare_story_updates transaction already used by construction preflight and
+paid Classic commands. This preserves player-slot, finite-value and ended-match
+checks without claiming Classic finish or full runner admission. The existing
+natural Barracks test also asserts exactly one completed-building story count.
+No wallet, timer, pose or completion state is installed to make the test pass.
+The successor requires a new Root-granted batch run and Hermes runtime ACK on
+its exact final head. The original 25/2 log remains unchanged in Root's 0323
+path; the earlier parser and compile failures remain tied to their own heads.
