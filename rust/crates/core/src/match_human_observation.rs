@@ -278,10 +278,8 @@ impl Match {
         }
         self.recipient_routing(owner)?;
         let g = &self.world.game;
-        if self.options.mode == crate::economy::Mode::World
-            || g.mode.is_some()
-            || !(0..=SAFE_TICK).contains(&g.tick)
-        {
+        self.require_ai_recipient_mode()?;
+        if !(0..=SAFE_TICK).contains(&g.tick) {
             return Err("human commander requires an ordinary observation boundary".into());
         }
         let expected = (g.tick > 0).then(|| g.tick - (g.tick - 1) % 4);

@@ -1,0 +1,3 @@
+- Feed Classic, Assault and Horde commander tactics from recipient-delivered roles, plans, cooldowns, mine knowledge and wall work, and enable aimed ground abilities with the integrated projectile receiver.
+- Cover hidden-state AI privacy through actual mode snapshots and exercise the ordinary command union, live projectiles and every-seat match delivery.
+- Remove the obsolete queued-aircraft attachment refusal after integrating aviation delivery. The Horde projectile lifecycle keeps all assertions and drops its call to the removed aircraft weapon restriction method.

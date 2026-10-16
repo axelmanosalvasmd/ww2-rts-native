@@ -74,9 +74,10 @@ impl NativeStartup {
             && state.options.mode == Mode::Horde
             && state.world.game.mode == Some(ww2_core::game::ModeKind::Horde);
         let expected = ordinary_mode(settings.mode);
-        if !horde && (expected.is_none()
-            || !(expected == Some(state.options.mode)
-                || expected == Some(Mode::Conquest) && state.options.mode == Mode::Default))
+        if !horde
+            && (expected.is_none()
+                || !(expected == Some(state.options.mode)
+                    || expected == Some(Mode::Conquest) && state.options.mode == Mode::Default))
             || state.options.map_key.as_deref() != Some(settings.map)
             || state.options.weather != WeatherChoice::from_reference(Some(settings.weather))
             || state.options.sandbox != settings.sandbox
@@ -129,7 +130,9 @@ impl NativeStartup {
                     .ok_or("missing Assault startup state")?
                     .defender_team,
             )?,
-            Mode::Horde if horde => StartPlan::prepare_horde(authored, &state.options, &state.rules)?,
+            Mode::Horde if horde => {
+                StartPlan::prepare_horde(authored, &state.options, &state.rules)?
+            }
             _ => return Err("native startup requires a represented ordinary mode".into()),
         };
         // Validate the canonical mode pair even when this API is used before RoomRuntime.

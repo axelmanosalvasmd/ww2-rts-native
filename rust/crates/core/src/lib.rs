@@ -45,6 +45,8 @@ pub mod commander_mind;
 mod commander_mirror;
 mod commander_shopping;
 pub mod commander_tactics;
+#[cfg(test)]
+mod commander_union_tests;
 pub mod companion_ray;
 pub mod companions;
 pub mod conquest_end;
@@ -239,3 +241,6 @@ mod save_state;
 
 #[cfg(test)]
 mod production_lifecycle_intent_tests;
+
+#[cfg(test)]
+mod ai_privacy_modes_tests;
