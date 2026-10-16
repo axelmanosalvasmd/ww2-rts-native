@@ -266,6 +266,7 @@ pub struct LiveFlight {
     pub sequence: u32,
     pub max_contacts: u32,
     pub near: f64,
+    /// Launch cell, or usize::MAX for an aircraft launched outside the map.
     pub start_cell: usize,
     pub intended: Option<UnitId>,
     pub damage_scale: f64,
@@ -764,7 +765,14 @@ impl Match {
                 || p.source_kind >= self.rules.kinds.len()
                 || crate::match_actor::checked_game_owner(&self.world.game, p.owner).is_err()
                 || self.combat.get(p.shooter).is_none()
-                || p.start_cell >= self.world.game.flags.len()
+                || (p.start_cell >= self.world.game.flags.len()
+                    && (p.start_cell != usize::MAX
+                        || !self.rules.kinds[p.source_kind].air
+                        || self
+                            .world
+                            .game
+                            .cell_of(p.launch_origin.x, p.launch_origin.z)
+                            .is_some()))
                 || p.max_contacts > 16
                 || p.sequence > p.max_contacts
                 || ![
@@ -936,6 +944,62 @@ impl Match {
         }
         Ok(())
     }
+    fn weapon_start_cell(&self, unit: &Unit) -> Result<usize, String> {
+        let g = &self.world.game;
+        if unit.air.is_some() && g.w > 0 && g.h > 0 {
+            Ok(g.cell_of(unit.x, unit.z).unwrap_or(usize::MAX))
+        } else {
+            g.cell_of(unit.x, unit.z)
+                .ok_or_else(|| "shooter outside battlefield".into())
+        }
+    }
+
+    fn flight_crossed_cells(
+        &self,
+        a: projectiles::Point3,
+        b: projectiles::Point3,
+    ) -> Result<Vec<usize>, String> {
+        let g = &self.world.game;
+        let dx = b.x - a.x;
+        let dz = b.z - a.z;
+        if ![a.x, a.z, b.x, b.z, dx, dz].iter().all(|v| v.is_finite()) {
+            return Err("non-finite flight cell traversal".into());
+        }
+        let mut enter: f64 = 0.0;
+        let mut exit: f64 = 1.0;
+        for (origin, delta, extent) in [(a.x, dx, g.w as f64 * CELL), (a.z, dz, g.h as f64 * CELL)]
+        {
+            if delta == 0.0 {
+                if origin < 0.0 || origin >= extent {
+                    return Ok(Vec::new());
+                }
+            } else {
+                let first = -origin / delta;
+                let last = (extent - origin) / delta;
+                enter = math::max(enter, math::min(first, last));
+                exit = math::min(exit, math::max(first, last));
+                if enter > exit {
+                    return Ok(Vec::new());
+                }
+            }
+        }
+        // Clip only cell enumeration. Sweeps retain the original segment and fractions.
+        projectiles::crossed_cells(
+            projectiles::BodyPosition {
+                x: if enter == 0.0 { a.x } else { a.x + dx * enter },
+                z: if enter == 0.0 { a.z } else { a.z + dz * enter },
+            },
+            projectiles::BodyPosition {
+                x: if exit == 1.0 { b.x } else { a.x + dx * exit },
+                z: if exit == 1.0 { b.z } else { a.z + dz * exit },
+            },
+            CELL,
+            g.w,
+            g.h,
+        )
+        .map_err(|e| format!("flight cell traversal: {e:?}"))
+    }
+
     fn flight_contact(
         &self,
         p: &LiveFlight,
@@ -947,17 +1011,10 @@ impl Match {
         let g = &self.world.game;
         let level_height = n(self.firing_config()?, "levelHeight", 2.5);
         let mut best: Option<FlightContact> = None;
-        for c in projectiles::crossed_cells(
-            projectiles::BodyPosition { x: a.x, z: a.z },
-            projectiles::BodyPosition { x: b.x, z: b.z },
-            CELL,
-            g.w,
-            g.h,
-        )
-        .map_err(|e| format!("flight cell traversal: {e:?}"))?
-        {
+        for c in self.flight_crossed_cells(a, b)? {
             let ch = g.physical(c);
             if p.sequence == 0
+                && p.start_cell < g.flags.len()
                 && (c == p.start_cell
                     || (ch == b'#'
                         && (c % g.w).abs_diff(p.start_cell % g.w) <= 1
@@ -1274,7 +1331,7 @@ impl Match {
                 sequence: 0,
                 max_contacts: profile.max_contacts,
                 near: profile.near,
-                start_cell: g.cell_of(u.x, u.z).ok_or("shooter outside battlefield")?,
+                start_cell: self.weapon_start_cell(u)?,
                 intended: Some(target),
                 damage_scale,
                 armor_piercing: ap,
@@ -2279,7 +2336,7 @@ impl Match {
             sequence: 0,
             max_contacts: profile.max_contacts,
             near: profile.near,
-            start_cell: g.cell_of(u.x, u.z).ok_or("shooter outside battlefield")?,
+            start_cell: self.weapon_start_cell(u)?,
             intended: None,
             damage_scale: 1.0,
             armor_piercing: false,

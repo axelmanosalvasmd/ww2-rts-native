@@ -574,11 +574,11 @@ fn bombing_run_delivers_six_spaced_bombs_then_expires() {
 fn dive_bomber_hits_its_spot_once_and_digs_ground() {
     let f = fixture();
     let mut m = make(&f["traces"][191]);
+    assert_eq!(m.rules.kinds[m.world.game.units[&1].kind].name, "tank");
     let at = Point { x: 41.0, z: 41.0 };
     m.world.game.units.get_mut(&1).unwrap().x = at.x;
     m.world.game.units.get_mut(&1).unwrap().z = at.z;
     m.grid.rebuild(&m.world.game.units);
-    let tank_hp = m.world.game.units[&1].hp;
     assert_eq!(m.admit_support(0, "dive", at, Some(0.0)).unwrap(), None);
     let ids = m.world.game.units.keys().copied().collect::<Vec<_>>();
     m.world.game.tick = 1;
@@ -594,7 +594,11 @@ fn dive_bomber_hits_its_spot_once_and_digs_ground() {
     assert!(m.support.events.contains(&SupportEvent::Bomb(at)));
     assert!(m.world.game.strikes.is_empty());
     assert!(m.world.game.chars.contains(&b'+'));
-    assert!(m.world.game.units[&1].hp < tank_hp);
+    assert!(
+        m.world.game.units[&1].hp <= 0.0,
+        "the direct hit kills the tank: {} HP",
+        m.world.game.units[&1].hp
+    );
 }
 
 #[test]
@@ -705,6 +709,26 @@ fn recorded_dive_support_delivers_through_the_match_runner() {
     for player in &mut m.start.economy.players {
         player.mp = 5_000.0;
     }
+    let tank = m
+        .world
+        .game
+        .units
+        .values()
+        .find(|u| u.owner == 1 && !m.rules.kinds[u.kind].structure)
+        .unwrap()
+        .id;
+    let unit = unit_spawn::initial_unit(
+        &m.rules,
+        Catalog::compiled().unwrap(),
+        m.rules.kind("tank").unwrap(),
+        tank,
+        1,
+        Point { x: 41.0, z: 41.0 },
+    )
+    .unwrap();
+    m.commands
+        .insert(tank, UnitControl::new(&unit, &m.rules).unwrap());
+    m.world.game.units.insert(tank, unit);
     for unit in m.world.game.units.values_mut() {
         unit.hold_pos = true;
         let controls = m.commands.units.get_mut(&unit.id).unwrap();
@@ -721,12 +745,18 @@ fn recorded_dive_support_delivers_through_the_match_runner() {
         Command::from_json(&json!({"t":"support","kind":"dive","x":41,"z":41,"dir":0})).unwrap(),
     )
     .unwrap();
+    m.grid.rebuild(&m.world.game.units);
+    let mut tank_killed = false;
     let mut bomb_ticks = Vec::new();
     for tick in 1..=101 {
         let report = m
             .advance_tick()
             .unwrap_or_else(|e| panic!("tick {tick}: {e}"));
         assert!(report.phases.contains(&TickPhase::Support));
+        tank_killed |= report.events.iter().any(|event| matches!(event,
+            TickEvent::Support(SupportEvent::Environment(ww2_core::environment::Effect::Hurt(hurt)))
+                if hurt.unit == tank && hurt.killed
+        ));
         bomb_ticks.extend(report.events.iter().filter_map(|event| {
             matches!(event, TickEvent::Support(SupportEvent::Bomb(_))).then_some(tick)
         }));
@@ -741,6 +771,11 @@ fn recorded_dive_support_delivers_through_the_match_runner() {
         "recorded arrival delay"
     );
     assert!(m.world.game.strikes.is_empty());
+    assert!(tank_killed, "the direct hit reports the tank kill");
+    assert!(
+        !m.world.game.units.contains_key(&tank),
+        "the match retires the killed tank"
+    );
 }
 
 #[test]

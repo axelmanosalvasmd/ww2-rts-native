@@ -824,11 +824,15 @@ fn intent_mov56_oncoming_lane_holder_releases_when_route_changes() {
         vec![Point { x: 7.0, z: 20.0 }],
     );
     let mut active = game.units.remove(&1).unwrap();
-    active.lane_scan = Some(LaneScan {
-        path: active.path_gen,
-        until: 100.0,
-        lane: Some((Point { x: 20.0, z: 20.0 }, Point { x: 30.0, z: 20.0 })),
-    });
+    // A four metre crossing through blocked terrain admits one hull at a time.
+    for z in 0..game.h {
+        for x in 10..15 {
+            if !(9..11).contains(&z) {
+                game.flags[z * game.w + x] = rules.kinds[active.kind].block();
+            }
+        }
+    }
+    assert!(active.lane_scan.is_none());
     let mut grid = SpatialGrid::new(&game.units, 16.0);
     let waiting = traffic_step(
         &game,
@@ -841,6 +845,11 @@ fn intent_mov56_oncoming_lane_holder_releases_when_route_changes() {
     assert!(
         waiting.blocked && waiting.waiting,
         "oncoming friend has the narrow lane"
+    );
+    assert_eq!(
+        active.lane_scan.as_ref().unwrap().lane,
+        Some((Point { x: 20.0, z: 20.0 }, Point { x: 29.0, z: 20.0 })),
+        "terrain scanning must discover the narrow crossing"
     );
     assert_eq!(active.queued_behind, 2);
     game.units.get_mut(&2).unwrap().x = 33.0;
@@ -868,15 +877,18 @@ fn intent_mov56_oncoming_lane_holder_releases_when_route_changes() {
         rules.movement.tick,
     );
     assert!(!farther.waiting, "a farther friend does not hold this side");
+    active.path = vec![Point { x: 16.0, z: 40.0 }];
     active.path_gen += 1;
+    let new_goal = active.path.first().copied();
     let changed = traffic_step(
         &game,
         &rules,
         &grid,
         &mut active,
-        Some(destination),
+        new_goal,
         rules.movement.tick,
     );
+    assert_eq!(active.lane_scan.as_ref().unwrap().lane, None);
     assert_eq!(active.lane_scan.as_ref().unwrap().path, active.path_gen);
     assert!(
         !changed.waiting,
@@ -955,5 +967,10 @@ fn intent_mov53_mov58_vehicle_passes_a_protected_squad_and_reaches_its_route_end
     assert!(
         game.units[&1].path.is_empty(),
         "tank must finish its retained route"
+    );
+    assert!(
+        length(game.units[&1].at(), destination) < 0.5,
+        "empty path must mean arrival at the retained destination: {:?}",
+        game.units[&1].at()
     );
 }

@@ -7,6 +7,16 @@ Read current main before integration: it lacks ai_receipt_input and ai_delivered
 # Three Crossroads Native: design decisions
 
 
+## Movement actors and review repairs (2026-10-16)
+
+The movement runtime connects house entry and exit, carrier wreck ejection, World train passengers and aircraft purchases, orders and weapon actuation to the existing Match owners. Game keeps pose and movement state; combat keeps carrier links; rail and aviation metadata keep their actor-specific lifecycle. Public ingress admission remains bounded by its existing gates.
+
+Aircraft shots keep their true off-map origin and collision segment. Only the terrain-cell traversal is clipped to the battlefield, so off-map launches neither abort the tick nor shift the shot to an unrelated edge cell. This follows the same geometry rule as the combat runtime repair in PR #299. Wounded house occupants leave through the existing ground-exit path before automatic retreat. World elimination admits validated train links and retires their metadata with the removed actors. Mixed Attack selections send orders to both aircraft and ground actors through their existing command paths.
+
+The movement witnesses discover a narrow crossing from terrain, measure arrival against the retained destination, and require a directly hit tank to die under dive bombing. These are prototype-intent repairs, with no FFI, header, wire, contract or privacy change. Owner acknowledgment and broader client adoption remain separate from these focused native checks.
+
+
+
 ## First-five engineering merged with MAP273 main (2026-10-16, source only)
 
 Merge the preserved first-five head `d9f035f7afabaefe1389ef3153ebb160260a8efe` with literal main `66a3c3c0ceefda309bb9acc2db4d1e14c7d6434e`, retaining both parents. Freeze the complete typed incoming-plus-owned union before checkout mutation. Keep both complete DESIGN additions, the incoming MAP-25/31/47/48/50 checks and registry declaration, incoming MOV6/CMB6/NET5, all 939 IDs and Acceptance cells, both held World bodies and ignores, their 581-tick fixture and both authentic engineering fixtures. The only shared changed path is DESIGN; no provider source overlaps. All reviewed first-five source leaves stay exact to d9f035, and the separate next-five checkpoint stays outside this merge.

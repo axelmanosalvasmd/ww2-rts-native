@@ -1061,7 +1061,7 @@ impl crate::match_runtime::Match {
             }
             self.preflight_ability_selection(&selected, *at, *queue, *automatic)?;
         }
-        // New variants currently actuate their aircraft branches only.
+        // Validate shared targets before preparing aircraft orders.
         match command {
             Command::Attack { target, .. } => {
                 let target = u32::try_from(*target)
@@ -1382,6 +1382,24 @@ impl crate::match_runtime::Match {
                 queue: true,
                 ..
             } => {
+                let target_is_air = self.world.game.units
+                    [&u32::try_from(*target).expect("validated attack target")]
+                    .air
+                    .is_some();
+                let ground = selected
+                    .iter()
+                    .copied()
+                    .filter(|id| !target_is_air && !self.is_aircraft_command_unit(*id))
+                    .map(i64::from)
+                    .collect::<Vec<_>>();
+                let ground_denial = if ground.is_empty() {
+                    Some(Denial::QueueFull)
+                } else {
+                    self.ground_attack_command(owner, &ground, *target, true)?
+                };
+                if ground_denial == Some(Denial::Unsupported) {
+                    return Ok(ground_denial);
+                }
                 let target = u32::try_from(*target).expect("validated aircraft attack target");
                 let at = self.world.game.units[&target].at();
                 let mut queued = false;
@@ -1405,9 +1423,34 @@ impl crate::match_runtime::Match {
                         queued = true;
                     }
                 }
-                return Ok((!queued).then_some(Denial::QueueFull));
+                return Ok(if queued { None } else { ground_denial });
             }
-            Command::Attack { .. } | Command::Escort { .. } | Command::Retreat { .. } => {
+            Command::Attack { target, .. } => {
+                let target_is_air = self.world.game.units
+                    [&u32::try_from(*target).expect("validated attack target")]
+                    .air
+                    .is_some();
+                let ground = selected
+                    .iter()
+                    .copied()
+                    .filter(|id| !target_is_air && !self.is_aircraft_command_unit(*id))
+                    .map(i64::from)
+                    .collect::<Vec<_>>();
+                let denial = if ground.is_empty() {
+                    Some(Denial::Needs)
+                } else {
+                    self.ground_attack_command(owner, &ground, *target, false)?
+                };
+                if denial == Some(Denial::Unsupported) {
+                    return Ok(denial);
+                }
+                let ordered_aircraft = !aircraft.is_empty();
+                for prepared in aircraft {
+                    self.apply_aircraft_order(prepared);
+                }
+                return Ok(if ordered_aircraft { None } else { denial });
+            }
+            Command::Escort { .. } | Command::Retreat { .. } => {
                 if aircraft.is_empty() {
                     return Ok(Some(Denial::Needs));
                 }

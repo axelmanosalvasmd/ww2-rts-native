@@ -939,6 +939,10 @@ mod intent_tests {
     use serde_json::json;
 
     fn scene() -> Match {
+        scene_with_seed(318)
+    }
+
+    fn scene_with_seed(seed: u64) -> Match {
         let map = AuthoritativeMap::from_json(
             &serde_json::to_vec(&json!({
                 "name":"Aircraft intent", "w":64, "h":64,
@@ -952,7 +956,7 @@ mod intent_tests {
         Match::new(
             &map,
             MatchOptions {
-                seed: 318,
+                seed,
                 mode: Mode::Conquest,
                 players: vec![
                     PlayerConfig {
@@ -1131,6 +1135,87 @@ mod intent_tests {
             flights,
             "weapon cooldown limits launches"
         );
+    }
+
+    #[test]
+    fn off_map_attack_aircraft_launches_and_hits_through_the_match_runner() {
+        use crate::{match_firing::LaunchEvent, match_tick::TickEvent};
+        // This seed's first accuracy roll hits, isolating the off-map contact path.
+        let mut m = scene_with_seed(5);
+        let attacker = m.spawn_aircraft(0, "attacker").unwrap();
+        let target = m
+            .world
+            .game
+            .units
+            .values()
+            .find(|u| u.owner == 1 && !m.rules.kinds[u.kind].structure)
+            .unwrap()
+            .id;
+        for unit in m.world.game.units.values_mut() {
+            unit.hold_pos = true;
+            let control = m.commands.units.get_mut(&unit.id).unwrap();
+            control.hold_fire = true;
+            control.auto_cast = false;
+            control.auto_retreat = false;
+        }
+        {
+            let u = m.world.game.units.get_mut(&attacker).unwrap();
+            u.x = -6.0;
+            u.z = 70.0;
+            u.air = Some(PlaneState::Out);
+        }
+        {
+            let u = m.world.game.units.get_mut(&target).unwrap();
+            u.x = 8.0;
+            u.z = 70.0;
+        }
+        m.grid.rebuild(&m.world.game.units);
+        m.world.game.players[0].visible = vec![target];
+        m.aviation.planes.get_mut(&attacker).unwrap().mission = Some(PlaneMission {
+            kind: MissionKind::Attack,
+            target: Some(target),
+            at: Point { x: 8.0, z: 70.0 },
+        });
+        let hp = m.world.game.units[&target].hp;
+        let mut off_map_flights = Vec::new();
+        let mut hit = false;
+        let mut contacts = Vec::new();
+        for tick in 1..=30 {
+            let report = m
+                .advance_tick()
+                .unwrap_or_else(|e| panic!("tick {tick}: {e}"));
+            for event in report.events {
+                match event {
+                    TickEvent::Firing(LaunchEvent::Flight {
+                        id, shooter, at, ..
+                    }) if shooter == attacker && at.x < 0.0 => {
+                        off_map_flights.push(id);
+                    }
+                    TickEvent::Firing(LaunchEvent::Contact(contact))
+                        if contact.shooter == attacker =>
+                    {
+                        hit |= off_map_flights.contains(&contact.flight)
+                            && contact.target == Some(target)
+                            && contact.hit;
+                        contacts.push(contact);
+                    }
+                    _ => {}
+                }
+            }
+            if hit {
+                break;
+            }
+        }
+        assert!(
+            !off_map_flights.is_empty(),
+            "the launch retains its true off-map origin"
+        );
+        assert!(
+            hit,
+            "the off-map projectile reaches the ground target: {contacts:?}"
+        );
+        assert!(m.world.game.units[&target].hp < hp);
+        assert!(m.tick_state.fault().is_none());
     }
 
     #[test]

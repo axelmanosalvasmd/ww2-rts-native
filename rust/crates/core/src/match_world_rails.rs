@@ -1430,4 +1430,28 @@ mod intent_tests {
         assert!(m.combat.get(train).unwrap().cargo.is_empty());
         m.advance_tick().unwrap();
     }
+    #[test]
+    fn loaded_world_train_elimination_retires_links_and_preserves_other_nations_trains() {
+        for eliminated_owner in [0, 1] {
+            let (mut m, rider, train) = world_with_rail_passenger();
+            for region in &mut m.world_runtime.as_mut().unwrap().regions {
+                region.team = 1 - eliminated_owner;
+            }
+            m.advance_tick().unwrap();
+            assert!(m.start.economy.players[eliminated_owner as usize].out);
+            if eliminated_owner == 0 {
+                assert!(!m.world.game.units.contains_key(&rider));
+                assert!(!m.world.game.units.contains_key(&train));
+                assert!(!m.rail_runs.contains_key(&train));
+                assert!(!m.commands.units.contains_key(&rider));
+                assert!(!m.commands.units.contains_key(&train));
+            } else {
+                assert!(m.world.game.units[&rider].riding);
+                assert_eq!(m.combat.get(rider).unwrap().carrier, Some(train));
+                assert_eq!(m.combat.get(train).unwrap().cargo, vec![rider]);
+                assert!(m.rail_runs.contains_key(&train));
+            }
+            m.advance_tick().unwrap();
+        }
+    }
 }

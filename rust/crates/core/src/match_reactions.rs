@@ -85,7 +85,7 @@ impl Match {
         Ok(home)
     }
 
-    /// Source retreat reset. Air, carrier and building exit need their own actuator.
+    /// Source retreat reset, with a physical house exit before choosing the home.
     pub fn retreat_unit(&mut self, id: UnitId) -> Result<(), String> {
         let u = self
             .world
@@ -94,8 +94,8 @@ impl Match {
             .get(&id)
             .ok_or("missing retreat unit")?
             .clone();
-        if u.air.is_some() || u.riding || u.garrison.is_some() {
-            return Err("air, carrier or garrison retreat is unsupported".into());
+        if u.air.is_some() || u.riding {
+            return Err("air or carrier retreat is unsupported".into());
         }
         if u.id != id
             || u.dig != self.field_works.is_active(id)
@@ -112,8 +112,60 @@ impl Match {
         u.path_gen
             .checked_add(1)
             .ok_or("reaction path identity exhausted")?;
-        let home = self.reaction_home(id)?;
-        let route = self.command_route(u.owner, &u, home)?;
+        let (u, home, route) = if u.garrison.is_some() {
+            use crate::{
+                existing_observers::{ExistingObservers, PreparedGroundExit},
+                match_routing::{RecipientContext, prepare_recipient_exit_routing},
+            };
+            let exits = [PreparedGroundExit::prepare(
+                &self.world.game,
+                &self.rules,
+                id,
+            )?];
+            let home = self.reaction_home_for(exits[0].unit())?;
+            let context = RecipientContext {
+                world: &self.world,
+                rules: &self.rules,
+                building_cells: &self.building_cells,
+                start: &self.start,
+                options: &self.options,
+                environment: &self.environment,
+            };
+            let preview = prepare_recipient_exit_routing(
+                context,
+                self.recipients
+                    .get_mut(u.owner)
+                    .ok_or("missing retreat recipient")?,
+                &mut self.routing_fog,
+                u.owner,
+                ExistingObservers::new(&exits)?,
+            )?;
+            let mut paths = preview.fork_paths(&self.commands.paths);
+            let query = preview.query();
+            let terrain = query
+                .path_terrain(preview.live())
+                .map_err(|e| format!("retreat exit terrain: {e:?}"))?;
+            let route = crate::match_commands::search_route(
+                &mut paths,
+                terrain,
+                crate::pathfinding::PathRules::compiled().map_err(|e| e.to_string())?,
+                &self.rules.kinds[u.kind],
+                exits[0].unit(),
+                home,
+            )?
+            .result;
+            let [exit] = exits;
+            let u = exit.into_unit();
+            let (_, receipt) = preview.prepare_publication(&mut self.world, &self.environment)?;
+            receipt.commit();
+            self.commands.paths = paths;
+            self.grid.update(id, &u);
+            (u, home, route)
+        } else {
+            let home = self.reaction_home(id)?;
+            let route = self.command_route(u.owner, &u, home)?;
+            (u, home, route)
+        };
         self.apply_retreat_route(u, home, route)?;
         Ok(())
     }
