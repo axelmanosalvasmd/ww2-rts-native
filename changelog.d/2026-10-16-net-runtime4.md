@@ -1,0 +1,3 @@
+- Add deterministic AI delivery scheduling, independent of snapshot decoding, that retains each seat's last delivered view, refreshes requested views before any actions, and idles after a winner. Room AI activation remains guarded.
+- Add the core rule and host control for ending an inactive Horde wave break. Full Horde ticking, snapshots and hosting remain guarded.
+- Extend disconnected-seat checks for frozen wallets and command refusal, including the Classic munitions and fuel component. Logistics stays behind its existing full-tick guard. Persistent AI handover and complete Horde results remain pending.

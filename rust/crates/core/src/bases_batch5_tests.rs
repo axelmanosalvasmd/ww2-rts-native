@@ -129,7 +129,7 @@ fn base48_admitted_command_families_reject_low_tier_without_side_effects() {
 }
 
 #[test]
-fn base48_gate_request_stays_out_of_ordinary_match_state() {
+fn base48_low_tier_gate_request_stays_out_of_ordinary_match_state() {
     let mut m = ordinary(true);
     let worker = own(&m, 0, "rifle");
     let before = format!(
@@ -148,7 +148,7 @@ fn base48_gate_request_stays_out_of_ordinary_match_state() {
         &mut m,
         0,
         json!({"t":"dig","kind":"gate","ids":[worker],"x":30,"z":25}),
-        "unsupported",
+        "tier",
     );
     assert_eq!(
         format!(

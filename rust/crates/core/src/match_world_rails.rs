@@ -24,13 +24,13 @@ pub const RAIL_LOAD: f64 = 8.0;
 pub const RAIL_UNLOAD: f64 = 2.0;
 pub const RAIL_EVERY: f64 = 20.0;
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct RailPoint {
     pub cell: usize,
     pub at: Point,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct RailRun {
     pub path: Vec<RailPoint>,
     pub next: usize,
@@ -85,6 +85,18 @@ pub struct WorldRailLine {
     pub cells: Vec<usize>,
     pub regions: Vec<usize>,
     pub bridges: Vec<usize>,
+}
+
+impl WorldRailLine {
+    /// A line carries this team's trains only while every region belongs to it
+    /// and every original bridge cell still has a deck (`railOpen` at the pin).
+    /// Read live terrain so collapse and repair cannot leave cached connectivity.
+    pub fn is_open(&self, chars: &[u8], region_teams: &[i32], team: i32) -> bool {
+        self.regions
+            .iter()
+            .all(|&id| region_teams.get(id) == Some(&team))
+            && self.bridges.iter().all(|&c| chars.get(c) == Some(&b'='))
+    }
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]

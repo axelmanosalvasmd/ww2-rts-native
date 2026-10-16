@@ -51,10 +51,7 @@ impl Match {
         if self.options.mode == crate::economy::Mode::Horde {
             self.validate_horde_economy()
         } else if crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode) {
-            if self.options.mode == crate::economy::Mode::Tutorial {
-                self.validate_tutorial_state()?;
-            }
-            Ok(())
+            self.validate_actor_mode()
         } else {
             Err("construction phases require ordinary ground or canonical Horde".into())
         }
@@ -278,6 +275,24 @@ impl Match {
 
     /// Read-only admission. The sole runner calls this before inputs and again before its clock.
     pub fn validate_construction_tick(&self) -> Result<(), String> {
+        // Horde exposes assigned facility work, not the ordinary construction phase.
+        if self.options.mode == crate::economy::Mode::Horde
+            && !self.commands.units.iter().any(|(worker, control)| {
+                control.build_target.is_some()
+                    && self
+                        .world
+                        .game
+                        .units
+                        .get(worker)
+                        .is_some_and(|unit| unit.build)
+            })
+        {
+            return Err("construction phases require ordinary Conquest".into());
+        }
+        self.validate_construction_inputs()
+    }
+
+    fn validate_construction_inputs(&self) -> Result<(), String> {
         self.validate_construction_mode()?;
         if self.world.game.tick < 0 {
             return Err("construction phases require a nonnegative tick".into());
@@ -463,13 +478,24 @@ impl Match {
                         available = f64::INFINITY;
                     }
                 }
+                let cap = if self.elimination_sudden_death() {
+                    number(classic, "decay")? * 0.6
+                } else {
+                    f64::INFINITY
+                };
                 let amount = math::min(
                     available,
-                    full * (number(classic, "repair")? * crew * (recovery / workers.len() as f64))
-                        * dt,
+                    full * math::min(
+                        number(classic, "repair")? * crew * (recovery / workers.len() as f64),
+                        cap,
+                    ) * dt,
                 );
+
                 (built, amount)
             } else {
+                if self.elimination_sudden_death() {
+                    continue;
+                }
                 let time = definition
                     .get("buildTime")
                     .and_then(Value::number)
@@ -555,7 +581,8 @@ impl Match {
         ids: &[i64],
         command: &crate::match_commands::Command,
     ) -> Result<Vec<UnitId>, String> {
-        self.validate_construction_tick()?;
+        // Build and Assist must admit a canonical Horde facility before it has a crew.
+        self.validate_construction_inputs()?;
         self.validate_match_finish_state()?;
         if owner >= self.world.game.players.len()
             || !self.start.economy.players[owner].mp.is_finite()
@@ -674,11 +701,12 @@ impl Match {
                         None,
                     )
                     .map_err(|e| format!("construction garrison exit: {e:?}"))?;
-                unit.x = (cell % game.w) as f64 * crate::game::CELL + crate::game::CELL / 2.0;
-                unit.z = (cell / game.w) as f64 * crate::game::CELL + crate::game::CELL / 2.0;
-                unit.garrison = None;
+                crate::unit_placement::place_unit(&mut preview.grid, &mut unit, |unit| {
+                    unit.x = (cell % game.w) as f64 * crate::game::CELL + crate::game::CELL / 2.0;
+                    unit.z = (cell / game.w) as f64 * crate::game::CELL + crate::game::CELL / 2.0;
+                    unit.garrison = None;
+                });
                 preview.physical.world.game.units.insert(id, unit.clone());
-                preview.grid.update(id, &unit);
             }
             preview.routed = true;
             let receipt = crate::match_routing::refresh_recipient_parts(
@@ -901,6 +929,9 @@ impl Match {
             queue,
         };
         let selected = self.construction_selection(owner, ids, &command)?;
+        if self.elimination_sudden_death() {
+            return Ok(Some(Denial::SuddenDeath));
+        }
         if !crate::economy::build_kinds(self.options.mode)
             .map_err(|e| e.to_string())?
             .contains(&name)

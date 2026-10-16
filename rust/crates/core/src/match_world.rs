@@ -27,7 +27,7 @@ pub struct RegionState {
     pub locked: Option<bool>,
     pub cap_tick: Option<i64>,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ResourceNode {
     pub cell: usize,
     pub at: Point,
@@ -308,6 +308,7 @@ impl Match {
             environment: crate::environment::EnvironmentRuntime::default(),
             firing: crate::match_firing::FiringState::default(),
             assault: None,
+            elimination: None,
             horde: None,
             recipients: Vec::new(),
             routing_fog: crate::fog::Fog::default(),

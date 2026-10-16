@@ -2,7 +2,7 @@
 use crate::grid::UnitId;
 use std::collections::BTreeMap;
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct AbilityUnit {
     /// Source `cd`, allowed to expire below zero.
     pub cooldown: f64,
@@ -13,7 +13,7 @@ pub struct AbilityUnit {
     pub aimed_walked: bool,
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct AbilityState {
     units: BTreeMap<UnitId, AbilityUnit>,
 }
@@ -156,13 +156,13 @@ impl Match {
             self.options.mode,
             crate::economy::Mode::Default
                 | crate::economy::Mode::Conquest
+                | crate::economy::Mode::Assault
+                | crate::economy::Mode::Annihilation
                 | crate::economy::Mode::Classic
                 | crate::economy::Mode::Tutorial
                 | crate::economy::Mode::World
         ) {
-            return Err(
-                "abilities currently require represented Conquest, Classic, Tutorial or World state".into(),
-            );
+            return Err("abilities require a represented ordinary or World state".into());
         }
         self.validate_actor_mode()?;
         if self.world.game.tick < 0
@@ -746,10 +746,11 @@ impl Match {
                     if u.garrison.is_some() {
                         let at = exits[&id];
                         let unit = self.world.game.units.get_mut(&id).unwrap();
-                        unit.x = at.x;
-                        unit.z = at.z;
-                        unit.garrison = None;
-                        self.grid.update(id, unit);
+                        crate::unit_placement::place_unit(&mut self.grid, unit, |unit| {
+                            unit.x = at.x;
+                            unit.z = at.z;
+                            unit.garrison = None;
+                        });
                     }
                     self.cancel_field_work(id)?;
                     let u = self.world.game.units.get_mut(&id).unwrap();

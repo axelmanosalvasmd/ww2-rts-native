@@ -25,6 +25,7 @@ mod mov_runtime_batch;
 #[cfg(test)]
 mod native_order_intent_tests;
 
+pub mod ai_schedule;
 pub mod ai_view;
 pub mod assault_runtime;
 pub mod catalog;
@@ -47,6 +48,7 @@ pub mod conquest_end;
 pub mod deployment;
 pub mod economy;
 pub mod economy_state;
+pub mod elimination_modes;
 #[cfg(test)]
 mod engineering_runtime_assertion_tests;
 pub mod environment;
@@ -102,6 +104,8 @@ mod match_destroy;
 pub mod match_end;
 pub mod match_firing;
 pub mod match_garrison;
+
+mod match_gates;
 pub mod match_ground_contact;
 pub mod match_ground_orders;
 pub mod match_ground_support;
@@ -148,9 +152,11 @@ pub mod supply_convoys;
 pub mod supply_network;
 pub mod supply_routes;
 pub mod terrain;
+pub mod terrain_surface;
 pub mod traffic;
 pub mod traffic_knowledge;
 pub mod tutorial_steps;
+mod unit_placement;
 pub mod unit_publication;
 pub mod unit_spawn;
 pub mod vehicle;
@@ -204,4 +210,26 @@ mod engineering_intent_tests;
 mod mov_intent_batch;
 
 #[cfg(test)]
+mod misc_bridge_tests;
+
+#[cfg(test)]
+mod misc_retreat_support_tests;
+
+#[cfg(test)]
+mod misc_map_save_tests;
+
+#[cfg(test)]
+#[path = "../../server/src/authoritative-map-data.rs"]
+pub(crate) mod shipped_map_fixtures;
+
+#[cfg(test)]
 mod point_supply_intent_tests;
+
+#[cfg(test)]
+mod mov_followup_speed_tests;
+
+#[cfg(test)]
+mod mov_followup_garrison_tests;
+
+mod save_codec;
+mod save_state;

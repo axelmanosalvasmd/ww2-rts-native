@@ -14,7 +14,7 @@ use crate::{
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct WreckRow {
     pub id: u32,
     pub kind: String,
@@ -24,7 +24,7 @@ pub struct WreckRow {
     pub rotation: f64,
     pub motion: Option<DebrisRow>,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub(crate) struct RememberedWreck {
     pub query: Wreck,
     pub display: Option<WreckRow>,
