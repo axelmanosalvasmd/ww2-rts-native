@@ -4,8 +4,10 @@ Baseline: prototype `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`.
 This implementation follows the prototype's server shapes and recipient rules.
 Group G is authorized by the stream brief and Julio's recorded owner decision
 [#5 comment 6217590741](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6217590741).
-Merge still requires Hermes' exact-head acknowledgement and the owner confirmation
-tracked on #5. This document adds no Unreal interface or World admission.
+Julio confirmed the relayed approval in
+[#5 comment 6217727398](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6217727398).
+Hermes' exact-head runtime review remains required. This document adds no Unreal
+interface or World admission.
 
 ## Membership and input
 
