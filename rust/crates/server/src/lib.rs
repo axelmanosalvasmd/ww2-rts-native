@@ -4,6 +4,7 @@ mod commander_ingress;
 mod lobby;
 mod maps;
 mod native_startup;
+mod static_files;
 mod trusted_room;
 pub use trusted_room::TrustedRoomConfig;
 pub mod room_runtime;
@@ -14,11 +15,12 @@ pub mod tick_timing;
 
 use axum::{
     Json, Router,
+    body::Body,
     extract::{
-        RawQuery, State, WebSocketUpgrade,
+        OriginalUri, RawQuery, State, WebSocketUpgrade,
         ws::{CloseFrame, Message, WebSocket},
     },
-    http::header,
+    http::{HeaderMap, Method, Response, header},
     routing::{any, get},
 };
 use lobby::{Connection, Hub, Output};
@@ -45,12 +47,15 @@ const MAX_MESSAGE: usize = 16 * 1024;
 pub struct Config {
     pub max_rooms: usize,
     pub public_url: String,
+    /// Optional browser asset root, with access limited to the prototype's static prefixes.
+    pub static_root: Option<std::path::PathBuf>,
 }
 impl Default for Config {
     fn default() -> Self {
         Self {
             max_rooms: 32,
             public_url: String::new(),
+            static_root: None,
         }
     }
 }
@@ -66,6 +71,7 @@ struct Server {
     hub: Arc<Mutex<Hub>>,
     next: Arc<AtomicU64>,
     clock: Instant,
+    static_files: Option<static_files::StaticFiles>,
     #[cfg(test)]
     test_now_ms: Option<Arc<AtomicU64>>,
 }
@@ -154,6 +160,7 @@ async fn serve_inner(
         hub: Arc::new(Mutex::new(hub)),
         next: Arc::new(AtomicU64::new(1)),
         clock: Instant::now(),
+        static_files: config.static_root.map(static_files::StaticFiles::new),
         #[cfg(test)]
         test_now_ms: None,
     };
@@ -188,7 +195,7 @@ async fn serve_inner(
         .route("/api/rooms", get(directory))
         .route("/maps", any(maps::serve))
         .route("/ws", get(upgrade))
-        .fallback(maps::serve)
+        .fallback(static_or_maps)
         .with_state((server, stop.subscribe()));
     let result = axum::serve(listener, app)
         .with_graceful_shutdown(async move {
@@ -207,6 +214,23 @@ async fn maintenance_stop(server: &Server) {
 }
 
 type App = (Server, watch::Receiver<bool>);
+async fn static_or_maps(
+    State((server, _)): State<App>,
+    OriginalUri(uri): OriginalUri,
+    method: Method,
+    headers: HeaderMap,
+) -> Response<Body> {
+    if uri.path().starts_with("/maps/") || server.static_files.is_none() {
+        return maps::serve(OriginalUri(uri), method, headers).await;
+    }
+    server
+        .static_files
+        .as_ref()
+        .unwrap()
+        .serve(uri, headers)
+        .await
+}
+
 async fn directory(
     State((server, _)): State<App>,
 ) -> ([(header::HeaderName, &'static str); 1], Json<Value>) {

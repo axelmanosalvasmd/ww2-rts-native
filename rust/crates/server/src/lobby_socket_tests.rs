@@ -151,6 +151,7 @@ async fn sockets(check: impl FnOnce(Rig) + Send + 'static) {
         hub: Arc::new(Mutex::new(Hub::new(32, String::new()))),
         next: Arc::new(AtomicU64::new(1)),
         clock: Instant::now(),
+        static_files: None,
         test_now_ms: Some(now.clone()),
     };
     let (stop, stopped) = watch::channel(false);

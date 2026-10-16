@@ -465,6 +465,7 @@ fn original_result_roster_rows_follow_people_across_removal_and_refill() {
                         disconnected: None,
                         denies: Vec::new(),
                         rtt: None,
+                        map_pings: Vec::new(),
                         last_match: Some(
                             json!({"team":name.as_bytes()[0] - b'a',"outcome":"victory"}),
                         ),

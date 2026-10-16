@@ -126,6 +126,7 @@ struct Person {
     disconnected: Option<u64>,
     denies: Vec<u64>,
     rtt: Option<f64>,
+    map_pings: Vec<u64>,
     last_match: Option<Value>,
 }
 
@@ -410,13 +411,56 @@ impl Room {
             &mut self.spectators[watching.unwrap()]
         };
         if t == "ping" {
-            if msg.get("x").is_none() && msg.get("z").is_none() {
+            if msg.get("x").is_some() || msg.get("z").is_some() {
+                let Some(slot) = seated.filter(|_| !me.ai) else {
+                    return false;
+                };
+                let Some(native) = &self.native else {
+                    return false;
+                };
+                let game = &native.runtime.state().world.game;
+                let Some(x) = msg["x"].as_f64().filter(|x| x.is_finite()) else {
+                    return false;
+                };
+                let Some(z) = msg["z"].as_f64().filter(|z| z.is_finite()) else {
+                    return false;
+                };
+                if x < 0.0
+                    || z < 0.0
+                    || x > game.w as f64 * ww2_core::game::CELL
+                    || z > game.h as f64 * ww2_core::game::CELL
+                    || !me.connection.as_ref().is_some_and(Connection::ready)
+                {
+                    return false;
+                }
+                me.map_pings.retain(|at| now.saturating_sub(*at) < 5_000);
+                if me.map_pings.len() >= 3 {
+                    return false;
+                }
+                me.map_pings.push(now);
+                let team = me.team;
+                let ping = json!({"t":"ping","from":slot,
+                    "x":ww2_core::math::round(x * 10.0) / 10.0,
+                    "z":ww2_core::math::round(z * 10.0) / 10.0});
+                for person in &self.players {
+                    if !person.ai
+                        && person.team == team
+                        && let Some(connection) = &person.connection
+                        && connection.ready()
+                    {
+                        connection.send(ping.clone());
+                    }
+                }
+            } else {
                 if let Some(rtt) = msg["rtt"].as_f64().filter(|v| v.is_finite()) {
                     me.rtt = Some(rtt.round().clamp(0.0, 9999.0));
                 }
                 let mut pong = json!({"t":"pong"});
                 if let Some(c) = msg.get("c") {
                     pong["c"] = c.clone();
+                }
+                if let Some(native) = &self.native {
+                    pong["srv"] = native.runtime.latency_stats();
                 }
                 me.connection.as_ref().unwrap().send(pong);
             }
@@ -429,9 +473,42 @@ impl Room {
             }
             return false;
         }
-        if CommanderIngress::recognizes(t)
+        if matches!(t, "pause" | "resume")
+            && host
+            && seated.is_some()
+            && me.connection.as_ref().is_some_and(Connection::ready)
             && let Some(native) = &mut self.native
         {
+            let message = if t == "pause" {
+                native
+                    .runtime
+                    .pause(
+                        seated.unwrap(),
+                        &me.name,
+                        crate::room_runtime::PauseReason::Host,
+                        now,
+                    )
+                    .ok()
+                    .flatten()
+            } else if native.runtime.fault().is_none() {
+                Some(native.runtime.resume(now))
+            } else {
+                None
+            };
+            if let Some(message) = message {
+                for person in self.people() {
+                    if let Some(connection) = &person.connection {
+                        connection.send(message.clone());
+                    }
+                }
+            }
+            return false;
+        }
+        if attached && matches!(t, "save" | "loadSave") {
+            me.deny(t, "save", now);
+            return false;
+        }
+        if let Some(native) = &mut self.native {
             // The current connection was resolved from the stable roster above.
             // Paused rooms ignore ordinary orders just like the Source callback.
             if native.runtime.paused() || !me.connection.as_ref().is_some_and(Connection::ready) {
@@ -501,6 +578,7 @@ impl Room {
                     disconnected: None,
                     denies: Vec::new(),
                     rtt: None,
+                    map_pings: Vec::new(),
                     last_match: None,
                 });
             }
@@ -1536,6 +1614,44 @@ impl Hub {
             return;
         }
         if *joined {
+            if msg["t"] == "end"
+                && let Some(room) = self.rooms.get_mut(code)
+                && room
+                    .native
+                    .as_ref()
+                    .is_some_and(|native| native.runtime.fault().is_none())
+                && room.is_host(connection.id)
+                && room.players.iter().any(|p| {
+                    p.connection
+                        .as_ref()
+                        .is_some_and(|c| c.id == connection.id && c.ready())
+                })
+            {
+                let mut native = room.native.take().unwrap();
+                let resume = native.runtime.resume(now);
+                for person in room.people() {
+                    if let Some(connection) = &person.connection {
+                        connection.send(resume.clone());
+                    }
+                }
+                room.result = Some(RoomResult {
+                    report: json!({"ended":true}),
+                    status: crate::NativeRoomStatus {
+                        epoch: native.epoch,
+                        tick: native.runtime.state().world.game.tick,
+                        held: native.runtime.held(),
+                        ending_complete: true,
+                        paused: false,
+                        fault: native.runtime.fault().map(str::to_owned),
+                    },
+                });
+                room.retain_seats(|_, p| {
+                    p.ai || p.connection.as_ref().is_some_and(Connection::ready)
+                });
+                self.accounts.retain(|_, account| account.room != code);
+                room.broadcast(&self.maps, &self.public_url);
+                return;
+            }
             if self.trusted_command(code, connection.id, &msg, now) {
                 return;
             }
@@ -1685,6 +1801,7 @@ impl Hub {
                 disconnected: None,
                 denies: Vec::new(),
                 rtt: None,
+                map_pings: Vec::new(),
                 last_match: None,
             };
             if room.has_seat(&self.maps) && msg["spectate"] != true {
@@ -2041,3 +2158,11 @@ mod lobby_socket_tests;
 #[cfg(test)]
 #[path = "combat_deny_tests.rs"]
 mod combat_deny_tests;
+
+#[cfg(test)]
+#[path = "net_runtime_tests.rs"]
+mod net_runtime_tests;
+
+#[cfg(test)]
+#[path = "net_runtime_command_tests.rs"]
+mod net_runtime_command_tests;

@@ -1,4 +1,4 @@
-//! Host stamps for bounded ordinary commander input over the sole core queue.
+//! Host stamps for ordinary commander input over the sole core queue.
 use serde_json::Value;
 use std::collections::BTreeMap;
 use ww2_core::{
@@ -23,15 +23,27 @@ impl CommanderIngress {
             Some("amove") => "amove",
             Some("stop") => "stop",
             Some("stance") => "stance",
+            Some("build") => "build",
+            Some("assist") => "assist",
+            Some("destroy") => "destroy",
+            Some("board") => "board",
+            Some("unload") => "unload",
+            Some("entrench") => "entrench",
+            Some("dig") => "dig",
+            Some("tech") => "tech",
+            Some("buy") => "buy",
+            Some("support") => "support",
+            Some("cover") => "cover",
+            Some("attack") => "attack",
+            Some("escort") => "escort",
+            Some("retreat") => "retreat",
+            Some("ability") => "ability",
+            Some("autocast") => "autocast",
+            // The core's Unsupported value also represents unknown JSON names.
+            // Unknown gameplay messages retain the prototype's blocked reply.
             _ => return Err(Denial::Blocked),
         };
         let command = Command::from_json(raw)?;
-        if !matches!(
-            command,
-            Command::Move { .. } | Command::Stop { .. } | Command::Stance { .. }
-        ) {
-            return Err(Denial::Blocked);
-        }
         let state_player = state
             .start
             .economy
@@ -41,12 +53,17 @@ impl CommanderIngress {
         if state.finish.is_some() || state_player.out || state_player.away {
             return Err(Denial::Blocked);
         }
-        // This initial service slice covers ordinary ground controls. Foreign,
-        // missing and source-ineligible IDs retain the core's selection rules.
-        let rows = match &command {
-            Command::Move { orders, .. } => orders.iter().map(|o| o.unit).collect::<Vec<_>>(),
-            Command::Stop { ids } | Command::Stance { ids, .. } => ids.clone(),
-            _ => unreachable!(),
+        // Preserve the bounded ground-control guards while other families use
+        // their canonical core admission. Foreign, missing and source-ineligible
+        // IDs retain the core's selection rules.
+        let rows = if Self::recognizes(name) {
+            match &command {
+                Command::Move { orders, .. } => orders.iter().map(|o| o.unit).collect::<Vec<_>>(),
+                Command::Stop { ids } | Command::Stance { ids, .. } => ids.clone(),
+                _ => return Err(Denial::Blocked),
+            }
+        } else {
+            Vec::new()
         };
         for raw in rows.iter().take(50.max(state.world.game.units.len())) {
             let Some(unit) = u32::try_from(*raw)

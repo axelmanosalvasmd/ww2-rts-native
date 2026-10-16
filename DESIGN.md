@@ -6,6 +6,13 @@ Read current main before integration: it lacks ai_receipt_input and ai_delivered
 
 # Three Crossroads Native: design decisions
 
+## Optional browser assets and command admission (2026-10-16)
+
+The NET runtime batch keeps browser assets outside the executable. `WW2_STATIC_ROOT` selects an existing asset tree; the library uses `Config.static_root`. The four prototype prefixes and three page routes are served only when configured. File reads and gzip work run on blocking workers, away from the async socket executor. Canonical directory confinement also rejects symlinks that leave an allowed prefix. The gzip cache retains at most 256 canonical paths and replaces each entry when its size/mtime tag changes. These are host implementation choices, without browser gameplay or Unreal adoption claims.
+
+The server now submits the core's represented gameplay commands to its existing recorded tick queue. Host-stamped identity and sequence ownership remain unchanged. Existing ground-control safeguards stay in place; other families use core command admission and return its denial through the stable person, including after reconnect. Missing core command families remain refused. Host pause/resume and manual end use existing JSON v0 messages. Map-ping budgets use the existing monotonic Hub clock, so tests can advance the rolling window without sleeping and wall-clock changes cannot reset it. Native match preparation remains synchronous under the Hub lock, so no asynchronous start can publish after manual end. This does not implement general mode startup or change World admission, FFI, wire shapes or recipient visibility.
+
+
 
 ## First-five engineering merged with MAP273 main (2026-10-16, source only)
 

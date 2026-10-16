@@ -255,6 +255,13 @@ impl RoomRuntime {
         }
         Ok(captured)
     }
+    /// Existing JSON v0 latency telemetry, derived from scheduled snapshot ticks.
+    pub(crate) fn latency_stats(&self) -> Value {
+        json!([
+            ww2_core::math::round(self.meter.stats().snapshot_tick.p95 * 10.0) / 10.0,
+            self.meter.snap_every()
+        ])
+    }
     pub fn paused(&self) -> bool {
         self.pause.is_some()
     }

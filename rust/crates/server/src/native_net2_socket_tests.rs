@@ -103,6 +103,7 @@ async fn sockets(check: impl FnOnce(&mut Rig, [Receiver; 2]) + Send + 'static) {
         hub: Arc::new(Mutex::new(hub)),
         next: Arc::new(std::sync::atomic::AtomicU64::new(1)),
         clock: std::time::Instant::now(),
+        static_files: None,
         test_now_ms: None,
     };
     let (stop, stopped) = watch::channel(false);
