@@ -4,7 +4,7 @@ use super::*;
 use crate::{
     match_commands::{Command, Denial, MoveOrder},
     recipient_snapshot::{DeliveryState, SelectedSeat, SnapshotCapability, SnapshotError},
-    supply_convoys::TruckState,
+    supply_convoys::{StoreId, TruckState},
 };
 
 fn cargo(m: &mut Match, truck: u32) -> logistics::Stock {
@@ -62,6 +62,7 @@ fn intent_log39_match_supply_hold_resume_queued_moves_and_nearest_source_retreat
     let mut m = arena(true);
     let target = troop(&m);
     let truck = *m.convoys.as_ref().unwrap().trucks.keys().next().unwrap();
+    place(&mut m, truck, Point { x: 65., z: 81. });
     let stock = cargo(&mut m, truck);
     let destination = Point { x: 67., z: 77. };
     place(&mut m, target, destination);

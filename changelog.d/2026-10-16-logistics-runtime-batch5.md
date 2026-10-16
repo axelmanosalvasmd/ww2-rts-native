@@ -2,3 +2,4 @@
 - Cover manual truck orders, scheduler alerts, point supply cuts and their income, radio, reinforcement and territory effects with component and Match adapter checks. Classic/World cache construction and train boarding remain held.
 - Replace the test for unconditional convoy retreat refusal with atomic refusal when no supply source exists, including trucks beyond the ordinary troop selection cap.
 - Check capture-square edges and the tick 40/41 supply boundary, keeping unsupported mode refusals explicit.
+- Correct the new convoy test import and set an explicit truck position for nearest-source retreat.
