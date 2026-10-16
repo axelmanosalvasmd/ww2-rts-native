@@ -7,6 +7,8 @@
 
 #[path = "../authoritative_maps.rs"]
 mod authoritative_maps;
+#[path = "../base_audit_features.rs"]
+mod base_audit_features;
 #[path = "../client_view.rs"]
 mod client_view;
 #[path = "../combat.rs"]
@@ -47,6 +49,8 @@ mod human_commander_timing;
 mod legacy_scenario;
 #[path = "../logistics.rs"]
 mod logistics;
+#[path = "../logistics_features.rs"]
+mod logistics_features;
 #[path = "../match_combat.rs"]
 mod match_combat;
 #[path = "../match_routing.rs"]
