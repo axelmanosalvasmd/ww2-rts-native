@@ -2042,5 +2042,6 @@ mod lobby_socket_tests;
 #[path = "combat_deny_tests.rs"]
 mod combat_deny_tests;
 
+#[cfg(test)]
 #[path = "net_batch50_lobby_tests.rs"]
 mod net_batch50;
