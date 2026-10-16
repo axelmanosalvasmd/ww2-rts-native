@@ -16,6 +16,12 @@ use crate::{
 };
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
+#[cfg(test)]
+mod route_intent_tests;
+
+#[cfg(test)]
+mod intent_tests;
+
 const KEYS: usize = 3;
 const SOURCE_RADIUS: f64 = 15.0;
 const TRUCK_RADIUS: f64 = 12.0;

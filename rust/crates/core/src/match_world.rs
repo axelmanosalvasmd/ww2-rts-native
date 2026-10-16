@@ -75,6 +75,42 @@ pub struct WorldActorView<'a> {
     pub spawn: Point,
     pub visible: &'a [u32],
 }
+impl crate::world_map::WorldDefinition {
+    /// Membership, legacy grid, then bounds, in prototype precedence order.
+    /// Bounds in this immutable definition use cells and are converted to metres.
+    /// A zero span supports a standalone legacy query, not World map admission.
+    pub fn region_index_at(&self, width: usize, height: usize, at: Point) -> Option<usize> {
+        if !at.x.is_finite() || !at.z.is_finite() {
+            return None;
+        }
+        if let Some(membership) = &self.region_map {
+            let (x, y) = ((at.x / CELL).floor(), (at.z / CELL).floor());
+            if x < 0.0 || y < 0.0 || x >= width as f64 || y >= height as f64 {
+                return None;
+            }
+            let cell = (y as usize).checked_mul(width)?.checked_add(x as usize)?;
+            let index = *membership.get(cell)?;
+            return (index >= 0)
+                .then_some(index as usize)
+                .filter(|&i| i < self.regions.len());
+        }
+        if self.region_cells == 0 {
+            return self.regions.iter().position(|region| {
+                let bounds = region.bounds.map(|v| v as f64 * CELL);
+                crate::world_territories::inside_known_region(None, Some(&bounds), at, CELL)
+            });
+        }
+        let span = self.region_cells as f64 * CELL;
+        let (x, y) = ((at.x / span).floor(), (at.z / span).floor());
+        let columns = width as f64 / self.region_cells as f64;
+        if x < 0.0 || y < 0.0 || x >= columns || y >= height as f64 / self.region_cells as f64 {
+            return None;
+        }
+        let index = y * columns + x;
+        // Fractional source array keys have no region on partial grid columns.
+        (index.fract() == 0.0 && index < self.regions.len() as f64).then_some(index as usize)
+    }
+}
 impl Match {
     pub fn world_actor_view(&self, owner: usize) -> Result<WorldActorView<'_>, String> {
         let runtime = self.world_runtime.as_ref().ok_or("missing World runtime")?;
@@ -139,32 +175,11 @@ impl Match {
         if !at.x.is_finite() || !at.z.is_finite() {
             return Err("nonfinite World region point".into());
         }
-        let (geography, runtime) = self.checked_world_regions()?;
+        let (geography, _) = self.checked_world_regions()?;
         let game = &self.world.game;
-        if let Some(membership) = &geography.region_map {
-            let Some(cell) = game.cell_of(at.x, at.z) else {
-                return Ok(None);
-            };
-            let index = membership[cell];
-            return Ok((index >= 0)
-                .then_some(index as usize)
-                .filter(|&i| i < runtime.regions.len()));
-        }
-        let span = geography.region_cells as f64 * CELL;
-        let (x, y) = ((at.x / span).floor(), (at.z / span).floor());
-        let columns = game.w as f64 / geography.region_cells as f64;
-        if x < 0.0 || y < 0.0 || x >= columns || y >= game.h as f64 / geography.region_cells as f64
-        {
-            return Ok(None);
-        }
-        let index = y * columns + x;
-        // A fractional source array key has no region. Province bounds also retain
-        // the source's partial last-column behavior on nonmultiple dimensions.
-        Ok(
-            (index.fract() == 0.0 && index < runtime.regions.len() as f64)
-                .then_some(index as usize),
-        )
+        Ok(geography.region_index_at(game.w, game.h, at))
     }
+
     pub fn world_region_at(&self, at: Point) -> Result<Option<&RegionState>, String> {
         let index = self.world_region_index(at)?;
         Ok(index.map(|index| {
@@ -813,4 +828,89 @@ fn world_find_site(
         index += 1;
     }
     None
+}
+
+#[cfg(test)]
+mod region_lookup_tests {
+    use super::*;
+    use crate::world_map::{WorldDefinition, WorldRegion, WorldSize};
+
+    #[test]
+    fn map58_region_lookup_matches_prototype_membership_grid_and_bounds() {
+        let mut definition = WorldDefinition {
+            size: WorldSize::Huge,
+            region_cells: 2,
+            regions: (0..6)
+                .map(|i| WorldRegion {
+                    id: 31 + i as i32 * 11,
+                    x: i,
+                    y: 0,
+                    bounds: [i, 0, i + 2, 2],
+                    home: None,
+                    kind: None,
+                    name: None,
+                    biome: None,
+                    team: None,
+                })
+                .collect(),
+            region_map: Some(vec![1, -1, 0, 1, -1, 0, 1, 0, 1, 0, -1, 1, 0, 1, 0, -1]),
+            biomes: None,
+            seed: None,
+            generator_version: None,
+            metadata: BTreeMap::new(),
+        };
+        // shared/sim.js worldRegionAt indexes the vector, never the sparse ID.
+        for ((x, z), expected) in [
+            ((0.0, 0.0), Some(1)),
+            ((2.0, 0.0), None),
+            ((4.0, 0.0), Some(0)),
+            ((7.999, 7.999), None),
+            ((8.0, 0.0), None),
+            ((-0.1, 0.0), None),
+        ] {
+            assert_eq!(definition.region_index_at(4, 4, Point { x, z }), expected);
+        }
+        definition.region_map = None;
+        for ((x, z), expected) in [
+            ((0.0, 0.0), Some(0)),
+            ((4.0, 0.0), Some(1)),
+            ((0.0, 4.0), Some(2)),
+            ((7.999, 7.999), Some(3)),
+            ((8.0, 0.0), None),
+            ((0.0, -0.1), None),
+        ] {
+            assert_eq!(definition.region_index_at(4, 4, Point { x, z }), expected);
+        }
+        // Nonmultiple dimensions retain fractional JavaScript array-key behavior.
+        assert_eq!(
+            definition.region_index_at(5, 4, Point { x: 4.0, z: 0.0 }),
+            Some(1)
+        );
+        assert_eq!(
+            definition.region_index_at(5, 4, Point { x: 0.0, z: 4.0 }),
+            None
+        );
+        assert_eq!(
+            definition.region_index_at(5, 4, Point { x: 8.0, z: 0.0 }),
+            Some(2)
+        );
+        // Bounds are stored in cells here, but source runtime bounds use metres.
+        definition.region_cells = 0;
+        assert_eq!(
+            definition.region_index_at(4, 4, Point { x: 2.0, z: 0.0 }),
+            Some(0)
+        );
+        assert_eq!(
+            definition.region_index_at(4, 4, Point { x: 4.0, z: 0.0 }),
+            Some(1)
+        );
+        assert_eq!(
+            definition.region_index_at(4, 4, Point { x: 0.0, z: 4.0 }),
+            None
+        );
+        assert_eq!(
+            definition.region_index_at(4, 4, Point { x: -0.1, z: 0.0 }),
+            None
+        );
+    }
 }

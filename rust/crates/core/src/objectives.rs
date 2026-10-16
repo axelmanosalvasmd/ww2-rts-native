@@ -3,12 +3,32 @@
 
 use crate::{
     catalog::{Catalog, CatalogError, Value},
+    economy::Mode,
     game::{CELL, MOVE, Point, Unit, VBLOCK},
     grid::UnitId,
     math,
     navigation::TerrainView,
     unit_spawn::{SpawnError, SpawnPlacer},
 };
+
+/// The point-supply beat is separate from the logistics supply network.
+/// Horde, Tutorial and World never run this flood, even when supply is enabled.
+pub fn point_supply_due(mode: Mode, enabled: bool, tick: i64) -> Result<bool, Error> {
+    if tick < 0 {
+        return Err(Error::InvalidInput("point supply tick"));
+    }
+    if !enabled || matches!(mode, Mode::Horde | Mode::Tutorial | Mode::World) {
+        return Ok(false);
+    }
+    let every = Catalog::compiled()?
+        .table("CFG")?
+        .get("supply")
+        .and_then(|v| v.get("every"))
+        .and_then(Value::number)
+        .filter(|v| v.is_finite() && *v >= 1.0 && v.fract() == 0.0)
+        .ok_or(Error::InvalidInput("point supply beat"))?;
+    Ok(tick % every as i64 == 1)
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Objective {
