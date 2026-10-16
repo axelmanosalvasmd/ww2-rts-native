@@ -47,7 +47,10 @@ fn if20_smoke_scatter_consumes_only_the_off_map_stream() {
         .iter()
         .zip(&perturbed.world.game.smokes)
     {
-        assert_eq!((a.x.to_bits(), a.z.to_bits()), (b.x.to_bits(), b.z.to_bits()));
+        assert_eq!(
+            (a.x.to_bits(), a.z.to_bits()),
+            (b.x.to_bits(), b.z.to_bits())
+        );
         expected_control.next_fraction(StreamId::OffMap);
         expected_perturbed.next_fraction(StreamId::OffMap);
     }

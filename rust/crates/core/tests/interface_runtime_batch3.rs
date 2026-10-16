@@ -5,7 +5,9 @@ use ww2_core::{
     economy_state::ArmySize,
     game::{Point, Wreck},
     map::AuthoritativeMap,
+    match_commands::{Command, Stance},
     match_runtime::{Match, MatchOptions, PlayerConfig},
+    orders::OrderKey,
     random::{MatchRandom, StreamId},
     recipient_snapshot::{DeliveryState, SnapshotCache},
     route_knowledge::{
@@ -102,7 +104,7 @@ fn if07_cover_classes_house_edges_and_exploration_match_prototype_rules() {
     let at = Point { x: 1.0, z: 1.0 };
     assert_eq!(
         knowledge
-            .cover_preview(at, &vec![false; 72], true, Option::None, &[], &[])
+            .cover_preview(at, &[false; 72], true, Option::None, &[], &[])
             .unwrap()
             .class,
         None
@@ -372,14 +374,31 @@ fn if20_match_streams_replay_across_rooms_and_unrelated_ai_draws() {
         control.advance_tick().unwrap();
         replay.advance_tick().unwrap();
         assert_units(&control, &replay);
-        assert_eq!(control.start.environment_seed, replay.start.environment_seed);
-        assert_eq!(control.start.weather_seed, replay.start.weather_seed);
         assert_eq!(
-            snapshot(&mut control, &mut left_delivery),
-            snapshot(&mut replay, &mut right_delivery)
+            control.start.environment_seed,
+            replay.start.environment_seed
         );
+        assert_eq!(control.start.weather_seed, replay.start.weather_seed);
         assert!(control.tick_state.fault().is_none() && replay.tick_state.fault().is_none());
     }
+    // Persistent flights remain outside complete snapshot admission. Stop firing
+    // through the recorded boundary and let the actual flight phase settle them.
+    for state in [&mut control, &mut replay] {
+        for owner in 0..2 {
+            let ids = state.world.game.units.values().filter(|u| u.owner == owner).map(|u| i64::from(u.id)).collect();
+            state.enqueue_command(OrderKey { tick: 41, issuer: owner as u32, sequence: 1 }, Command::Stance { ids, stance: Stance::HoldFire, on: true }).unwrap();
+        }
+    }
+    for _ in 0..8 {
+        let a = control.advance_tick().unwrap();
+        let b = replay.advance_tick().unwrap();
+        assert_eq!(a.commands, b.commands);
+        assert!(a.commands.iter().all(|r| r.denial.is_none()));
+        assert_units(&control, &replay);
+    }
+    assert!(control.firing.flights.is_empty() && replay.firing.flights.is_empty());
+    assert_eq!(snapshot(&mut control, &mut left_delivery), snapshot(&mut replay, &mut right_delivery));
+    assert!(control.tick_state.fault().is_none() && replay.tick_state.fault().is_none());
     let left = control.start.random.snapshot();
     let mut right = replay.start.random.snapshot();
     assert!(

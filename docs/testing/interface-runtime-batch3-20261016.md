@@ -24,8 +24,9 @@ Unreal adoption and additional C queries remain separate work.
   `rust/crates/ffi/include/ww2_core.h` finds only a recipient-view handle and
   caller-supplied formation data, with no authoritative game handle.
 - IF-20: `if20_match_streams_replay_across_rooms_and_unrelated_ai_draws`.
-  Equal seeds produce equal startup units and forty ordinary combat ticks,
-  including complete recipient snapshots. Another room and unrelated AI
+  Equal seeds produce equal startup units and forty ordinary combat ticks.
+  Recorded Hold Fire orders then stop firing, eight real ticks settle the
+  flights, and complete recipient snapshots compare equally. Another room and unrelated AI
   draws cannot perturb that simulation. The test requires a real Combat
   stream draw, compares all other used purpose states and resumes each
   defined purpose from its recorded state.
@@ -59,7 +60,9 @@ elimination and command guards found no new persistent state to admit.
 The ordinary-tick test still runs eight real ticks and collects complete
 recipient snapshots before and after each query, asserting no fault and
 no snapshot change. The combat replay test independently crosses forty
-ticks and complete snapshot collection.
+combat ticks and eight settling ticks before complete snapshot collection.
+Persistent-flight snapshot admission stays closed; this test does not
+claim that active flights can be delivered.
 
 The FFI, C header, wire format, contracts, privacy rules, reference pin and
 parity status files retain their existing content. This batch adds no Source
