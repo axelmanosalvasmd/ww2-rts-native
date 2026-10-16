@@ -352,110 +352,111 @@ fn protected(runtime: &RoomRuntime) -> Vec<String> {
     ]
 }
 
+fn aircraft_purchase_ready(mut m: Match) -> (Match, u32) {
+    m.production = ww2_core::production::ProductionState::new(vec![
+        ww2_core::economy::TechState::new(3, 0, 0, 0).unwrap();
+        2
+    ])
+    .unwrap();
+    for unit in m.world.game.units.values() {
+        if m.rules.kinds[unit.kind].building {
+            m.production.initialize_building(unit.id).unwrap();
+        }
+    }
+    m.start.economy.players[0].mp = 50_000.;
+    m.start.economy.players[0].fuel = 50_000.;
+    let field = m.next_unit_id;
+    let kind = m.rules.kind("airfield").unwrap();
+    let definition = Catalog::compiled().unwrap().unit("airfield").unwrap();
+    let size = definition.get("size").unwrap().number().unwrap() as usize;
+    let hp = definition.get("hpPer").unwrap().number().unwrap();
+    let g = &m.world.game;
+    let cells = (1..g.chars.len())
+        .filter(|cell| cell % g.w + size < g.w && cell / g.w + size < g.h)
+        .map(|cell| {
+            (0..size)
+                .flat_map(|y| (0..size).map(move |x| cell + y * g.w + x))
+                .collect::<Vec<_>>()
+        })
+        .find(|cells| {
+            let at = Point {
+                x: (cells[0] % g.w) as f64 * ww2_core::game::CELL
+                    + size as f64 * ww2_core::game::CELL / 2.,
+                z: (cells[0] / g.w) as f64 * ww2_core::game::CELL
+                    + size as f64 * ww2_core::game::CELL / 2.,
+            };
+            cells.iter().all(|&cell| {
+                g.chars[cell] == b'.'
+                    && g.height.as_ref().is_none_or(|h| h[cell] == h[cells[0]])
+            }) && g
+                .units
+                .values()
+                .all(|u| ww2_core::math::hypot(u.x - at.x, u.z - at.z) > 10.)
+        })
+        .unwrap();
+    let at = Point {
+        x: (cells[0] % g.w) as f64 * ww2_core::game::CELL
+            + size as f64 * ww2_core::game::CELL / 2.,
+        z: (cells[0] / g.w) as f64 * ww2_core::game::CELL
+            + size as f64 * ww2_core::game::CELL / 2.,
+    };
+    for &cell in &cells {
+        m.world.set_cell(cell, b'K').unwrap();
+    }
+    let mut draft = StagedUnit::ordinary(
+        &m.world.game,
+        &m.rules,
+        0,
+        kind,
+        field,
+        m.world.game.units.len() as u32,
+        m.start.players[0].spawn,
+        Some(at),
+    )
+    .unwrap();
+    draft.unit.built = Some(1.);
+    draft.unit.hp = hp;
+    draft.unit.cells = Some(cells.iter().map(|&cell| cell as u32).collect());
+    prepare_publication(
+        PublicationParts {
+            units: &mut m.world.game.units,
+            grid: &mut m.grid,
+            controls: &mut m.commands.units,
+            recruitment: &mut m.recruit_metadata,
+            next_id: &mut m.next_unit_id,
+        },
+        &m.rules,
+        2,
+        vec![draft],
+    )
+    .unwrap()
+    .publish_with(|unit, _| {
+        m.combat.initialize(unit.id).hit_by = Some(0);
+        m.firing.initialize(unit.id);
+        m.abilities.initialize(unit.id);
+        m.recovery.initialize(unit.id);
+        m.production.initialize_building(unit.id).unwrap();
+        m.building_rallies.insert(unit.id, None);
+    });
+    for &cell in &cells {
+        m.building_cells.insert(
+            cell,
+            ww2_core::match_runtime::BuildingCell {
+                unit: field,
+                owner: 0,
+                at,
+            },
+        );
+    }
+    m.world
+        .register_building_structure(field, &cells, hp, hp)
+        .unwrap();
+    (m, field)
+}
+
 #[test]
 fn r1_aircraft_purchase_publishes_paid_aircraft_and_every_seat_keeps_snapshots() {
-    let purchase_ready = || {
-        let mut m = crate::lobby::native_tests::native_match();
-        m.production = ww2_core::production::ProductionState::new(vec![
-            ww2_core::economy::TechState::new(3, 0, 0, 0).unwrap();
-            2
-        ])
-        .unwrap();
-        for unit in m.world.game.units.values() {
-            if m.rules.kinds[unit.kind].building {
-                m.production.initialize_building(unit.id).unwrap();
-            }
-        }
-        m.start.economy.players[0].mp = 50_000.;
-        m.start.economy.players[0].fuel = 50_000.;
-        let field = m.next_unit_id;
-        let kind = m.rules.kind("airfield").unwrap();
-        let definition = Catalog::compiled().unwrap().unit("airfield").unwrap();
-        let size = definition.get("size").unwrap().number().unwrap() as usize;
-        let hp = definition.get("hpPer").unwrap().number().unwrap();
-        let g = &m.world.game;
-        let cells = (1..g.chars.len())
-            .filter(|cell| cell % g.w + size < g.w && cell / g.w + size < g.h)
-            .map(|cell| {
-                (0..size)
-                    .flat_map(|y| (0..size).map(move |x| cell + y * g.w + x))
-                    .collect::<Vec<_>>()
-            })
-            .find(|cells| {
-                let at = Point {
-                    x: (cells[0] % g.w) as f64 * ww2_core::game::CELL
-                        + size as f64 * ww2_core::game::CELL / 2.,
-                    z: (cells[0] / g.w) as f64 * ww2_core::game::CELL
-                        + size as f64 * ww2_core::game::CELL / 2.,
-                };
-                cells.iter().all(|&cell| {
-                    g.chars[cell] == b'.'
-                        && g.height.as_ref().is_none_or(|h| h[cell] == h[cells[0]])
-                }) && g
-                    .units
-                    .values()
-                    .all(|u| ww2_core::math::hypot(u.x - at.x, u.z - at.z) > 10.)
-            })
-            .unwrap();
-        let at = Point {
-            x: (cells[0] % g.w) as f64 * ww2_core::game::CELL
-                + size as f64 * ww2_core::game::CELL / 2.,
-            z: (cells[0] / g.w) as f64 * ww2_core::game::CELL
-                + size as f64 * ww2_core::game::CELL / 2.,
-        };
-        for &cell in &cells {
-            m.world.set_cell(cell, b'K').unwrap();
-        }
-        let mut draft = StagedUnit::ordinary(
-            &m.world.game,
-            &m.rules,
-            0,
-            kind,
-            field,
-            m.world.game.units.len() as u32,
-            m.start.players[0].spawn,
-            Some(at),
-        )
-        .unwrap();
-        draft.unit.built = Some(1.);
-        draft.unit.hp = hp;
-        draft.unit.cells = Some(cells.iter().map(|&cell| cell as u32).collect());
-        prepare_publication(
-            PublicationParts {
-                units: &mut m.world.game.units,
-                grid: &mut m.grid,
-                controls: &mut m.commands.units,
-                recruitment: &mut m.recruit_metadata,
-                next_id: &mut m.next_unit_id,
-            },
-            &m.rules,
-            2,
-            vec![draft],
-        )
-        .unwrap()
-        .publish_with(|unit, _| {
-            m.combat.initialize(unit.id).hit_by = Some(0);
-            m.firing.initialize(unit.id);
-            m.abilities.initialize(unit.id);
-            m.recovery.initialize(unit.id);
-            m.production.initialize_building(unit.id).unwrap();
-            m.building_rallies.insert(unit.id, None);
-        });
-        for &cell in &cells {
-            m.building_cells.insert(
-                cell,
-                ww2_core::match_runtime::BuildingCell {
-                    unit: field,
-                    owner: 0,
-                    at,
-                },
-            );
-        }
-        m.world
-            .register_building_structure(field, &cells, hp, hp)
-            .unwrap();
-        (m, field)
-    };
+    let purchase_ready = || aircraft_purchase_ready(crate::lobby::native_tests::native_match());
 
     // These purchases pass ordinary economy/maker admission without a host binding.
     let (mut standalone, field) = purchase_ready();
@@ -959,5 +960,101 @@ fn aircraft_and_artillery_fire_while_every_seat_receives_every_tick_through_vict
         }
         assert_eq!(room.held(), 120);
         assert_eq!(room.state().world.game.tick, end.end_tick + 60);
+    }
+}
+
+#[test]
+fn base21_hosted_classic_aircraft_train_fifo_at_exact_times_and_pause_without_losing_jobs() {
+    use ww2_core::game::PlaneState;
+    let map = AuthoritativeMap::from_json(&serde_json::to_vec(&json!({
+        "name":"Hosted aircraft training", "w":96,"h":96,
+        "rows":vec![".".repeat(96);96],
+        "spawns":[{"x":10,"y":10},{"x":80,"y":80}],
+        "points":[{"x":48,"y":48,"mp":1}]
+    })).unwrap()).unwrap();
+    let mut options = arena(&[]).options;
+    options.mode = Mode::Classic;
+    options.tech = false;
+    let (mut state, field) = aircraft_purchase_ready(Match::new_classic(&map, options).unwrap());
+    for control in state.commands.units.values_mut() {
+        control.hold_fire = true;
+        control.auto_cast = false;
+        control.auto_retreat = false;
+    }
+    let at = state.world.game.units[&field].at();
+    state.building_rallies.insert(field, Some(Point { x:140., z:140. }));
+    let initial_mp = state.start.economy.players[0].mp;
+    let initial_fuel = state.start.economy.players[0].fuel;
+    for name in ["fighter", "attacker", "bomber"] {
+        assert_eq!(state.execute_command(0, &Command::Buy {kind:name.into(), from:Some(field)}, false).unwrap(), None);
+    }
+    assert_eq!(state.start.economy.players[0].mp, initial_mp - 740.);
+    assert_eq!(state.start.economy.players[0].fuel, initial_fuel - 210.);
+    let first_id = state.next_unit_id;
+    let paid = state.production.building(field).unwrap().jobs().to_vec();
+    assert_eq!(paid.iter().map(|j|j.kind.as_str()).collect::<Vec<_>>(), ["fighter", "attacker", "bomber"]);
+    let selected = (0..2).map(|slot| SelectedSeat {slot,full:true,omit:false}).collect::<Vec<_>>();
+    let mut runtime = RoomRuntime::new(state, 0).unwrap();
+    // An unfinished producer cannot advance even its active paid job.
+    runtime.state_mut().world.game.units.get_mut(&field).unwrap().built = Some(0.5);
+    for _ in 0..4 {
+        runtime.advance_tick(&[false;2]).unwrap();
+        let frames = runtime.collect_frame(&selected, FrameKind::Current).unwrap();
+        assert_eq!(frames.len(), 2);
+        assert_eq!(runtime.state().production.building(field).unwrap().progress(), 0.);
+        assert_eq!(runtime.state().production.building(field).unwrap().jobs(), paid);
+        assert!(runtime.fault().is_none());
+    }
+    runtime.state_mut().world.game.units.get_mut(&field).unwrap().built = Some(1.);
+    let mut born = Vec::new();
+    for (name, seconds) in [("fighter",30.), ("attacker",35.), ("bomber",45.)] {
+        let start_tick = runtime.state().world.game.tick;
+        let id = runtime.state().next_unit_id;
+        loop {
+            runtime.advance_tick(&[false;2]).unwrap();
+            let frames = runtime.collect_frame(&selected, FrameKind::Current).unwrap();
+            assert_eq!(frames.len(), 2);
+            let state = runtime.state();
+            let elapsed = (state.world.game.tick - start_tick) as f64 * 0.05;
+            let owner = &frames.iter().find(|f|f.slot==0).unwrap().message;
+            let other = &frames.iter().find(|f|f.slot==1).unwrap().message;
+            for key in ["queues", "productionJobs", "air"] {
+                assert!(!other[key].as_array().unwrap().iter().any(|r|r[0]==field || r[0]==id), "{key} stays private");
+            }
+            let queue = owner["queues"].as_array().unwrap().iter().find(|r|r[0]==field).unwrap();
+            assert_eq!(queue[2], 140.);
+            assert_eq!(queue[3], 140.);
+            assert!(runtime.fault().is_none());
+            if let Some(unit) = state.world.game.units.get(&id) {
+                assert!(elapsed >= seconds && elapsed <= seconds + 0.051, "{name}: {elapsed}");
+                assert_eq!(state.rules.kinds[unit.kind].name, name);
+                assert_eq!(unit.air, Some(PlaneState::Base));
+                assert_eq!(unit.at(), at);
+                assert!(unit.path.is_empty());
+                let air = owner["air"].as_array().unwrap().iter().find(|r|r[0]==id).unwrap();
+                let def = Catalog::compiled().unwrap().unit(name).unwrap();
+                assert_eq!(air, &json!([id,0,50.,def.get("ammo").unwrap().number().unwrap(),0.]));
+                assert_eq!(state.production.building(field).unwrap().progress(),0.);
+                born.push(id);
+                break;
+            }
+            assert!(elapsed <= seconds + 0.051, "{name} never completed");
+            assert_eq!(queue[4], name);
+        }
+    }
+    assert_eq!(born, vec![first_id,first_id+1,first_id+2]);
+    assert!(runtime.state().production.building(field).unwrap().jobs().is_empty());
+    // Sudden Death freezes a real paid job, including its existing progress.
+    assert_eq!(runtime.state_mut().execute_command(0,&Command::Buy {kind:"fighter".into(),from:Some(field)},false).unwrap(), None);
+    runtime.advance_tick(&[false;2]).unwrap();
+    let progress = runtime.state().production.building(field).unwrap().progress();
+    let pending = runtime.state().production.building(field).unwrap().jobs().to_vec();
+    runtime.state_mut().elimination.as_mut().unwrap().sudden_death = true;
+    for _ in 0..5 {
+        runtime.advance_tick(&[false;2]).unwrap();
+        assert_eq!(runtime.collect_frame(&selected,FrameKind::Current).unwrap().len(),2);
+        assert_eq!(runtime.state().production.building(field).unwrap().progress(),progress);
+        assert_eq!(runtime.state().production.building(field).unwrap().jobs(),pending);
+        assert!(runtime.fault().is_none());
     }
 }

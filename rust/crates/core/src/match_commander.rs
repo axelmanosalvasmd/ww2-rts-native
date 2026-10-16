@@ -1203,6 +1203,8 @@ impl Match {
                                         .is_some_and(|c| c.trucks.contains_key(&u.id)),
                                 amove: None,
                                 airborne: u.air.is_some() && vision::airborne(u),
+                                air_at_base: u.owner == owner
+                                    && u.air == Some(crate::game::PlaneState::Base),
                                 wall_work: u.owner == owner
                                     && self.field_works.jobs().get(&u.id).is_some_and(|job| {
                                         job.kind == crate::field_works::FortKind::Wall

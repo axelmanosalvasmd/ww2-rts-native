@@ -382,3 +382,68 @@ fn mov84_classic_constructs_two_airfields_and_trains_each_plane_at_its_paid_prod
     assert_eq!(born.len(), 6);
     assert!(state.tick_state.fault().is_none());
 }
+
+#[test]
+fn base18_aviation_purchase_rejects_invalid_makers_atomically_and_places_each_plane_at_selected_field() {
+    use crate::match_commands::Command;
+    for mode in [Mode::Default, Mode::Conquest, Mode::Assault, Mode::Annihilation] {
+        let mut state = scene(mode);
+        state.start.economy.players[0].mp = 10000.;
+        state.start.economy.players[0].fuel = 777.;
+        let (allied, _) = field(&mut state, 1, 12, 30);
+        let (enemy, _) = field(&mut state, 2, 24, 30);
+        let (unfinished, _) = field(&mut state, 0, 36, 30);
+        let (dead, _) = field(&mut state, 0, 48, 30);
+        let (first, first_at) = field(&mut state, 0, 60, 30);
+        let (second, second_at) = field(&mut state, 0, 72, 30);
+        state.world.game.units.get_mut(&unfinished).unwrap().built = Some(0.99);
+        state.world.game.units.get_mut(&dead).unwrap().hp = 0.;
+        state.player_rallies[0] = Some(Point {x:10.,z:10.});
+        state.building_rallies.insert(second, Some(Point {x:20.,z:20.}));
+        let buy = |name:&str, from| Command::Buy {kind:name.into(),from};
+        for from in [allied, enemy, unfinished, dead, u32::MAX] {
+            let mp = state.start.economy.players[0].mp;
+            let next = state.next_unit_id;
+            assert_eq!(state.execute_command(0, &buy("fighter",Some(from)),false).unwrap(),Some("needs".into()));
+            assert_eq!(state.start.economy.players[0].mp,mp);
+            assert_eq!(state.next_unit_id,next);
+            assert!(state.aviation.planes.is_empty());
+        }
+        for (name, price, from, at) in [
+            ("fighter",280.,None,first_at),
+            ("attacker",340.,Some(second),second_at),
+            ("bomber",420.,Some(first),first_at),
+        ] {
+            let mp = state.start.economy.players[0].mp;
+            let id = state.next_unit_id;
+            assert_eq!(state.execute_command(0,&buy(name,from),false).unwrap(),None);
+            assert_eq!(state.start.economy.players[0].mp,mp-price);
+            assert_eq!(state.start.economy.players[0].fuel,777.);
+            let u=&state.world.game.units[&id];
+            assert_eq!(u.owner,0);
+            assert_eq!(state.rules.kinds[u.kind].name,name);
+            assert_eq!(u.at(),at);
+            assert_eq!(u.air,Some(PlaneState::Base));
+            assert!(u.path.is_empty());
+            assert!(state.aviation.planes[&id].mission.is_none());
+            assert_eq!(state.recruit_metadata[&id].building,from.unwrap_or(first));
+            assert!(state.production.building(first).unwrap().jobs().is_empty());
+            assert!(state.production.building(second).unwrap().jobs().is_empty());
+        }
+        // Restore synthetic invalid-maker probes before entering actual ticks.
+        state.world.game.units.get_mut(&unfinished).unwrap().built=Some(1.);
+        state.world.game.units.get_mut(&dead).unwrap().hp=1800.;
+        if matches!(mode,Mode::Default|Mode::Conquest) {
+            let mut delivery=DeliveryState::new(&state).unwrap();
+            for _ in 0..5 {
+                let snapshots=delivered_tick(&mut state,&mut delivery);
+                assert_eq!(snapshots[0]["air"].as_array().unwrap().len(),3);
+                assert_eq!(snapshots[1]["air"],json!([]));
+                assert_eq!(snapshots[2]["air"],json!([]));
+            }
+        } else {
+            for _ in 0..5 {state.advance_tick().unwrap();}
+        }
+        assert!(state.tick_state.fault().is_none());
+    }
+}
