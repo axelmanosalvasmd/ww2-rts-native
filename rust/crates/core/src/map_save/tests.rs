@@ -166,7 +166,7 @@ fn map15_map_loading_uses_the_existing_complete_scenario_validator() {
         );
     }
     let error = Match::new(&loaded, options()).err().unwrap();
-    assert!(error.contains("does not yet execute authored scenarios"));
+    assert!(error.contains("authored scenarios currently require ordinary match-scoped once-only objective and announcement triggers"));
 }
 
 #[test]
