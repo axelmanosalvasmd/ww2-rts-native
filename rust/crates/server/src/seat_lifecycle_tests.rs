@@ -185,7 +185,7 @@ fn client_pause_and_resume_remain_unavailable_even_for_native_host() {
 
 #[test]
 fn net80_human_drop_expiry_reconnect_host_release_and_fresh_match_allowance() {
-    let (mut hub, host, mut host_rx, guest, mut guest_rx) = setup();
+    let (mut hub, _host, mut host_rx, guest, mut guest_rx) = setup();
     hub.disconnected("ABC", guest.id, 10);
     assert!(hub.native_status("ABC").unwrap().paused);
     hub.poll_native(30_009, 0);
