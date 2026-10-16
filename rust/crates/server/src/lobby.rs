@@ -222,6 +222,7 @@ struct AttachedRuntime {
 }
 
 struct PreparedNative {
+    now: u64,
     attached: AttachedRuntime,
     starts: Vec<(usize, Value)>,
     resume: Value,
@@ -850,7 +851,7 @@ impl Hub {
     }
     pub fn attach_native(&mut self, code: &str, state: Match, now: u64) -> Result<u64, String> {
         let prepared = self.prepare_native(code, state, now, false)?;
-        Ok(self.publish_native(code, prepared, now))
+        Ok(self.publish_native(code, prepared))
     }
 
     pub(crate) fn configure_trusted_room(&mut self, trusted: Option<crate::TrustedRoomConfig>) {
@@ -930,6 +931,7 @@ impl Hub {
         let starts = runtime.collect_starts(&slots, &startup, &names, epoch)?;
         let pause = runtime.paused().then(|| runtime.pause_message(now));
         Ok(PreparedNative {
+            now,
             attached: AttachedRuntime {
                 epoch,
                 ingress: CommanderIngress::default(),
@@ -944,8 +946,9 @@ impl Hub {
         })
     }
 
-    fn publish_native(&mut self, code: &str, prepared: PreparedNative, now: u64) -> u64 {
+    fn publish_native(&mut self, code: &str, prepared: PreparedNative) -> u64 {
         let PreparedNative {
+            now,
             attached,
             starts,
             resume,
@@ -1629,7 +1632,7 @@ impl Hub {
         let mut prepared = self.prepare_native(code, state, now, restart)?;
         prepared.attached.receipt =
             Some(trusted.receipt(prepared.attached.runtime.state(), prepared.attached.epoch));
-        Ok(self.publish_native(code, prepared, now))
+        Ok(self.publish_native(code, prepared))
     }
 
     fn trusted_command(&mut self, code: &str, connection_id: u64, msg: &Value, now: u64) -> bool {
