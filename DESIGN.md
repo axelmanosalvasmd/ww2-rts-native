@@ -1,5 +1,15 @@
 # Three Crossroads Native: design decisions
 
+## Native ground-order intent checks (2026-10-16, execution pending)
+
+Axel's [6206861267 owner decision](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6206861267) adopts rules 1 to 5 exactly. The new private `native_order_intent_tests` module exercises CMB-83/91/140/144/145 and MOV-49 through native orders and the ordinary tick runner. Startup keeps native random streams, an explicit seed and canonical providers. Construction, purchase, movement, boarding, unloading and retirement use existing native APIs. The aircraft case uses canonical spawn and command APIs. No runtime provider, interface, guard, reference pin or RNG seam changes.
+
+Nine tests cover stance validation and private flags, hold-fire explicit attack, attack-move halt/kill/resume/arrival, Stop cleanup, aircraft Stop/Retreat, group Retreat and paid-work cancellation, and loaded/unloaded scuttle. Literal row/test/prototype mappings are in the owned combat and movement sections. All native checks are UNRUN until Root issues a new literal grant for one focused nextest batch with `--no-fail-fast` and the ignored regression included.
+
+CMB-144 remains incomplete. Its foreign-construction regression expects the intended foreign-only `needs` and unrelated mixed-selection success. The earlier actual `Err("unrepresented or inconsistent construction activity")` on 0290fcf6 stays failed; the test does not accept both results. This negative setup corrupts foreign construction metadata solely to reproduce that retained failure. No actuator guard is bypassed. Garrison exit and capture exclusion remain uncovered, so passing other Retreat cases cannot complete the row. Loaded scuttle and ordinary Unload have separate tests and results. Failed or incomplete rows stay in progress while the batch continues.
+
+The earlier aligned capture suites and artifacts are preserved. These behavior checks neither create Source recorders/captures/provenance bundles nor reclassify their historical results. Native PASS plus reviewer confirmation of prototype intent is required before promoting an eligible row. Root combines contributions within one open PR per parity file and the 50-row cap. Existing runtime changes still require Hermes' exact-head acknowledgment.
+
 ## Zero-project reservation reason (2026-10-16, source only)
 
 Correct only the exact dispatch expectation for `ZeroProjectIdentity` when the existing selection starts with worker 1. The unchanged injection moves the shared project record to key zero and rebinds worker 2 alone. Worker 1 still references the removed record, so its canonical membership predicate fails before the project-record checks. Orders `[1,2]` and `[1,1,4,3,2]` therefore expect membership identity; `[3,2]` and `[2,1]` retain project projection. Worker 2's direct-validator expectation and every other fault expectation remain exact. No error normalization or alternative accepted reason is added.
