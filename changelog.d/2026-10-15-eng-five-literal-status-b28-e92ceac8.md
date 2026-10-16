@@ -1,0 +1,1 @@
+- Mark ENG-15/16/17/23/24 ported for their complete literal Acceptance checks, citing actual b28 formatting, fourteen native passes and strict Clippy success. Preserve all Acceptance cells, broader held clauses and producing-head failures; this docs-only child runs no project jobs.

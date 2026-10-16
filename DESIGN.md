@@ -1,5 +1,13 @@
 # Three Crossroads Native: design decisions
 
+## Five literal engineering checks qualified at b28 (2026-10-15, docs only)
+
+The producing head `b28ca8e531426cc240103b6936a8abd8cb68986d`, Rust tree `866795e6e303acc529e53381e45c7fa4b6b37baa`, passed formatting, all fourteen exact native selections once each and strict locked core/all-target ci-test Clippy. The independent predicate audit accepts the complete literal Acceptance checks for ENG-15, ENG-16, ENG-17, ENG-23 and ENG-24 individually. This private documentation child updates only those five Rust/Status pairs to `ported`. All Acceptance bytes, every other table cell and the entire tested Rust tree remain unchanged. The [row evidence](docs/runtime/engineering-five-literal-checks-b28.md) records the exact mapping, source locators, actual producing-head receipts and broader held clauses.
+
+No project execution occurs in this child, and the b28 results are not relabeled as child or integration results. Source generation and exact byte verification remain attributed to a52. Historical ca56, ef81, 0604 and cd6 failures, both clock objections and the fixed 011a expected-only projection remain retained with their original outcomes. The full 260389-byte, mode 0444 ada3b28c fixture and complete twelve-trace baseline remain exact. Fill/concrete execution, broader shared-project clauses, whole-match/World proof, owner-view kind 7 and the MOV28 bridge proposal remain separate and unadopted here. Owner agreement, hosted success and Unreal adoption are not established by `ported`.
+
+This child stays directly on b28 under the immutable qualification exception. Future integration must reconstruct the complete incoming/owned union against literal post-PR270 main and satisfy Root's exact-head review and any new execution grants. Receipt of issue #5 and PR #16/#195 replies is separate from consent, comparison defaults or provider adoption. Root alone owns the ledger, grants, publication, push and merge. IMPL_ENGINEERING retains first engineering publication priority.
+
 ## Engineering byte-array Clippy repair (2026-10-15, source only)
 
 At frozen `cd6dda0cf5cc5e3865c0c003255845e50aba0028` (Rust tree `67b1570e5b640af29443c57e54ecf4d63fa1c14a`), formatting passed and all fourteen selected native checks passed once. Strict core all-target Clippy then failed with `byte_char_slices` at `match_projects_original_checks.rs:86`. Preserve that head's complete report and raw diagnostic in `/tmp/eng-five-native-cd6-2333-e92ceac8/`; those results remain attributed to cd6.
