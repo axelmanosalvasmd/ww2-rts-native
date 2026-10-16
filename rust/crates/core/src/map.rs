@@ -243,14 +243,18 @@ impl AuthoritativeMap {
                 },
             ));
         }
+        let positions = raw_spawns
+            .iter()
+            .map(|spawn| open_pos(spawn, "spawns"))
+            .collect::<Result<Vec<_>>>()?;
         let spawns = raw_spawns
             .iter()
-            .map(|s| {
-                let (x, y) = open_pos(s, "spawns")?;
+            .zip(positions)
+            .map(|(spawn, (x, y))| {
                 Ok(Spawn {
                     x,
                     y,
-                    assault: optional_bool(s, "assault")?,
+                    assault: optional_bool(spawn, "assault")?,
                 })
             })
             .collect::<Result<Vec<_>>>()?;
@@ -303,53 +307,59 @@ impl AuthoritativeMap {
                 },
             ));
         }
-        let sequence = source
-            .get("pointSequence")
-            .map(|v| integer(v, 0, 1_000_000_000, "pointSequence"))
-            .transpose()?;
-        let points = raw_points
+        // The editor reports all geometry and score failures before point metadata.
+        let mut points = raw_points
             .iter()
-            .enumerate()
-            .map(|(i, p)| {
-                let (x, y) = open_pos(p, "points")?;
-                if let (Some(sequence), Some(id)) = (sequence, p["id"].as_str())
-                    && let Some(digits) = id.strip_prefix("point:")
-                    && !digits.is_empty()
-                    && digits.bytes().all(|c| c.is_ascii_digit())
-                    && digits.parse::<f64>().unwrap_or(f64::INFINITY) >= sequence as f64
-                {
-                    return Err(invalid("pointSequence", "must exceed existing point IDs"));
-                }
-                let kind = p
-                    .get("kind")
-                    .map(|k| {
-                        k.as_str()
-                            .filter(|k| ["radio", "depot"].contains(k))
-                            .map(str::to_owned)
-                            .ok_or_else(|| invalid("points.kind", "unknown point kind"))
-                    })
-                    .transpose()?;
-                let needs = p
-                    .get("needs")
-                    .map(|n| integer(n, 0, raw_points.len() - 1, "points.needs"))
-                    .transpose()?;
-                if needs == Some(i) {
-                    return Err(invalid("points.needs", "cannot depend on itself"));
-                }
-                let score = |key| match p.get(key) {
+            .map(|point| {
+                let (x, y) = open_pos(point, "points")?;
+                let score = |key| match point.get(key) {
                     None | Some(Value::Null) => Ok(1.0),
-                    Some(v) => number(v, 0.0, 5.0, key),
+                    Some(value) => number(value, 0.0, 5.0, key),
                 };
                 Ok(CapturePoint {
                     x,
                     y,
                     vp: score("vp")?,
                     mp: score("mp")?,
-                    kind,
-                    needs,
+                    kind: None,
+                    needs: None,
                 })
             })
             .collect::<Result<Vec<_>>>()?;
+        let sequence = source
+            .get("pointSequence")
+            .map(|value| integer(value, 0, 1_000_000_000, "pointSequence"))
+            .transpose()?;
+        for point in raw_points {
+            if let (Some(sequence), Some(id)) = (sequence, point["id"].as_str())
+                && let Some(digits) = id.strip_prefix("point:")
+                && !digits.is_empty()
+                && digits.bytes().all(|c| c.is_ascii_digit())
+                && digits.parse::<f64>().unwrap_or(f64::INFINITY) >= sequence as f64
+            {
+                return Err(invalid("pointSequence", "must exceed existing point IDs"));
+            }
+        }
+        for (point, raw) in points.iter_mut().zip(raw_points) {
+            point.kind = raw
+                .get("kind")
+                .map(|kind| {
+                    kind.as_str()
+                        .filter(|kind| ["radio", "depot"].contains(kind))
+                        .map(str::to_owned)
+                        .ok_or_else(|| invalid("points.kind", "unknown point kind"))
+                })
+                .transpose()?;
+        }
+        for (i, (point, raw)) in points.iter_mut().zip(raw_points).enumerate() {
+            point.needs = raw
+                .get("needs")
+                .map(|value| integer(value, 0, raw_points.len() - 1, "points.needs"))
+                .transpose()?;
+            if point.needs == Some(i) {
+                return Err(invalid("points.needs", "cannot depend on itself"));
+            }
+        }
         for i in 0..points.len() {
             let mut cursor = i;
             for k in 0..=points.len() + 1 {
@@ -363,8 +373,6 @@ impl AuthoritativeMap {
             }
         }
         let catalog = Catalog::compiled().map_err(|e| MapError::Catalog(e.to_string()))?;
-        crate::scenario_validation::validate_scenario(&source, catalog)
-            .map_err(|e| invalid("scenario", &e.0))?;
         let houses = catalog
             .table("CFG")
             .map_err(|e| MapError::Catalog(e.to_string()))?
@@ -442,6 +450,8 @@ impl AuthoritativeMap {
                 triggers.push(Trigger { at, say, blow });
             }
         }
+        crate::scenario_validation::validate_scenario(&source, catalog)
+            .map_err(|e| invalid("scenario", &e.0))?;
         // Legacy timed triggers migrate to a scenario in the reference. Protect those
         // scenario limits too, without claiming support for authored scenario graphs.
         if !triggers.is_empty() {
