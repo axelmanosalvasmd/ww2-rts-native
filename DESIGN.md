@@ -4255,3 +4255,221 @@ Prepare the five local Rust/Status pairs LOG-03/04/10/15/24 as a reviewable port
 ## Owned-only logistics rebase after MAP267 (2026-10-15)
 
 Rebase PR271 from preserved4cbc3922 onto exact incoming main f7b0e5889e3b707beb6d18c4ea8d20a7d9f7b578 by replaying only its seven owned non-merge commits. Main262 and all incoming G1/engineering history are already ancestors of f7 and are not replayed. Preserve the three owned base-correction annotations from mergec350 as an explicit owned documentation step; the other two old merges introduce no unique owned annotation lines. Retain complete incoming MAP five-row validation/runtime/tests and every incoming path. Reconstruct the aggregate typed union independently from common base262, old4cbc and incomingf7 before replay, then compare every path, mode, type and blob. Exactly five logistics Rust/Status pairs and all55 Acceptance/other cells remain as reviewed; causal fixture, reader and recorder stay byte-identical to producing9efa. The successor is a new integration head: prior4cbc ACCEPT and9efa execution do not transfer. No Source, Cargo, formatter, lint, native, discovery or hosted job is run during reconstruction; Root must record a new exact scope before reservedS1 is used.
+
+
+
+## MAP-47 footprint consumer readback (2026-10-15, source only)
+
+The seven cases at `ca34eb2c` did not distinguish infantry from vehicles,
+sample multiplicity, or the MOVE-only filter from a vehicle blocker mask.
+Add two cases to the existing test, without adding another test function
+or changing production code. A rifle straddles a ford, wire and trench;
+three ordered samples land in its centre cell. A tank samples worn rubble,
+whose VBLOCK flag must not exclude it from this speed average. Each has a
+matching call to the actual pinned Source helper. Nine footprint cases
+are now specified. This is a source coverage count, not a runtime result.
+
+Retain the original 456 ground values, water assertion, complete three
+MAP-50 checks, continuous Slope component and six grade/class calls. The
+five new tests and two retained fixture gates still give seven proposed
+unique native instances. No Source, Cargo, formatter, Clippy or discovery
+command runs here. All MAP Acceptance/Status cells and old fixture bytes
+remain unchanged. PR #267 stays frozen at its separate qualified `7996167c`.
+
+## MAP footprint input alignment before execution (2026-10-15)
+
+Source inspection after frozen `e253d4f0` shows that `World::set_cell`
+initializes natural mud/ford surface wear. The pure footprint matrix
+intentionally supplies zero wear to Source. Supply that same authored
+input after native terrain construction, before its first query. Keep
+the mutation provider unchanged. The old checkpoint remains in history
+and has no execution or failure to relabel. Also describe the original
+water layout as direct input rather than claiming an existing capture.
+All Source/native/fmt/Clippy commands remain unrun, and all parity cells
+remain byte-identical to frozen PR #267. Review must target this child.
+
+
+## Next MAP terrain component checks (2026-10-15)
+
+MAP-25/31/47/48/50 use the existing component comparison rule. The new
+simtest module calls the production terrain, map mutation, pathfinding,
+unit initialization, movement and LOS providers. It changes no runtime
+code, interfaces, map admission, guards or parity cells. PR #267 stays
+frozen at `47fe2eaf`; this work has its own branch and checkout.
+
+The ground input starts with `boundary:minimum` in the retained original
+map corpus. The existing mutation provider installs each of all 19 Source
+terrain letters, including runtime-only K/A. A literal dry-value table
+checks wear 0/0.5/1, wetness 0/1, infantry/vehicle and level 0/-1, for
+456 exact double comparisons. These are authored expected constants,
+not new recorded Source outputs. The separate Source checker must test
+them against the real pinned `groundMul` body before claiming agreement.
+Seven `speedMul` cases distinguish five ordered mixed samples, wall and
+water exclusion, zero-sample fallback, naval bypass, off-map exclusion
+and the actual 0.6-radius offset.
+
+The native water check keeps the original river/bridge/ford layout and
+exact cross-water sight coordinates. MAP-50 retains every assertion from
+`LOS`, `test.js:638` and `Depressions`, including the latter's unreachable
+cliff path. The existing 18-ray original fixture remains a separate gate
+for start/end exclusion, SIGHT blockers, three/four woods, directional
+rays, smoke, hills and raised eyes. No whole-match requirement is added.
+
+The Slope consumer ports the original two tanks' coordinates, orientations,
+goals and two-second comparison. Canonical native unit initialization and
+real pathfinding supply inputs to production movement. Native state feeds
+all 40 steps in each of the two scenes, for 160 movement calls. The original
+uphill deficit and downhill tolerance remain literal. Six further block
+calls test infantry and vehicle speed at a partial positive grade, a grade
+above one and a negative grade. This is a movement component check, not
+an ordinary Match tick, command-admission or recipient-delivery claim.
+No recorded expected states, health edits or random resets feed it.
+
+The Source checker only exposes the private ground/footprint helpers,
+without rewriting their bodies. It checks the same literal matrix and
+seven footprint cases, then evaluates the four original check bodies and
+their original shared helpers unchanged. The water sight assertion runs
+separately. It writes no fixture or reference file and never replaces the
+random generator. The existing movement/LOS fixture bytes remain intact.
+
+Measured execution status: zero Source commands and zero native tests,
+formatting or Clippy commands on this branch. The five new tests and the
+Source checker are uncompiled and unrun. Qualification needs a new exact
+slot grant, first-failure preservation and independent review. Status
+promotion stays held while PR #267 owns the maps publication lease.
+
+
+## Five MAP terrain checks on accepted main (2026-10-15, unrun)
+
+Start a fresh branch at fetched main `f7b0e5889e3b707beb6d18c4ea8d20a7d9f7b578`.
+Import only the frozen `47fe2eaf..3a4112b2` terrain-check delta. The source
+checker and five-test native module are exact frozen blobs, with one additive
+consolidated registry declaration. Preserve main's accepted `7996167c`
+validation/runtime changes, all foreign registrations, all 140 MAP Acceptance
+cells, every other table cell and both complete fixture trees. The earlier
+next-five sections above retain historical branch and PR references; PR267
+is now merged, and none of its old proof qualifies these new checks.
+
+Keep `9fde0f87d89c479cb70bec18a73cc059c87b6797` and its external report
+unchanged on their original ref. Its grid, weather and MAP-49 additions are
+not imported. This task owns only MAP-25/31/47/48/50. No status promotion
+or comparison-default mapping is applied. No provider, admission, interface,
+wire, ABI, reference or privacy change occurs.
+
+The complete proposed scope is 456 ground comparisons over all 19 letters,
+nine footprint cases with authored zero wear supplied after M/F mutation,
+infantry and repeated-cell sampling, MOVE-only filtering, original water
+sight, all eight assertions across LOS/ridge/Depressions, and the original
+two-second Slope journey (160 movement calls) plus six grade/class calls.
+The five new functions and two unchanged LOS/movement fixture tests form
+seven unique proposed native instances. These are source counts, not passes.
+
+Zero Source, Node, Cargo, native, fmt, lint, discovery or CI jobs ran here.
+Root must grant this integrated exact head and Source-first selection
+before any execution, then a guarded external slot for native qualification.
+The source-only private report records the full predicate map and expected
+typed tree union. Historical results, raw failures and original checks stay
+attributed to their producing heads. Root owns independent review, hosted
+checks and any publication. This checkpoint completes no row.
+
+
+## Five MAP terrain checks after PR271 (2026-10-15, qualification pending)
+
+Integrate the six owned paths from preserved beaf1896 onto literal PR271
+merge f7c51b1a. Keep the checker and native consumer bytes unchanged, and
+add only the terrain module to the incoming consolidated registry. Preserve
+main's complete DESIGN history, all LOG and accepted MAP validator changes,
+all 140 MAP Acceptance cells, every other parity cell and every fixture.
+The earlier beaf1896 global-ref assertion failure remains a metadata
+failure, with no Source or engine execution. This task checks only its
+owned MAP refs and main preservation, without constraining other writers.
+
+The selected predicates remain all 456 ground values, nine footprint cases
+with authored zero wear after M/F mutation, original water sight, all eight
+LOS/ridge/Depressions assertions and the complete original Slope clauses.
+Five new native functions and two unchanged fixture gates form seven
+proposed instances. Source-first and native execution require a new Root
+exact-head selection and slot grant. No previous result qualifies this
+integration, and no row status or comparison-default mapping changes.
+Locally acknowledge issue5 comments6201127263,6201618030,6202564980 and
+6202580526 with their conditions. Receipt grants no additional scope.
+ABI2, the e4e579a pin and draft contract status remain unchanged.
+
+
+## MAP terrain qualification formatter child (2026-10-15)
+
+The corrected explicit Rust 1.99.0 fmt check at `a99c2b38` ran and reported
+five layout hunks in `map_terrain_components.rs`. Apply exactly those raw
+diagnostic replacements, including trailing commas. Preserve every literal,
+assertion, input and other Rust byte. The prior bare-Cargo launcher failure
+and this actual formatter exit1 remain separate in their original packets.
+No native test or Clippy has run. Freeze this child for Root to bind before
+further qualification; Source remains attributed to `a99c2b38`.
+
+
+## MAP-31 authored objective admission repair (2026-10-15, unrun)
+
+At producing head `92c18323f55c1539877b96fa3b28108c72f067e6`, formatting
+passes and the ground consumer completes all 456 comparisons. The first
+native MAP-31 attempt then fails in AuthoritativeMap admission at the
+`points` open-ground guard, before World construction or any LOS query.
+The original blank helper places its point at cell (10, 10); the retained
+river authors water there. This is a test/harness input overlap. No LOS
+semantic failure was observed. Preserve that first failure and raw logs at
+`/tmp/map-native-92c18323-52b4776c/` without retrying or relabeling them.
+
+Separate the existing authored scene input from its World construction.
+Only the water scene replaces its point metadata, before admission and
+observations, with a neutral point at cell (2, 2), explicitly VP 0 and MP 0.
+The river's first ten columns are authored open ground, so this location
+follows directly from the input layout, without a query or expected answer.
+All other scenes retain their original point metadata. The original river,
+bridge and ford rows, heights, smoke, actor positions, rays, water flag
+predicate and LOS assertions are unchanged. No terrain provider, admission
+guard, expected output or production code changes.
+
+The owned Source water query consumes only dimensions, terrain flags and
+empty smoke, not objective metadata. It therefore needs no shared-input
+binding change. The Source checker remains byte-identical to its one-time
+`a99c2b38` PASS. That historical Source result and the producing `92c18323`
+ground PASS do not qualify this child. The other five selected native
+functions and Clippy were unrun at the first failure. All 140 MAP Acceptance
+cells and all other parity cells remain unchanged.
+
+Freeze this bounded source-only child of the failed exact head. Main
+`f7c51b1a` and all prior owned MAP refs and evidence remain preserved.
+No Source, Cargo, native, formatter, lint, discovery, retry or CI job runs
+under this repair task. Root alone records a new exact-head Source/native
+qualification scope, resources and slot selection after freeze. No row is
+promoted, and no whole-match, client, interface or owner-policy claim changes.
+
+
+## MAP terrain integration after PR268 (2026-10-15, source only)
+
+Carry only the six original MAP terrain-check paths and their bounded
+formatter and MAP-31 input repairs from preserved `7f7acc9f` onto literal
+main `011a39d0cfc1cbcdf28024fd73ff92f74f8639ac`. The checker and complete
+five-test module remain exact. Preserve all incoming DESIGN text as a
+complete prefix and add only one terrain declaration to the incoming
+consolidated registry. All six incoming MOV statuses, both complete held
+World tests with their ignore reasons, fixtures, LOG and G1 history, all
+939 gameplay IDs and every Acceptance cell remain unchanged.
+
+The MAP-31 authored point stays at cell (2, 2), neutral with VP 0 and MP 0,
+before admission. All five mechanical formatter hunks remain exact. No
+shipping provider, admission guard, interface, wire, FFI or reference changes.
+No MAP status proposal is applied. The private five-row publication packet
+at `/tmp/map-private-publication-7f7-52b4776c` remains unchanged.
+
+Actual formatting, seven native passes and strict Clippy belong only to
+producing `7f7acc9f`, Rust tree `09cf932889e3e2aa21587f2dbba3364f2c2e9695`.
+The one Source pass belongs to `a99c2b38`. The failed `92c18323` admission
+attempt and earlier raw failures remain preserved. None qualifies this
+successor. No Source, Node, Cargo, rustc, native, formatter, lint, discovery
+or CI job runs during integration. Any execution needs a new literal Root
+head, seven-function selection and guarded slot grant. Root owns review,
+publication and subsequent row eligibility.
+
+The inherited pre-MOV tables literally contained 248 ported rows, while
+the earlier report said 250. Retain that discrepancy without repairing
+tables or replacing the reported figure with a new global claim.
