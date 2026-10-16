@@ -111,3 +111,21 @@ All 20 rows below stay out of this PR's proven list. CMB-112/127/134/137 are dro
 | CMB-156 | Client control groups have no native witness. |
 | CMB-158 | No complete seeded native replay or outcome witness. |
 | CMB-159 | No deterministic purpose-stream witness in this extraction. Native purpose streams are permitted by PARITY.md. |
+
+## CMB-WEAK follow-up
+
+The follow-up to merged PR #278 strengthens five row witnesses. It replaces the CMB-123 direct vision-pass test with `cmb123_vision_is_team_shared_and_refreshes_through_match_ticks`, which observes team visibility at ticks 201 and 205 and its cached value between them. The earlier receipt above belongs to the original test body and name.
+
+| Row | Strengthened witness |
+| --- | --- |
+| CMB-86 | `cmb86_target_threat_hysteresis_visibility_and_explicit_lock`: a closer challenger inside the margin stays rejected, then one outside it takes over |
+| CMB-104 | `cmb104_109_grenades_satchel_and_petard_impact_hurt_both_teams_and_structures`: Rifle Grenade and Medium HE impact enemy and friendly infantry, a vehicle and a registered structural section |
+| CMB-109 | The same impact test covers Ranger and Commando satchels and Churchill Petard |
+| CMB-123 | `cmb123_vision_is_team_shared_and_refreshes_through_match_ticks`: automatic refresh through the Match tick, shared with a teammate that has no observer |
+| CMB-139 | `cmb139_attack_denies_missing_allied_hidden_and_unarmed`: a visible airborne enemy rejects a ground attack order with Needs and preserves the prior ground target |
+
+The impact test places the structure beside the trajectory so direct contact cannot satisfy its blast assertion. It also checks an outside-radius unit and verifies that grenade-ticket cleanup cannot apply damage twice.
+
+CMB-84 gains `cmb84_aircraft_hold_fire_guards_patrol_anti_air_and_support_interception`, including positive anti-air and interception controls. The complete row is dropped from this follow-up's proven set: automatic aircraft ground fire, explicit ground attack and fighter hunting remain unavailable in `match_aviation.rs`. Implementing those actuators is outside this small test follow-up. This does not change a parity status.
+
+Prototype source read: `shared/sim.js:2199-2255`, `3495-3510`, `3928-3946`, `4379-4441`, `4702-4742`, `5320`, `5416-5428` and `5614-5622` at `e4e579a`. The follow-up passed all 46 `combat_feature_tests::` library tests on the Vostro (162 library tests skipped), in S3 under the required 6 GiB memory and zero-swap limit. An initial build found a Hold Position fixture-field error; the first executed selection then found stale startup production rows in the vision fixture. Both setup errors were corrected before the complete passing module run. `cargo +1.99.0 fmt --all --check --manifest-path rust/Cargo.toml` and strict locked workspace/all-target Clippy also passed, in S3 under the same limits. Both successful jobs released their slot on exit.
