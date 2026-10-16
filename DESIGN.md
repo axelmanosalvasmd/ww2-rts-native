@@ -10,6 +10,14 @@ Read current main before integration: it lacks ai_receipt_input and ai_delivered
 
 # Three Crossroads Native: design decisions
 
+## Editable map drafts and bounded save preparation (2026-10-16)
+
+Map authoring uses an in-memory draft separate from `World` and `Match`. Selection moves retain the selected layer's material overrides and authored section identities, health and supports. Failed bounds or collision checks leave the draft unchanged. Removal and support pruning can leave an invalid draft, which must pass the ordinary map validator before saving. This keeps unsupported surviving sections visible as authoring errors instead of silently repairing their anchors.
+
+The map loader now calls the scenario validator added in #298. A validated scenario can be edited and prepared for saving, but every startup profile rejects explicit authored scenarios before creating match state because their executor is absent. The previous fixture assertion that scenarios were unsupported by the loader now checks their retained definition. No command, event, flag or other live match state was added.
+
+`map_save::prepare_map_save` applies the prototype's save-field projection and an 8 MiB limit to incoming bytes before parsing, including discarded properties. It prepares bytes in memory and validates the projected document again. HTTP editor authorization, persistence and server integration remain absent, so MAP-23 remains component-only. The existing 16 MiB authoritative-loader limit is unchanged. Generated World documents are outside the demonstrated save scope. MAP-57's rendered-ground sampler and MAP-90's station-yard construction integration remain unimplemented; World admission stays guarded. MAP-92 retains field-specific diagnostics and stronger bounded integer checks for region IDs and ordered bounds, reported as differs candidates rather than approved differences.
+
 
 ## First-five engineering merged with MAP273 main (2026-10-16, source only)
 

@@ -1,0 +1,3 @@
+- Add in-memory map selection moves, removal and structure pruning that preserve underlying layers, materials and section metadata, and reject unsupported surviving sections during validation.
+- Validate authored scenarios during map loading with the existing scenario validator; keep scenario execution outside match admission. Update the former unsupported-scenario fixture assertion to check validated authoring data.
+- Add validated save-field projection with an 8 MiB incoming-document cap. Server editor persistence remains unwired. Add a World validation matrix without changing native diagnostics; rendered-ground sampling and station-yard construction exclusions remain pending.

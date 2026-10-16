@@ -3,7 +3,8 @@
 //! This is not a client-map importer or a match constructor. Client projections erase mines,
 //! triggers and scenarios irreversibly. Callers must supply the original authoritative document;
 //! the format has no provenance marker that could distinguish a stripped projection.
-//! Authored scenarios remain unsupported. Unknown authoring properties stay in `source()` for later systems.
+//! Authored scenarios are validated here; their execution remains guarded at match admission.
+//! Unknown authoring properties stay in `source()` for later systems.
 use std::{collections::BTreeMap, fmt};
 
 use serde_json::Value;
@@ -220,11 +221,6 @@ impl AuthoritativeMap {
             .transpose()?;
         let layers = normalize_layers(&source, w, h, &chars)?;
         let structures = crate::structures::parse(source.get("structures"), w, h, &layers)?;
-        if source.get("scenario").is_some() {
-            return Err(MapError::Unsupported {
-                feature: "scenario",
-            });
-        }
         let is_world = source.get("world").is_some();
         let minimum_spawns = if is_world { 1 } else { 2 };
         let pos = |v: &Value, field: &str| -> Result<(usize, usize)> {
@@ -371,6 +367,8 @@ impl AuthoritativeMap {
             }
         }
         let catalog = Catalog::compiled().map_err(|e| MapError::Catalog(e.to_string()))?;
+        crate::scenario_validation::validate_scenario(&source, catalog)
+            .map_err(|e| invalid("scenario", &e.0))?;
         let houses = catalog
             .table("CFG")
             .map_err(|e| MapError::Catalog(e.to_string()))?
