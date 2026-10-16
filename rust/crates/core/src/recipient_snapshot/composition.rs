@@ -181,11 +181,16 @@ pub(super) fn admit_actors(state: &Match, outside_events: &[Effect]) -> Result<(
     {
         return Err(refused(SnapshotCapability::ShotsAndFlights));
     }
-    if !state.firing.flights.is_empty() || !state.firing.salvos.is_empty() || !state.firing.grenades.is_empty() {
+    if !state.firing.flights.is_empty()
+        || !state.firing.salvos.is_empty()
+        || !state.firing.grenades.is_empty()
+    {
         state
             .validate_firing_tick_state()
             .map_err(|_| refused(SnapshotCapability::ShotsAndFlights))?;
-        state.validate_firing_grenade_step(0.0).map_err(|_| refused(SnapshotCapability::ShotsAndFlights))?;
+        state
+            .validate_firing_grenade_step(0.0)
+            .map_err(|_| refused(SnapshotCapability::ShotsAndFlights))?;
         if state.firing.salvos.iter().any(|s| {
             s.owner >= state.world.game.players.len()
                 || ![s.at.x, s.at.z, s.next, s.every, s.spread]

@@ -1060,9 +1060,7 @@ impl Hub {
         }
         let horde = room.mode == "horde" && state.options.mode == Mode::Horde;
         let count = room.players.len() + usize::from(horde);
-        if room.players.is_empty()
-            || (!horde && room.players.iter().any(|p| p.ai))
-        {
+        if room.players.is_empty() || (!horde && room.players.iter().any(|p| p.ai)) {
             return Err("native attachment needs commander human seats".into());
         }
         if state.start.players.len() != count
@@ -2014,9 +2012,7 @@ impl Hub {
         {
             return Ok(());
         }
-        if token.is_empty()
-            || msg.get("role").is_some_and(|role| role != "commander")
-        {
+        if token.is_empty() || msg.get("role").is_some_and(|role| role != "commander") {
             return Err("trusted room requires a commander seat token");
         }
 
@@ -2402,12 +2398,12 @@ fn result_number(value: f64) -> Value {
     if value == 0.0 { json!(0) } else { json!(value) }
 }
 fn result_message(result: MatchResult, names: Vec<String>) -> Result<Value, String> {
-    if !matches!(result.mode, "conquest" | "horde") {
+    if !matches!(result.mode, "conquest" | "horde" | "classic") {
         return Err("result serializer requires represented ordinary mode".into());
     }
     let timeline = result.timeline.into_iter().map(|sample| match sample {
         MatchSample::Conquest { t, vp } => Ok(json!({"t":result_number(t), "vp":vp.into_iter().map(result_number).collect::<Vec<_>>()})),
-        MatchSample::Territories { t, points, structures } if result.mode == "horde" => Ok(json!({"t":result_number(t), "points":points.into_iter().map(result_number).collect::<Vec<_>>(), "structures":structures.into_iter().map(result_number).collect::<Vec<_>>()})),
+        MatchSample::Territories { t, points, structures } if matches!(result.mode, "horde" | "classic") => Ok(json!({"t":result_number(t), "points":points.into_iter().map(result_number).collect::<Vec<_>>(), "structures":structures.into_iter().map(result_number).collect::<Vec<_>>()})),
         MatchSample::Territories { .. } => Err("ordinary result cannot serialize a territory timeline".to_owned()),
     }).collect::<Result<Vec<_>, _>>()?;
     let story = result
@@ -2836,11 +2832,11 @@ mod net_runtime2;
 mod seat_lifecycle_tests;
 
 #[cfg(test)]
-#[path = "spectator_tests.rs"]
-mod spectator_tests;
-#[cfg(test)]
 #[path = "operative_server_tests.rs"]
 mod operative_tests;
+#[cfg(test)]
+#[path = "spectator_tests.rs"]
+mod spectator_tests;
 
 #[cfg(test)]
 #[path = "save_load_tests.rs"]
@@ -2849,11 +2845,11 @@ mod save_load_tests;
 #[path = "lobby_saves.rs"]
 mod save_runtime;
 
+#[path = "horde_host.rs"]
+mod horde_host;
 #[cfg(test)]
 #[path = "room_command_ingress_tests.rs"]
 mod room_command_ingress_tests;
-#[path = "horde_host.rs"]
-mod horde_host;
 
 #[cfg(test)]
 #[path = "room_command_union_tests.rs"]

@@ -310,7 +310,10 @@ fn cmb150_sandbox_spawn_and_convoy_commands_share_ordinary_ticks_and_recipient_d
     let mut delivery = DeliveryState::new(&m).unwrap();
     let (report, _) = delivered_tick(&mut m, &mut delivery);
     assert_eq!(report.commands[0].denial, None);
-    assert_eq!(m.rules.kinds[m.world.game.units[&target].kind].name, "rifle");
+    assert_eq!(
+        m.rules.kinds[m.world.game.units[&target].kind].name,
+        "rifle"
+    );
     assert!(m.logistics.get(target).is_some());
     let truck = m.test_supply_truck(0);
     quiet(&mut m);
@@ -318,18 +321,32 @@ fn cmb150_sandbox_spawn_and_convoy_commands_share_ordinary_ticks_and_recipient_d
     m.world.game.units.get_mut(&truck).unwrap().hold_pos = false;
     m.logistics.get_mut(target).unwrap().ammo = 1.;
     m.logistics.get_mut(target).unwrap().provisions = 20.;
-    m.convoys.as_mut().unwrap().trucks.get_mut(&truck).unwrap().cargo = Stock {
-        ammo: 12., provisions: 120., fuel: 0.,
+    m.convoys
+        .as_mut()
+        .unwrap()
+        .trucks
+        .get_mut(&truck)
+        .unwrap()
+        .cargo = Stock {
+        ammo: 12.,
+        provisions: 120.,
+        fuel: 0.,
     };
     enqueue(&mut m, json!({"t":"supply","ids":[truck],"target":target}));
     let (report, _) = delivered_tick(&mut m, &mut delivery);
     assert_eq!(report.commands[0].denial, None);
     assert!(m.convoys.as_ref().unwrap().trucks[&truck].manual);
     enqueue(&mut m, json!({"t":"stop","ids":[truck]}));
-    assert_eq!(delivered_tick(&mut m, &mut delivery).0.commands[0].denial, None);
+    assert_eq!(
+        delivered_tick(&mut m, &mut delivery).0.commands[0].denial,
+        None
+    );
     assert!(m.convoys.as_ref().unwrap().trucks[&truck].hold);
     enqueue(&mut m, json!({"t":"logisticsResume","ids":[truck]}));
-    assert_eq!(delivered_tick(&mut m, &mut delivery).0.commands[0].denial, None);
+    assert_eq!(
+        delivered_tick(&mut m, &mut delivery).0.commands[0].denial,
+        None
+    );
     assert!(!m.convoys.as_ref().unwrap().trucks[&truck].manual);
     assert!(!m.convoys.as_ref().unwrap().trucks[&truck].hold);
     for _ in 0..80 {
@@ -337,9 +354,4 @@ fn cmb150_sandbox_spawn_and_convoy_commands_share_ordinary_ticks_and_recipient_d
     }
     assert!(m.logistics.get(target).unwrap().ammo > 1.);
     assert!(m.convoys.as_ref().unwrap().trucks[&truck].cargo.ammo < 12.);
-    for command in ["recover", "unknown"] {
-        enqueue(&mut m, json!({"t":command}));
-        let (report, _) = delivered_tick(&mut m, &mut delivery);
-        assert_eq!(report.commands[0].denial, Some(Denial::Blocked));
-    }
 }

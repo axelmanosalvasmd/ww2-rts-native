@@ -52,7 +52,7 @@ All inherited World, aircraft-weapon, privacy, invalid-state, terminal tick and 
 
 ## Row accounting
 
-- CMB-150 (R1): `cmb150_sandbox_spawn_and_convoy_commands_share_ordinary_ticks_and_recipient_delivery`; inherited `convoy_room_shapes_preserve_selection_order_duplicates_and_uncapped_orders_fallback`, `convoy_room_supply_stop_resume_survives_pending_save_and_finishes_with_every_seat`, and `convoy_room_denials_distinguish_selection_target_disabled_and_unassignable_job`; #393 sandbox dispatch, refusal, aircraft/grenade flight and terminal-delivery tests. The new composition sends Spawn, Supply, Stop and LogisticsResume through the same recorded queue and captures every seat after each tick. Non-World Recover and unknown commands retain `blocked`. World recovery remains deferred and unclaimed.
+- CMB-150 (R1): `cmb150_sandbox_spawn_and_convoy_commands_share_ordinary_ticks_and_recipient_delivery`, `cmb150_nonworld_recovery_and_unknown_orders_keep_exact_blocked_denial`; inherited `convoy_room_shapes_preserve_selection_order_duplicates_and_uncapped_orders_fallback`, `convoy_room_supply_stop_resume_survives_pending_save_and_finishes_with_every_seat`, and `convoy_room_denials_distinguish_selection_target_disabled_and_unassignable_job`; #393 sandbox dispatch, refusal, aircraft/grenade flight and terminal-delivery tests. The new composition sends Spawn, Supply, Stop and LogisticsResume through the same recorded queue and captures every seat after each tick. Non-World Recover and unknown commands retain `blocked`. World recovery remains deferred and unclaimed.
 - NET-43: see the complete command-union mapping in `net43-roomcmds2.md`.
 - NET-58: see the event composition mapping in `net58-roomcmds2.md`.
 
@@ -66,3 +66,9 @@ The independent review also identified unused operative flight helpers after pro
 Independent merge-tree audit recomputed automatic trees `97bcd539` (main), `7fa4ea2a` (#393), `16ea4246` (#374) and `f392b069` (#413). The main merge matches exactly. Each dependency merge differs only in the paths recorded above and this integration record. No hidden hand-edited path was found. A successor bounded source review accepts the documented repairs and NET-58 additions; execution and a final combined-head review remain separate gates.
 
 The sandbox start test's historical Horde refusal is replaced by `sandbox_horde_start_and_spawn_keep_every_canonical_seat_live`: host-started sandbox Horde, guest enemy spawn, correct Horde owner and six ordinary ticks with all three canonical snapshots. World refusal remains. The seated/operative output adapters in `operative_server_tests.rs` and `horde_host_tests.rs` explicitly reject watcher output after composing the spectator enum variant; their earlier assertions remain.
+
+The first shared-target diagnostic selected zero tests from reused binaries and counts as no execution evidence. Qualification forces current crate recompilation before interpreting any test inventory or result.
+
+The combined `59ed284c` review found Classic terminal results still restricted to Conquest/Horde. The successor admits Classic's existing territory timeline and extends the cancellation witness through queued headquarters destruction, natural elimination, 120 hold callbacks, 60 frames per seat, recipient outcomes and stable lobby return. Public Classic start remains guarded.
+
+Workspace formatting applies only mechanical Rust layout in the owned logistics test, recipient list/cache/composition/operative validation/owner tests/projectile tests/public state files, and server ingress/lobby/operative output/command-union/sandbox tests. No formatter-only predicate or guard changes.

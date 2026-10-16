@@ -452,7 +452,6 @@ fn sandbox_spawned_rifle_grenade_survives_throw_flight_and_expiry_for_every_seat
     }
 }
 
-
 #[test]
 fn sandbox_horde_start_and_spawn_keep_every_canonical_seat_live() {
     let mut room = Sandbox::lobby();
@@ -469,20 +468,57 @@ fn sandbox_horde_start_and_spawn_keep_every_canonical_seat_live() {
     let slot = state.horde.as_ref().unwrap().slot;
     let id = state.next_unit_id;
     let at = state.start.players[0].spawn;
-    room.send(1, json!({"t":"spawn","unit":"rifle","enemy":true,"x":at.x+20.,"z":at.z}));
-    let selected = (0..3).map(|slot| SelectedSeat {slot,full:true,omit:false}).collect::<Vec<_>>();
+    room.send(
+        1,
+        json!({"t":"spawn","unit":"rifle","enemy":true,"x":at.x+20.,"z":at.z}),
+    );
+    let selected = (0..3)
+        .map(|slot| SelectedSeat {
+            slot,
+            full: true,
+            omit: false,
+        })
+        .collect::<Vec<_>>();
     for tick in 0..6 {
         let runtime = room.runtime();
-        let report = runtime.advance_tick(&[false;3]).unwrap();
+        let report = runtime.advance_tick(&[false; 3]).unwrap();
         if tick == 0 {
             assert_eq!(report.commands.len(), 1);
             assert_eq!(report.commands[0].denial, None);
         }
         assert_eq!(runtime.state().world.game.units[&id].owner, slot);
         assert!(runtime.state().horde.as_ref().unwrap().active);
-        let frames = runtime.collect_frame(&selected, FrameKind::Scheduled).unwrap();
+        let frames = runtime
+            .collect_frame(&selected, FrameKind::Scheduled)
+            .unwrap();
         assert_eq!(frames.len(), 3);
-        assert!(frames.iter().all(|frame| frame.message["mode"]["kind"] == "horde"));
+        assert!(
+            frames
+                .iter()
+                .all(|frame| frame.message["mode"]["kind"] == "horde")
+        );
         assert!(runtime.fault().is_none());
+    }
+}
+
+#[test]
+fn cmb150_nonworld_recovery_and_unknown_orders_keep_exact_blocked_denial() {
+    let mut room = Sandbox::lobby();
+    room.start(true);
+    for command in ["recover", "unknown"] {
+        room.send(1, json!({"t":command}));
+    }
+    assert_eq!(room.runtime().state().commands.pending_commands(), 0);
+    let messages = room.drain();
+    assert!(messages[0].is_empty());
+    assert_eq!(
+        messages[1],
+        vec![
+            json!({"t":"deny","cmd":"recover","reason":"blocked"}),
+            json!({"t":"deny","cmd":"unknown","reason":"blocked"}),
+        ]
+    );
+    for _ in 0..6 {
+        room.tick();
     }
 }

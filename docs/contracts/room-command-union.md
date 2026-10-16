@@ -52,3 +52,15 @@ attachment. Classic frames retain owner-only production identities and refunds
 (`shared/sim.js:5895-5898`), and public node rows `[x,z,rate,fuelFlag]`
 (`shared/sim.js:5932,6019`). Canonical elimination and production validation
 precedes delivery. No World snapshot or room admission is opened.
+
+
+Classic natural finishes use the same result object keys as Conquest, with
+`mode:"classic"`, `winVp:null`, the canonical `hq` reason and territory timeline
+samples `{t,points,structures}`. Each seat receives its own `you` outcome. The
+server retains play for 120 callbacks, advances the simulation and emits a
+frame every second callback, then resumes and returns to lobby with the result
+(`server.js:738-754`; `shared/story.js:66-70`). The lifecycle test ends through
+an ordinary queued HQ destruction and canonical elimination, after exercising
+production cancellation. It checks 60 ending frames for every seat, final
+result keys and timeline, and stable post-result status. Public Classic start
+remains guarded.

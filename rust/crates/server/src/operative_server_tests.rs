@@ -75,8 +75,10 @@ fn drain_commanders(
                     result.push(serde_json::from_str(&write.json).unwrap());
                     hub.complete_snapshot(&write, true, now);
                 }
-                Output::Watcher(_) => panic!("watcher output reached a seated or operative recipient"),
-            Output::Close(_, reason) => panic!("unexpected commander close: {reason}"),
+                Output::Watcher(_) => {
+                    panic!("watcher output reached a seated or operative recipient")
+                }
+                Output::Close(_, reason) => panic!("unexpected commander close: {reason}"),
             }
         }
         result

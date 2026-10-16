@@ -313,17 +313,42 @@ mod tests {
     #[test]
     fn supported_stance_is_queued_and_malformed_rows_do_not_reserve_keys() {
         let mut state = crate::lobby::native_tests::native_match();
-        let actor = state.world.game.units.values()
+        let actor = state
+            .world
+            .game
+            .units
+            .values()
             .find(|u| u.owner == 0 && state.rules.kinds[u.kind].name == "rifle")
-            .unwrap().id;
+            .unwrap()
+            .id;
         let mut ingress = CommanderIngress::default();
-        let before = format!("{:?}", (&state.world.game.units, &state.commands.units, &ingress));
-        assert_eq!(ingress.enqueue(&mut state, 0,
-            &json!({"t":"move","orders":[[actor,2,"bad"]]})), Err(Denial::Blocked));
-        assert_eq!(format!("{:?}", (&state.world.game.units, &state.commands.units, &ingress)), before);
+        let before = format!(
+            "{:?}",
+            (&state.world.game.units, &state.commands.units, &ingress)
+        );
+        assert_eq!(
+            ingress.enqueue(
+                &mut state,
+                0,
+                &json!({"t":"move","orders":[[actor,2,"bad"]]})
+            ),
+            Err(Denial::Blocked)
+        );
+        assert_eq!(
+            format!(
+                "{:?}",
+                (&state.world.game.units, &state.commands.units, &ingress)
+            ),
+            before
+        );
         assert_eq!(state.commands.pending_commands(), 0);
-        ingress.enqueue(&mut state, 0,
-            &json!({"t":"stance","ids":[actor],"key":"autoRetreat","on":true})).unwrap();
+        ingress
+            .enqueue(
+                &mut state,
+                0,
+                &json!({"t":"stance","ids":[actor],"key":"autoRetreat","on":true}),
+            )
+            .unwrap();
         let report = state.advance_tick().unwrap();
         assert!(ingress.complete(&report.commands).is_empty());
         assert!(state.commands.units[&actor].auto_retreat);
@@ -382,10 +407,19 @@ mod tests {
     fn conquest_production_cancel_uses_canonical_denial_after_enqueue() {
         let mut state = crate::lobby::native_tests::native_match();
         let mut ingress = CommanderIngress::default();
-        ingress.enqueue(&mut state, 0, &json!({"t":"cancelProduction","id":1,"job":1})).unwrap();
+        ingress
+            .enqueue(
+                &mut state,
+                0,
+                &json!({"t":"cancelProduction","id":1,"job":1}),
+            )
+            .unwrap();
         assert_eq!(state.commands.pending_commands(), 1);
         let report = state.advance_tick().unwrap();
-        assert_eq!(ingress.complete(&report.commands), vec![(0, "cancelProduction", Denial::Needs)]);
+        assert_eq!(
+            ingress.complete(&report.commands),
+            vec![(0, "cancelProduction", Denial::Needs)]
+        );
         assert_eq!(state.commands.pending_commands(), 0);
         assert!(ingress.feedback.is_empty());
     }
@@ -399,7 +433,10 @@ mod tests {
         assert!(CommanderIngress::recognizes("orders"));
         ingress.enqueue(&mut state, 0, &raw).unwrap();
         assert_eq!(state.commands.pending_commands(), 1);
-        assert_eq!(format!("{:?}", (&state.world.game.units, &state.commands.units)), before);
+        assert_eq!(
+            format!("{:?}", (&state.world.game.units, &state.commands.units)),
+            before
+        );
         let report = state.advance_tick().unwrap();
         assert_eq!(ingress.complete(&report.commands).len(), 1);
         assert_eq!(state.commands.pending_commands(), 0);

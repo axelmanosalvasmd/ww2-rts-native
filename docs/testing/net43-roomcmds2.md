@@ -15,7 +15,7 @@ Classic snapshot admission and waiting Ability projection to existing owners.
 | NET-43 | `net43_ability_autocast_and_waiting_kind_six_survive_room_delivery` | Successful guest Autocast, foreign selection exclusion, waiting aimed Ability with exact kind-6 owner row, private orders, immediate aimed Ability and later room frames. |
 | NET-43 | `net43_board_unload_and_aircraft_escort_run_through_ordinary_rooms` | Actual boarding, riding/cargo state, mixed aircraft Escort selection, successful Unload, aircraft Move/Stop and later room frames. |
 | NET-43 | `net43_build_and_worker_replacement_remain_live_after_admission` | Paid guest Build creates its site through the queue, retains construction through frames, accepts AutoRetreat and lets Stop clear the canonical assignment. |
-| NET-43 | `net43_classic_waiting_production_cancels_refunds_and_delivers_every_seat` | Actual authored Classic attachment with logistics disabled, two queued purchases, original waiting-job refund, active-job `notWaiting`, foreign `unseen`, owner-only job identities, Classic currency/mode/node rows and later frames for both seats. |
+| NET-43 | `net43_classic_waiting_production_cancels_refunds_and_delivers_every_seat` | Actual authored Classic attachment with logistics disabled, two queued purchases, original waiting-job refund, active-job `notWaiting`, foreign `unseen`, owner-only job identities, Classic currency/mode/node rows, natural HQ loss through the queue, 120 ending callbacks with 60 frames per seat, and the final Classic result and territory timeline. |
 | NET-43 | `net43_classic_attachment_keeps_mode_map_binding_and_refuses_node_rounding_overflow` | Preserves authored map and mode binding, rejects overflow during node rounding without publication, and retains World snapshot refusal. |
 | NET-43 | `queued_ability_uses_prototype_kind_six_rounded_anchor_and_owner_privacy` | Exact tenths rounding, singleton normalized Ability projection, private orders and refusal of malformed stored variants. |
 
@@ -28,7 +28,10 @@ Tests use the canonical authored `default` map. Additional actors are declared
 through the canonical staged unit publication API before attachment. Build
 placement is discovered in a separate deterministic fixture; the live room
 receives the site only through its public queued command. Classic is attached
-through the normal native startup validation, with no snapshot bypass. Every
+through the normal native startup validation, with no snapshot bypass. Its
+cancellation test then destroys the opposing HQ through the ordinary command
+queue and observes canonical elimination, the complete ending hold and lobby
+results. No finish state is assigned by the test. Every
 ordinary test callback checks room fault state and projects every seat; later
 callbacks also require actual frame delivery to both seats.
 

@@ -317,7 +317,9 @@ impl crate::match_runtime::Match {
             crate::economy::Mode::Default | crate::economy::Mode::Conquest
         ) || game.mode.is_some()
         {
-            return Err("global ordinary lists require Conquest, canonical Classic or Horde".into());
+            return Err(
+                "global ordinary lists require Conquest, canonical Classic or Horde".into(),
+            );
         }
         let mut ids = std::collections::BTreeSet::new();
         let mut rows = Vec::with_capacity(game.wrecks.len());
@@ -350,8 +352,20 @@ impl crate::match_runtime::Match {
         }
         self.validate_actor_mode()?;
         self.validate_elimination_state()?;
-        let rows = self.elimination.as_ref().ok_or("missing Classic nodes")?.nodes.iter()
-            .map(|node| [rounded(node.at.x), rounded(node.at.z), node.rate, if node.fuel { 1. } else { 0. }])
+        let rows = self
+            .elimination
+            .as_ref()
+            .ok_or("missing Classic nodes")?
+            .nodes
+            .iter()
+            .map(|node| {
+                [
+                    rounded(node.at.x),
+                    rounded(node.at.z),
+                    node.rate,
+                    if node.fuel { 1. } else { 0. },
+                ]
+            })
             .collect::<Vec<_>>();
         if rows.iter().flatten().any(|number| !number.is_finite()) {
             return Err("unrepresentable Classic node row".into());

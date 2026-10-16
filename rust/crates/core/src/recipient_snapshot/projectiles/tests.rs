@@ -1,13 +1,13 @@
 use super::*;
 use crate::{
     economy::Faction,
-    game::Point,
-    projectiles::{self as geometry, Point3},
     economy_state::ArmySize,
+    game::Point,
     match_commands::Command,
     match_firing::{AbilityBlast, LaunchEvent},
     match_runtime::{MatchOptions, PlayerConfig},
     match_tick::TickEvent,
+    projectiles::{self as geometry, Point3},
     unit_publication::{PublicationParts, StagedUnit, prepare_publication},
     weather::WeatherChoice,
 };

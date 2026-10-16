@@ -145,9 +145,15 @@ impl<'a> SnapshotCache<'a> {
             return Err(SnapshotError::UnsupportedMode);
         }
         if classic {
-            state.validate_actor_mode().map_err(|_| SnapshotError::Rules)?;
-            state.validate_elimination_state().map_err(|_| SnapshotError::Rules)?;
-            state.validate_production_phases(0.0).map_err(|_| SnapshotError::Rules)?;
+            state
+                .validate_actor_mode()
+                .map_err(|_| SnapshotError::Rules)?;
+            state
+                .validate_elimination_state()
+                .map_err(|_| SnapshotError::Rules)?;
+            state
+                .validate_production_phases(0.0)
+                .map_err(|_| SnapshotError::Rules)?;
         }
         if horde {
             state
