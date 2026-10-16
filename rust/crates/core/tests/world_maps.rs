@@ -155,3 +155,27 @@ fn ordinary_match_start_refuses_newly_supported_world_maps() {
         matches!(Match::new(&map, options),Err(e) if e == "native startup does not yet initialize World matches")
     );
 }
+
+#[test]
+fn map92_world_corruptions_reject_without_mutating_the_authoritative_input() {
+    let good=input();
+    let pristine=AuthoritativeMap::from_world(good.clone()).unwrap();
+    for defect in 0..11 {
+        let mut bad=good.clone();
+        match defect {
+            0=>bad.geography.regions.pop().map(|_|()).unwrap(),
+            1=>bad.geography.region_cells=63,
+            2=>{bad.geography.region_map.as_mut().unwrap().pop();},
+            3=>bad.geography.region_map.as_mut().unwrap()[0]=64,
+            4=>bad.geography.region_map.as_mut().unwrap()[0]= -2,
+            5=>bad.geography.regions[1].id=bad.geography.regions[0].id,
+            6=>bad.chars[2*20+2]=b'W',
+            7=>bad.geography.regions[1].bounds=[0,0,21,20],
+            8=>bad.geography.regions[1].home=Some(0),
+            9=>bad.geography.regions[0].home=None,
+            _=>{for y in 0..20 {bad.heights.as_mut().unwrap()[y*20+9]=2;}},
+        }
+        assert!(AuthoritativeMap::from_world(bad).is_err(),"world defect {defect}");
+        assert_eq!(AuthoritativeMap::from_world(good.clone()).unwrap().source(),pristine.source());
+    }
+}

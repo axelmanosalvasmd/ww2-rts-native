@@ -4752,3 +4752,28 @@ no old green result is transferred to this child. MAP49 stays todo. All other
 parity cells, fixtures, registries, World guards and incoming MAP5, MOV6, CMB6
 and NET5 rows remain unchanged. Root owns exact-head independent review, any
 new execution grant, publication and integration.
+
+## Owned MAP native feature batch under the approved intent rule (2026-10-16)
+
+Axel's owner answer 6206861267 approves rules 1 to 5 exactly, without the
+coordinator's proposed added conditions. Apply that decision to all 42 remaining
+owned MAP rows in one window. Behavior uses native tests plus reviewer reading
+of the pinned prototype. Existing exact table, math, grid and component fixtures
+stay intact; no behavior recorder, capture or provenance bundle is added.
+
+Add 17 native tests for coordinates, off-map queries, layer composition and
+materials, authored weather, terrain health/fire/destruction, crater quality,
+woods sight, ford/mud/roads, rail masks, combat cover/elevation, both original
+bridge journeys, World setup, lookup, memory/reconnect and invalid geography.
+The combat checks register a cfg(test)-only child module. Shipping runtime,
+interfaces, dependencies and reference pin are unchanged. Normal native RNG
+advances in the 3,000-volley high-ground comparison and artillery journey.
+
+The compact mapping in docs/parity/maps.md covers every owned row. Twenty-five
+rows are candidates, all UNRUN; seventeen remain held with concrete provider or
+exact-value gaps. In particular, moved vehicle crushing is explicitly refused
+by match_ground_contact.rs, editor movement/pruning is absent, and World
+validation strings differ from the retained exact oracle. Do not silently mark
+these differences as intentional or transfer earlier passes to this head.
+Root owns the next literal execution grant, reviewer assignment, public actions
+and integration. Only actual passing rows with reviewer confirmation may move.

@@ -2466,3 +2466,7 @@ impl Match {
 #[cfg(test)]
 #[path = "world_ground_actor_tests.rs"]
 mod world_ground_actor_tests;
+
+#[cfg(test)]
+#[path = "map_feature_tests.rs"]
+mod map_feature_tests;
