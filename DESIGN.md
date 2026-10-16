@@ -1,3 +1,11 @@
+## Seat lifecycle controls and metadata (2026-10-16)
+
+Host pause and resume reuse the server's existing `RoomRuntime` pause state. The server owns the supplied wall-clock deadlines and the one-second pause/frame cadence; the deterministic core receives no timer. Paused ingress ignores new orders while preserving the queue for resume. Operative and AI room admission remain closed on R1.
+
+Every admitted seat receives the existing roster-ordered `online` and `ping` arrays, as in reference `e4e579a` (`server.js:504,774`, `server/room-tick.js:30`). AI seats project `true` and `-1`, and unknown human RTT stays null. The common frame sender applies these fields to scheduled, paused and catch-up delivery without changing recipient visibility or wire shape.
+
+AI-19 evidence covers the existing detached core state: lazy spawn camera, private RNG, sampled opening delay and explicit resets through ordinary ticks and both recipient snapshots. It does not enable room AI or its takeover/departure callers. NET-80 remains outside the proven set because live AI handover and loaded-save pause need separate activation and save work.
+
 ## Runtime engineering: native bridge identity (2026-10-16)
 
 Paid bridges and Fill use the existing field-work jobs and canonical World mutations. Newly constructed bridge graphs use deterministic identities derived from the first cell and the append-only structure count. Repair reuses an existing bridge section identity, restores wood and 200 HP, and reconnects neighboring sections. These graph identities stay separate from the shared actor ID allocator, so construction does not advance actor IDs. Support, terrain invalidation and hull-width queries continue to use the canonical graph and physical terrain. This is an internal identity choice; no new wire or ABI shape is introduced.
