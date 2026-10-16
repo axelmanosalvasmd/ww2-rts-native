@@ -61,7 +61,7 @@ impl Match {
         let Some(cell) = self.world.game.cell_of(at.x, at.z) else {
             return Ok(Some(Denial::Blocked));
         };
-        let width = self.world.game.w as usize;
+        let width = self.world.game.w;
         let at = Point {
             x: (cell % width) as f64 * crate::game::CELL + crate::game::CELL / 2.0,
             z: (cell / width) as f64 * crate::game::CELL + crate::game::CELL / 2.0,
@@ -172,15 +172,15 @@ impl Match {
             }),
             AircraftOrder::Stop | AircraftOrder::Retreat => None,
         };
-        if let Some(m) = mission {
-            if matches!(order, AircraftOrder::Attack(_)) {
-                let t = &self.world.game.units[&m.target.expect("attack target")];
-                if t.hp <= 0.0
-                    || self.world.game.allied(owner, t.owner)
-                    || !self.world.game.players[owner].sees(t.id)
-                {
-                    return Err(AviationError::Invalid("invalid aircraft attack target"));
-                }
+        if let Some(m) = mission
+            && matches!(order, AircraftOrder::Attack(_))
+        {
+            let t = &self.world.game.units[&m.target.expect("attack target")];
+            if t.hp <= 0.0
+                || self.world.game.allied(owner, t.owner)
+                || !self.world.game.players[owner].sees(t.id)
+            {
+                return Err(AviationError::Invalid("invalid aircraft attack target"));
             }
         }
         let send = mission

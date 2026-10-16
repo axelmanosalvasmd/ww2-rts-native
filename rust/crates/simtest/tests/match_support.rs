@@ -566,7 +566,7 @@ fn bombing_run_delivers_six_spaced_bombs_then_expires() {
         assert!((bomb.z - at.z).abs() <= 1.5);
     }
     assert!(m.world.game.strikes.is_empty());
-    assert!(m.world.game.chars.iter().any(|c| *c == b'+'));
+    assert!(m.world.game.chars.contains(&b'+'));
     assert!(m.world.game.units[&1].hp < before_hp);
 }
 
@@ -593,7 +593,7 @@ fn dive_bomber_hits_its_spot_once_and_digs_ground() {
     );
     assert!(m.support.events.contains(&SupportEvent::Bomb(at)));
     assert!(m.world.game.strikes.is_empty());
-    assert!(m.world.game.chars.iter().any(|c| *c == b'+'));
+    assert!(m.world.game.chars.contains(&b'+'));
     assert!(m.world.game.units[&1].hp < tank_hp);
 }
 

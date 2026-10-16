@@ -358,6 +358,7 @@ impl WorldRails {
 impl RailRun {
     /// Advance the locomotive without consuming incidental container order.
     /// A cut is checked before crossing the next cell, including after loading.
+    #[allow(clippy::too_many_arguments)]
     pub fn step(
         &mut self,
         at: Point,
@@ -1115,11 +1116,7 @@ mod intent_tests {
         assert_eq!(bypass, vec![0, 8, 9, 10, 11, 12, 4]);
         rails.lines.pop();
         assert!(rails.route(7, 0, 1, &[7, 7, 7], &chars, 10).is_none());
-        assert!(
-            rails
-                .route(7, 0, 1, &[7, -1, 7], &vec![b'='; 20], 10)
-                .is_none()
-        );
+        assert!(rails.route(7, 0, 1, &[7, -1, 7], &[b'='; 20], 10).is_none());
     }
 
     #[test]
@@ -1307,8 +1304,10 @@ mod intent_tests {
         });
         m.world.game.units.get_mut(&sentinel).unwrap().repath = 100.0;
         let mut sentinel_turned_after_train_left = false;
+        let mut landing_train_pose = m.world.game.units[&train].pose();
         for _ in 0..440 {
             let before = m.world.game.units[&sentinel].repath;
+            landing_train_pose = m.world.game.units[&train].pose();
             m.advance_tick().unwrap();
             if !m.rail_runs.contains_key(&train) {
                 sentinel_turned_after_train_left = m.world.game.units[&sentinel].repath < before;
@@ -1318,16 +1317,76 @@ mod intent_tests {
         assert!(sentinel_turned_after_train_left);
         assert!(!m.world.game.units.contains_key(&train));
         assert!(!m.world.game.units[&id].riding);
-        assert!(m.world.game.units[&id].x > 170.0);
+        let desired = Point {
+            x: landing_train_pose.x
+                + math::cos(landing_train_pose.rot + std::f64::consts::PI / 2.0) * 5.0,
+            z: landing_train_pose.z
+                + math::sin(landing_train_pose.rot + std::f64::consts::PI / 2.0) * 5.0,
+        };
+        let cell = SpawnPlacer::new()
+            .nearest_free(
+                crate::match_runtime::terrain_view(&m.world.game),
+                desired,
+                m.rules.kinds[m.world.game.units[&id].kind].block(),
+                None,
+            )
+            .unwrap();
+        assert_eq!(
+            m.world.game.units[&id].at(),
+            Point {
+                x: (cell % m.world.game.w) as f64 * CELL + CELL / 2.0,
+                z: (cell / m.world.game.w) as f64 * CELL + CELL / 2.0,
+            }
+        );
         assert_eq!(m.combat.get(id).unwrap().carrier, None);
     }
 
     #[test]
     fn mov82_world_tick_ejects_and_retires_a_wrecked_train_without_stale_links() {
+        use crate::match_combat::{DamageWorld, ExplosionSource};
         let (mut m, id, train) = world_with_rail_passenger();
         // A rider with a lower ID can take its early turn before the train is destroyed.
         assert!(m.sync_rail_passenger(id, m.rules.movement.tick).unwrap());
-        m.world.game.units.get_mut(&train).unwrap().hp = 0.0;
+        let at = m.world.game.units[&train].at();
+        let order: Vec<_> = m.world.game.units.keys().copied().collect();
+        let mut damage = DamageWorld {
+            world: &mut m.world,
+            combat: &mut m.combat,
+            grid: &mut m.grid,
+            rules: &m.rules,
+            logistics: &m.logistics,
+            production: &m.production,
+            mode: m.options.mode,
+            tech_enabled: m.options.tech,
+            environment: &mut m.environment,
+            environment_seed: &mut m.start.environment_seed,
+            next_id: &mut m.next_unit_id,
+            unit_order: &order,
+            wind_angle: m.start.wind.0,
+            wind_strength: m.start.wind.1,
+        };
+        damage
+            .explosion(
+                at,
+                0.5,
+                ExplosionSource {
+                    infantry: 0.0,
+                    vehicle: 10_000.0,
+                    terrain: None,
+                    suppression: 0.0,
+                    scar: 0.0,
+                    anti_garrison: None,
+                    weapon_kind: None,
+                    off_map_support: false,
+                },
+                1,
+                None,
+                None,
+                None,
+                &mut m.firing,
+            )
+            .unwrap();
+        assert!(m.world.game.units[&train].hp <= 0.0);
         m.advance_tick().unwrap();
         assert!(!m.rail_runs.contains_key(&train));
         assert!(!m.world.game.units.contains_key(&train));
