@@ -85,3 +85,12 @@ new command tests and affected ground-order, flight/event, room and convoy
 lifecycles. Cargo uses the repository's ci-test build profile. Workspace formatting
 and strict all-target workspace Clippy are required before publication. Exact
 commands, producing head and results are recorded in the PR body.
+
+## Final main integration
+
+Merged main `803dcadf` after the implementation commit. One conflict region in
+`commander_tactics.rs` retains both the stream's whole-ground-army front and
+medic seek setup, and main's `world_free` set. The following unit loop uses both
+owners. No other merge region was hand edited; incoming tutorial, Gate, AI and
+server test changes are automatic. The stream does not claim the newly inherited
+AI rows. Focused commander policy tests are included to check this merge region.
