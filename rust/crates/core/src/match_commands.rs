@@ -996,7 +996,7 @@ impl crate::match_runtime::Match {
                 u32::try_from(*raw)
                     .ok()
                     .and_then(|id| self.world.game.units.get(&id))
-                    .is_some_and(|u| u.owner == owner && u.hp > 0.0 && u.air.is_some())
+                    .is_some_and(|u| u.owner == owner && u.air.is_some())
             }) {
                 return self.aircraft_area_command(owner, ids, *at, *queue);
             }

@@ -469,3 +469,16 @@ fn fire_at_mixed_aircraft_and_ground_sheller_keeps_main_refusal_atomic() {
         assert_eq!(m.start.random.snapshot(), random);
     }
 }
+
+#[test]
+fn fire_at_dead_aircraft_keeps_main_needs_refusal_without_ground_validation() {
+    let (mut m, _) = scene("howitzer");
+    let bomber = m.spawn_aircraft(0, "bomber").unwrap();
+    m.world.game.units.get_mut(&bomber).unwrap().hp = 0.0;
+    let before = format!("{:?}", (&m.world, &m.commands.units, &m.aviation));
+    assert_eq!(
+        dispatch(&mut m, json!({"t":"fireat","ids":[bomber],"x":41,"z":41})),
+        Some(Denial::Needs)
+    );
+    assert_eq!(format!("{:?}", (&m.world, &m.commands.units, &m.aviation)), before);
+}
