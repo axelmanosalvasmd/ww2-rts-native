@@ -8,6 +8,7 @@ mod native_startup;
 mod trusted_room;
 pub use trusted_room::TrustedRoomConfig;
 pub mod room_runtime;
+pub mod shards;
 pub mod snapshot_backpressure;
 pub mod snapshot_delta;
 pub mod snapshot_lists;

@@ -272,8 +272,11 @@ fn raw_event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
                 }
                 // SmallArms is an operative payload. Throw is shared by ordinary
                 // abilities and operatives, with no retained source provenance.
-                // Both refuse until that capability has its own admission facts.
-                LaunchEvent::Throw { .. } | LaunchEvent::SmallArms(_) => return Err(refused()),
+                // Horde breath effects also remain outside ordinary recipient admission.
+                LaunchEvent::Throw { .. }
+                | LaunchEvent::SmallArms(_)
+                | LaunchEvent::Breath { .. }
+                | LaunchEvent::BreathShell { .. } => return Err(refused()),
                 LaunchEvent::Contact(value) => {
                     kind(state, value.kind)?;
                     identity(value.flight)?;

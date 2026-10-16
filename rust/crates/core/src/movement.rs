@@ -34,6 +34,14 @@ use crate::traffic_knowledge::TrafficKnowledge;
 use crate::vehicle::{VehicleStep, angle_delta, swept_vehicle_clear, vehicle_step};
 use crate::vision::{in_trench, or_one};
 
+#[cfg(test)]
+#[path = "movement_runtime_tests.rs"]
+mod runtime_tests;
+
+#[cfg(test)]
+#[path = "mov_runtime_wreck_tests.rs"]
+mod wreck_runtime_tests;
+
 fn dist(a: Point, b: Point) -> f64 {
     math::hypot(a.x - b.x, a.z - b.z)
 }

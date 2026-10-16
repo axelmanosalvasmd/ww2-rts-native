@@ -1,0 +1,2 @@
+- Publish wrecked-carrier passenger Hurt effects directly in the tick report and drain the carrier output before the passenger continues its ground turn.
+- Rewrite `intent_cmb145_scuttle_retires_owned_units_and_ejects_passengers_without_refund_or_bounty` to retain and check the immediate retirement effects when retirement precedes the next tick, requiring exactly one passenger Hurt across both phases. Keep all survival, injury, drowning, control, wallet, bounty and snapshot checks.

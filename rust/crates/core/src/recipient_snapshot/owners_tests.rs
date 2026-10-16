@@ -103,6 +103,11 @@ fn queued_owner_adapters_refuse_unnormalized_or_unrepresented_orders() {
             queue: false,
         },
         dig(at),
+        Command::Enter {
+            ids: vec![1],
+            at,
+            queue: false,
+        },
     ] {
         let mut queued = command.clone();
         let mut wrong_actor = command.clone();
@@ -115,7 +120,8 @@ fn queued_owner_adapters_refuse_unnormalized_or_unrepresented_orders() {
             match candidate {
                 Command::Assist { ids, queue, .. }
                 | Command::Cover { ids, queue, .. }
-                | Command::Dig { ids, queue, .. } => {
+                | Command::Dig { ids, queue, .. }
+                | Command::Enter { ids, queue, .. } => {
                     *ids = ids_value;
                     *queue = queued_value;
                 }
@@ -161,6 +167,22 @@ fn queued_owner_adapters_refuse_unnormalized_or_unrepresented_orders() {
             x: 41.,
             z: f64::INFINITY,
         }),
+        Command::Enter {
+            ids: vec![1],
+            at: Point {
+                x: f64::NAN,
+                z: 43.,
+            },
+            queue: false,
+        },
+        Command::Enter {
+            ids: vec![1],
+            at: Point {
+                x: 41.,
+                z: f64::INFINITY,
+            },
+            queue: false,
+        },
     ] {
         let mut state = fixture();
         state
@@ -409,4 +431,163 @@ fn queued_dig_then_cover_survives_payment_or_skip_and_complete_delivery() {
         assert_eq!(state.story[0].mp_spent, if funded { 30. } else { 0. });
         assert_eq!(state.world.game.chars.contains(&b'T'), funded);
     }
+}
+
+#[test]
+fn queued_enter_keeps_source_kind_house_anchor_and_owner_privacy() {
+    let mut state = fixture();
+    let at = Point { x: 41.34, z: 43.36 };
+    state
+        .commands
+        .units
+        .get_mut(&1)
+        .unwrap()
+        .orders
+        .push_back(Command::Enter {
+            ids: vec![1],
+            at,
+            queue: false,
+        });
+    let cache = SnapshotCache::new(&state).unwrap();
+    assert_eq!(
+        cache.recipient(0).unwrap().fields["orders"],
+        json!([[1, 1, 9, 41.3, 43.4]])
+    );
+    // The fixture includes another seat on the owner's team as well as an enemy.
+    for slot in [1, 2] {
+        assert_eq!(cache.recipient(slot).unwrap().fields["orders"], json!([]));
+    }
+}
+
+#[test]
+fn queued_enter_while_moving_survives_every_seat_delivery_through_ordinary_finish() {
+    use crate::{
+        match_end::EndReason,
+        mov_audit_test_support::{point, scene_rows},
+    };
+    let mut rows = vec![".".repeat(64); 64];
+    rows[12].replace_range(18..19, "B");
+    let mut state = scene_rows(rows);
+    state.start.win_vp = 5.;
+    for control in state.commands.units.values_mut() {
+        control.hold_fire = true;
+        control.auto_cast = false;
+    }
+    for unit in state.world.game.units.values_mut() {
+        unit.hold_pos = true;
+    }
+    let id = state.next_unit_id;
+    let staged = StagedUnit::ordinary(
+        &state.world.game,
+        &state.rules,
+        0,
+        state.rules.kind("rifle").unwrap(),
+        id,
+        state.world.game.units.len() as u32,
+        state.start.players[0].spawn,
+        Some(point(25., 25.)),
+    )
+    .unwrap();
+    state.publish_starting_unit(staged).unwrap();
+    state.commands.units.get_mut(&id).unwrap().hold_fire = true;
+    let mut delivery = DeliveryState::new(&state).unwrap();
+    deliver(&mut state, &mut delivery);
+    assert_eq!(
+        state
+            .execute_command(
+                0,
+                &Command::Move {
+                    orders: vec![MoveOrder {
+                        unit: i64::from(id),
+                        at: point(31., 25.)
+                    }],
+                    control_ids: None,
+                    attack_move: false,
+                    queue: false,
+                    together: false,
+                    face: None,
+                },
+                false
+            )
+            .unwrap(),
+        None
+    );
+    let move_goal = state.world.game.units[&id].world_goal.unwrap();
+    state.advance_tick().unwrap();
+    deliver(&mut state, &mut delivery);
+    assert!(!state.world.game.units[&id].path.is_empty());
+    assert_eq!(
+        state
+            .execute_command(
+                0,
+                &Command::Enter {
+                    ids: vec![i64::from(id)],
+                    at: point(37., 25.),
+                    queue: true,
+                },
+                false
+            )
+            .unwrap(),
+        None
+    );
+    let snapshots = deliver(&mut state, &mut delivery);
+    assert_eq!(snapshots[0]["orders"], json!([[id, 1, 9, 37., 25.]]));
+    assert_eq!(snapshots[1]["orders"], json!([]));
+    let mut queued_moving_ticks = 0;
+    let mut garrisoned = false;
+    for _ in 0..1600 {
+        state.advance_tick().unwrap();
+        let snapshots = deliver(&mut state, &mut delivery);
+        assert_eq!(snapshots[1]["orders"], json!([]));
+        if !state.commands.units[&id].orders.is_empty() {
+            queued_moving_ticks += usize::from(!state.world.game.units[&id].path.is_empty());
+            assert_eq!(snapshots[0]["orders"], json!([[id, 1, 9, 37., 25.]]));
+            if state.world.game.units[&id].path.is_empty() {
+                // Orders are consumed before movement, so the final route tick still queues Enter.
+                assert_eq!(state.world.game.units[&id].at(), move_goal);
+            }
+        }
+        if !garrisoned && state.world.game.units[&id].garrison.is_some() {
+            garrisoned = true;
+            assert!(state.commands.units[&id].orders.is_empty());
+            assert_eq!(state.world.game.units[&id].garrison, Some(12 * 64 + 18));
+            // A second squad captures the neutral objective and earns the winning VP.
+            let capturer = state.next_unit_id;
+            let staged = StagedUnit::ordinary(
+                &state.world.game,
+                &state.rules,
+                0,
+                state.rules.kind("rifle").unwrap(),
+                capturer,
+                state.world.game.units.len() as u32,
+                state.start.players[0].spawn,
+                Some(state.start.points[0].at),
+            )
+            .unwrap();
+            state.publish_starting_unit(staged).unwrap();
+            state.commands.units.get_mut(&capturer).unwrap().hold_fire = true;
+        }
+        if state.finish.is_some() {
+            break;
+        }
+    }
+    assert!(
+        queued_moving_ticks > 1,
+        "entry must remain queued behind the moving route"
+    );
+    assert!(
+        garrisoned,
+        "the queued entry must activate and reach the house"
+    );
+    let finish = state
+        .finish
+        .expect("ordinary match must finish from objective income");
+    assert_eq!(finish.winner, 0);
+    assert_eq!(finish.reason, EndReason::VictoryPoints);
+    assert!(state.start.economy.players[0].vp >= state.start.win_vp);
+    for _ in 0..10 {
+        state.advance_tick().unwrap();
+        deliver(&mut state, &mut delivery);
+    }
+    assert!(state.tick_state.fault().is_none());
 }

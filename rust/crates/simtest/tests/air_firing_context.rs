@@ -108,6 +108,7 @@ fn make(case: &Value, frame: &Value) -> Match {
                     timer: number(&a["timer"]),
                     orbit: number(&a["ang"]),
                     mission,
+                    attack_pick: 0,
                     downed: false,
                 },
             );

@@ -1,0 +1,1 @@
+- Mark 25 parity rows ported from merged native intent tests: CMB-38, 43, 44, 45, 46, 47, 48, 49, 51, 53, 56, 57, 60, 63, 66, 67, 68, 74, 75, 76, 77, 78, 79, 80 (#299) and NET-96 (#358).

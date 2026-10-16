@@ -5,8 +5,9 @@ use serde_json::{Value, json};
 use ww2_core::{
     catalog::Catalog,
     game::{Game, LAND, MUD, PlaneState, Point},
+    grid::SpatialGrid,
     map::AuthoritativeMap,
-    movement::weather_speed,
+    movement::{move_unit, weather_speed},
     rules::Rules,
     terrain::{ground_mul, speed_mul},
     unit_spawn::{initial_aircraft, initial_unit},
@@ -340,5 +341,57 @@ fn eng76_warning_boundary_and_single_change_are_explicit() {
             rules.weather_row(Some(&plan), tick),
             WeatherRow::Current(WeatherKind::Clear)
         );
+    }
+}
+
+#[test]
+fn mov09_weather_speed_reaches_infantry_vehicle_and_boat_movement() {
+    // Pure speed factors for every kind are covered by eng74 above.
+    // shared/weather.js:10-17,105-109 at e4e579a supplies these exact values.
+    let rules = Rules::compiled().unwrap();
+    let mut g = game();
+    for (name, infantry, vehicle) in [
+        (None, 1.0, 1.0),
+        (Some("clear"), 1.0, 1.0),
+        (Some("fog"), 1.0, 1.0),
+        (Some("rain"), 1.0, 1.0),
+        (Some("mud"), 0.9, 1.0),
+        (Some("snow"), 0.9, 0.85),
+    ] {
+        g.weather = name.map(|name| rules.weather_kind(name).unwrap());
+        // Read the actual movement budget, including its terrain factor. This catches
+        // a missing weather consumer or applying Rain/Mud off-road slowing twice.
+        for kind in ["rifle", "tank", "lcvp", "gunboat", "destroyer"] {
+            for wet in [0.0, 1.0] {
+                let mut terrain = g.clone();
+                terrain.wet = Some(wet);
+                if rules.kinds[rules.kind(kind).unwrap()].naval {
+                    terrain.chars.fill(b'W');
+                    terrain.flags.fill(ww2_core::game::MOVE);
+                }
+                let at = Point { x: 15.0, z: 15.0 };
+                let mut u = initial_unit(
+                    &rules,
+                    Catalog::compiled().unwrap(),
+                    rules.kind(kind).unwrap(),
+                    1,
+                    0,
+                    at,
+                )
+                .unwrap();
+                u.path = vec![Point { x: 30.0, z: 15.0 }];
+                let def = &rules.kinds[u.kind];
+                let factor = if def.infantry { infantry } else { vehicle };
+                let expected = def.speed * speed_mul(&terrain, &rules, &u) * factor;
+                terrain.units.insert(1, u);
+                let mut grid = SpatialGrid::new(&terrain.units, 16.0);
+                let moved = move_unit(&mut terrain, &rules, &mut grid, 1, 1.0).unwrap();
+                same_bits(moved.speed, expected, kind);
+                assert!(
+                    terrain.units[&1].x > at.x,
+                    "{kind} consumes its route budget"
+                );
+            }
+        }
     }
 }
