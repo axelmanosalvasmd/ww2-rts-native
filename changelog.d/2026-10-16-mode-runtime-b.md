@@ -1,0 +1,5 @@
+- Add deterministic Horde setup and an explicit bounded wave phase for seeded purchases, reserves, entry orders, support wallets, aircraft and wave clearing. Let defenders buy from shared facilities with their own wallets and armies. Full Horde ticking and hosting remain guarded.
+- Add complete authored scenario schema validation without changing map admission or executing general missions.
+- Refresh Horde vehicle-entry clearance after terrain changes, test the return to general purchases after profile quotas and reinforcement work at the 4096 limit, and document the late Horde phase and stricter scenario unit-type validation.
+- Let shared story services recognize consistent mode tags, report the correct mode names and count all Classic buildings in timeline samples.
+- Add 26 intent and supporting checks for Horde wave rules, schema limits, ending-hold ordering and away-player command and economy behavior; all 26 and 22 retained regressions pass on the Vostro. Keep incomplete scenario, result, record and all-mode lifecycle rows open.

@@ -37,8 +37,9 @@ pub enum FortKind {
     Nest,
     Mines,
     Demine,
-    Fill,
     Aid,
+    Bridge,
+    Fill,
 }
 impl FortKind {
     pub fn as_str(self) -> &'static str {
@@ -50,8 +51,9 @@ impl FortKind {
             Self::Nest => "nest",
             Self::Mines => "mines",
             Self::Demine => "demine",
-            Self::Fill => "fill",
             Self::Aid => "aid",
+            Self::Bridge => "bridge",
+            Self::Fill => "fill",
         }
     }
     pub fn parse(name: &str) -> Result<Self, Error> {
@@ -63,9 +65,10 @@ impl FortKind {
             "nest" => Ok(Self::Nest),
             "mines" => Ok(Self::Mines),
             "demine" => Ok(Self::Demine),
-            "fill" => Ok(Self::Fill),
             "aid" => Ok(Self::Aid),
-            "bridge" | "wall" | "gate" => Err(Error::UnsupportedKind),
+            "bridge" => Ok(Self::Bridge),
+            "fill" => Ok(Self::Fill),
+            "wall" | "gate" => Err(Error::UnsupportedKind),
             _ => Err(Error::Refused(Reason::Blocked)),
         }
     }
@@ -126,7 +129,7 @@ pub struct Dig {
     /// Written on the first in-reach work phase, as in the source's lazy `dig.n`.
     pub original_cells: Option<usize>,
     pub front: Option<f64>,
-    /// Only the distant Clear mines work has a source reach field in this slice.
+    /// Long-reach work caches an approach point on the builder's side.
     pub reach: Option<f64>,
     pub from: Option<Point>,
 }
@@ -215,8 +218,9 @@ fn definitions() -> Result<&'static Definitions, Error> {
             FortKind::Nest,
             FortKind::Mines,
             FortKind::Demine,
-            FortKind::Fill,
             FortKind::Aid,
+            FortKind::Bridge,
+            FortKind::Fill,
         ] {
             let source = table.get(kind.as_str()).ok_or(Error::Rules)?;
             let count = if kind == FortKind::Nest {
@@ -344,7 +348,9 @@ pub fn placement(
         ) else {
             continue;
         };
-        let valid = if kind == FortKind::Fill {
+        let valid = if kind == FortKind::Bridge {
+            w.game.chars[cell] == b'W'
+        } else if kind == FortKind::Fill {
             w.fillable(cell)
         } else if kind == FortKind::Demine {
             w.game.chars[cell] == b'N' && team.is_none_or(|team| mine_known(w, cell, team))
@@ -356,6 +362,31 @@ pub fn placement(
                 cell,
                 ch: if kind == FortKind::Nest { ch } else { d.ch },
             });
+        }
+    }
+    if kind == FortKind::Bridge {
+        let mut accepted = BTreeSet::new();
+        let mut pending = cells;
+        cells = Vec::new();
+        loop {
+            let before = pending.len();
+            pending.retain(|work| {
+                if w.bridge_supported_at(work.cell)
+                    || w.neighbors(work.cell)
+                        .into_iter()
+                        .flatten()
+                        .any(|c| accepted.contains(&c))
+                {
+                    accepted.insert(work.cell);
+                    cells.push(*work);
+                    false
+                } else {
+                    true
+                }
+            });
+            if pending.len() == before {
+                break;
+            }
         }
     }
     if cells.is_empty() {
@@ -423,7 +454,12 @@ impl FieldWorksRuntime {
             .direction
             .filter(|v| v.is_finite())
             .unwrap_or_else(|| {
-                math::atan2(at.z - unit.z, at.x - unit.x) + std::f64::consts::FRAC_PI_2
+                math::atan2(at.z - unit.z, at.x - unit.x)
+                    + if request.kind == FortKind::Bridge {
+                        0.
+                    } else {
+                        std::f64::consts::FRAC_PI_2
+                    }
             });
         let cells = placement(w, request.kind, at, direction, Some(wallet.team), sees)?;
         if request.kind == FortKind::Aid
@@ -566,6 +602,10 @@ impl FieldWorksRuntime {
         } else if job.kind == FortKind::Fill {
             if w.fillable(cell.cell) {
                 w.fill_cell(cell.cell)?;
+            }
+        } else if job.kind == FortKind::Bridge {
+            if w.game.chars[cell.cell] == b'W' && w.bridge_supported_at(cell.cell) {
+                w.build_bridge_cell(cell.cell)?;
             }
         } else if b".+RDM".contains(&w.game.chars[cell.cell]) && !under {
             w.set_cell(cell.cell, cell.ch)?;

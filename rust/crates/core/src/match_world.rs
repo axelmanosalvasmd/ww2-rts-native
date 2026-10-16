@@ -316,6 +316,7 @@ impl Match {
             environment: crate::environment::EnvironmentRuntime::default(),
             firing: crate::match_firing::FiringState::default(),
             assault: None,
+            horde: None,
             recipients: Vec::new(),
             routing_fog: crate::fog::Fog::default(),
             tick_state: crate::match_tick::TickState::default(),

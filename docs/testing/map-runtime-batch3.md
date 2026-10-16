@@ -14,7 +14,7 @@ This batch starts at main `09e03d07`. The reference is `e4e579a838aabae3b1d9dadb
 
 ## Runtime compatibility
 
-The only new persistent descriptor is `FortKind::Fill` in the existing paid Dig job. Definitions supply its existing prototype cost, count and time. Tick admission (`field_project_tick.rs`), recipient admission (`field_work_snapshot.rs`), work-row projection (`recipient_snapshot/engineering.rs`) and retirement cancellation already consume generic fort definitions and jobs. Command admission still refuses World field works. No new stored field, link, event or queue format is introduced.
+Main gained the shared Fill implementation through PR #294 during this batch's validation. The merge keeps that implementation unchanged and removes this branch's duplicate. MAP-34 now tests main's `FortKind::Fill` and terrain repair. Tick admission (`field_project_tick.rs`), recipient admission (`field_work_snapshot.rs`), work-row projection (`recipient_snapshot/engineering.rs`) and retirement cancellation consume generic fort definitions and jobs. Command admission still refuses World field works. No new stored field, link, event or queue format is introduced by this PR.
 
 Region helpers are pure queries over existing geography and memory. The sanitizer returns a copy and adds no match state. FFI, C headers, wire shapes, contracts and privacy policy remain unchanged.
 

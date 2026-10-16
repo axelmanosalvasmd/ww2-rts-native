@@ -1,3 +1,3 @@
-- Add ordinary paid rubble filling, slope-limited ground repair and road restoration, while excluding original World spoil tips from fillable damage. Exercise the new Fill job through ticks, recipient snapshots and retirement.
+- Cover ordinary paid rubble filling, slope-limited ground repair and road restoration, while excluding original World spoil tips from fillable damage. Exercise Fill jobs through ticks, recipient snapshots and retirement.
 - Add legacy bounds lookup, half-open explored-region containment and territory outlines without internal seams.
 - Sanitize material-bearing authored maps for HTTP and startup delivery, removing private mines and scripts while preserving underlying surfaces. Cover observed terrain updates after startup.

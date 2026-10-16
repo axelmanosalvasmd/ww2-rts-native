@@ -100,7 +100,7 @@ fn map34_fillability_world_scenery_and_slope_limited_surface_restore() {
         world.set_cell(21, ch).unwrap();
         assert!(world.fillable(21));
     }
-    world.fill_cell(0).unwrap();
+    assert_eq!(world.fill_cell(0), Err(crate::world::WorldError::InvalidChange));
     assert_eq!(world.game.chars[0], b'R');
     world.set_cell(22, b'D').unwrap();
     world.set_cell(22, b'R').unwrap();

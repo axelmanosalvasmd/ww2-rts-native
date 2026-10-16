@@ -89,11 +89,16 @@ impl Match {
         &self,
         unit: &Unit,
     ) -> Result<Option<logistics::Reserves>, String> {
-        if !matches!(
+        let horde_spawn = self.options.mode == crate::economy::Mode::Horde
+            && self.world.game.mode == Some(crate::game::ModeKind::Horde)
+            && self.start.shared_defenders.is_some()
+            && !self.options.logistics;
+        if !(matches!(
             self.options.mode,
             crate::economy::Mode::Default | crate::economy::Mode::Conquest
-        ) {
-            return Err("new reserves require ordinary Conquest".into());
+        ) || horde_spawn)
+        {
+            return Err("new reserves require ordinary Conquest or no-logistics Horde".into());
         }
         if unit.id == 0
             || unit.owner >= self.start.players.len()
