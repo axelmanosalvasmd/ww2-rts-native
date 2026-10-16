@@ -21,6 +21,18 @@ pub enum Target {
     Point(String),
     Region(i32),
 }
+impl Target {
+    fn is_region(&self) -> bool {
+        matches!(self, Self::Region(_))
+            || matches!(self, Self::Point(id) if id.starts_with("region:"))
+    }
+    fn key(&self) -> String {
+        match self {
+            Self::Point(id) => id.clone(),
+            Self::Region(id) => format!("region:{id}"),
+        }
+    }
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Comparison {
     AtMost,
@@ -131,14 +143,18 @@ impl Match {
         let key = |id: &str, scope| (id.to_owned(), scope);
         let owner = |target: &Target| -> Option<i32> {
             match target {
-                Target::Point(id) => self
+                Target::Point(id) if !id.starts_with("region:") => self
                     .start
                     .points
                     .iter()
                     .find(|p| p.id.as_str() == Some(id.as_str()))
                     .map(|p| p.owner.map_or(-1, |slot| slot as i32)),
-                Target::Region(id) => self.world.geography().and_then(|g| {
-                    let index = g.regions.iter().position(|r| r.id == *id)?;
+                _ => self.world.geography().and_then(|g| {
+                    let key = target.key();
+                    let index = g
+                        .regions
+                        .iter()
+                        .position(|r| format!("region:{}", r.id) == key)?;
                     self.world_runtime
                         .as_ref()?
                         .regions
@@ -170,31 +186,27 @@ impl Match {
                 }
                 self.world.game.tick as f64 * 0.05 >= *seconds
             }
-            Kind::Ownership(target) => match target {
-                Target::Region(_) => owner(target).zip(team()).is_some_and(|(a, b)| a == b),
-                Target::Point(_) => {
-                    if let Scope::Team(id) = context.scope
-                        && q.side.is_none()
-                    {
-                        owner(target)
-                            .and_then(|o| usize::try_from(o).ok())
-                            .and_then(|o| players.get(o))
-                            .is_some_and(|p| p.team == id)
-                    } else {
-                        owner(target)
-                            .zip(i32::try_from(side).ok())
-                            .is_some_and(|(a, b)| a == b)
-                    }
+            Kind::Ownership(target) => {
+                if target.is_region() {
+                    owner(target).zip(team()).is_some_and(|(a, b)| a == b)
+                } else if let Scope::Team(id) = context.scope
+                    && q.side.is_none()
+                {
+                    owner(target)
+                        .and_then(|o| usize::try_from(o).ok())
+                        .and_then(|o| players.get(o))
+                        .is_some_and(|p| p.team == id)
+                } else {
+                    owner(target)
+                        .zip(i32::try_from(side).ok())
+                        .is_some_and(|(a, b)| a == b)
                 }
-            },
+            }
             Kind::Capture(target) => {
-                let target_key = match target {
-                    Target::Point(id) => id.clone(),
-                    Target::Region(id) => format!("region:{id}"),
-                };
+                let target_key = target.key();
                 if let Scope::Team(id) = context.scope
                     && q.side.is_none()
-                    && matches!(target, Target::Point(_))
+                    && !target.is_region()
                 {
                     players.iter().any(|p| {
                         p.team == id
@@ -203,7 +215,7 @@ impl Match {
                                 .contains(&(target_key.clone(), p.slot as i32))
                     })
                 } else {
-                    let identity = if matches!(target, Target::Region(_)) {
+                    let identity = if target.is_region() {
                         team()
                     } else {
                         i32::try_from(side).ok()
@@ -405,6 +417,23 @@ mod tests {
             context(),
             q(Kind::Ownership(Target::Point("absent".into())))
         ));
+    }
+    #[test]
+    fn mode83_reserved_region_prefix_does_not_read_a_same_named_point() {
+        let mut m = scene();
+        let mut s = ConditionState::default();
+        m.start.points[0].id = json!("region:7");
+        m.start.points[0].owner = Some(2);
+        s.captured.insert(("region:7".into(), 2));
+        let c = Context {
+            slot: 2,
+            ..context()
+        };
+        let target = Target::Point("region:7".into());
+        assert!(!check(&m, &s, c, q(Kind::Ownership(target.clone()))));
+        assert!(!check(&m, &s, c, q(Kind::Capture(target.clone()))));
+        s.captured.insert(("region:7".into(), 5));
+        assert!(check(&m, &s, c, q(Kind::Capture(target))));
     }
     #[test]
     fn mode83_loss_counts_and_arrival_state_distinguish_unarrived_and_dead() {
@@ -699,6 +728,12 @@ mod tests {
             &m,
             &s,
             context(),
+            q(Kind::Ownership(Target::Point(format!("region:{id}"))))
+        ));
+        assert!(check(
+            &m,
+            &s,
+            context(),
             q(Kind::Ownership(Target::Region(id)))
         ));
         assert!(!check(
@@ -712,6 +747,12 @@ mod tests {
         ));
         s.captured.insert((format!("region:{id}"), 5));
         m.world_runtime.as_mut().unwrap().regions[2].team = 1;
+        assert!(check(
+            &m,
+            &s,
+            context(),
+            q(Kind::Capture(Target::Point(format!("region:{id}"))))
+        ));
         assert!(check(
             &m,
             &s,

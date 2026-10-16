@@ -7,12 +7,13 @@ MODE-83 covers the condition evaluator itself. General authored scenario admissi
 The MODE-83 tests in `scenario_conditions::tests` are:
 
 - `mode83_ownership_capture_and_explicit_side_use_canonical_players`
+- `mode83_reserved_region_prefix_does_not_read_a_same_named_point`
 - `mode83_loss_counts_and_arrival_state_distinguish_unarrived_and_dead`
 - `mode83_area_entry_is_half_open_and_group_scan_charges_twice`
 - `mode83_completion_fallback_and_boolean_work_follow_source_short_circuiting`
 - `mode83_region_ownership_and_capture_use_region_team_not_vector_index`
 
-These cover every condition branch at `shared/scenarios.js:108-122`, including explicit side overrides, team contexts, stable region IDs, unarrived versus dead authored units, pending groups, all count comparisons, area boundaries, completion fallback, time thresholds and bounded short-circuit evaluation. Match and authored state remain unchanged by reads.
+These cover every condition branch at `shared/scenarios.js:108-122`, including explicit side overrides, team contexts, stable and reserved region IDs, unarrived versus dead authored units, pending groups, all count comparisons, area boundaries, completion fallback, time thresholds and bounded short-circuit evaluation. Match and authored state remain unchanged by reads.
 
 MODE-91 has partial evidence for the assigned refund and recovery gap:
 
