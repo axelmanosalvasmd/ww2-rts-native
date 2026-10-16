@@ -180,7 +180,10 @@ fn fire_at_direct_shells_same_structure_and_finishes_when_cell_is_gone() {
             .sum::<f64>()
             < before
     );
-    assert!(m.world.game.cell_hp[cell] <= 0., "shells must destroy the interior target");
+    assert!(
+        m.world.game.cell_hp[cell] <= 0.,
+        "shells must destroy the interior target"
+    );
     assert_eq!(m.commands.units[&id].fire_at, None);
 }
 #[test]
@@ -204,6 +207,17 @@ fn fire_at_salvo_persists_on_unseen_open_ground_until_replaced() {
     m.advance_tick().unwrap();
     snapshots(&m);
     assert_eq!(m.commands.units[&id].fire_at, None);
+    assert_eq!(
+        dispatch(&mut m, json!({"t":"fireat","ids":[id],"x":71,"z":71})),
+        None
+    );
+    assert_eq!(
+        dispatch(
+            &mut m,
+            json!({"t":"fireat","ids":[id],"x":73,"z":71,"queue":true})
+        ),
+        None
+    );
     m.start.economy.players[0].vp = m.start.win_vp;
     for _ in 0..20 {
         let report = m.advance_tick().unwrap();
@@ -213,6 +227,8 @@ fn fire_at_salvo_persists_on_unseen_open_ground_until_replaced() {
         }
     }
     assert!(m.finish.is_some());
+    assert_eq!(m.commands.units[&id].fire_at, cell);
+    assert_eq!(m.commands.units[&id].orders.len(), 1);
     assert_eq!(m.tick_state.fault(), None);
 }
 
