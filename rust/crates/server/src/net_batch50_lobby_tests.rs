@@ -854,18 +854,8 @@ fn away_seat_stops_ordinary_wallet_income_and_cannot_command() {
 }
 
 #[test]
-fn unimplemented_roles_and_public_lifecycle_remain_explicit_refusals() {
+fn public_lifecycle_remains_an_explicit_refusal_without_trusted_configuration() {
     let (mut hub, mut host, _guest) = room();
-    let mut operative = Peer::new(3);
-    operative.send(&mut hub, "ABC", json!({"t":"hello","token":"operative","name":"Operative","role":"operative","commander":0}), 0);
-    assert!(!operative.joined);
-    assert!(
-        matches!(operative.output.try_recv(), Ok(Output::Json(v)) if v == json!({"t":"deny","cmd":"join","reason":"commander"}))
-    );
-    assert!(matches!(
-        operative.output.try_recv(),
-        Ok(Output::Close(1008, "operative unavailable"))
-    ));
     for (index, name) in ["start", "restart", "end", "leave", "handAi", "nextwave"]
         .iter()
         .enumerate()

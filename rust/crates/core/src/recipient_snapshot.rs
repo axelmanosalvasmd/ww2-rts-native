@@ -22,6 +22,10 @@ mod engineering;
 mod falling;
 #[path = "recipient_snapshot/flights.rs"]
 mod flights;
+#[path = "recipient_snapshot/operative.rs"]
+mod operative;
+#[path = "recipient_snapshot/operative_flights.rs"]
+mod operative_flights;
 #[path = "recipient_snapshot/owners.rs"]
 mod owners;
 #[path = "recipient_snapshot/projectiles.rs"]
@@ -36,6 +40,7 @@ mod shots;
 mod support;
 pub use composition::{GroundListDeliveryFrame, QuiescentDeliveryFrame, SupportedSeatSnapshot};
 pub use delivery::{DeliveryFrame, DeliveryState};
+pub use operative::OperativeDelivery;
 pub use selected::{SelectedDeliveryFrame, SelectedGroundListFrame, SelectedSeat};
 pub use shots::{SelectedGroundShotFrame, ShotRef};
 pub use support::SUPPORTED_SUPPORT_KINDS;
@@ -170,6 +175,12 @@ impl<'a> SnapshotCache<'a> {
         if state.options.mode == crate::economy::Mode::Horde {
             projectiles::validate(state)?;
         }
+        state
+            .prepare_companion_tick()
+            .map_err(|_| SnapshotError::Unsupported {
+                unit: 0,
+                capability: SnapshotCapability::Operatives,
+            })?;
         let rows = state
             .world
             .game
@@ -228,7 +239,23 @@ impl<'a> SnapshotCache<'a> {
         fields.extend(self.public[slot].clone());
         fields.insert("falling".into(), falling::project(self.state, slot)?);
         if self.state.options.mode != crate::economy::Mode::Horde {
-            fields.insert("flights".into(), flights::project(self.state, slot)?);
+            if !self.state.firing.flights.is_empty()
+                && self.state.firing.flights.values().all(|flight| {
+                    self.state
+                        .commands
+                        .units
+                        .get(&flight.shooter)
+                        .is_some_and(|c| c.operative)
+                })
+                && operative_flights::validate(self.state).is_ok()
+            {
+                fields.insert(
+                    "flights".into(),
+                    operative_flights::project(self.state, slot)?,
+                );
+            } else {
+                fields.insert("flights".into(), flights::project(self.state, slot)?);
+            }
         }
         Ok(RecipientProjection {
             fields,
@@ -289,9 +316,6 @@ fn unit_row(state: &Match, u: &Unit) -> Result<Value, SnapshotError> {
         .map_err(|_| unsupported(SnapshotCapability::GateState))?;
     crate::match_construction::validate_build_activity(u, control)
         .map_err(|_| unsupported(SnapshotCapability::Engineering))?;
-    if control.operative {
-        return Err(unsupported(SnapshotCapability::Operatives));
-    }
     let ability = state
         .abilities
         .get(u.id)
@@ -331,6 +355,9 @@ fn unit_row(state: &Match, u: &Unit) -> Result<Value, SnapshotError> {
         u.built.unwrap_or(1.0),
     ])?;
     let mut flags = 0u64;
+    if control.operative {
+        flags |= 131072;
+    }
     if u.air.is_some() && !vision::airborne(u) {
         flags |= 512;
     }
