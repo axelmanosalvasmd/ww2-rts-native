@@ -2498,3 +2498,7 @@ mod audit_native;
 #[cfg(test)]
 #[path = "engineering_runtime2_pit_tests.rs"]
 mod engineering_runtime2_pit_tests;
+
+#[cfg(test)]
+#[path = "map_feature_tests.rs"]
+mod map_feature_tests;
