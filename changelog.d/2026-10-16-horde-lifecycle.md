@@ -1,0 +1,1 @@
+- Connect the core Horde wave phase, vision, public mode fields and Kaiju effects to normal ticks and recipient snapshots. Add damage-scaling checks and a boss-wave journey through bunker defeat and ending ticks. Replace component tests that required the old core Horde mode refusal; hosted Horde admission and complete projectile delivery remain separate work.

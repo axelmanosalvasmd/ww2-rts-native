@@ -1,5 +1,4 @@
-//! Deterministic Horde setup and explicit late wave phase. Public tick admission
-//! remains guarded until the other Horde mode owners are connected.
+//! Deterministic Horde setup and the late wave phase used by the core tick runner.
 use crate::{
     catalog::{Catalog, Value},
     economy::{Faction, Mode},
@@ -78,7 +77,7 @@ pub struct HordeState {
 }
 /// The caller detaches these public world effects at the same boundary as other
 /// phase events. They do not define snapshot or wire fields.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum HordeEvent {
     BossSurfaced { at: Point },
 }
@@ -315,7 +314,7 @@ impl Match {
     }
 
     /// Refresh the core vision component, including active-wave Horde markers.
-    /// Full Horde tick and recipient admission remain separate guarded paths.
+    /// The core tick runner invokes this on its ordinary vision cadence.
     pub fn refresh_horde_visibility(&mut self) -> Result<(), String> {
         self.validate_horde_phase(0.0)?;
         let h = self.horde.as_ref().ok_or("missing Horde state")?;
@@ -393,8 +392,8 @@ impl Match {
             report,
         }))
     }
-    /// Explicit constructor for the Horde-owned wave phase. Generic `Match::new`
-    /// and ordinary `advance_tick` retain their existing admission guards.
+    /// Explicit Horde constructor. Generic `Match::new` keeps its ordinary setup;
+    /// the shared tick runner admits this canonical Horde state.
     pub fn new_horde(map: &AuthoritativeMap, mut options: MatchOptions) -> Result<Self, String> {
         if options.mode != Mode::Horde || !(1..=5).contains(&options.players.len()) {
             return Err("Horde needs Horde mode and one through five defenders".into());
@@ -810,3 +809,11 @@ impl Match {
 #[cfg(test)]
 #[path = "match_horde_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "match_horde_lifecycle_tests.rs"]
+mod lifecycle_tests;
+
+#[cfg(test)]
+#[path = "match_horde_runner_tests.rs"]
+mod runner_tests;

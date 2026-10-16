@@ -156,14 +156,8 @@ fn base24_shared_rally_drives_buyer_owned_paid_recruitment() {
         Some(Denial::Unseen)
     );
     assert_eq!(m.building_rallies[&maker], Some(at));
-    assert!(
-        SnapshotCache::new(&m).is_err(),
-        "complete Horde snapshots stay guarded"
-    );
-    assert!(
-        m.advance_tick().is_err(),
-        "complete Horde ticks stay guarded"
-    );
+    SnapshotCache::new(&m).unwrap();
+    m.advance_tick().unwrap();
 }
 
 #[test]

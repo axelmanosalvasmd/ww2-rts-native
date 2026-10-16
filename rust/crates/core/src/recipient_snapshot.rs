@@ -81,9 +81,8 @@ pub struct RecipientProjection {
     pub missing: Vec<SnapshotCapability>,
 }
 
-/// The public Horde mode component, separate from complete recipient admission.
-/// No seat data or hidden purchase state enters this row. The complete Horde
-/// snapshot and host remain guarded by their existing mode checks.
+/// Prototype Horde mode fields, shared by all recipients. Internal purchase
+/// state stays private; profile and boss are absent until the first wave.
 pub fn horde_mode_row(state: &Match) -> Result<Value, SnapshotError> {
     let mode = state.horde_projection().map_err(|_| SnapshotError::Rules)?;
     let horde = state.horde.as_ref().ok_or(SnapshotError::Rules)?;
@@ -94,6 +93,10 @@ pub fn horde_mode_row(state: &Match) -> Result<Value, SnapshotError> {
         "left": mode.left, "active": mode.active, "boss": mode.boss,
         "slot": horde.slot
     });
+    if mode.wave == 0 {
+        row.as_object_mut().unwrap().remove("profile");
+        row.as_object_mut().unwrap().remove("boss");
+    }
     if let Some(profile) = mode.next_profile {
         row["nextProfile"] = json!(profile.as_str());
     }
@@ -110,13 +113,21 @@ pub struct SnapshotCache<'a> {
 }
 impl<'a> SnapshotCache<'a> {
     pub fn new(state: &'a Match) -> Result<Self, SnapshotError> {
-        if !matches!(state.options.mode, Mode::Default | Mode::Conquest)
-            || state.world.game.mode.is_some()
+        let horde = state.options.mode == Mode::Horde
+            && state.world.game.mode == Some(crate::game::ModeKind::Horde);
+        if !(horde
+            || matches!(state.options.mode, Mode::Default | Mode::Conquest)
+                && state.world.game.mode.is_none())
             || state.world.geography().is_some()
             || state.assault.is_some()
             || state.world_runtime.is_some()
         {
             return Err(SnapshotError::UnsupportedMode);
+        }
+        if horde {
+            state
+                .validate_horde_economy()
+                .map_err(|_| SnapshotError::Rules)?;
         }
         let g = &state.world.game;
         let cells = g.w.checked_mul(g.h).ok_or(SnapshotError::Rules)?;
