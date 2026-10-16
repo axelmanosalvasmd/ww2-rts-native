@@ -84,9 +84,15 @@ fn scene_mode(teams: &[i32], mode: Mode) -> Match {
     let map = map();
     let mut opts = options(teams);
     opts.mode = mode;
-    let mut m = Match::new(&map, opts).unwrap();
+    let mut m = if mode == Mode::Classic {
+        Match::new_classic(&map, opts).unwrap()
+    } else {
+        Match::new(&map, opts).unwrap()
+    };
+    let game_mode = m.world.game.mode;
     let players = m.world.game.players.clone();
     m.world = World::from_map(&map).unwrap();
+    m.world.game.mode = game_mode;
     m.world.game.players = players;
     for player in &mut m.world.game.players {
         player.visible.clear();
@@ -121,12 +127,15 @@ fn remembered(m: &Match, team: i32) -> &[KnownBuilding] {
 
 #[test]
 fn cmb130_classic_remembers_last_seen_buildings_until_an_airborne_observer_revisits() {
-    let mut m = scene(&[0, 1, 0]);
+    let mut m = scene_mode(&[0, 1, 0], Mode::Classic);
+    // Keep all seats alive while the enemy building is observed and destroyed.
+    for (owner, home) in [(0, at(5., 5.)), (1, at(180., 180.)), (2, at(5., 180.))] {
+        let cell = m.world.game.cell_of(home.x, home.z).unwrap();
+        m.place_starting_building(owner, "hq", cell).unwrap();
+    }
     let scout = add(&mut m, "rifle", 2, at(70., 70.));
     let building = add(&mut m, "hq", 1, at(80., 70.));
     m.world.game.units.get_mut(&building).unwrap().built = Some(0.25);
-    m.options.mode = Mode::Classic;
-    m.world.game.mode = Some(ModeKind::Classic);
     rebuild(&mut m);
     m.refresh_classic_visibility().unwrap();
     assert!(m.world.game.players[0].sees(building));
@@ -165,7 +174,9 @@ fn cmb130_classic_remembers_last_seen_buildings_until_an_airborne_observer_revis
         1,
         "unseen destruction retains the ghost"
     );
-    let plane = add(&mut m, "fighter", 0, at(60., 70.));
+    let plane = m.spawn_aircraft(0, "fighter").unwrap();
+    m.world.game.units.get_mut(&plane).unwrap().x = 60.;
+    m.world.game.units.get_mut(&plane).unwrap().z = 70.;
     // A wall blocks ground sight. A parked plane cannot invalidate the ghost.
     let c = m.world.game.cell_of(70., 70.).unwrap();
     m.world.set_cell(c, b'K').unwrap();
@@ -176,16 +187,12 @@ fn cmb130_classic_remembers_last_seen_buildings_until_an_airborne_observer_revis
     m.world.game.units.get_mut(&plane).unwrap().air = Some(PlaneState::Out);
     m.refresh_classic_visibility().unwrap();
     assert!(remembered(&m, 0).is_empty());
-    assert!(
-        m.advance_tick()
-            .unwrap_err()
-            .reason
-            .contains("requires represented ordinary or World mode")
-    );
-    assert!(
-        m.tick_state.fault().is_none(),
-        "unsupported mode refuses before tick mutation"
-    );
+    m.initialize_recipient_routing().unwrap();
+    for _ in 0..5 {
+        m.advance_tick().unwrap();
+        assert!(m.tick_state.fault().is_none());
+        assert!(remembered(&m, 0).is_empty());
+    }
     assert!(matches!(
         SnapshotCache::new(&m),
         Err(SnapshotError::UnsupportedMode)

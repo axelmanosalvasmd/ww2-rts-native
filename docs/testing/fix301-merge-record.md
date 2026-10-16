@@ -415,3 +415,53 @@ ed129fd522236053f365fdd102272de304493957a6672cf56dca31a2d769639b  nextest.log
 0d3e3c8c931d64638e320bb50a6a7cb7009688e0a38438cedca63828e7e3bbbf  caps.json
 dd9f3d6ba1391e96be1927f7593b8590b72c1591e2a62c3a422054e048c6927d  m6-resolution.patch
 ```
+
+## M7: hosted CI expectations after combat batch 5
+
+- Parent 1: acked PR head `f7f9e2743aabd22d874c85e11d26cd940ce134dd`.
+- Parent 2 (merged main): `6d21066fa26b8d67124b446a23163b7f0cc20214`.
+- Merge commit: `cc512b68465ad509718fb6094c5bae5a6addcc6f`.
+- `git merge-tree --write-tree f7f9e2743aabd22d874c85e11d26cd940ce134dd 6d21066fa26b8d67124b446a23163b7f0cc20214` exits 0 with tree `5d5649dafdf2b758cbcc54c5206aaeecda647f2b`, identical to the committed merge tree. Conflict list: empty. Hand-edited merge-resolution hunks: zero.
+- The requested branch was already checked out in `stream-mode-a`. This repair uses `fix-301ci`, on local branch `fix/301ci-20261016` from the exact remote PR head, and pushes normally to `runtime/mode-a-20261016`. It does not change the occupied worktree.
+
+Acknowledged the task's `f7f9e274` baseline and the coordination replies requiring a fresh exact-head ack after a refresh. The old ack and old validation do not qualify this successor. No issue post is made. The coordinator retains re-ack, hosted gates and merge.
+
+### Reproduced failures and classification
+
+The unedited automatic merge reproduces both reported failures: 2 selected, 0 passed, 2 failed, 1,078 skipped. Run ID `f222fa64-3344-42f3-a871-1186d72ef89d`; raw log `/tmp/fix301-before.log`. Both fail in the old Classic tick-mode refusal assertion, at `cmb5_ability_tests.rs:261` and `cmb5_visibility_tests.rs:179` respectively.
+
+Both are case (a): obsolete assertions about Classic runner admission. Their fixtures previously changed Conquest's mode tag without initializing Classic elimination state. The represented runner now reaches the missing-state guard, rather than the old unsupported-mode guard. The tests must construct supported Classic state and check successful ticks. The Classic and World recipient snapshot refusals remain correct: `recipient_snapshot.rs:113-119` still admits only Default and Conquest. No production source or admission guard changes in this repair.
+
+Authored test hunks after the automatic merge:
+
+1. `cmb5_ability_tests.rs`: use `Match::new_classic` for Classic, preserving the existing World constructor and ordinary constructor; remove the obsolete mode-tag mutation and its import/comment. Replace the old Classic tick rejection with validation and four successful ticks after detaching component-produced firing events. Every existing cost, aimed-arrival, no-double-payment, cooldown and insufficient-funds assertion remains. Keep the existing snapshot refusal for both Classic and World.
+2. `cmb5_visibility_tests.rs`: the scene helper uses the Classic constructor and preserves its canonical Game mode when replacing the component world. Publish a distant HQ with a valid terrain footprint per seat so observation and hidden destruction do not eliminate a player; create the observer aircraft with canonical runtime metadata. Replace the old tick rejection with five successful ticks, no fault and no reappearance of the cleared memory. Every original visibility, shared-team, exact remembered row, last-observed progress, unseen destruction, wall, parked-plane and airborne-invalidation assertion remains. Preserve Classic's snapshot refusal and leave both Default/Conquest no-ghost tests unchanged.
+
+Prototype inspected at `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`:
+
+- CMB-112: `shared/sim.js:518-528` defines and charges construction-mode ability costs; `3608-3624` defers aimed payment and charges immediate use; `5416-5430` charges on aimed arrival and clears an unaffordable order without firing. Native test: `cmb5_ability_tests::cmb112_classic_and_world_charge_on_use_and_aimed_arrival`.
+- CMB-130: `shared/sim.js:4381-4394` shares team vision and excludes parked aircraft; `4441-4448` stores observed building facts and invalidates empty locations on ground or airborne revisit; `4456` selects memory by recipient team; `6037` emits unseen memories as ghosts. Native test: `vision::cmb5_visibility_tests::cmb130_classic_remembers_last_seen_buildings_until_an_airborne_observer_revisits`.
+
+CMB-130 remains incomplete as a full running-recipient witness: Classic's recipient guard prevents every-seat ghost delivery through a finish. Do not add the conditional "CMB-130 now provable in Classic" claim or expand the fourteen MODE row candidates. World hosting and all interface, wire and privacy boundaries stay unchanged.
+
+The first repaired two-test run passed CMB-112 and failed CMB-130 before mutation with `aircraft admission: Environment(InvalidInput("building footprint"))`. This exposed the newly added fixture HQs lacking canonical footprints. Replacing those three placeholder HQs with `place_starting_building` supplies valid terrain and metadata without changing any existing observation assertion. Raw log: `/tmp/fix301-after.log`.
+
+### M7 validation
+
+Vostro, Rust 1.99.0, commands from `rust/`. Cargo uses the shared slot lock and its matching target directory, with `MemoryMax=6G`, `MemorySwapMax=0` and four build jobs. Focused tests use S1; formatting and Clippy use S3. Each lock is released when its Cargo command exits.
+
+- Tested Rust tree: `4cf170b2110f58dad7ff51e6846732a58c4dfef3`. The final commit has this same Rust tree; later edits record results only.
+- `cargo nextest run --locked --cargo-profile ci-test -p ww2-core -j4 --retries 0 --no-fail-fast -E 'test(elimination) | test(classic) | test(recovery) | test(abilit) | test(memory) | test(recipient_snapshot) | test(cmb112) | test(cmb130) | test(ghosts)'`: 149 passed, 0 failed, 931 skipped across two binaries. This includes both repaired tests and both unchanged Default/Conquest no-ghost tests. Run ID: `d57fb7aa-e4b5-4eb5-8eab-4c3b3301d4d7`.
+- `cargo fmt --all --check`: PASS.
+- `cargo clippy --locked --workspace --all-targets -j4 -- -D warnings`: PASS.
+- Independent source inspection confirmed that every original ability-payment and building-memory assertion remains, except the obsolete tick refusal. That review ran no Cargo.
+
+No full-workspace test run, Source/Node execution, issue post or force-push. Hosted CI is left to run on the pushed head. Raw logs and SHA256:
+
+```text
+ee6540daa231ad8eec1fc827d8931cb2c85d09280ebbf83cb4a1134a9254edaf  /tmp/fix301-before.log
+78023794430b46fba027652e158a16c73985d93c9565c4b47015941b5273c4ac  /tmp/fix301-after.log
+79a76454c529829eafc3351d36749a3048c4815c6e7b021f836edf40e299f79b  /tmp/fix301-focused.log
+b41eed0957426719ca8e1583f9fba022f8d97bae408a6d6f26fc0ab8041168a7  /tmp/fix301-fmt.log
+3fbf08ec86c29792613eda60df0bd23eb628da684e4497bf4896183faff84ee7  /tmp/fix301-clippy.log
+```
