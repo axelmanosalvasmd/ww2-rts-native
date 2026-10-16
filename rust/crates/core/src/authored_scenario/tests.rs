@@ -48,15 +48,15 @@ fn authored_checkpoint_preserves_canonical_trigger_and_objective_history() {
     };
 
     let data = json!({"version":1,"areas":[{"id":"entry","box":[20,20,24,24]}],
-        "groups":[],"objectives":[{"id":"mission","text":"Complete the mission"}],
-        "triggers":[
-            {"id":"complete","scope":"match","condition":{"kind":"time","seconds":0.1},
-             "repeat":{"mode":"once","cooldown":3},
-             "actions":[{"kind":"objectiveComplete","objective":"mission"}]},
-            {"id":"announce","scope":"match","condition":{"kind":"time","seconds":0.25},
-             "repeat":{"mode":"once","cooldown":7},
-             "actions":[{"kind":"say","text":"Done"}]}
-        ]});
+    "groups":[],"objectives":[{"id":"mission","text":"Complete the mission"}],
+    "triggers":[
+        {"id":"complete","scope":"match","condition":{"kind":"time","seconds":0.1},
+         "repeat":{"mode":"once","cooldown":3},
+         "actions":[{"kind":"objectiveComplete","objective":"mission"}]},
+        {"id":"announce","scope":"match","condition":{"kind":"time","seconds":0.25},
+         "repeat":{"mode":"once","cooldown":7},
+         "actions":[{"kind":"say","text":"Done"}]}
+    ]});
     let map = AuthoritativeMap::from_json(
         &serde_json::to_vec(&json!({
             "name":"Canonical authored checkpoint", "w":64, "h":40,
@@ -98,8 +98,14 @@ fn authored_checkpoint_preserves_canonical_trigger_and_objective_history() {
     state.advance_tick().unwrap();
     let before = state.authored_scenario.clone();
     let scenario = before.as_ref().unwrap();
-    assert_eq!(scenario.executions["complete@match"], TriggerState::default());
-    assert_eq!(scenario.executions["announce@match"], TriggerState::default());
+    assert_eq!(
+        scenario.executions["complete@match"],
+        TriggerState::default()
+    );
+    assert_eq!(
+        scenario.executions["announce@match"],
+        TriggerState::default()
+    );
     assert_eq!(scenario.facts.trigger_counts.len(), 2);
     assert_eq!(
         scenario.facts.trigger_counts[&("complete".into(), Scope::Match)],
