@@ -2037,3 +2037,11 @@ mod trusted_room_tests;
 #[cfg(test)]
 #[path = "lobby_socket_tests.rs"]
 mod lobby_socket_tests;
+
+#[cfg(test)]
+#[path = "combat_deny_tests.rs"]
+mod combat_deny_tests;
+
+#[cfg(test)]
+#[path = "net_batch50_lobby_tests.rs"]
+mod net_batch50;
