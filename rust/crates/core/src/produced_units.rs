@@ -72,7 +72,7 @@ pub(crate) struct TutorialProduceInput {
     pub rally: Option<Point>,
     pub tick: u64,
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum RallyKind {
     Building,
     Player,
@@ -90,7 +90,7 @@ pub struct ProducedPlacement {
     pub aim: f64,
     pub rally: Option<RallyRequest>,
 }
-#[derive(Default)]
+#[derive(Default, serde::Serialize, serde::Deserialize)]
 pub struct ProducedPlacer {
     spawn: SpawnPlacer,
     vehicles: VehicleNavigation,

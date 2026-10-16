@@ -18,7 +18,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "--seed" if seed.is_none() => seed = Some(args.next().ok_or("--seed requires U64")?),
             "--help" | "-h" => {
                 println!(
-                    "ww2-server [--bind HOST:PORT] [--trusted-room CODE --seed U64]\nAddress priority: --bind, WW2_BIND, HOST/PORT, 127.0.0.1:3000. Port 0 selects a free port.\nWW2_SHARDS: 1-64 isolated game threads (default 1).\nTrusted mode: one private two-human Conquest room, standard army, sandbox off, logistics off (temporary). Seeds/receipts stay host-private."
+                    "ww2-server [--bind HOST:PORT] [--trusted-room CODE --seed U64]\nAddress priority: --bind, WW2_BIND, HOST/PORT, 127.0.0.1:3000. Port 0 selects a free port.\nWW2_SHARDS: 1-64 isolated game threads (default 1).\nTrusted mode: one private two-human Conquest room, named armies, sandbox off, logistics off (temporary). Seeds/receipts stay host-private."
                 );
                 return Ok(());
             }
@@ -39,6 +39,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let listener = TcpListener::bind(&address).await?;
     println!("LISTENING http://{}", listener.local_addr()?);
     let config = Config {
+        saves_dir: env::var_os("SAVES_DIR")
+            .map(Into::into)
+            .unwrap_or_else(|| "saves".into()),
         public_url: env::var("PUBLIC_URL").unwrap_or_default(),
         diagnostic_dir: (env::var("WW2_DIAG").as_deref() == Ok("1")).then(|| "logs".into()),
         tick_log: env::var("WW2_TICKLOG").as_deref() == Ok("1"),

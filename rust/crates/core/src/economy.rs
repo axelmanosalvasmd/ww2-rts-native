@@ -12,7 +12,7 @@ use crate::{
 };
 use std::fmt;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Mode {
     Default,
     Classic,
@@ -51,6 +51,7 @@ impl Mode {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub enum Faction {
     Usa = 0,
     Germany = 1,
@@ -94,7 +95,7 @@ impl fmt::Display for Error {
 }
 impl std::error::Error for Error {}
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Price {
     pub mp: f64,
     pub fuel: f64,
@@ -115,7 +116,7 @@ pub struct ResearchCost {
     pub mun: f64,
     pub time: f64,
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Technology {
     Tier,
     Infantry,
@@ -123,7 +124,7 @@ pub enum Technology {
     Armor,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct TechState {
     tier: u8,
     infantry: u8,

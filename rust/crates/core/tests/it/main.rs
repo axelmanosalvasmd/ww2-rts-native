@@ -24,6 +24,8 @@ mod bases_batch3_rally;
 mod bases_batch3_runtime;
 #[path = "../bases_batch3_training.rs"]
 mod bases_batch3_training;
+#[path = "../client_cell_state.rs"]
+mod client_cell_state;
 #[path = "../client_view.rs"]
 mod client_view;
 #[path = "../combat.rs"]
@@ -68,6 +70,10 @@ mod human_commander_timing;
 mod interface_intent;
 #[path = "../interface_map_helpers.rs"]
 mod interface_map_helpers;
+#[path = "../interface_math_intent.rs"]
+mod interface_math_intent;
+#[path = "../interface_motion_intent.rs"]
+mod interface_motion_intent;
 #[path = "../interface_runtime_batch3.rs"]
 mod interface_runtime_batch3;
 #[path = "../interface_stream_consumers.rs"]
@@ -84,14 +90,21 @@ mod map_world_batch2;
 mod match_combat;
 #[path = "../match_routing.rs"]
 mod match_routing;
+#[path = "../match_seed_intent.rs"]
+mod match_seed_intent;
 #[path = "../math.rs"]
 mod math;
 #[path = "../mode_intent_batch1.rs"]
 mod mode_intent_batch1;
 #[path = "../mode_point_services.rs"]
 mod mode_point_services;
+
 #[path = "../mode_runtime_batch4.rs"]
 mod mode_runtime_batch4;
+#[path = "../mode_runtime_world.rs"]
+mod mode_runtime_world;
+#[path = "../mode_startup_fallback.rs"]
+mod mode_startup_fallback;
 #[path = "../mov_aircraft_controls.rs"]
 mod mov_aircraft_controls;
 #[path = "../mov_aircraft_immunity.rs"]

@@ -3,6 +3,7 @@
 //! `aimPoint`, `inStrip`, the camouflage and trench rules). Its answers match the JavaScript exactly
 //! (`harness/vision-check.mjs`).
 //!
+//! Horde wave markers are composed by `Match::update_horde_vision`; this pass has no wave state.
 //! Construction-mode building memory is refreshed separately after this pass. Horde and World have
 //! explicit Match adapters for their mode-specific observers and visibility exceptions.
 
@@ -33,7 +34,7 @@ const NEAR_BUCKET: f64 = 16.0;
 const LONG_AGO: f64 = -1e9;
 
 /// Last observed building facts, without current health or other hidden live state.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct KnownBuilding {
     pub id: u32,
     pub kind: usize,

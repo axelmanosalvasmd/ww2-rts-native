@@ -29,7 +29,7 @@ impl From<production::Error> for RecruitError {
     }
 }
 /// Immutable facts from the recruitment transaction, separate from live control.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct RecruitMetadata {
     pub building: u32,
     pub initial_rally: Option<RallyKind>,
@@ -129,6 +129,7 @@ fn admission_facts<'a>(
         || player_rallies.len() != count
         || game.tick < 0
         || (!crate::match_actor::ordinary_ground_mode(game, options.mode) && !horde)
+        || options.mode.is_construction()
         || options.logistics
     {
         return Err(RecruitError::InvalidState("Conquest recruitment state"));
@@ -234,7 +235,7 @@ macro_rules! recruit_parts {
     };
 }
 impl Match {
-    /// Execute recorded Conquest purchases against the canonical finish and seat state.
+    /// Execute recorded ordinary or Horde purchases against canonical finish and seat state.
     /// Routing borrows the actual refreshed recipient projection, never a copied view.
     pub fn recorded_buy(
         &mut self,
@@ -251,8 +252,16 @@ impl Match {
         if self.finish.is_some() || wallet.away || wallet.out {
             return Err(production::Error::Denied(Denial::Blocked).into());
         }
-        self.validate_ordinary_finish_state()
-            .map_err(RecruitError::Story)?;
+        if self.options.mode == crate::economy::Mode::Horde {
+            self.validate_horde_economy().map_err(RecruitError::Story)?;
+        } else {
+            if self.options.mode == crate::economy::Mode::Tutorial {
+                self.validate_tutorial_state()
+                    .map_err(RecruitError::Story)?;
+            }
+            self.validate_match_finish_state()
+                .map_err(RecruitError::Story)?;
+        }
         if self
             .rules
             .kind(kind)

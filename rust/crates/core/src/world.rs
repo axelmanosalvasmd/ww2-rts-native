@@ -44,7 +44,7 @@ pub struct CellChange {
     pub material: Option<String>,
     pub height: Option<i8>,
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct InitialTerrain {
     pub chars: Vec<u8>,
     pub ground: Vec<u8>,
@@ -53,7 +53,7 @@ pub struct InitialTerrain {
     pub height: Option<Vec<i8>>,
     pub trench_front: Option<Vec<f32>>,
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Appearance {
     Intact,
     Damaged,
@@ -69,7 +69,7 @@ impl Appearance {
     }
 }
 /// Map-like timers with explicit first-insertion order, as required by fire RNG traversal.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct OrderedFires {
     order: Vec<usize>,
     timers: BTreeMap<usize, f64>,
@@ -109,7 +109,7 @@ impl OrderedFires {
     }
 }
 /// Mine discovery bits retain first-insertion order, including deletion and rediscovery.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct OrderedMineSeen {
     order: Vec<usize>,
     bits: BTreeMap<usize, u32>,
@@ -143,7 +143,7 @@ impl std::ops::Deref for OrderedMineSeen {
     }
 }
 /// Field hospitals retain placement order when recovery and convoy sources are collected.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct OrderedAid {
     order: Vec<usize>,
     owners: BTreeMap<usize, usize>,
@@ -176,14 +176,14 @@ impl std::ops::Deref for OrderedAid {
         &self.owners
     }
 }
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FailureMetadata {
     pub impulse: Option<f64>,
     pub failed_at: Option<f64>,
     pub direction: Option<crate::game::Point>,
     pub settled_at: Option<f64>,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SectionMetadata {
     pub id: String,
     pub structure_id: String,
@@ -194,31 +194,33 @@ pub struct SectionMetadata {
     pub appearance: Appearance,
     pub failure: FailureMetadata,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct DetachedSection {
     pub cell: usize,
     pub metadata: SectionMetadata,
     pub state: Section,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct WorldStructure {
     pub id: String,
-    pub kind: &'static str,
+    #[serde(deserialize_with = "crate::save_state::static_string")]
+    pub kind: crate::save_state::StaticStr,
     pub cells: Vec<usize>,
     pub section_ids: Vec<String>,
     pub entity_id: Option<u32>,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SectionRow {
     pub id: String,
     pub structure_id: String,
-    pub state: &'static str,
+    #[serde(deserialize_with = "crate::save_state::static_string")]
+    pub state: crate::save_state::StaticStr,
     pub hp: f64,
     pub max_hp: f64,
     pub material: String,
     pub anchor: bool,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct CellData {
     pub ground: u8,
     pub object: u8,
@@ -233,7 +235,7 @@ pub struct CellData {
     pub rail: Option<u8>,
     pub station: Option<usize>,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct CellRow {
     pub cell: usize,
     pub ch: u8,
@@ -241,12 +243,14 @@ pub struct CellRow {
     pub state: u8,
     pub data: CellData,
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
 pub enum Recipient {
     Player(usize),
     Spectators,
 }
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct RegionVersions {
     pub infantry: u64,
     pub vehicle: u64,
@@ -258,7 +262,7 @@ pub struct Mutation {
     pub logged_index: Option<usize>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct World {
     pub game: Game,
     pub mine_layer: Vec<u8>,
@@ -280,8 +284,10 @@ pub struct World {
     pub sections: BTreeMap<usize, SectionMetadata>,
     pub detached_sections: BTreeMap<String, DetachedSection>,
     initial: std::sync::Arc<InitialTerrain>,
+    #[serde(skip)]
     geography: Option<crate::world_map::WorldDefinition>,
     pub versions: RegionVersions,
+    #[serde(skip, default = "crate::save_state::compiled_rules")]
     rules: Rules,
     log: Vec<CellRow>,
     log_indexes: BTreeMap<usize, usize>,

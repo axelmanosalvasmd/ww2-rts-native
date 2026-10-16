@@ -20,6 +20,8 @@ mod delivery;
 mod engineering;
 #[path = "recipient_snapshot/falling.rs"]
 mod falling;
+#[path = "recipient_snapshot/modes.rs"]
+mod modes;
 #[path = "recipient_snapshot/operative.rs"]
 mod operative;
 #[path = "recipient_snapshot/operative_flights.rs"]
@@ -32,13 +34,17 @@ mod public_state;
 mod selected;
 #[path = "recipient_snapshot/shots.rs"]
 mod shots;
+#[path = "recipient_snapshot/spectator.rs"]
+mod spectator;
 #[path = "recipient_snapshot/support.rs"]
 mod support;
 pub use composition::{GroundListDeliveryFrame, QuiescentDeliveryFrame, SupportedSeatSnapshot};
 pub use delivery::{DeliveryFrame, DeliveryState};
+pub use modes::mode_row;
 pub use operative::OperativeDelivery;
 pub use selected::{SelectedDeliveryFrame, SelectedGroundListFrame, SelectedSeat};
 pub use shots::{SelectedGroundShotFrame, ShotRef};
+pub use spectator::SpectatorDelivery;
 pub use support::SUPPORTED_SUPPORT_KINDS;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -95,10 +101,14 @@ pub fn horde_mode_row(state: &Match) -> Result<Value, SnapshotError> {
     let mut row = json!({
         "kind": "horde", "defenderTeam": 0, "attackerTeam": 1,
         "timeLeft": mode.time_left, "suddenDeath": false,
-        "profile": mode.profile.as_str(), "wave": mode.wave,
-        "left": mode.left, "active": mode.active, "boss": mode.boss,
+        "wave": mode.wave,
+        "left": mode.left, "active": mode.active,
         "slot": horde.slot
     });
+    if mode.wave > 0 {
+        row["profile"] = json!(mode.profile.as_str());
+        row["boss"] = json!(mode.boss);
+    }
     if let Some(profile) = mode.next_profile {
         row["nextProfile"] = json!(profile.as_str());
     }

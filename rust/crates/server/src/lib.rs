@@ -5,6 +5,7 @@ mod diagnostics;
 mod lobby;
 mod maps;
 mod native_startup;
+mod saves;
 mod trusted_room;
 pub use trusted_room::TrustedRoomConfig;
 pub mod room_runtime;
@@ -50,6 +51,8 @@ pub struct Config {
     /// Opt-in host JSONL output. No diagnostic fields enter recipient messages.
     pub diagnostic_dir: Option<std::path::PathBuf>,
     pub tick_log: bool,
+    /// Private match files, shared by game workers.
+    pub saves_dir: std::path::PathBuf,
 }
 impl Default for Config {
     fn default() -> Self {
@@ -58,6 +61,7 @@ impl Default for Config {
             public_url: String::new(),
             diagnostic_dir: None,
             tick_log: false,
+            saves_dir: "saves".into(),
         }
     }
 }
@@ -154,6 +158,7 @@ async fn serve_inner(
 ) -> std::io::Result<()> {
     let mut hub = Hub::new(config.max_rooms.clamp(1, 256), config.public_url);
     hub.configure_trusted_room(trusted);
+    hub.configure_saves(config.saves_dir);
     hub.configure_diagnostics(config.diagnostic_dir, config.tick_log)?;
     // Dropping or aborting this future invalidates the same stopped authority
     // used under the Hub lock, even when graceful shutdown never runs.
@@ -302,9 +307,17 @@ async fn socket_loop(
             _ = stop.changed() => { close(&mut socket,1001,"server shutdown").await; break; }
             _ = cancelled.changed() => { close(&mut socket,1013,"too far behind").await; break; }
             Some(output) = rx.recv() => {
-                let diagnostic_bytes = if diagnostics { output.diagnostic_bytes() } else { 0 };
+                let diagnostic_bytes = output.diagnostic_bytes();
                 match output {
                     Output::Json(v) => if socket.send(Message::Text(v.to_string().into())).await.is_err() { break; },
+                    Output::Watcher(json) => {
+                        let result = tokio::select! {
+                            result = socket.send(Message::Text(json.to_string().into())) => result.is_ok(),
+                            _ = stop.changed() => false,
+                            _ = cancelled.changed() => false,
+                        };
+                        if !result { break; }
+                    },
                     Output::Snapshot(mut write) => {
                         let message = Message::Text(std::mem::take(&mut write.json).into());
                         let result = tokio::select! {

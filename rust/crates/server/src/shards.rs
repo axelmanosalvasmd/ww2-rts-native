@@ -308,6 +308,7 @@ async fn run_worker(
 ) -> io::Result<()> {
     let mut hub = Hub::new(config.max_rooms.clamp(1, 256), config.public_url);
     hub.configure_trusted_room(trusted);
+    hub.configure_saves(config.saves_dir);
     if let Err(error) = hub.configure_diagnostics(config.diagnostic_dir, config.tick_log) {
         let _ = started.send(Err(error));
         return Ok(());
