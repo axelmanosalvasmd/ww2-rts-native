@@ -1,5 +1,5 @@
 //! Convoy room input through recorded orders, ordinary ticks and recipient delivery.
-use super::runtime_tests::{arena, arena_with_barrier, place, troop};
+use super::runtime_tests::{arena, place, troop};
 use crate::{
     game::Point,
     logistics::Stock,
@@ -215,7 +215,7 @@ fn convoy_room_supply_stop_resume_survives_pending_save_and_finishes_with_every_
 }
 
 #[test]
-fn convoy_room_denials_distinguish_selection_target_disabled_and_disconnected_route() {
+fn convoy_room_denials_distinguish_selection_target_disabled_and_unassignable_job() {
     for reason in [
         "no trucks",
         "enemy truck",
@@ -223,14 +223,10 @@ fn convoy_room_denials_distinguish_selection_target_disabled_and_disconnected_ro
         "enemy target",
         "incomplete cache",
         "disabled",
-        "no route",
+        "no source",
         "resume no trucks",
     ] {
-        let mut m = if reason == "no route" {
-            arena_with_barrier(true, true)
-        } else {
-            arena(reason != "disabled")
-        };
+        let mut m = arena(reason != "disabled");
         let target = troop(&m);
         let truck = if reason == "disabled" {
             target
@@ -278,17 +274,13 @@ fn convoy_room_denials_distinguish_selection_target_disabled_and_disconnected_ro
                     None
                 );
             }
-            "no route" => {
-                place(&mut m, truck, Point { x: 77., z: 81. });
-                place(&mut m, target, Point { x: 87., z: 81. });
-                m.convoys
-                    .as_mut()
-                    .unwrap()
-                    .trucks
-                    .get_mut(&truck)
-                    .unwrap()
-                    .cargo
-                    .ammo = 12.;
+            "no source" => {
+                // This empty truck has no collection origin at command time.
+                // The later convoy phase may rebuild stores from ordinary sources.
+                m.logistics.get_mut(target).unwrap().ammo = 1.;
+                let convoys = m.convoys.as_mut().unwrap();
+                assert_eq!(convoys.trucks[&truck].cargo, Stock::default());
+                convoys.stores.clear();
             }
             _ => {}
         }
@@ -299,7 +291,7 @@ fn convoy_room_denials_distinguish_selection_target_disabled_and_disconnected_ro
         let mut delivery = DeliveryState::new(&m).unwrap();
         let (report, _) = delivered_tick(&mut m, &mut delivery);
         assert_eq!(report.commands.len(), 1, "{reason}");
-        let expected = if matches!(reason, "disabled" | "no route") {
+        let expected = if matches!(reason, "disabled" | "no source") {
             Denial::Blocked
         } else {
             Denial::Needs

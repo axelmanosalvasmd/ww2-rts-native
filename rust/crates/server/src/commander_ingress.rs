@@ -156,8 +156,8 @@ impl CommanderIngress {
             if forced && !allowed_forced {
                 continue;
             }
-            if (kind.air || unit.air.is_some()) && !matches!(command, Command::FireAt { .. })
-                || kind.naval && !matches!(command, Command::FireAt { .. })
+            if (kind.air || kind.naval || unit.air.is_some())
+                && !matches!(command, Command::FireAt { .. })
                 || matches!(command, Command::Move { .. } | Command::Stop { .. }) && unit.build
                 || matches!(
                     command,

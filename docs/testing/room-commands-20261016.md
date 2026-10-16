@@ -49,7 +49,7 @@ non-World convoy portion of CMB-150 without replacing flight/privacy owners.
 - CMB-150 (assigned non-World convoy portion):
   `convoy_room_shapes_preserve_selection_order_duplicates_and_uncapped_orders_fallback`,
   `convoy_room_supply_stop_resume_survives_pending_save_and_finishes_with_every_seat`,
-  `convoy_room_denials_distinguish_selection_target_disabled_and_disconnected_route`.
+  `convoy_room_denials_distinguish_selection_target_disabled_and_unassignable_job`.
   Full-row sandbox integration remains with #393; running World recovery is deferred.
 - NET-43: `net43_room_routes_fireat_and_convoys_with_guest_keys_and_exact_denials`
   supplements inherited #296/#366 tests. It checks pause, guest authority, stamped
@@ -80,9 +80,9 @@ lifecycle witness; execution is required before counting it. Hermes' exact-head
 runtime ack remains pending, and no client adoption is claimed.
 
 Validation uses a real shared slot with matching target directory, Rust 1.99.0,
-6 GiB memory, zero swap and -j4. Nextest selects only core/server tests for the
-new command tests and affected ground-order, flight/event, room and convoy
-lifecycles. Cargo uses the repository's ci-test build profile. Workspace formatting
+6 GiB memory, zero swap and -j4. Nextest selects all server library tests because room admission changed, plus
+focused core command, aircraft, ground-order, flight/event, convoy lifecycle and
+commander merge checks. No full workspace nextest run is used. Cargo uses the repository's ci-test build profile. Workspace formatting
 and strict all-target workspace Clippy are required before publication. Exact
 commands, producing head and results are recorded in the PR body.
 
@@ -94,3 +94,19 @@ medic seek setup, and main's `world_free` set. The following unit loop uses both
 owners. No other merge region was hand edited; incoming tutorial, Gate, AI and
 server test changes are automatic. The stream does not claim the newly inherited
 AI rows. Focused commander policy tests are included to check this merge region.
+
+Integration validation found two #296 witnesses still pinning the superseded
+three-kind support restriction. `every_support_kind_keeps_ordinary_r1_scheduled_snapshots_flowing`
+now requires actual strike/cooldown state for all eight kinds, using a visible
+owned position so paradrop visibility is genuinely satisfied. The former
+`recon_refuses_before_reservation_and_keeps_ordinary_r1_snapshots_flowing` is
+rewritten as `recon_reserves_once_and_keeps_ordinary_r1_snapshots_flowing`,
+retaining both trusted and attached rooms and requiring payment, cooldown,
+canonical sequence continuity and recipient snapshots. No runtime guard is
+weakened to satisfy the tests.
+
+The initial convoy refusal fixture correctly accepted a one-metre approach:
+the actuator stops nine metres short of its target, so the authored water was
+not a planning barrier. The refusal witness now uses an empty truck without a
+collection source, proving an unassignable job rather than inferring route
+failure from terrain. The actual transfer/hold/resume/finish witness is unchanged.
