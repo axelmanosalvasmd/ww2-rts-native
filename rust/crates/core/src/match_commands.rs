@@ -318,6 +318,7 @@ pub enum Denial {
     NotWaiting,
     NoBuilders,
     NotVisible,
+    Coast,
 }
 impl Denial {
     pub fn name(self) -> &'static str {
@@ -341,6 +342,7 @@ impl Denial {
             Self::NotWaiting => "notWaiting",
             Self::NoBuilders => "noBuilders",
             Self::NotVisible => "notVisible",
+            Self::Coast => "coast",
         }
     }
 }
