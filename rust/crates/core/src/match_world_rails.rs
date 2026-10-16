@@ -469,6 +469,17 @@ impl Match {
             .get(id)
             .ok_or("missing rail validation combat")?;
         if kind.rail {
+            // Sandbox spawnUnit creates an idle train without a World rail run.
+            // It carries no passengers and Source skips its turn (sim.js:5354).
+            if self.options.sandbox
+                && !unit.rail
+                && !unit.riding
+                && !self.rail_runs.contains_key(&id)
+                && metadata.carrier.is_none()
+                && metadata.cargo.is_empty()
+            {
+                return Ok(false);
+            }
             let run = self.rail_runs.get(&id).ok_or("unregistered World train")?;
             if !unit.rail
                 || !run.wait.is_finite()

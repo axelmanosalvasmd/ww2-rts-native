@@ -561,7 +561,9 @@ impl crate::match_runtime::Match {
                 continue;
             }
             if self.rules.kinds[unit.kind].rail {
-                self.step_rail_train(id, dt)?;
+                if self.validate_rail_tick_actor(id)? {
+                    self.step_rail_train(id, dt)?;
+                }
                 continue;
             }
             if self.options.mode == crate::economy::Mode::World {

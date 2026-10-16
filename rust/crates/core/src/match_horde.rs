@@ -372,6 +372,9 @@ impl Match {
     }
     pub fn horde_result(&self) -> Result<Option<HordeResult>, String> {
         self.validate_horde_phase(0.0)?;
+        if self.options.sandbox {
+            return Ok(None);
+        }
         let Some(report) = self.match_result()? else {
             return Ok(None);
         };
@@ -498,7 +501,12 @@ impl Match {
             "income",
         )
     }
-    fn horde_path(&self, name: &str, from: Point, target: Point) -> Result<Vec<Point>, String> {
+    pub(crate) fn horde_path(
+        &self,
+        name: &str,
+        from: Point,
+        target: Point,
+    ) -> Result<Vec<Point>, String> {
         let game = &self.world.game;
         let n = game.w * game.h;
         let near = vec![0; n];
@@ -773,7 +781,7 @@ impl Match {
             || m.total_budget < 0.0
             || m.profile_spent < 0.0
             || m.reserve.len() > 240
-            || (m.active && m.wave == 0)
+            || (m.active && m.wave == 0 && !self.options.sandbox)
             || m.profile_history.len() > 2
         {
             return Err("invalid Horde phase state".into());

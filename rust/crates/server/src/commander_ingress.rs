@@ -15,7 +15,7 @@ pub(crate) struct CommanderIngress {
 }
 impl CommanderIngress {
     pub fn recognizes(t: &str) -> bool {
-        matches!(t, "move" | "amove" | "stop" | "stance")
+        matches!(t, "move" | "amove" | "stop" | "stance" | "spawn")
     }
     pub fn enqueue(&mut self, state: &mut Match, slot: usize, raw: &Value) -> Result<(), Denial> {
         let name = match raw["t"].as_str() {
@@ -23,12 +23,16 @@ impl CommanderIngress {
             Some("amove") => "amove",
             Some("stop") => "stop",
             Some("stance") => "stance",
+            Some("spawn") => "spawn",
             _ => return Err(Denial::Blocked),
         };
         let command = Command::from_json(raw)?;
         if !matches!(
             command,
-            Command::Move { .. } | Command::Stop { .. } | Command::Stance { .. }
+            Command::Move { .. }
+                | Command::Stop { .. }
+                | Command::Stance { .. }
+                | Command::Spawn { .. }
         ) {
             return Err(Denial::Blocked);
         }
@@ -46,6 +50,7 @@ impl CommanderIngress {
         let rows = match &command {
             Command::Move { orders, .. } => orders.iter().map(|o| o.unit).collect::<Vec<_>>(),
             Command::Stop { ids } | Command::Stance { ids, .. } => ids.clone(),
+            Command::Spawn { .. } => Vec::new(),
             _ => unreachable!(),
         };
         for raw in rows.iter().take(50.max(state.world.game.units.len())) {

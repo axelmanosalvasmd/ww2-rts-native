@@ -1597,8 +1597,8 @@ impl Hub {
         } else if room.native.is_some() {
             return Err("start requires lobby state".into());
         }
-        if room.listed || room.mode != "conquest" || room.army != "standard" || room.sandbox {
-            return Err("R1 requires private Conquest, standard army and sandbox off".into());
+        if room.listed || room.mode != "conquest" || room.army != "standard" {
+            return Err("R1 requires private Conquest and standard army".into());
         }
         if room.players.len() != 2
             || !room.spectators.is_empty()
@@ -1644,7 +1644,7 @@ impl Hub {
                 tech: true,
                 supply: true,
                 logistics: logistics_enabled_for(&room.mode, map.source()),
-                sandbox: false,
+                sandbox: room.sandbox,
             },
         )
         .map_err(|e| e.to_string())?;
@@ -2432,6 +2432,10 @@ mod net83_followup_tests;
 #[cfg(test)]
 #[path = "mode_runtime_a_tests.rs"]
 mod mode_runtime_a_tests;
+
+#[cfg(test)]
+#[path = "sandbox_runtime_tests.rs"]
+mod sandbox_runtime_tests;
 
 #[cfg(test)]
 #[path = "net_runtime3_tests.rs"]
