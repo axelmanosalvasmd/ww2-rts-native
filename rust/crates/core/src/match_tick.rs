@@ -560,7 +560,19 @@ impl crate::match_runtime::Match {
                 if result.map_err(|error| format!("aircraft turn: {error}"))? {
                     continue;
                 }
-                match self.apply_unit_riding(id, dt)? {
+                let riding = self.apply_unit_riding(id, dt);
+                events.extend(
+                    self.firing
+                        .take_events()
+                        .into_iter()
+                        .map(|event| match event {
+                            crate::match_firing::LaunchEvent::Environment(effect) => {
+                                TickEvent::Environment(effect)
+                            }
+                            event => TickEvent::Firing(event),
+                        }),
+                );
+                match riding? {
                     crate::match_carriers::RidingOutcome::Riding => continue,
                     crate::match_carriers::RidingOutcome::OnFoot => {}
                     crate::match_carriers::RidingOutcome::Ejected(hurt) => {
