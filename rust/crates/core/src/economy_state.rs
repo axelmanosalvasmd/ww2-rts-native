@@ -18,7 +18,7 @@ use crate::{
 };
 use std::{collections::BTreeMap, fmt};
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ArmySize {
     #[default]
     Standard,
@@ -65,7 +65,7 @@ impl Default for ModeContext {
 }
 
 /// The vector index is the player's slot, matching the reference's player array.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct PlayerEconomy {
     pub team: i32,
     pub away: bool,
@@ -181,7 +181,7 @@ impl fmt::Display for Error {
 }
 impl std::error::Error for Error {}
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct EconomyState {
     pub players: Vec<PlayerEconomy>,
 }

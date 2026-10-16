@@ -37,7 +37,7 @@ pub(crate) fn clean_client(value: &Value) -> Value {
     )
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub(crate) struct PlayerDiagnostics {
     pub at: Option<u64>,
     pub client: Value,

@@ -227,3 +227,6 @@ mod mov_followup_speed_tests;
 
 #[cfg(test)]
 mod mov_followup_garrison_tests;
+
+mod save_codec;
+mod save_state;

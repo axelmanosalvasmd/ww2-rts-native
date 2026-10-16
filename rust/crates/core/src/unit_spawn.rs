@@ -32,7 +32,7 @@ pub struct SpawnPlacement {
     pub point: Point,
 }
 
-#[derive(Default)]
+#[derive(Default, serde::Serialize, serde::Deserialize)]
 pub struct SpawnPlacer {
     component: Vec<bool>,
     seen: Vec<u32>,

@@ -11,7 +11,7 @@ use crate::{
     math,
 };
 use std::collections::BTreeMap;
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum MissionKind {
     Patrol,
     Escort,
@@ -28,13 +28,13 @@ impl MissionKind {
         }
     }
 }
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct PlaneMission {
     pub kind: MissionKind,
     pub target: Option<UnitId>,
     pub at: Point,
 }
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct AircraftRuntime {
     pub fuel: f64,
     pub ammo: f64,
@@ -45,12 +45,12 @@ pub struct AircraftRuntime {
     pub attack_pick: UnitId,
     pub downed: bool,
 }
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct AntiAirRuntime {
     pub shot: Option<f64>,
     pub reserve: Option<f64>,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum AviationEvent {
     AntiAir {
         shooter: UnitId,
@@ -66,7 +66,7 @@ pub enum AviationEvent {
         direction: f64,
     },
 }
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct AviationState {
     pub planes: BTreeMap<UnitId, AircraftRuntime>,
     pub anti_air: BTreeMap<UnitId, AntiAirRuntime>,

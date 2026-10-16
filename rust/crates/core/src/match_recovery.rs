@@ -2,14 +2,14 @@
 use crate::grid::UnitId;
 use std::collections::BTreeMap;
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct RecoveryUnit {
     pub hp_was: Option<f64>,
     pub wound_at: Option<i64>,
     pub heal_at: Option<i64>,
     pub reinforcement: f64,
 }
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct RecoveryState {
     units: BTreeMap<UnitId, RecoveryUnit>,
 }
