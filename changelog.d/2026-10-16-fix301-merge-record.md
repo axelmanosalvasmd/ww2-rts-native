@@ -1,3 +1,4 @@
 - Record final validation and every manual resolution in the five post-review PR #301 merges and the five updated behavior tests.
 - Preserve Tutorial and bounded mode runners together, including guarded purchases, shared recovery, transactional training refunds and lobby test accounting.
 - Keep Horde construction and building repair guarded when combining its actor support with the ordinary mode runners, and extend the existing setup test to check those refusals.
+- Restore Tutorial building-repair refusal in preflight and mutation after the merge broadened actor admission. Keep Default, Conquest, Assault, Annihilation and Classic repair support, with a Tutorial regression and the existing Horde exclusion test.
