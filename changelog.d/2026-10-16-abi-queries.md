@@ -1,0 +1,1 @@
+- Add ABI 2.1 C queries for recipient placement and authored-map validation, migration, spawns, previews, paths, houses and bounded seeded simulation. Preserve existing C functions and layouts. World placement history, team-qualified demine knowledge and complete editor fairness equivalence remain deferred.

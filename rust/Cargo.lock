@@ -944,6 +944,7 @@ name = "ww2-ffi"
 version = "0.1.0"
 dependencies = [
  "cbindgen",
+ "serde_json",
  "ww2-core",
 ]
 
