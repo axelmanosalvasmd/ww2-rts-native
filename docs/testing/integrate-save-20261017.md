@@ -40,3 +40,64 @@ The repaired four-merge checkpoint at `3a12e1ad` passed all 1,883 tests, with 10
 The eight-merge focused build found a missing `VBLOCK` import: main had extracted runtime geography validation, while #409 adds a separate editor route validator using that flag. Restore the import without changing either validator.
 
 The next focused build found #415's new test Person initializer missing main's `map_pings` field. Initialize it to the same empty history as ordinary Person creation; runtime and assertions are unchanged.
+
+## Completed save-chain validation, 2026-10-17
+
+The final two exact heads are merged with no-ff ancestry: #418 at
+`c4a9176448130a36f1f6d9a97b4248929df12784` and #434 at
+`b2ece3c642672a6eae97bcc0ccfec3c225de16fb`. The merge resolutions retain
+Classic partial-capability, privacy and multi-leg retreat assertions, plus
+both additive ABI query sets. Existing ABI layouts and World admission remain
+unchanged.
+
+Qualified source commit: `e28ceb34d4ea2ec93b91aed2091f55565947d89d`.
+Qualified Rust tree: `af9e969e99864c72d9c1d39bd199337bf7f87a7e`.
+Machine: Debian cloud, 9 logical CPUs, 9.7 GiB RAM, no swap. Rust 1.99.0,
+cargo-nextest 0.9.148. Other heavy work was paused. The source tree and
+Cargo.lock were unchanged throughout qualification.
+
+- Serial prebuild passed with `cargo test --locked --no-run -j1 -p ww2-core -p ww2-server -p ww2-simtest`.
+- All three repaired focused regressions passed.
+- Full nextest run: **1,959 passed, zero failures, 10 pre-existing ignored tests**, 656.765 seconds.
+- `cargo fmt --all --check`: passed.
+- `cargo clippy --locked --workspace --all-targets -- -D warnings`: passed.
+- `cargo test --locked --workspace --doc`: passed; all four crates contain zero runnable doctests.
+
+The nextest invocation used `--locked --profile ci -j4` and all three packages
+above. Its compiler profile was the default test profile with
+`CARGO_PROFILE_TEST_OPT_LEVEL=2`, debug information disabled, and incremental
+compilation disabled. Test-profile debug assertions and overflow checks were
+retained. This is an equivalent-settings default-test build, not a named
+`ci-test` execution. Final combined-workspace qualification will use the named
+`ci-test` compiler profile, include FFI tests, and run the release-library check.
+
+A cloud-only nextest tool configuration reserved all four scheduling slots for
+large fixture consumers and trusted binary socket tests:
+
+```toml
+[[profile.ci.overrides]]
+filter = 'test(engineering_consumers::support_selected::) | test(movement_existing_checks::) | binary(trusted_room_process)'
+threads-required = 'num-test-threads'
+```
+
+This was supplied with `--tool-config-file cloud:<absolute-config-path>`.
+All other tests kept four-way scheduling. No assertions, retries, ignore lists
+or timeouts were changed. The resource policy follows nextest's documented
+[heavy-test scheduling](https://nexte.st/docs/configuration/threads-required/).
+
+Earlier unsuccessful runs are not qualifications. The first complete diagnostic
+on `0c70dcd0` had 1,949 passes and 10 unsuccessful executions: three semantic
+failures and seven SIGKILL terminations. The three repairs are named in
+`changelog.d/2026-10-17-integrate-save-validation.md`. The subsequent unrestricted
+four-slot run on the repaired source had 1,954 passes, four SIGKILL terminations
+and one socket-read timeout. The support fixture expands to 417,298,622 bytes
+before JSON-tree allocation. Serial diagnosis passed both the bombing fixture
+and unchanged mine-contact socket test; the resource-scheduled complete run
+above then passed every enabled test. This scheduling change is explicit rather
+than treating a filtered rerun as a full-suite result.
+
+The trusted AI regression checks successful one-human-plus-AI setup, then the
+original full-roster refusal and spectator matrix. A third AI gets the existing
+`{"t":"deny","cmd":"addAi","reason":"blocked"}` frame. The AI lifecycle
+witness reads the normal completed `Output::Snapshot` JSON delivery path, not an
+omniscient substitute. General lobby capacity and World admission are unchanged.
