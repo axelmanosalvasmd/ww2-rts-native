@@ -235,6 +235,173 @@ fn trusted_restart_resets_input_and_delivery_but_keeps_old_socket_write_accounti
     assert!(state.commands.pending_tick(1).next().is_none());
 }
 
+// Prototype server.js:359-389 and :688-689: retain settings, replace the game,
+// and draw new seeds. The native host records a deterministic seed per match.
+#[test]
+fn mode94_restart_keeps_settings_uses_fresh_seeds_and_runs_recipient_frames() {
+    let (mut hub, a, mut ra, b, mut rb) = room();
+    hub.rooms.get_mut("ABC").unwrap().weather = "random".into();
+    hub.start_trusted("ABC", a.id, false, 0).unwrap();
+    super::native_tests::initial_start(&mut ra);
+    super::native_tests::initial_start(&mut rb);
+    let old = hub.rooms["ABC"].native.as_ref().unwrap().runtime.state();
+    let settings = old.options.clone();
+    let seeds = (
+        old.options.seed,
+        old.start.weather_seed,
+        old.start.environment_seed,
+    );
+    let original_units = old.world.game.units.clone();
+    let unit = old
+        .world
+        .game
+        .units
+        .values()
+        .find(|u| u.owner == 0)
+        .unwrap()
+        .id;
+    hub.rooms
+        .get_mut("ABC")
+        .unwrap()
+        .native
+        .as_mut()
+        .unwrap()
+        .runtime
+        .state_mut()
+        .world
+        .game
+        .units
+        .get_mut(&unit)
+        .unwrap()
+        .hp = 1.0;
+    // A guest cannot replace the game, even in the trusted room.
+    hub.message("ABC", &b, &mut true, json!({"t":"restart"}), 1);
+    assert_eq!(hub.native_status("ABC").unwrap().epoch, 1);
+    assert!(
+        matches!(rb.try_recv(), Ok(Output::Json(v)) if v == json!({"t":"deny","cmd":"restart","reason":"scenario"}))
+    );
+    hub.message("ABC", &a, &mut true, json!({"t":"restart"}), 2);
+    super::native_tests::initial_start(&mut ra);
+    super::native_tests::initial_start(&mut rb);
+    let native = hub.rooms["ABC"].native.as_ref().unwrap();
+    let fresh = native.runtime.state();
+    assert_eq!(native.epoch, 2);
+    assert_eq!(fresh.world.game.tick, 0);
+    assert_ne!(fresh.options.seed, seeds.0);
+    assert_ne!(fresh.start.weather_seed, seeds.1);
+    assert_ne!(fresh.start.environment_seed, seeds.2);
+    let mut fresh_options = fresh.options.clone();
+    fresh_options.seed = settings.seed;
+    assert_eq!(format!("{fresh_options:?}"), format!("{settings:?}"));
+    assert_eq!(fresh.world.game.units[&unit].hp, original_units[&unit].hp);
+    assert_eq!(
+        native.receipt.as_ref().unwrap()["options"]["seed"],
+        fresh.options.seed
+    );
+    let expected =
+        crate::authoritative_maps::create_match("default", fresh.options.clone()).unwrap();
+    assert_eq!(
+        format!("{:?}", fresh.world.game.units),
+        format!("{:?}", expected.world.game.units)
+    );
+    let mut frames = [0; 2];
+    for callback in 0..6_u64 {
+        let now = 2 + callback * 50;
+        hub.poll_native(now, now * 1_000_000);
+        for (slot, receiver) in [&mut ra, &mut rb].into_iter().enumerate() {
+            while let Ok(output) = receiver.try_recv() {
+                let Output::Snapshot(frame) = output else {
+                    panic!("only fresh recipient frames expected")
+                };
+                assert_eq!(frame.epoch, 2);
+                let snapshot: Value = serde_json::from_str(&frame.json).unwrap();
+                assert!(snapshot["tick"].as_u64().unwrap() > 0);
+                hub.complete_snapshot(&frame, true, now);
+                frames[slot] += 1;
+            }
+        }
+        assert!(hub.native_status("ABC").unwrap().fault.is_none());
+    }
+    assert_eq!(hub.native_status("ABC").unwrap().tick, 6);
+    assert!(frames.into_iter().all(|count| count > 0));
+}
+
+#[test]
+fn mode94_map_and_match_creation_failures_preserve_running_game_and_next_seed() {
+    for missing_map in [true, false] {
+        let (mut hub, a, mut ra, _, mut rb) = room();
+        hub.start_trusted("ABC", a.id, false, 0).unwrap();
+        super::native_tests::initial_start(&mut ra);
+        super::native_tests::initial_start(&mut rb);
+        hub.poll_native(0, 0);
+        let checkpoint = hub.rooms["ABC"]
+            .native
+            .as_ref()
+            .unwrap()
+            .runtime
+            .save_json()
+            .unwrap();
+        // Exercise both a real catalog load failure and Match::new rejecting
+        // the loaded map's setup, rather than an injected result or fault.
+        if missing_map {
+            hub.rooms.get_mut("ABC").unwrap().map = "missing-authored-map".into();
+        } else {
+            hub.rooms.get_mut("ABC").unwrap().players[1].team = 6;
+        }
+        let before = identity(&hub);
+        let lobby = hub.rooms["ABC"].lobby(a.id, &hub.maps, &hub.public_url);
+        let error = hub.start_trusted("ABC", a.id, true, 1).unwrap_err();
+        assert!(
+            if missing_map {
+                error.contains("unknown authored map")
+            } else {
+                error.starts_with("match startup:")
+            },
+            "{error}"
+        );
+        assert_eq!(identity(&hub), before);
+        assert_eq!(
+            hub.rooms["ABC"]
+                .native
+                .as_ref()
+                .unwrap()
+                .runtime
+                .save_json()
+                .unwrap(),
+            checkpoint
+        );
+        assert_eq!(
+            hub.rooms["ABC"].lobby(a.id, &hub.maps, &hub.public_url),
+            lobby
+        );
+        assert_eq!(hub.next_epoch, 1);
+        assert!(ra.try_recv().is_err() && rb.try_recv().is_err());
+        hub.message("ABC", &a, &mut true, json!({"t":"restart"}), 2);
+        assert!(
+            matches!(ra.try_recv(), Ok(Output::Json(v)) if v == json!({"t":"deny","cmd":"restart","reason":"scenario"}))
+        );
+        assert!(rb.try_recv().is_err());
+        assert_eq!(identity(&hub), before);
+        let room = hub.rooms.get_mut("ABC").unwrap();
+        room.map = "default".into();
+        room.players[1].team = 1;
+        hub.poll_native(50, 50_000_000);
+        assert_eq!(hub.native_status("ABC").unwrap().tick, 2);
+        for receiver in [&mut ra, &mut rb] {
+            let Output::Snapshot(frame) = receiver.try_recv().unwrap() else {
+                panic!("old game must still produce a recipient frame")
+            };
+            assert_eq!(frame.epoch, 1);
+            hub.complete_snapshot(&frame, true, 50);
+        }
+        assert!(hub.native_status("ABC").unwrap().fault.is_none());
+        hub.start_trusted("ABC", a.id, true, 51).unwrap();
+        let fresh = hub.rooms["ABC"].native.as_ref().unwrap().runtime.state();
+        assert_eq!(fresh.options.seed, 3936342);
+        assert_eq!(hub.next_epoch, 2);
+    }
+}
+
 #[test]
 fn trusted_canonical_map_weather_matrix_records_options_before_publication() {
     let maps: Value = serde_json::from_str(include_str!("map-catalog.json")).unwrap();

@@ -261,3 +261,6 @@ mod movement_tick_privacy_tests;
 #[cfg(test)]
 mod movement_tick_speed_tests;
 mod numeric_keys;
+
+#[cfg(test)]
+mod results_restart_tests;

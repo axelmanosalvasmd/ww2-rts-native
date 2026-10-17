@@ -201,6 +201,14 @@ fn net41_r1_restart_repeats_settings_resets_pause_and_reconnects_absent_seat() {
         .find(|m| m["t"] == "start")
         .unwrap();
     messages(&mut guest_rx);
+    let original_options = hub.rooms["ABC"]
+        .native
+        .as_ref()
+        .unwrap()
+        .runtime
+        .state()
+        .options
+        .clone();
     let original = hub.rooms["ABC"]
         .native
         .as_ref()
@@ -244,11 +252,22 @@ fn net41_r1_restart_repeats_settings_resets_pause_and_reconnects_absent_seat() {
     assert_eq!(restarted[1]["mode"], "conquest");
     let start = &restarted[2];
     assert_ne!(start["matchId"], first["matchId"]);
-    for field in [
-        "map", "names", "teams", "factions", "spawn", "spawns", "sandbox",
-    ] {
+    for field in ["map", "names", "teams", "factions", "sandbox", "weather"] {
         assert_eq!(start[field], first[field], "{field}");
     }
+    let mut expected_options = original_options;
+    expected_options.seed = expected_options.seed.wrapping_add(1);
+    let expected = crate::authoritative_maps::create_match("default", expected_options).unwrap();
+    let expected_spawns = json!(
+        expected
+            .start
+            .players
+            .iter()
+            .map(|p| json!({"x": p.spawn.x, "z": p.spawn.z}))
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(start["spawns"], expected_spawns);
+    assert_eq!(start["spawn"], expected_spawns[0]);
     let mut receipt = hub.rooms["ABC"]
         .native
         .as_ref()
@@ -256,7 +275,13 @@ fn net41_r1_restart_repeats_settings_resets_pause_and_reconnects_absent_seat() {
         .receipt
         .clone()
         .unwrap();
+    assert_eq!(receipt["options"]["seed"], expected.options.seed);
+    assert_eq!(receipt["environmentSeed"], expected.start.environment_seed);
+    assert_ne!(receipt["environmentSeed"], original["environmentSeed"]);
+    // Fresh seeds regenerate the spawn layout and environment. Other settings stay fixed.
     receipt["matchId"] = original["matchId"].clone();
+    receipt["options"]["seed"] = original["options"]["seed"].clone();
+    receipt["environmentSeed"] = original["environmentSeed"].clone();
     assert_eq!(receipt, original);
     assert_eq!(hub.rooms["ABC"].weather, "rain");
     assert_eq!(hub.native_status("ABC").unwrap().tick, 0);

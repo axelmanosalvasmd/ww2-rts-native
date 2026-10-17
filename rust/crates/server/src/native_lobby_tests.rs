@@ -72,7 +72,7 @@ fn write(rx: &mut mpsc::Receiver<Output>) -> SnapshotWrite {
         }
     }
 }
-fn initial_start(rx: &mut mpsc::Receiver<Output>) {
+pub(super) fn initial_start(rx: &mut mpsc::Receiver<Output>) {
     for kind in ["pause", "lobby", "start"] {
         let Output::Json(message) = rx.try_recv().unwrap() else {
             panic!("initial setup precedes snapshots")

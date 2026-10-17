@@ -1875,7 +1875,9 @@ impl Hub {
         let state = crate::authoritative_maps::create_match(
             &room.map,
             MatchOptions {
-                seed: trusted.seed,
+                // Failed preparations leave next_epoch unchanged, so only a
+                // published match advances the deterministic seed sequence.
+                seed: trusted.seed.wrapping_add(self.next_epoch),
                 mode: Mode::Conquest,
                 players,
                 shuffle: true,
