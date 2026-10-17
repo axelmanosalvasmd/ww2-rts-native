@@ -372,6 +372,7 @@ fn mode01_non_world_mode_rows_match_the_prototype_public_fields() {
             for slot in 0..count {
                 let projection = frame.recipient(slot).unwrap();
                 assert_eq!(projection.fields["mode"], expected, "Classic seat {slot}");
+                assert_eq!(projection.fields["ghosts"], json!([]));
                 assert_eq!(
                     projection.missing,
                     vec![

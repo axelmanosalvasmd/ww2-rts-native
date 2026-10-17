@@ -169,6 +169,7 @@ fn admit(state: &Match, outside_events: &[Effect]) -> Result<(), SnapshotError> 
 }
 pub(super) fn admit_actors(state: &Match, outside_events: &[Effect]) -> Result<(), SnapshotError> {
     support::admit_lifecycle(state)?;
+    operative_flights::validate(state)?;
     // Recipient projections belong to delivery preflight. This common actor
     // guard must not read a skipped seat's private wallet or lazy producers.
     let refused = |capability| SnapshotError::Unsupported {
