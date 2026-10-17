@@ -181,7 +181,7 @@ impl Match {
             })
             .collect::<Vec<_>>();
         let initial = self.world.initial();
-        self.supply_net = GroundSupplyNetwork::compute(
+        self.supply_net = GroundSupplyNetwork::compute_for_mode(
             SupplyInput {
                 view: view(&self.world.game),
                 chars: &self.world.game.chars,
@@ -192,6 +192,7 @@ impl Match {
                 players: &players,
             },
             &mut SpawnPlacer::new(),
+            self.options.mode,
         )?;
         Ok(())
     }

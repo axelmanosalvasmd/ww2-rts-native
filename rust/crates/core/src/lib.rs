@@ -216,6 +216,15 @@ mod engineering_intent_tests;
 mod mov_intent_batch;
 
 #[cfg(test)]
+mod logistics_support_tests;
+
+#[cfg(test)]
+mod logistics_network_depot_tests;
+
+#[cfg(test)]
+mod logistics_runtime_tests;
+
+#[cfg(test)]
 mod bases_runtime_construction_tests;
 
 #[cfg(test)]
