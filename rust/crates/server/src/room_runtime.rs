@@ -133,7 +133,6 @@ impl RoomRuntime {
             .map_err(|e| format!("watcher snapshot: {e:?}"))
     }
     pub fn new(mut state: Match, now_ms: u64) -> Result<Self, String> {
-        state.tick_state.restrict_aircraft_weapons_for_delivery();
         state.validate_tick_state()?;
         state
             .restrict_to_ordinary_snapshots()
@@ -331,6 +330,13 @@ impl RoomRuntime {
         }
         Ok(captured)
     }
+    /// Existing JSON v0 latency telemetry, derived from scheduled snapshot ticks.
+    pub(crate) fn latency_stats(&self) -> Value {
+        json!([
+            ww2_core::math::round(self.meter.stats().snapshot_tick.p95 * 10.0) / 10.0,
+            self.meter.snap_every()
+        ])
+    }
     pub(crate) fn open_loaded_pause(
         &mut self,
         slot: usize,
@@ -485,3 +491,7 @@ impl RoomRuntime {
 #[cfg(test)]
 #[path = "room_runtime_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "spectator_mission_tests.rs"]
+mod spectator_mission_tests;

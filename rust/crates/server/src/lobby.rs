@@ -189,6 +189,7 @@ struct Person {
     disconnected: Option<u64>,
     denies: Vec<u64>,
     rtt: Option<f64>,
+    map_pings: Vec<u64>,
     diagnostics: crate::diagnostics::PlayerDiagnostics,
     last_match: Option<Value>,
 }
@@ -449,6 +450,7 @@ impl Room {
         if let Some(last) = &self.result {
             let mut report = last.report.clone();
             report["you"] = you
+                .filter(|_| report.get("story").is_some_and(Value::is_array))
                 .and_then(|slot| self.players[slot].last_match.clone())
                 .unwrap_or(Value::Null);
             result["result"] = report;
@@ -501,7 +503,47 @@ impl Room {
             &mut self.spectators[watching.unwrap()]
         };
         if t == "ping" {
-            if msg.get("x").is_none() && msg.get("z").is_none() {
+            if msg.get("x").is_some() || msg.get("z").is_some() {
+                let Some(slot) = seated.filter(|_| !me.ai) else {
+                    return false;
+                };
+                let Some(native) = &self.native else {
+                    return false;
+                };
+                let game = &native.runtime.state().world.game;
+                let Some(x) = msg["x"].as_f64().filter(|x| x.is_finite()) else {
+                    return false;
+                };
+                let Some(z) = msg["z"].as_f64().filter(|z| z.is_finite()) else {
+                    return false;
+                };
+                if x < 0.0
+                    || z < 0.0
+                    || x > game.w as f64 * ww2_core::game::CELL
+                    || z > game.h as f64 * ww2_core::game::CELL
+                    || !me.connection.as_ref().is_some_and(Connection::ready)
+                {
+                    return false;
+                }
+                me.map_pings.retain(|at| now.saturating_sub(*at) < 5_000);
+                if me.map_pings.len() >= 3 {
+                    return false;
+                }
+                me.map_pings.push(now);
+                let team = me.team;
+                let ping = json!({"t":"ping","from":slot,
+                    "x":ww2_core::math::round(x * 10.0) / 10.0,
+                    "z":ww2_core::math::round(z * 10.0) / 10.0});
+                for person in &self.players {
+                    if !person.ai
+                        && person.team == team
+                        && let Some(connection) = &person.connection
+                        && connection.ready()
+                    {
+                        connection.send(ping.clone());
+                    }
+                }
+            } else {
                 if let Some(rtt) = msg["rtt"].as_f64().filter(|v| v.is_finite()) {
                     me.rtt = Some(rtt.round().clamp(0.0, 9999.0));
                 }
@@ -513,6 +555,9 @@ impl Room {
                 if let Some(c) = msg.get("c") {
                     pong["c"] = c.clone();
                 }
+                if let Some(native) = &self.native {
+                    pong["srv"] = native.runtime.latency_stats();
+                }
                 me.connection.as_ref().unwrap().send(pong);
             }
             return false;
@@ -522,6 +567,66 @@ impl Room {
                 me.name = clean(name, 16, "Soldier", false);
                 return true;
             }
+            return false;
+        }
+        if host && matches!(t, "pause" | "resume" | "end") && self.native.is_some() {
+            let native = self.native.as_mut().unwrap();
+            if native.runtime.fault().is_some()
+                || !me.connection.as_ref().is_some_and(Connection::ready)
+            {
+                me.deny(t, "blocked", now);
+                return false;
+            }
+            let message = match t {
+                "pause" => native.runtime.pause(
+                    seated.unwrap(),
+                    &me.name,
+                    crate::room_runtime::PauseReason::Host,
+                    now,
+                ),
+                _ => Ok(Some(native.runtime.resume(now))),
+            };
+            match message {
+                Ok(Some(message)) => {
+                    for person in self.players.iter().chain(&self.spectators) {
+                        if let Some(connection) = &person.connection {
+                            connection.send(message.clone());
+                        }
+                    }
+                }
+                Ok(None) => {}
+                Err(error) => {
+                    native.runtime.fault_stop(error);
+                    return false;
+                }
+            }
+            if t == "end" {
+                let status = crate::NativeRoomStatus {
+                    epoch: native.epoch,
+                    tick: native.runtime.state().world.game.tick,
+                    held: native.runtime.held(),
+                    ending_complete: true,
+                    paused: false,
+                    fault: None,
+                };
+                self.result = Some(RoomResult {
+                    report: json!({"ended":true}),
+                    status,
+                });
+                self.native = None;
+                self.retain_seats(|_, person| {
+                    person.ai || person.connection.as_ref().is_some_and(Connection::ready)
+                });
+                return true;
+            }
+            return false;
+        }
+        // Host controls above remain usable during pause. Other gameplay is ignored.
+        if self
+            .native
+            .as_ref()
+            .is_some_and(|native| native.runtime.paused())
+        {
             return false;
         }
         if seated.is_none() && (CommanderIngress::recognizes(t) || UNAVAILABLE.contains(&t)) {
@@ -561,6 +666,11 @@ impl Room {
             if let Err(error) = native.runtime.next_wave(host) {
                 native.runtime.fault_stop(error);
             }
+            return false;
+        }
+        if attached && seated.is_some() && !UNAVAILABLE.contains(&t) {
+            // Unknown orders use the prototype's ordinary blocked feedback.
+            me.deny(t, "blocked", now);
             return false;
         }
         // Other gameplay and public setup admission remain unavailable.
@@ -611,6 +721,7 @@ impl Room {
                     disconnected: None,
                     denies: Vec::new(),
                     rtt: None,
+                    map_pings: Vec::new(),
                     diagnostics: crate::diagnostics::PlayerDiagnostics::default(),
                     last_match: None,
                 });
@@ -794,6 +905,14 @@ const UNAVAILABLE: &[&str] = &[
     "supply",
     "logisticsResume",
 ];
+
+// Prototype server.js:353-356. This selects an option, not mode admission.
+fn logistics_enabled_for(mode: &str, map: &Value) -> bool {
+    if truthy(&map["scenario"]) {
+        return map["scenario"]["logistics"] == Value::Bool(true);
+    }
+    matches!(mode, "conquest" | "classic" | "annihilation" | "world")
+}
 
 fn truthy(v: &Value) -> bool {
     match v {
@@ -1718,6 +1837,7 @@ impl Hub {
                 })
             })
             .collect::<Result<Vec<_>, String>>()?;
+        let map = crate::authoritative_maps::load(&room.map).map_err(|e| e.to_string())?;
         let state = crate::authoritative_maps::create_match(
             &room.map,
             MatchOptions {
@@ -1732,7 +1852,7 @@ impl Hub {
                 map_key: Some(room.map.clone()),
                 tech: true,
                 supply: true,
-                logistics: false,
+                logistics: logistics_enabled_for(&room.mode, map.source()),
                 sandbox: false,
             },
         )
@@ -2001,6 +2121,7 @@ impl Hub {
                 disconnected: None,
                 denies: Vec::new(),
                 rtt: None,
+                map_pings: Vec::new(),
                 diagnostics: crate::diagnostics::PlayerDiagnostics::default(),
                 last_match: None,
             };
@@ -2563,6 +2684,14 @@ mod lobby_socket_tests;
 mod combat_deny_tests;
 
 #[cfg(test)]
+#[path = "net_runtime_tests.rs"]
+mod net_runtime_tests;
+
+#[cfg(test)]
+#[path = "net_runtime_command_tests.rs"]
+mod net_runtime_command_tests;
+
+#[cfg(test)]
 #[path = "net_batch50_lobby_tests.rs"]
 mod net_batch50;
 
@@ -2596,3 +2725,7 @@ mod save_load_tests;
 
 #[path = "lobby_saves.rs"]
 mod save_runtime;
+
+#[cfg(test)]
+#[path = "room_command_ingress_tests.rs"]
+mod room_command_ingress_tests;

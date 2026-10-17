@@ -1,9 +1,9 @@
-//! Manual convoy adapters stay below the full logistics tick and snapshot guards.
+//! Manual convoy adapters remain valid through ordinary ticks and recipient delivery.
 use super::runtime_tests::{arena, arena_with_barrier, place, troop};
 use super::*;
 use crate::{
     match_commands::{Command, Denial, MoveOrder},
-    recipient_snapshot::{DeliveryState, SelectedSeat, SnapshotCapability, SnapshotError},
+    recipient_snapshot::{DeliveryState, SelectedSeat},
     supply_convoys::{StoreId, TruckState},
 };
 
@@ -35,26 +35,26 @@ fn move_to(truck: u32, at: Point, queue: bool) -> Command {
         face: None,
     }
 }
-fn assert_guards(m: &mut Match) {
-    let before = format!("{:?}", (&m.world.game.units, &m.convoys, &m.commands.units));
-    let tick = m.world.game.tick;
-    assert_eq!(
-        m.advance_tick().unwrap_err().reason,
-        "reserve and convoy tick phases are not connected"
-    );
-    assert_eq!(m.world.game.tick, tick);
+fn assert_delivery(m: &mut Match) {
     assert!(m.tick_state.fault().is_none());
-    assert_eq!(
-        format!("{:?}", (&m.world.game.units, &m.convoys, &m.commands.units)),
-        before
-    );
-    assert!(matches!(
-        m.preflight_ordinary_snapshot(),
-        Err(SnapshotError::Unsupported {
-            capability: SnapshotCapability::Logistics,
-            ..
+    let mut delivery = DeliveryState::new(m).unwrap();
+    let selected = (0..m.start.players.len())
+        .map(|slot| SelectedSeat {
+            slot,
+            full: true,
+            omit: false,
         })
-    ));
+        .collect::<Vec<_>>();
+    let frame = delivery
+        .capture_selected_with_tick_events(m, &selected, &[])
+        .unwrap()
+        .unwrap();
+    for slot in 0..selected.len() {
+        assert_eq!(
+            frame.recipient(slot).unwrap().into_json()["logistics"]["enabled"],
+            true
+        );
+    }
 }
 
 #[test]
@@ -141,7 +141,7 @@ fn intent_log39_match_supply_hold_resume_queued_moves_and_nearest_source_retreat
     assert_eq!(retreat.state, TruckState::Manual);
     assert!(retreat.manual && !retreat.hold && retreat.target.is_none());
     assert_eq!(retreat.cargo, stock);
-    assert_guards(&mut m);
+    assert_delivery(&mut m);
 }
 
 #[test]
@@ -196,7 +196,7 @@ fn intent_log39_match_refuses_missing_source_and_malformed_orders_atomically() {
             Err(Denial::Blocked)
         ));
     }
-    assert_guards(&mut m);
+    assert_delivery(&mut m);
 }
 
 #[test]
@@ -247,7 +247,7 @@ fn intent_log39_match_unreachable_existing_source_refuses_before_route_publicati
         ),
         before
     );
-    assert_guards(&mut m);
+    assert_delivery(&mut m);
 }
 
 #[test]
@@ -283,7 +283,7 @@ fn intent_log43_match_scheduler_owner_alerts_stay_below_full_snapshot_guard() {
     let events = m.convoys.as_ref().unwrap().events.clone();
     m.step_supply_convoys(false).unwrap();
     assert_eq!(m.convoys.as_ref().unwrap().events, events);
-    assert_guards(&mut m);
+    assert_delivery(&mut m);
 }
 
 #[test]
