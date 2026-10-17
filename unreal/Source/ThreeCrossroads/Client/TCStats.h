@@ -111,6 +111,8 @@ public:
 	static FTCMeasure Measure();
 	// CSS font-weight 700 (loss heading/detail and the boss name).
 	static FTCMeasure HeavyMeasure();
+	// Subtract foreground rectangles from a glyph quad, preserving partial letters at every edge.
+	static TArray<FBox2D> VisibleText(const FBox2D& Quad, const TArray<FBox2D>& Occlusions);
     // Source browser symbols missing from Barlow/Droid are converted into the shared HUD atlas.
     static float HudSymbolAdvance(uint32 CodePoint); // em advance, -1 when not in the atlas
     static bool DrawHudSymbol(uint32 CodePoint, UCanvas* Canvas, FVector2D Pos, float Px, FLinearColor Colour);

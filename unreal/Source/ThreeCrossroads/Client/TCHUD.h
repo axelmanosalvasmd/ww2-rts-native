@@ -47,6 +47,8 @@ namespace FTCHudFit
 {
 	// index.html's lower-left column and #buy. Drawing and tests consume the same measured boxes.
 	constexpr float LeftW = 248.f, ScreenGap = 8.f, GridGap = 3.f, OrderH = 50.f;
+	// index.html's media query measures the physical viewport, independently of #hud zoom.
+	inline float LeftWidth(FVector2D View, float Scale) { return View.X * Scale >= 1600 && View.Y * Scale >= 860 ? 268.f : LeftW; }
 	struct FControl
 	{
 		FString Label, Icon, Key, Value, Hover;
@@ -62,7 +64,7 @@ namespace FTCHudFit
 		FString Hover;
 		int32 Owner = -1;
 	};
-	struct FIcon { FString Key; FBox2D Box; FLinearColor Colour; bool bPortrait = false; int32 Owner = -1; };
+	struct FIcon { FString Key; FBox2D Box; FLinearColor Colour; bool bPortrait = false; int32 Owner = -1; FBox2D Clip = FBox2D(ForceInit); };
 	struct FHit { FBox2D Box; FControl Control; };
 	struct FTextFit { FString Text; FBox2D Box, Clip; };
 	struct FBottomLayout
@@ -80,7 +82,7 @@ namespace FTCHudFit
 	THREECROSSROADS_API FBottomLayout LeftPanel(float ViewH, const FString& Title, const TArray<FSelection>& Selection,
 		const TArray<FString>& Details, const TArray<FControl>& Orders, const TArray<FControl>& Menu, const FTCMeasure& Measure, float Scale = 1.f,
 		int32 Idle = 0, int32 Destination = 1, bool bTransfer = false, bool bDropdown = false, int32 SelectionFirst = 0, float TopLimit = 80.f,
-		int32 MenuFirst = 0, const TArray<FControl>& MenuTabs = {});
+		int32 MenuFirst = 0, const TArray<FControl>& MenuTabs = {}, float Width = LeftW);
 	THREECROSSROADS_API FBottomLayout RecruitPanel(float ViewW, float ViewH, float Right, const TArray<FString>& Headings,
 		const TArray<FControl>& Tabs, const TArray<TArray<FControl>>& Lists, const TArray<FControl>& Above, const FTCMeasure& Measure, float Scale = 1.f,
 		const TArray<FString>& Logistics = {}, int32 TotalCards = 0, int32 First = 0, float TopLimit = 80.f, const FBox2D& Economy = FBox2D(ForceInit));
@@ -129,6 +131,7 @@ class THREECROSSROADS_API ATCHUD : public AHUD
 	GENERATED_BODY()
 
 public:
+	virtual void PostRender() override;
 	virtual void DrawHUD() override;
 	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 	// Controller integration is a small lead patch. These local UI commands never cross the wire.
@@ -248,7 +251,7 @@ private:
 	bool bSettingsInMenu = false;
 	void DrawRecruitPanel(UFont* Font, float Left, float Bottom);
 	void DrawBottomLayout(const FTCHudFit::FBottomLayout& Layout, UFont* Font);
-	void DrawHudIcon(const FString& Key, const FBox2D& Box, FLinearColor Colour);
+	void DrawHudIcon(const FString& Key, const FBox2D& Box, FLinearColor Colour, const FBox2D& Clip = FBox2D(ForceInit));
 	void OfferTooltip(const FString& Text, const FBox2D& ScreenBox);
 	void DrawHint(UFont* Font);
 	TSharedPtr<FTCHudPortraits> Portraits;
@@ -280,6 +283,7 @@ private:
 	void DrawCapturePoints(UFont* Font);
 	void DrawPlans();
 	void DrawHealthBars();
+	FTCHudFit::FBottomLayout DeferredEconomy;
 	void DrawAlertFeed(UFont* Font);
 	void DrawEpilogue(UFont* Font, UFont* Big);
 	void DrawControlsSheet(UFont* Font, UFont* Big);

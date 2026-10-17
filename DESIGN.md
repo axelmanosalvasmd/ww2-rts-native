@@ -3243,10 +3243,13 @@ The staged switch from the interim C++ decoder to the Rust recipient view (`ww2_
   paint's queued tiles, the water and the apron (they drape on the drawn ground), the map pieces, the railways and the
   atmosphere. A start resets the terrain, binds the paint, resets water, apron and railways and hands the apron the
   paint's tiles (`FTCGroundPaint::ApronTiles`, `FTCApron::SetTileBytes`).
-- **Recipient knowledge.** An unknown World cell is never drawn and never shapes known ground (no ramp, cliff, water,
-  road, trench or scar from it); the paint leaves it a flat fog shade and never reads its placeholder row; water and the
-  apron read only known cells. The reference draws World's unknown cells as flat open ground: this is the one deliberate
-  departure. `ATCTerrain::DrawnOnUnknown` counts drawn vertices owned by unknown cells (the status line logs it).
+- **Recipient knowledge.** Relief, water and the apron consume discovered cells. Unknown paint inputs are sanitized
+  to the source's public open-ground, level-zero placeholders before the ordinary ground painter blends them. The fog
+  renderer covers unknown cells with an opaque level-zero plane using that same painted material, then applies the
+  shared filtered fog. No hidden terrain/object/material/state is read and painting never discovers a cell. The retained
+  known-cell mask still filters decals. Known-only relief omits the source's full placeholder relief and joins known
+  edges to the public plane. `ATCTerrain::DrawnOnUnknown` counts relief vertices owned by unknown cells, excluding that
+  fog underlay. Round 23 replaces the earlier flat dark paint departure; full placeholder relief remains unverified.
 - **Contract check.** `ThreeCrossroads.Terrain.HeightOracle33` builds the relief in the game's layout for all 33 authored
   maps and checks `docs/contracts/terrain.md`: levels equal `levelAt` at every centre and at 1,000 points a map; plain
   centres within 0.1 m of level x 2.5; trenches 0.9 m and roads 0.1 m down; each wet cell's line a frozen level x 2.5 +

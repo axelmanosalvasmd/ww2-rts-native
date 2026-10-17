@@ -216,6 +216,7 @@ UCLASS()
 class THREECROSSROADS_API UTCSoldierCrowd : public USceneComponent
 {
 	GENERATED_BODY()
+	friend class ATCUnitRenderer; // optional recipient-to-instance visibility audit, including submitted crowd keys
 
 public:
 	UTCSoldierCrowd();

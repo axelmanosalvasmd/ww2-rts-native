@@ -189,6 +189,20 @@ struct FTCMapPreview
 	TArray<FColor> Raster(int32 Side = 280) const;
 };
 
+// A map's retry delay must not postpone a different map selected in the lobby.
+struct FTCMapPreviewRetry
+{
+	bool Due(const FString& Key, double Now) const
+	{
+		const double* At = Next.Find(Key);
+		return !Key.IsEmpty() && (!At || Now >= *At);
+	}
+	void Tried(const FString& Key, double Now) { Next.Add(Key, Now + 5.0); }
+	void Reset() { Next.Reset(); }
+private:
+	TMap<FString, double> Next;
+};
+
 class FTCMatchOptions
 {
 public:
@@ -288,7 +302,7 @@ public:
 private:
 	struct FDownload { FString Key, Body; bool bDone = false, bOk = false; };
 	TSharedPtr<FDownload> Download;
-	double NextMapTry = -1e9;
+	FTCMapPreviewRetry MapRetry;
 	FString PreviewServer, PreviewImageKey;
 	TStrongObjectPtr<UTexture2D> PreviewImage;
 	struct FPending

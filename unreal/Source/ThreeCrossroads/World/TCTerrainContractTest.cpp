@@ -56,6 +56,10 @@ namespace TCTerrainFormulas
 		using namespace TCFogFrontierCore;
 		FChecks T;
 		#include "World/TCFogFrontier.Sampling.inl"
+		// Independent fog.js frontier arithmetic, including diagonal distances and the four-cell limit.
+		const int FrontierOracle[][2] = { {-1,0}, {1,244}, {2,221}, {4,174}, {5,153},
+			{8,96}, {9,81}, {10,66}, {13,33}, {16,11}, {17,6}, {20,0}, {25,0} };
+		for (const auto& S : FrontierOracle) T.Require(FrontierAlpha(S[0]) == S[1], "source radial frontier smoothstep, not a cell outline");
 		for (const auto& S : FogSamplingOracle)
 		{
 			T.Near(MistHash(S[0], S[1]), S[4], 1e-11, "source mist hash");
@@ -181,6 +185,27 @@ namespace TCTerrainFormulas
 		T.Near(G.Attributes().Amt[28], .7, 1e-7, "damage-stage coverage");
 		Wear.State = 4; G.Apply({ Wear });
 		T.Require(G.Attributes().Char[28] == 1, "burned ground receives char tint");
+		// The source paints public placeholders beneath its filtered frontier. Native
+		// keeps knowledge separate and normalizes undescribed inputs before painting.
+		FStartMap Public; Public.W = 12; Public.H = 10; Public.bWorld = true;
+		Public.Rows.assign(10, std::string(12, '.'));
+		Public.Heights.assign(10, std::string(12, '0'));
+		std::vector<FCellRow> Delivered;
+		for (int C = 0; C < 5; C++)
+		{
+			FCellRow R; R.C = 5 * 12 + C; R.Ch = C == 4 ? 'W' : '.';
+			R.bLevel = R.bState = R.bData = true; R.Ground = R.Ch; R.Object = '.'; R.Biome = 255;
+			Delivered.push_back(R);
+		}
+		FStartMap Scrambled = Public;
+		Scrambled.Rows.assign(10, std::string(12, '+')); Scrambled.Heights.assign(10, std::string(12, '4'));
+		Scrambled.LayerGround.assign(10, std::string(12, 'W')); Scrambled.LayerObjects.assign(10, std::string(12, 'R'));
+		Scrambled.Biome.assign(120, 3);
+		FGround Source; Source.Mode = EKnownMode::Reference; Source.Start(Public, Delivered, nullptr);
+		FGround Native; Native.Start(Scrambled, Delivered, nullptr);
+		T.Require(Native.Canvas() == Source.Canvas(), "native frontier underpaint equals source public-placeholder raster");
+		T.Require(!Native.IsKnown(66) && Native.IsKnown(64), "painting a placeholder never discovers it");
+		T.Require(Native.CharAt(66) == '.' && Native.LevelAt(66) == 0 && Native.ObjectAt(66) == '.', "unknown input cannot replace the public placeholder");
 		return T;
 	}
 
@@ -393,6 +418,48 @@ namespace TCTerrainFormulas
 	{
 		using namespace TCWaterCore;
 		FChecks T;
+		#include "World/TCWater.LightingOracle.inl"
+		for (const auto& S : WaterLightOracle)
+		{
+			T.Near(Fresnel(S[5]), S[7], 1e-13, "r186 dielectric Fresnel attenuates direct diffuse");
+			T.Near(GgxVisibility(S[1]*S[1], S[2], S[3]), S[8], 1e-10, "source correlated Smith visibility");
+			T.Near(GgxDistribution(S[1]*S[1], S[4]), S[9], 1e-9, "source GGX distribution");
+			T.Near(DirectBrdf(S[0], S[1], S[2], S[3], S[4], S[5], S[6]), S[10], 1e-9, "source direct BRDF and DFG multiple-scattering energy");
+		}
+		for (const auto& S : WaterVogelOracle)
+		{
+			double X, Y; VogelOffset((int)S[0], S[1], X, Y);
+			T.Near(X, S[2], 1e-13, "source five-tap Vogel disk x");
+			T.Near(Y, S[3], 1e-13, "source five-tap Vogel disk y");
+		}
+		for (const auto& S : WaterRotationOracle) T.Near(ShadowRotation(S[0], S[1]), S[2], 1e-12, "source per-pixel PCF rotation");
+		T.Near(BilinearShadow(0, 1, 1, 1, .25, .75), .8125, 0, "comparison filtering interpolates visibility, not raw depth");
+		T.Near(BilinearShadow(0, 1, 1, 0, .5, .5), .5, 0, "source bilinear comparison midpoint");
+		T.Near(BilinearShadow(1, 1, 1, 1, .37, .91), 1, 0, "unoccluded shadow samples conserve direct light");
+		// Independent native atlas cases around the biased comparison boundary.
+		// A wrong bias sign incorrectly lights the first two occluded samples.
+		const double AtlasCases[][4] = { {.5,.125,.625,0}, {.5,.125,.5625,0}, {.5,.125,.75,1}, {.75,0,.375,1} };
+		for (const auto& S : AtlasCases)
+			T.Near(ShadowReceiverDepth(S[0],S[1]) < S[2] ? 1 : 0,S[3],0,"native shadow receiver bias and strict depth comparison");
+		for (const int Resolution : {917,987,2048})
+		{
+			const double SourceTexel=.03125, CascadeRadius=31.0, SourceRadius=4.0;
+			const double NativeRadius=ShadowAtlasRadius(SourceRadius,SourceTexel,Resolution,CascadeRadius);
+			T.Near(NativeRadius*(2*CascadeRadius/Resolution),SourceRadius*SourceTexel,1e-14,"shadow disk conversion preserves the source world-space radius after atlas rounding");
+		}
+		T.Near(ShadowAtlasRadius(4,.03125,917,0),4,0,"missing native cascade keeps the source fallback radius");
+		// Apply the native common haze to the complete translucent composite. It must
+		// recover source per-surface fog for every colour, depth pair and alpha here.
+		for (double A : { 0.0, .6, .86, 1.0 }) for (double Fw : { 0.0, .1, .65 })
+			for (double Fb : { 0.0, .2, .8, .99 })
+			{
+				const double C=.08, Bed=.12, Haze=.5;
+				const double Native=(A*HazeCompensated(C,Haze,Fw,Fb)+(1-A)*Bed)*(1-Fb)+Haze*Fb;
+				const double Source=A*(C*(1-Fw)+Haze*Fw)+(1-A)*(Bed*(1-Fb)+Haze*Fb);
+				T.Near(Native,Source,2e-14,"water fog depth conserves the complete source alpha composite");
+			}
+		T.Near(HazeCompensated(.08,.5,1,1),.08,0,"fully hazed bed and water need no inversion");
+		T.Near(HazeCompensated(.01,.5,.1,.8),-1.705,1e-14,"shadowed water requires signed radiance until the common haze blend");
 		T.Near(PresentationTime(1017.25, 8.f, false), 17.25, 0, "High water clock wraps at 1000 seconds");
 		T.Near(PresentationTime(99, 8.f, true), 8, 0, "Low water clock holds its previous value");
 		T.Near(PresentationTime(99, 0.f, true), 0, 0, "fresh Low water starts at zero");
@@ -542,6 +609,8 @@ bool FTCFogOverlayContract::RunTest(const FString& Parameters)
 	State.Map.Known[27] = true;
 	State.FogVisible.Init(false, 64); State.FogExplored.Init(false, 64);
 	State.FogVisible[27] = State.FogExplored[27] = true;
+	ATCTerrain* Terrain = World->SpawnActor<ATCTerrain>();
+	Terrain->ResetFrom(State);
 	FTCFogFrontier Fog;
 	Fog.Attach(World); Fog.Start(State);
 	const FTCFogFrontier* Previous = TCFogLook::Active();
@@ -555,6 +624,9 @@ bool FTCFogOverlayContract::RunTest(const FString& Parameters)
 	}
 	else AddError(TEXT("raw alpha texture missing"));
 	TestEqual(TEXT("every unknown cell has a placeholder"), Fog.UnknownCovered(), 63);
+	if (UProceduralMeshComponent* Underlay = Fog.UnknownGroundForTests())
+		TestTrue(TEXT("filtered frontier keeps the public ground paint beneath unknown pixels"), Underlay->GetMaterial(0) == Terrain->GroundMaterialInstance());
+	else AddError(TEXT("public placeholder ground missing"));
 	UProceduralMeshComponent* Overlay = Fog.UnknownOverlayForTests();
 	if (TestNotNull(TEXT("fog also covers unknown water after translucency"), Overlay))
 	{
@@ -575,6 +647,11 @@ bool FTCFogOverlayContract::RunTest(const FString& Parameters)
 		if (UMaterialInterface* Material = LoadObject<UMaterialInterface>(nullptr, Path))
 			TestEqual(*FString::Printf(TEXT("%s composites before tone mapping with fog"), Path), Material->GetMaterial()->TranslucencyPass, MTP_BeforeDOF);
 		else AddError(FString::Printf(TEXT("fog pass material missing: %s"), Path));
+	if (UMaterialInterface* Material = LoadObject<UMaterialInterface>(nullptr, FTCWater::MaterialPath))
+	{
+		TestTrue(TEXT("source Standard water shading uses an unlit carrier for signed fog compensation"), Material->GetMaterial()->GetShadingModels().HasShadingModel(MSM_Unlit));
+		TestTrue(TEXT("negative intermediate water radiance survives until the common bed haze"), Material->GetMaterial()->bAllowNegativeEmissiveColor != 0);
+	}
 	TestEqual(TEXT("raw lookup uses current alpha, not the brightness multiplier"), TCFogLook::AlphaByte(State, false, 27), (uint8)Fog.AlphaNow(27));
 	TestEqual(TEXT("lifted raw alpha is clear"), TCFogLook::AlphaByte(State, true, 27), (uint8)0);
 	// Test the actual scenery adapter. Replacing its shader without replacing its old multiplier

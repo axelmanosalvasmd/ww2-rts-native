@@ -563,19 +563,14 @@ void ATCHUD::DrawHealthBars()
 		const FVector C = Project(W), E = Project(W + Right * 120.f);
 		if (C.Z <= 0 || E.Z <= 0 || C.X < 0 || C.Y < 0 || C.X > Canvas->ClipX || C.Y > Canvas->ClipY) continue;
 		const float BadgePxPerM = (float)FVector2D::Distance(FVector2D(C.X, C.Y), FVector2D(E.X, E.Y)) / 1.2f;
-		const float PxPerM = FMath::Clamp(BadgePxPerM, 4.f, 30.f);
+		const float PxPerM = BadgePxPerM; // main.js bars and stars keep their world dimensions
 		const float BgW = 2.4f * PxPerM, BgH = FMath::Max(3.f, 0.42f * PxPerM), BarW = 2.3f * PxPerM;
 		// round 17: not under the score strip's card (last frame's, screen pixels); the stars alone neither
 		if (StripCard.bIsValid && StripCard.Intersect(FBox2D(FVector2D(C.X - BgW / 2, C.Y - BgH / 2), FVector2D(C.X + BgW / 2, C.Y + BgH / 2)))) continue;
 		TCMarkersHud::DrawBadge(Canvas, U.Type, U.Owner, FVector2D(C.X, C.Y), BadgePxPerM);
 		TCMarkersHud::DrawCoverShield(Canvas, FVector2D(C.X, C.Y), BadgePxPerM, U.Cover, bGarr, W);
 		if (!bBar) { TCMarkersHud::DrawStars(Canvas, FVector2D(C.X, C.Y), PxPerM, U.Stars); continue; }
-		DrawRect(FLinearColor(FColor(0x11, 0x11, 0x11)), C.X - BgW / 2, C.Y - BgH / 2, BgW, BgH);
-		const FLinearColor HpC = Frac > 0.5f ? ATCUnitRenderer::SeatColor(U.Owner) : Frac > 0.25f ? FLinearColor(FColor(0xe0, 0x8a, 0x2a)) : FLinearColor(FColor(0xd0, 0x2a, 0x1a));
-		DrawRect(HpC, C.X - BarW / 2, C.Y - 0.07f * PxPerM - FMath::Max(1.5f, 0.2f * PxPerM) / 2, BarW * FMath::Min(1.f, Frac), FMath::Max(1.5f, 0.2f * PxPerM));
-		if (U.Supp > 0)
-			DrawRect(U.Supp >= 90 ? FLinearColor(FColor(0xff, 0x3b, 0x2a)) : FLinearColor(FColor(0xff, 0xd2, 0x3a)), C.X - BarW / 2, C.Y + 0.11f * PxPerM - FMath::Max(1.f, 0.1f * PxPerM) / 2,
-				BarW * FMath::Min(1.f, U.Supp / 100.f), FMath::Max(1.f, 0.1f * PxPerM));
+		TCMarkersHud::DrawHealthBar(Canvas, FVector2D(C.X, C.Y), PxPerM, U.Owner, Frac, U.Supp, W);
 		TCMarkersHud::DrawStars(Canvas, FVector2D(C.X, C.Y), PxPerM, U.Stars); // over the bar (renderOrder 4)
 	}
 }
@@ -657,15 +652,31 @@ void ATCHUD::DrawAlertFeed(UFont* Font)
 	const FTCPaint P = M->AlertFeed.Layout(In, (FTCType::IsLoaded() ? FTCType::Measure() : FTCPaint::CanvasMeasure(Font)), FTCType::IsLoaded() ? FTCType::HeavyMeasure() : FTCMeasure());
 	if (FixtureTick>0 && bLossFixtureDrawn)
 	{
-	 static int32 LastCards=-1;
+	 static int32 LastCards=-1, LastRoutine=-1;
 	 const int32 Cards=P.TextsOf(TEXT("alert:loss-heading")).Num();
-	 if (Cards!=LastCards)
+     const int32 Routine=P.TextsOf(TEXT("alert:text")).Num()+P.TextsOf(TEXT("alert:text-newest")).Num();
+	 if (Cards!=LastCards || Routine!=LastRoutine)
 	 {
-	  LastCards=Cards;
+	  LastCards=Cards; LastRoutine=Routine;
 	  UE_LOG(LogTC,Log,TEXT("hud: loss fixture presentation: %d cards, lines [%s], history %d, occupied %d"),Cards,
 	   *FString::Join(P.TextsOf(TEXT("alert:loss-detail")),TEXT(" | ")),M->AlertFeed.History().Entries().Num(),In.Avoid.Num());
+      for (const FTCAlertLine& L : M->AlertFeed.Lines())
+          UE_LOG(LogTC,Log,TEXT("hud: held alert %s age %.3f: %s"),*L.Alert.Kind,In.Now-L.Born,*L.Alert.Text);
+      for (const FTCPaintItem& I : P.Items)
+          if (I.Role==TEXT("alert:loss") || I.Role==TEXT("alert:loss-edge") || I.Role==TEXT("alert:line") || I.Role==TEXT("alert:text-newest") || I.Role==TEXT("alert:history"))
+              UE_LOG(LogTC,Log,TEXT("hud: alert box %s (%.3f,%.3f) (%.3f,%.3f) alpha %.3f text %s"),*I.Role,I.Pos.X,I.Pos.Y,I.Size.X,I.Size.Y,I.Colour.A,*I.Text);
 	 }
 	}
+    // Keep source alpha and anchors. Suppress only economy glyph fragments beneath near-solid cards;
+    // otherwise Canvas' independent text batches can leave readable cost/call-in text in the foreground.
+    DeferredEconomy.Paint.TextOcclusions.Reset();
+    for (const FTCPaintItem& Item : P.Items)
+        if ((Item.Role==TEXT("alert:loss") && Item.Colour.A>=.96f) ||
+            (Item.Role==TEXT("alert:history") && Item.Colour.A>=.93f) ||
+            (Item.Role==TEXT("alert:line") && Item.Colour.A>=.9f))
+            DeferredEconomy.Paint.TextOcclusions.Add(FBox2D(Item.Pos,Item.Pos+Item.Size));
+    DrawBottomLayout(DeferredEconomy,Font);
+    DeferredEconomy=FTCHudFit::FBottomLayout();
 	FTCType::Draw(P, Canvas, Font, UiNow);
 	// round 17: the history box (alert-history.js #alertHistory) for the sandbox panel's place next frame
 	AlertHistoryBox = FBox2D(ForceInit);

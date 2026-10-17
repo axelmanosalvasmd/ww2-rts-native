@@ -81,6 +81,7 @@ namespace TCLook
 	FLinearColor ToneMapped(const FLinearColor& Linear, float Exposure);
 	// three fog_fragment, tonemapping_fragment and OutputPass for an unlit world billboard.
 	// Returns linear colour for the HUD canvas, which applies the output transfer itself. Alpha is unchanged.
+	float BillboardFog(float Depth, float Near, float Far);
 	FLinearColor BillboardColour(const FLinearColor& Linear, float Depth, float Near, float Far,
 		const FLinearColor& Haze, float Exposure, bool bBeforeTone);
 	struct FShadowView { double Radius = 0, Texel = 0, FarDepth = 0, CascadeRadius = 0; int32 Resolution = 0; };

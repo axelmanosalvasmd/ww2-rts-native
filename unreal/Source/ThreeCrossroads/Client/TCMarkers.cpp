@@ -25,6 +25,7 @@
 #include "Engine/World.h"
 #include "Net/TCMatchState.h"
 #include "World/TCTerrain.h"
+#include "World/TCFogFrontier.h"
 #include "Client/TCMarkers.Ranges.inl"
 #include "Client/TCMarkers.Badges.inl"
 #include "Engine/Texture2D.h"
@@ -34,6 +35,8 @@
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "Fonts/SlateFontInfo.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/Material.h"
 
 namespace TCMarkerText
 {
@@ -139,6 +142,47 @@ namespace
 		// HUD canvases have a transient outer, so UObject::GetWorld() returns null. The rendered view owns the scene.
 		const FSceneView* View = Canvas ? Canvas->SceneView : nullptr;
 		return View && View->Family && View->Family->Scene ? View->Family->Scene->GetWorld() : nullptr;
+	}
+
+	const ATCLighting* MarkerLighting(const UCanvas* Canvas)
+	{
+		const UWorld* W = MarkerWorld(Canvas);
+		const ATCGameMode* M = W ? W->GetAuthGameMode<ATCGameMode>() : nullptr;
+		return M ? M->Lighting.Get() : nullptr;
+	}
+
+	float BillboardDepth(const UCanvas* Canvas, float PxPerMetre)
+	{
+		// A billboard metre projects to P[1][1] * viewHeight / (2 * viewDepth).
+		// Using the measured, unclamped scale also works with off-axis cameras and render scaling.
+		return Canvas && Canvas->SceneView && PxPerMetre > 0 ?
+			Canvas->ClipY * Canvas->SceneView->ViewMatrices.GetViewToClip().M[1][1] / (2.f * PxPerMetre) : 0.f;
+	}
+
+	UMaterialInstanceDynamic* BadgeMaterial(UCanvas* Canvas, UTexture2D* Atlas, float Depth)
+	{
+		const ATCLighting* L = MarkerLighting(Canvas);
+		if (!L) return nullptr;
+		static TStrongObjectPtr<UMaterialInterface> Base;
+		if (!Base)
+		{
+			Base.Reset(LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Markers/M_TCMarkerBillboard.M_TCMarkerBillboard")));
+			if (!Base) return nullptr;
+			TCFogLook::PrepareMaterial(Base.Get());
+		}
+		// Each queued tile needs its own uniform values until Canvas flushes. Reuse a bounded frame pool.
+		static TArray<TStrongObjectPtr<UMaterialInstanceDynamic>> Pool;
+		static uint64 Frame = MAX_uint64;
+		static int32 Next = 0;
+		if (Frame != GFrameCounter) { Frame = GFrameCounter; Next = 0; }
+		if (Next == Pool.Num()) Pool.Emplace(UMaterialInstanceDynamic::Create(Base.Get(), GetTransientPackage()));
+		UMaterialInstanceDynamic* Mid = Pool[Next++].Get();
+		Mid->SetTextureParameterValue(TEXT("Badge"), Atlas);
+		Mid->SetVectorParameterValue(TEXT("Haze"), L->Shown().Haze);
+		Mid->SetScalarParameterValue(TEXT("Exposure"), L->Shown().Exposure);
+		Mid->SetScalarParameterValue(TEXT("BeforeTone"), L->HazeBeforeTone() ? 1.f : 0.f);
+		Mid->SetScalarParameterValue(TEXT("Fog"), TCLook::BillboardFog(Depth, L->FogNear(), L->FogFar()));
+		return Mid;
 	}
 
 	bool JsonNumber(const TSharedPtr<FJsonValue>& V, double& Out)
@@ -268,7 +312,7 @@ void FTCMarkerPainter::Tri(const FVector& A, const FVector& B, const FVector& C,
 
 void FTCMarkerPainter::WorldTri(const FVector& A, const FVector& B, const FVector& C, const FLinearColor& Col)
 {
-	if (Scene) Scene->Triangle(A, B, C, Col, bDepthTest);
+	if (Scene) Scene->Triangle(A, B, C, Col, bDepthTest, bBeforeFog);
 	else Tri(ProjectWorld(A), ProjectWorld(B), ProjectWorld(C), Col);
 }
 
@@ -306,7 +350,49 @@ void FTCMarkerPainter::Ribbon(const std::vector<MC::FVertex>& V, const MC::FRibb
 		const double Wpx = D.Size();
 		Aa[I] = A.Z > 0 && B.Z > 0 && Wpx > 1e-6 ? 2.0 / Wpx * (FMath::Abs(D.X) + FMath::Abs(D.Y)) / Wpx : 1.0;
 	}
+
 	const FLinearColor BodyC = Colour(L.Hex, 1.0);
+	if (Scene)
+	{
+		// overlay.js computes its profile once per fragment, with real pixel derivatives.
+		const FLinearColor Ink = Colour(L.Hex, L.Opacity);
+		struct FClipVertex { FVector P; double Side; };
+		for (int32 I = 1; I < N; I++)
+		{
+			const MC::FVertex& A = V[I - 1]; const MC::FVertex& B = V[I];
+			if (L.DashPeriod > 0 && !MC::DashLit((A.U + B.U) / 2, L.DashPeriod, L.DashOn)) continue;
+			const FVector Q[] = {
+				Ground(A.X + A.Nx * Hw[I-1], A.Z + A.Nz * Hw[I-1], O.Y),
+				Ground(B.X + B.Nx * Hw[I], B.Z + B.Nz * Hw[I], O.Y),
+				Ground(B.X - B.Nx * Hw[I], B.Z - B.Nz * Hw[I], O.Y),
+				Ground(A.X - A.Nx * Hw[I-1], A.Z - A.Nz * Hw[I-1], O.Y) };
+			TArray<FClipVertex> Poly = {{Q[0],1},{Q[1],1},{Q[2],-1},{Q[3],-1}};
+			if (Clip) for (int32 E = 0; E < 4; E++)
+			{
+				TArray<FClipVertex> Out;
+				auto Distance = [&](const FVector& P) { return E==0 ? P.X-Clip[0]*100 : E==1 ? Clip[2]*100-P.X : E==2 ? P.Y-Clip[1]*100 : Clip[3]*100-P.Y; };
+				for (int32 J = 0; J < Poly.Num(); J++)
+				{
+					const FClipVertex& X=Poly[J]; const FClipVertex& Y=Poly[(J+1)%Poly.Num()];
+					const double Dx=Distance(X.P), Dy=Distance(Y.P);
+					if (Dx>=0) Out.Add(X);
+					if ((Dx>=0)!=(Dy>=0)) { const double T=Dx/(Dx-Dy); Out.Add({FMath::Lerp(X.P,Y.P,T),FMath::Lerp(X.Side,Y.Side,T)}); }
+				}
+				Poly=MoveTemp(Out);
+			}
+			for (int32 J=1; J+1<Poly.Num(); J++)
+				Scene->RibbonTriangle(Poly[0].P,Poly[J].P,Poly[J+1].P,Ink,bDepthTest,
+					FVector2D(Poly[0].Side,O.Core),FVector2D(Poly[J].Side,O.Core),FVector2D(Poly[J+1].Side,O.Core));
+			if (Fill > 0)
+			{
+				std::vector<double> P = {Cx,Cz,A.X-A.Nx*Hw[I-1],A.Z-A.Nz*Hw[I-1],B.X-B.Nx*Hw[I],B.Z-B.Nz*Hw[I]};
+				if (Clip) P=MC::ClipToRect(P,Clip[0],Clip[1],Clip[2],Clip[3]);
+				for (int32 J=1; J+1<(int32)P.size()/2; J++)
+					WorldTri(Ground(P[0],P[1],O.Y),Ground(P[J*2],P[J*2+1],O.Y),Ground(P[J*2+2],P[J*2+3],O.Y),Colour(L.Hex,L.Opacity*Fill));
+			}
+		}
+		return;
+	}
 	// the shader's edge colour (0.012, 0.016, 0.014) is a linear working-space colour mixed in linear light
 	const FLinearColor EdgeC((float)MC::EdgeRgb[0], (float)MC::EdgeRgb[1], (float)MC::EdgeRgb[2], 1.f);
 	// a polygon in metres (x, z pairs), cut at Clip, draped and fanned
@@ -672,6 +758,7 @@ void TCMarkersHud::DrawWorldRegions(FTCMarkerPainter& P, ATCGameMode& M, UFont* 
 	{
 		const FVector C = P.ProjectWorld(P.Ground(V.At.X, V.At.Y, 0));
 		if (!P.OnOrNearScreen(C)) continue;
+		P.SetBeforeFog(true);
 		// the border: LineSegments (runs) or a LineLoop (bounds), 0.55 opaque, 0.2 m over the ground (1 px lines)
 		FLinearColor Border(V.TeamColour);
 		Border.A = (float)FTCWorldRecovery::BorderOpacity;
@@ -681,6 +768,7 @@ void TCMarkersHud::DrawWorldRegions(FTCMarkerPainter& P, ATCGameMode& M, UFont* 
 			const FVector2D A = V.Loop[I], B = V.Loop[(I + 1) % V.Loop.Num()];
 			P.ScreenLine(P.Ground(A.X, A.Y, FTCWorldRecovery::BorderLift), P.Ground(B.X, B.Y, FTCWorldRecovery::BorderLift), Border);
 		}
+		P.SetBeforeFog(false);
 		// capturePoint(CFG.pointRadius, text).set(team >= 0 ? colour : null, capper colour, progress, contested)
 		MC::FCaptureState St;
 		St.bOwner = V.bOwner; St.OwnerHex = HexOf(V.TeamColour);
@@ -786,10 +874,9 @@ void TCMarkersHud::Verify(ATCGameMode& M, TSet<int32>& Selected)
 
 FLinearColor TCMarkersHud::WorldColour(UCanvas* Canvas, const FLinearColor& Colour, const FVector& World)
 {
-	const UWorld* W = MarkerWorld(Canvas);
-	const ATCGameMode* M = W ? W->GetAuthGameMode<ATCGameMode>() : nullptr;
-	if (!M || !M->Lighting) return Colour;
-	const ATCLighting& L = *M->Lighting;
+	const ATCLighting* Lighting = MarkerLighting(Canvas);
+	if (!Lighting) return Colour;
+	const ATCLighting& L = *Lighting;
 	const FSceneView& View = *Canvas->SceneView;
 	const float Depth = FVector::DotProduct(World - View.ViewLocation, View.ViewRotation.Vector()) / 100.0;
 	return TCLook::BillboardColour(Colour, Depth, L.FogNear(), L.FogFar(), L.Shown().Haze, L.Shown().Exposure, L.HazeBeforeTone());
@@ -830,9 +917,34 @@ void TCMarkersHud::DrawBadge(UCanvas* Canvas, const FString& Type, int32 Owner, 
 	const FVector2D Uv1 = Uv0 + FVector2D(128.0 / BadgeWidth, 128.0 / BadgeHeight);
 	const double Size = 1.45 * Scale;
 	// markers.js symbolBadge: local centre (-1.98, +0.08), 1.45 m square, billboarded without depth testing.
-	FCanvasTileItem Tile(Centre + FVector2D(-1.98 * Scale - Size / 2, -0.08 * Scale - Size / 2), Atlas->GetResource(), FVector2D(Size, Size), Uv0, Uv1, FLinearColor::White);
-	Tile.BlendMode = SE_BLEND_Translucent;
-	Canvas->DrawItem(Tile);
+	const FVector2D At = Centre + FVector2D(-1.98 * Scale - Size / 2, -0.08 * Scale - Size / 2);
+	if (UMaterialInstanceDynamic* Mat = BadgeMaterial(Canvas, Atlas.Get(), BillboardDepth(Canvas, Scale)))
+	{
+		FCanvasTileItem Tile(At, Mat->GetRenderProxy(), FVector2D(Size, Size), Uv0, Uv1);
+		Canvas->DrawItem(Tile);
+	}
+	else
+	{
+		FCanvasTileItem Tile(At, Atlas->GetResource(), FVector2D(Size, Size), Uv0, Uv1, FLinearColor::White);
+		Tile.BlendMode = SE_BLEND_Translucent; Canvas->DrawItem(Tile);
+	}
+}
+
+void TCMarkersHud::DrawHealthBar(UCanvas* Canvas, FVector2D Centre, float Scale, int32 Owner, float Fraction, int32 Suppression, const FVector& World)
+{
+	if (!Canvas || Scale <= 0) return;
+	auto Rect = [&](double X, double Y, double W, double H, FLinearColor Colour)
+	{
+		FCanvasTileItem Tile(Centre + FVector2D(X, Y) * Scale, FVector2D(W, H) * Scale, WorldColour(Canvas, Colour, World));
+		Tile.BlendMode = SE_BLEND_Translucent; Canvas->DrawItem(Tile);
+	};
+	// main.js makeUnit and applySnapshot. These are world metres, with no minimum pixel size.
+	Rect(-1.2, -.21, 2.4, .42, FLinearColor(FColor(0x11,0x11,0x11)));
+	const FLinearColor Hp = Fraction > .5f ? ATCUnitRenderer::SeatColor(Owner) : Fraction > .25f ?
+		FLinearColor(FColor(0xe0,0x8a,0x2a)) : FLinearColor(FColor(0xd0,0x2a,0x1a));
+	Rect(-1.15, -.17, 2.3 * FMath::Clamp(Fraction,0.f,1.f), .2, Hp);
+	if (Suppression > 0) Rect(-1.15, .06, 2.3 * FMath::Min(1.f,Suppression / 100.f), .1,
+		Suppression >= 90 ? FLinearColor(FColor(0xff,0x3b,0x2a)) : FLinearColor(FColor(0xff,0xd2,0x3a)));
 }
 
 void TCMarkersHud::DrawStars(UCanvas* Canvas, FVector2D BarCentre, float PxPerMetre, int32 Stars)
@@ -841,7 +953,9 @@ void TCMarkersHud::DrawStars(UCanvas* Canvas, FVector2D BarCentre, float PxPerMe
 	if (!Canvas || N <= 0) return;
 	Stats().Stars += N;
 	FTCMarkerPainter P(Canvas, nullptr, nullptr, FVector::ZeroVector, FVector::RightVector, FVector::ForwardVector);
-	const FLinearColor Gold = FTCMarkerPainter::Colour(MC::Star, 1.0);
+	FLinearColor Gold = FTCMarkerPainter::Colour(MC::Star, 1.0);
+	if (const ATCLighting* L = MarkerLighting(Canvas)) Gold = TCLook::BillboardColour(Gold, BillboardDepth(Canvas, PxPerMetre),
+		L->FogNear(), L->FogFar(), L->Shown().Haze, L->Shown().Exposure, L->HazeBeforeTone());
 	const double Half = MC::StarSide * FMath::Sqrt(2.0) / 2.0 * PxPerMetre;
 	for (int32 I = 0; I < N; I++) P.Diamond(BarCentre + FVector2D(MC::StarX(I) * PxPerMetre, -MC::StarRise * PxPerMetre), Half, Gold);
 }
@@ -851,6 +965,50 @@ void TCMarkersHud::DrawStars(UCanvas* Canvas, FVector2D BarCentre, float PxPerMe
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
 #include "Client/TCMarkers.Oracle.inl"
+#include "Engine/TextureRenderTarget2D.h"
+#include "RenderingThread.h"
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCMarkerBillboardMaterialTest, "ThreeCrossroads.Markers.BillboardMaterial", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FTCMarkerBillboardMaterialTest::RunTest(const FString&)
+{
+	UMaterial* Base = LoadObject<UMaterial>(nullptr, TEXT("/Game/Markers/M_TCMarkerBillboard.M_TCMarkerBillboard"));
+	if (!TestNotNull(TEXT("generated source badge fog material"), Base)) return false;
+	TestTrue(TEXT("badge draws after world tone mapping in the UI domain"), Base->MaterialDomain == MD_UI);
+	TestTrue(TEXT("badge preserves the source texture's alpha"), Base->BlendMode == BLEND_Translucent);
+	TCFogLook::PrepareMaterial(Base);
+	TStrongObjectPtr<UTexture2D> Tex(UTexture2D::CreateTransient(1, 1, PF_B8G8R8A8));
+	const FColor Ink(22,25,27,224);
+	void* Bytes = Tex->GetPlatformData()->Mips[0].BulkData.Lock(LOCK_READ_WRITE);
+	FMemory::Memcpy(Bytes, &Ink, sizeof(Ink)); Tex->GetPlatformData()->Mips[0].BulkData.Unlock();
+	Tex->SRGB = true; Tex->Filter = TF_Nearest; Tex->UpdateResource();
+	TStrongObjectPtr<UTextureRenderTarget2D> Target(NewObject<UTextureRenderTarget2D>());
+	Target->ClearColor = FLinearColor::Transparent;
+	Target->InitCustomFormat(16,16,PF_FloatRGBA,true);
+	TStrongObjectPtr<UMaterialInstanceDynamic> Mid(UMaterialInstanceDynamic::Create(Base, GetTransientPackage()));
+	Mid->SetTextureParameterValue(TEXT("Badge"), Tex.Get());
+	const FLinearColor Haze = TCLook::HexLinear(0xc9cbc6);
+	Mid->SetVectorParameterValue(TEXT("Haze"), Haze); Mid->SetScalarParameterValue(TEXT("Exposure"), .9f);
+	for (const bool High : {false,true}) for (const float Fog : {0.f,.15625f,.5f,.84375f,1.f})
+	{
+		Mid->SetScalarParameterValue(TEXT("BeforeTone"), High ? 1.f : 0.f); Mid->SetScalarParameterValue(TEXT("Fog"), Fog);
+		Target->UpdateResourceImmediate(true);
+		FTextureRenderTargetResource* Resource = Target->GameThread_GetRenderTargetResource();
+		FCanvas Canvas(Resource, nullptr, static_cast<UWorld*>(nullptr), ERHIFeatureLevel::SM5);
+		FCanvasTileItem Tile(FVector2D::ZeroVector, Mid->GetRenderProxy(), FVector2D(16,16));
+		Canvas.DrawItem(Tile); Canvas.Flush_GameThread(); FlushRenderingCommands();
+		TArray<FLinearColor> Pixels;
+		if (!TestTrue(TEXT("badge material GPU readback"), Resource->ReadLinearColorPixels(Pixels, FReadSurfaceDataFlags(RCM_MinMax)))) return false;
+		// BillboardColour receives depth, so invert this finite source smoothstep fixture for the CPU comparison.
+		const float T = Fog == .15625f ? .25f : Fog == .84375f ? .75f : Fog;
+		// Canvas material tiles write encoded RGB directly. Ordinary texture/colour tiles apply their own transfer.
+		FLinearColor Expected = TCLook::ToDisplay(TCLook::BillboardColour(FLinearColor(Ink), T, 0, 1, Haze, .9f, High));
+		Expected.R *= Expected.A; Expected.G *= Expected.A; Expected.B *= Expected.A;
+		const FLinearColor Pixel = Pixels[8 * 16 + 8];
+		TestTrue(*FString::Printf(TEXT("%s fog %.5f GPU RGB matches source CPU curve: %s expected %s"), High ? TEXT("High") : TEXT("Low"), Fog, *Pixel.ToString(), *Expected.ToString()),
+			FVector(Pixel.R,Pixel.G,Pixel.B).Equals(FVector(Expected.R,Expected.G,Expected.B), .003));
+	}
+	return true;
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCMarkersWorldTagContextTest, "ThreeCrossroads.Markers.WorldTagContext", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FTCMarkersWorldTagContextTest::RunTest(const FString&)
@@ -868,6 +1026,8 @@ bool FTCMarkersWorldTagContextTest::RunTest(const FString&)
 		FSceneView View(Options);
 		TStrongObjectPtr<UCanvas> Canvas(NewObject<UCanvas>());
 		Canvas->SceneView = &View;
+		Canvas->ClipY = 720;
+		TestEqual(TEXT("billboard scale recovers view depth without screen-size clamping"), BillboardDepth(Canvas.Get(),18.f), 20.f);
 		TestNull(TEXT("a HUD canvas is not a world object"), Canvas->GetWorld());
 		TestTrue(TEXT("world tags resolve the rendered scene for weather fog"), MarkerWorld(Canvas.Get()) == World);
 		Canvas->SceneView = nullptr;

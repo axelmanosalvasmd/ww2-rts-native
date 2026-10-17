@@ -51,6 +51,65 @@ namespace TCWaterCore
 	inline constexpr int OpenReach = 2;          // undiscovered cells beyond known water that still count as water
 	inline constexpr int NoiseSize = 128;
 
+	// three r186 common/lights_physical_pars_fragment and shadowmap_pars_fragment.
+	// The material uses these same equations in TCWater.Shader.inl. Values use linear light.
+	inline double Fresnel(double DotVH)
+	{
+		const double F = std::exp2((-5.55473 * DotVH - 6.98316) * DotVH);
+		return 0.04 * (1.0 - F) + F;
+	}
+	inline double GgxVisibility(double Alpha, double NL, double NV)
+	{
+		const double A2 = Alpha * Alpha;
+		const double GV = NL * std::sqrt(A2 + (1.0 - A2) * NV * NV);
+		const double GL = NV * std::sqrt(A2 + (1.0 - A2) * NL * NL);
+		return 0.5 / std::max(GV + GL, 1e-6);
+	}
+	inline double GgxDistribution(double Alpha, double NH)
+	{
+		const double A2 = Alpha * Alpha, D = NH * NH * (A2 - 1.0) + 1.0;
+		return A2 / (3.14159265358979323846 * D * D);
+	}
+	inline double DirectBrdf(double Colour, double Roughness, double NL, double NV, double NH, double VH, double DfgEnergy)
+	{
+		const double F = Fresnel(VH), Alpha = Roughness * Roughness;
+		const double Compensation = 1.0 + 0.04 * (1.0 / DfgEnergy - 1.0);
+		return Colour * (1.0 - F) / 3.14159265358979323846
+			+ F * GgxVisibility(Alpha, NL, NV) * GgxDistribution(Alpha, NH) * Compensation;
+	}
+	inline void VogelOffset(int Sample, double Phi, double& X, double& Y)
+	{
+		const double R = std::sqrt((Sample + 0.5) / 5.0), A = Sample * 2.399963229728653 + Phi;
+		X = std::cos(A) * R; Y = std::sin(A) * R;
+	}
+	inline double ShadowRotation(double PixelX, double PixelY)
+	{
+		auto Fract = [](double V) { return V - std::floor(V); };
+		return Fract(52.9829189 * Fract(PixelX * .06711056 + PixelY * .00583715)) * 6.28318530717958647692;
+	}
+	// Hardware bilinear depth comparison, emulated because the native atlas exposes a point sampler.
+	inline double BilinearShadow(double A, double B, double C, double D, double X, double Y)
+	{
+		return (A + (B - A) * X) * (1 - Y) + (C + (D - C) * X) * Y;
+	}
+	// ForwardShadowingCommon.ush compares 1-Z < sampledDepth-bias.x. The
+	// comparison filter takes the biased receiver depth on its left-hand side.
+	inline double ShadowReceiverDepth(double ShadowZ, double Bias)
+	{
+		return 1.0 - ShadowZ + Bias;
+	}
+	inline double ShadowAtlasRadius(double SourceRadius, double SourceTexel, int Resolution, double CascadeRadius)
+	{
+		return CascadeRadius > 0 ? SourceRadius * (SourceTexel * Resolution / (2 * CascadeRadius)) : SourceRadius;
+	}
+
+	// The native post pass sees the opaque bed depth. Move only the water term to its
+	// own fog depth before that common linear-light blend. The bed term is unchanged.
+	inline double HazeCompensated(double Colour, double Haze, double WaterFog, double BedFog)
+	{
+		return BedFog < .9999 ? (Colour * (1 - WaterFog) + Haze * (WaterFog - BedFog)) / (1 - BedFog) : Colour;
+	}
+
 	inline bool IsWet(uint8_t Ch) { return Ch == 'W' || Ch == 'F' || Ch == '='; }
 	inline double SmoothStep(double X, double Min, double Max) // three MathUtils.smoothstep
 	{
@@ -594,6 +653,7 @@ class UWorld;
 class UProceduralMeshComponent;
 class UMaterialInterface;
 class UMaterialInstanceDynamic;
+class ATCLighting;
 class UTexture2D;
 class FTCMatchState;
 
@@ -690,6 +750,7 @@ private:
 	bool bLastReveal = false;
 
 	TWeakObjectPtr<AActor> Actor;
+	TWeakObjectPtr<ATCLighting> Lighting;
 	TStrongObjectPtr<UProceduralMeshComponent> Mesh;
 	TStrongObjectPtr<UMaterialInterface> Material;
 	TStrongObjectPtr<UMaterialInstanceDynamic> MID;

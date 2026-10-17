@@ -110,6 +110,8 @@ public:
 	const FTCUnitModelStats& ModelStats() const { return Stats; }
 	// One line for the status log: how many units take which path, and why the model path is off when it is.
 	FString ModelStatusLine() const;
+	// Debug-only when -TCUnitAuditFile is supplied: decoded units and actual submitted instance transforms/bounds.
+	FString VisibilityAudit(const FTCMatchState& State, const ATCTerrain* Terrain) const;
 	// The near/far state the last frame chose for a squad or crew gun (false when unknown).
 	bool IsFar(int32 Id) const { const FShown* S = Shown.Find(Id); return S && S->bFar; }
 	// The soldiers' crowd (near, far, faded and fallen men), for the tests and the status line.
@@ -185,6 +187,7 @@ private:
 	// awareness for the live check, not a benchmark).
 	void ReportFrame();
 	double ReportAt = 0, FrameSum = 0, FrameMax = 0;
+	double AuditAt = 0;
 	FString DrawnList; // this frame's "id type owner x z near|far" for each unit drawn with its model (ReportFrame)
 	FString DrawnMenList; // optional -TCUnitAudit: per-squad expected and successfully submitted members
 	int32 FrameCount = 0;

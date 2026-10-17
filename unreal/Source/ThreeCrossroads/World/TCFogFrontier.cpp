@@ -1,8 +1,10 @@
 #include "World/TCFogFrontier.h"
+#include "World/TCTerrain.h"
 #include "ThreeCrossroads.h"
 #include "Net/TCMatchState.h"
 #include "Client/TCUnitTable.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "Engine/Texture2D.h"
 #include "GameFramework/Actor.h"
 #include "Materials/MaterialInterface.h"
@@ -15,7 +17,7 @@
 #include "Misc/Parse.h"
 
 const TCHAR* const FTCFogFrontier::ReferencePin = TEXT("e4e579a838aabae3b1d9dadbc17a0a87147bc52d");
-// unlit, Color (unreal/Tools/look/make-look-assets.py): the overlay's colour where the ground is opaque
+// Fallback when no terrain paint material exists (unreal/Tools/look/make-look-assets.py).
 const TCHAR* const FTCFogFrontier::UnknownMaterialPath = TEXT("/Game/Models/Materials/Look/M_TCLookEmissive.M_TCLookEmissive");
 
 namespace TCWaterView
@@ -294,7 +296,7 @@ void FTCFogFrontier::RebuildCover(const FTCMatchState& State)
 		return;
 	}
 	// One quad per run of unknown cells in a row, flat at level 0 (the start map's '.' at level 0), facing up: the
-	// browser's placeholder ground under its opaque overlay (fog.js dark 255 on World, colour SHADE).
+	// browser's public placeholder ground under its filtered overlay (fog.js dark 255 on World).
 	TArray<FVector> Verts, Normals;
 	TArray<int32> Tris;
 	const int32 W = Core.W, H = Core.H;
@@ -318,7 +320,18 @@ void FTCFogFrontier::RebuildCover(const FTCMatchState& State)
 	CoverMesh->ClearAllMeshSections();
 	if (!Tris.Num()) { CoverMesh->SetVisibility(false); CoverOverlay.Clear(); return; }
 	CoverMesh->CreateMeshSection_LinearColor(0, Verts, Tris, Normals, TArray<FVector2D>(), TArray<FLinearColor>(), TArray<FProcMeshTangent>(), false);
-	CoverMesh->SetMaterial(0, CoverMid.Get());
+	UMaterialInterface* Underlay = CoverMid.Get();
+	for (TActorIterator<ATCTerrain> It(Actor->GetWorld()); It; ++It)
+	{
+		if (It->MapW() == W && It->MapH() == H && It->GroundMaterialInstance())
+		{
+			// fog.js filters across the last known cell into the public placeholder.
+			// A pre-darkened opaque underlay cuts that interpolation at the cell edge.
+			Underlay = It->GroundMaterialInstance();
+			break;
+		}
+	}
+	CoverMesh->SetMaterial(0, Underlay);
 	CoverMesh->SetVisibility(true);
 	// Water is translucent and sits above this opaque placeholder. As in main.js, the fog must draw
 	// after that water, including its foam over undiscovered cells at the edge of a known river.

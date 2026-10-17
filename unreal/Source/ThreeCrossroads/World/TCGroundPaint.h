@@ -22,10 +22,10 @@
 // in a browser (unreal/Tools/terrain/make-ground-tiles.mjs) and kept as bytes in World/TCGroundPaint.Tiles.inl.
 //
 // Recipient knowledge: the painter reads only what this client was sent (the start's map and cells, later cell rows).
-// On a World Conquest map a cell no row has described yet is unknown: its pixels are not painted from anything (a flat
-// fog shade), no known pixel blends toward it, no blast mark or contour line reads it, and a field needs its whole
-// block known. KnownMode::Reference reproduces the browser instead (it paints World's placeholder '.' cells as open
-// ground); the harness uses it to hold the port to the oracle on every pixel.
+// On World Conquest, the start's unknown cells are the public open-ground, level-zero placeholders.
+// Native mode normalizes every undescribed cell to those values before running the same painter as the
+// reference. Placeholder pixels participate in the source blend beneath the bilinear fog frontier; they do
+// not count as discovered cells for decals. Reference mode reads a fixture's raw inputs for source oracles.
 //
 // Axes: canvas pixel (i, j) covers reference metres x in [i, i + 1) * 2 / P, z in [j, j + 1) * 2 / P; row 0 is the
 // north (z = 0) edge. In Unreal, U = X / (W * 200 cm), V = Y / (H * 200 cm) (World/TCTerrain.h axes).
@@ -409,6 +409,18 @@ namespace TCGroundPaintCore
 			Biome.clear(); BiomeCells.clear(); TintFresh = true;
 			if ((int)Map.Biome.size() == N) { Biome.resize((size_t)N); for (int C = 0; C < N; C++) Biome[(size_t)C] = (uint8_t)std::max(0, std::min(255, Map.Biome[(size_t)C])); }
 			Known.assign((size_t)N, bWorld ? 0 : 1);
+			if (bWorld && Mode == EKnownMode::Native)
+			{
+				std::vector<uint8_t> Delivered((size_t)N, 0);
+				for (const FCellRow& R : Cells) if (R.C >= 0 && R.C < N) Delivered[(size_t)R.C] = 1;
+				for (int C = 0; C < N; C++) if (!Delivered[(size_t)C])
+				{
+					Grid[(size_t)C] = StartRows[(size_t)C] = GroundL[(size_t)C] = ObjectL[(size_t)C] = '.';
+					Level[(size_t)C] = State[(size_t)C] = HasMaterial[(size_t)C] = 0;
+					Material[(size_t)C].clear();
+					if (!Biome.empty()) Biome[(size_t)C] = 255;
+				}
+			}
 			// createGround: the fields of the map as the start sent it (World maps redo them once its cells are in)
 			Fields = FieldsOf();
 			for (const FCellRow& R : Cells) ApplyRowData(R, true);
@@ -516,7 +528,6 @@ namespace TCGroundPaintCore
 		int TMask[MatCount] = {}, TShift[MatCount] = {}, TOx[MatCount] = {}, TOy[MatCount] = {};
 		bool TSwap[MatCount] = {};
 
-		bool Unknown(int C) const { return Mode == EKnownMode::Native && !Known[(size_t)C]; }
 
 		void ApplyRowData(const FCellRow& R, bool bStart)
 		{
@@ -560,7 +571,7 @@ namespace TCGroundPaintCore
 			{
 				const int X0 = Bx * BW + 1, Y0 = By * BH + 1, X1 = std::min(W - 1, Bx * BW + BW - 1), Y1 = std::min(H - 1, By * BH + BH - 1);
 				const int Sample = std::min(H - 1, By * BH + 4) * W + std::min(W - 1, Bx * BW + 5);
-				const FBiomeGround* L = Biome.empty() || Unknown(Sample) ? nullptr : BiomeGround(Biome[(size_t)Sample]);
+				const FBiomeGround* L = Biome.empty() ? nullptr : BiomeGround(Biome[(size_t)Sample]);
 				if (Rnd(Bx, By, 7) > (L ? L->Fields : 0.24) || X1 - X0 < 4 || Y1 - Y0 < 3) continue;
 				bool bKept = false;
 				for (const auto& S : Spawns) if (S.X > X0 - 9 && S.X < X1 + 9 - 1 && S.Y > Y0 - 9 && S.Y < Y1 + 9 - 1) bKept = true;
@@ -568,7 +579,7 @@ namespace TCGroundPaintCore
 				if (bKept) continue;
 				bool bOpen = true;
 				for (int Y = Y0; Y < Y1 && bOpen; Y++) for (int X = X0; X < X1; X++)
-					if (RowAt(X, Y) != '.' || Unknown(Y * W + X)) { bOpen = false; break; } // Native: a field waits for its whole block
+					if (RowAt(X, Y) != '.') { bOpen = false; break; }
 				if (!bOpen) continue;
 				const uint8_t Dir = Rnd(Bx, By, 8) < 0.5 ? (uint8_t)Field : (uint8_t)FieldV;
 				for (int Y = Y0; Y < Y1; Y++) for (int X = X0; X < X1; X++) F[(size_t)(Y * W + X)] = Dir;
@@ -581,7 +592,7 @@ namespace TCGroundPaintCore
 		{
 			if (X < 0 || Y < 0 || X >= W || Y >= H) return 0;
 			const int C = Y * W + X;
-			return Unknown(C) ? 0 : Grid[(size_t)C];
+			return Grid[(size_t)C];
 		}
 		void CellAttrs(const std::vector<int>* Changed)
 		{
@@ -606,7 +617,6 @@ namespace TCGroundPaintCore
 				A.Lev[(size_t)I] = F32(L);
 				int Pm = Grass, S = Dirt;
 				double Am = 0;
-				if (Unknown(I)) { A.Prim[(size_t)I] = Grass; A.Sec[(size_t)I] = Grass; A.Amt[(size_t)I] = 0.f; A.Key[(size_t)I] = 0; A.Tr[(size_t)I] = A.Tg[(size_t)I] = A.Tb[(size_t)I] = 1.f; return; }
 				const uint8_t Fl = Fields[(size_t)I];
 				if (Ch == '.')
 				{
@@ -616,7 +626,7 @@ namespace TCGroundPaintCore
 						const uint8_t C2 = At(X + Dx, Y + Dy);
 						if (C2 == 'W' || C2 == 'F' || C2 == '=') bWet = true;
 						const int Nx = X + Dx, Ny = Y + Dy;
-						if (Nx >= 0 && Ny >= 0 && Nx < W && Ny < H && !Unknown(Ny * W + Nx) && RowAt(Nx, Ny) == 'B') bTown = true;
+						if (Nx >= 0 && Ny >= 0 && Nx < W && Ny < H && RowAt(Nx, Ny) == 'B') bTown = true;
 					}
 					const FBiomeGround* Lk = Biome.empty() ? nullptr : BiomeGround(Biome[(size_t)I]);
 					if (Fl) { Pm = Fl; S = Grass; Am = 0.3; }
@@ -697,7 +707,6 @@ namespace TCGroundPaintCore
 						const int Nx = X + Dx;
 						const bool bIn = Nx >= 0 && Ny >= 0 && Nx < W && Ny < H;
 						if (bIn && A.Scar[(size_t)(Ny * W + Nx)]) continue;
-						if (bIn && Unknown(Ny * W + Nx)) continue; // Native: unknown ground is neither scar nor clean
 						const double D = JsHypot((double)Dx, (double)Dy);
 						if (D < Best) Best = D;
 					}
@@ -732,7 +741,7 @@ namespace TCGroundPaintCore
 			for (int Y = Ay; Y <= By; Y++) for (int X = Ax; X <= Bx; X++)
 			{
 				const int C = Y * W + X;
-				const FBiomeGround* L = Unknown(C) ? nullptr : BiomeGround(Biome[(size_t)C]);
+				const FBiomeGround* L = BiomeGround(Biome[(size_t)C]);
 				const size_t I = (size_t)((Y - Ay + 1) * SW + X - Ax + 1), Up = I - SW;
 				Sw[I] = F32((L ? 1.0 : 0.0) + (double)Sw[I - 1] + (double)Sw[Up] - (double)Sw[Up - 1]);
 				Sr[I] = F32((L ? L->Tint[0] : 0.0) + (double)Sr[I - 1] + (double)Sr[Up] - (double)Sr[Up - 1]);
@@ -815,7 +824,6 @@ namespace TCGroundPaintCore
 						R.Scars.insert(R.Scars.end(), { X + 0.5, Y + 0.5, (double)Kind, (double)Attrs.Depth[(size_t)Cell] });
 						R.Material = R.Material == -1 ? Kind : R.Material == Kind ? Kind : 0;
 					}
-					else if (bIn && Unknown(Cell)) continue; // Native: unknown ground is not clean ground
 					else if (X < X0) Left = X + 0.5;
 					else if (X == X0) Middle = X + 0.5;
 					else if (std::isnan(Right)) Right = X + 0.5;
@@ -1005,7 +1013,6 @@ namespace TCGroundPaintCore
 					uint8_t* Out = &Raster[((size_t)J * CW + I) * 4];
 					const int Gx = U <= 0 ? 0 : U >= W ? W - 1 : ToInt(U), Gy = V <= 0 ? 0 : V >= H ? H - 1 : ToInt(V);
 					const int Own = Gy * W + Gx;
-					if (Unknown(Own)) { Out[0] = Out[1] = Out[2] = 10; Out[3] = 255; continue; } // never painted from anything
 					const double Fx = U + (double)Nz.NA[(size_t)(RWx | CWx[(size_t)C])] * Warp - 0.5, Fy = V + (double)Nz.NA[(size_t)(RWy | CWy[(size_t)C])] * Warp - 0.5;
 					int Ix0 = (int)std::floor(Fx), Iy0 = (int)std::floor(Fy);
 					const double Tx = Fx - Ix0, Ty = Fy - Iy0;
@@ -1013,10 +1020,6 @@ namespace TCGroundPaintCore
 					Ix0 = std::min(std::max(Ix0, 0), W - 1); Ix1 = std::min(std::max(Ix1, 0), W - 1);
 					Iy0 = std::min(std::max(Iy0, 0), H - 1); Iy1 = std::min(std::max(Iy1, 0), H - 1);
 					int C00 = Iy0 * W + Ix0, C01 = Iy0 * W + Ix1, C10 = Iy1 * W + Ix0, C11 = Iy1 * W + Ix1;
-					if (Unknown(C00)) C00 = Own;
-					if (Unknown(C01)) C01 = Own;
-					if (Unknown(C10)) C10 = Own;
-					if (Unknown(C11)) C11 = Own;
 					const double Pa = Nz.NP[(size_t)(RP0 | CP0[(size_t)C])], Pb = Nz.NP[(size_t)(RP0 | CP1[(size_t)C])], Pc = Nz.NP[(size_t)(RP1 | CP0[(size_t)C])], Pd = Nz.NP[(size_t)(RP1 | CP1[(size_t)C])];
 					const double Ptx = CPt[(size_t)C];
 					const double Pn = (Pa + (Pb - Pa) * Ptx) * (1 - RPt) + (Pc + (Pd - Pc) * Ptx) * RPt;
@@ -1147,7 +1150,6 @@ namespace TCGroundPaintCore
 			}
 			// contour ink only near true cliffs (a step of two levels or more between neighbouring cell centres)
 			auto Lv = [&](int X, int Y) { return (double)A.Lev[(size_t)(std::min(H - 1, std::max(0, Y)) * W + std::min(W - 1, std::max(0, X)))]; };
-			auto Hidden = [&](int X, int Y) { return Unknown(std::min(H - 1, std::max(0, Y)) * W + std::min(W - 1, std::max(0, X))); };
 			std::vector<FPathOp> Path;
 			for (int Y = std::max(-1, Cy0 - 1); Y <= Cy1; Y++) for (int X = std::max(-1, Cx0 - 1); X <= Cx1; X++)
 			{
@@ -1155,7 +1157,6 @@ namespace TCGroundPaintCore
 				const double Lo = std::min(std::min(Av, Bv), std::min(Cv, Dv)), Hi = std::max(std::max(Av, Bv), std::max(Cv, Dv));
 				if (Lo == Hi) continue;
 				if (std::max(std::max(std::fabs(Av - Bv), std::fabs(Bv - Cv)), std::max(std::fabs(Cv - Dv), std::fabs(Dv - Av))) < 2) continue;
-				if (Hidden(X, Y) || Hidden(X + 1, Y) || Hidden(X + 1, Y + 1) || Hidden(X, Y + 1)) continue; // Native: no line through unknown ground
 				const double Ox = (X + 0.5) * P, Oy = (Y + 0.5) * P;
 				for (double T = Lo + 0.5; T < Hi; T++)
 				{

@@ -1,7 +1,7 @@
-#include "Client/TCStats.h"
 // See TCLocale.h. Ported from client/i18n.js at FTCLocale::ReferencePin; the dictionary is client/es.js as exported by
 // unreal/Tools/export-locale.mjs.
 #include "Client/TCLocale.h"
+#include "Client/TCStats.h"
 
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"

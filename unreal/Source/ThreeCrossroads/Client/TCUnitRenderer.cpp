@@ -15,6 +15,11 @@
 #include "Misc/Parse.h"
 #include "Misc/App.h"
 #include "HAL/PlatformTime.h"
+#include "Dom/JsonObject.h"
+#include "Serialization/JsonSerializer.h"
+#include "Serialization/JsonWriter.h"
+#include "Misc/FileHelper.h"
+#include "StaticMeshResources.h"
 
 // The engine's basic shapes are 100 cm across (cylinder and cone 100 cm tall, centred; the cone's apex is at +Z).
 
@@ -192,6 +197,13 @@ void ATCUnitRenderer::Draw(const FTCMatchState& State, const FTCUnitTable& Table
 	Stats.Matched = History.Matched + (Crowd ? Crowd->History.Matched : 0);
 	Stats.Moving = History.Moving + (Crowd ? Crowd->History.Moving : 0);
 	ReportFrame();
+	static const FString AuditFile = [] { FString Path; FParse::Value(FCommandLine::Get(), TEXT("TCUnitAuditFile="), Path); return Path; }();
+	if (!AuditFile.IsEmpty() && FPlatformTime::Seconds() >= AuditAt)
+	{
+		AuditAt = FPlatformTime::Seconds() + 5.0;
+		FFileHelper::SaveStringToFile(VisibilityAudit(State, Terrain) + TEXT("\n"), *AuditFile, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM,
+			&IFileManager::Get(), FILEWRITE_Append);
+	}
 	// every 5 s of real time while tracked hulls are drawn: how many turn their wheels and how far they have rolled
 	const double Real = FPlatformTime::Seconds();
 	if (Stats.WheelHulls && Real - WheelLogAt >= 5.0)
@@ -204,6 +216,76 @@ void ATCUnitRenderer::Draw(const FTCMatchState& State, const FTCUnitTable& Table
 float ATCUnitRenderer::CurrentLodMetres()
 {
 	return FTCGraphics::Get().Budget().LodMetres;
+}
+
+FString ATCUnitRenderer::VisibilityAudit(const FTCMatchState& State, const ATCTerrain* Terrain) const
+{
+	auto Vector = [](const FVector& V)
+	{
+		return TArray<TSharedPtr<FJsonValue>> { MakeShared<FJsonValueNumber>(V.X), MakeShared<FJsonValueNumber>(V.Y), MakeShared<FJsonValueNumber>(V.Z) };
+	};
+	TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
+	Root->SetNumberField(TEXT("tick"), State.Tick);
+	Root->SetStringField(TEXT("coordinates"), TEXT("Unreal world centimetres: X=source x, Y=source z, Z=height"));
+	TArray<int32> Ids; State.Units.GetKeys(Ids); Ids.Sort();
+	TArray<TSharedPtr<FJsonValue>> Units;
+	for (int32 Id : Ids)
+	{
+		const FTCUnit& U = State.Units[Id];
+		TSharedRef<FJsonObject> Row = MakeShared<FJsonObject>();
+		Row->SetNumberField(TEXT("id"), Id); Row->SetStringField(TEXT("type"), U.Type);
+		Row->SetNumberField(TEXT("owner"), U.Owner); Row->SetNumberField(TEXT("hp"), U.Hp);
+		Row->SetNumberField(TEXT("flags"), U.Flags); Row->SetNumberField(TEXT("x"), U.X); Row->SetNumberField(TEXT("z"), U.Z);
+		Row->SetBoolField(TEXT("drawnPolicy"), IsDrawn(U));
+		TArray<TSharedPtr<FJsonValue>> Instances;
+		auto Append = [&](UInstancedStaticMeshComponent* C, const auto& B, const TCHAR* Path)
+		{
+			if (!C || !C->GetStaticMesh()) return;
+			for (int32 I = 0; I < B.Keys.Num(); I++)
+			{
+				const uint64 Key = B.Keys[I];
+				if (int32(uint32(Key >> 24)) != Id) continue;
+				FTransform Xf;
+				if (!C->GetInstanceTransform(I, Xf, true)) continue; // read the submitted component, not the planned transform
+				TSharedRef<FJsonObject> Instance = MakeShared<FJsonObject>();
+				Instance->SetStringField(TEXT("path"), Path);
+				Instance->SetStringField(TEXT("mesh"), C->GetStaticMesh()->GetPathName());
+				Instance->SetNumberField(TEXT("slot"), (Key >> 4) & 0xffff);
+				Instance->SetNumberField(TEXT("kind"), Key & 15);
+				Instance->SetNumberField(TEXT("componentInstances"), C->GetInstanceCount());
+				Instance->SetBoolField(TEXT("visible"), C->IsVisible() && !C->bHiddenInGame);
+				Instance->SetArrayField(TEXT("origin"), Vector(Xf.GetLocation()));
+				const FBox Bounds = C->GetStaticMesh()->GetBoundingBox().TransformBy(Xf);
+				Instance->SetArrayField(TEXT("boundsMin"), Vector(Bounds.Min)); Instance->SetArrayField(TEXT("boundsMax"), Vector(Bounds.Max));
+				if (const FStaticMeshRenderData* Data = C->GetStaticMesh()->GetRenderData(); Data && Data->LODResources.Num())
+				{
+					const auto& VB = Data->LODResources[0].VertexBuffers.PositionVertexBuffer;
+					Instance->SetNumberField(TEXT("vertices"), VB.GetNumVertices());
+					if (Terrain && VB.GetVertexData() && FString(Path) == TEXT("part"))
+					{
+						int32 Above = 0; double Min = DBL_MAX, Max = -DBL_MAX;
+						for (uint32 V = 0; V < VB.GetNumVertices(); V++)
+						{
+							const FVector P = Xf.TransformPosition(FVector(VB.VertexPosition(V)));
+							const double Height = P.Z - Terrain->HeightAt(P.X / 100.0, P.Y / 100.0) * 100.0;
+							Above += Height > 1; Min = FMath::Min(Min, Height); Max = FMath::Max(Max, Height);
+						}
+						Instance->SetNumberField(TEXT("verticesAboveGround"), Above);
+						Instance->SetNumberField(TEXT("minGroundClearance"), Min); Instance->SetNumberField(TEXT("maxGroundClearance"), Max);
+					}
+				}
+				Instances.Add(MakeShared<FJsonValueObject>(Instance));
+			}
+		};
+		for (const auto& B : Frame) Append(B.Key, B.Value, TEXT("part"));
+		if (Crowd) for (const auto& B : Crowd->Frame) Append(B.Key, B.Value, TEXT("crowd"));
+		Row->SetArrayField(TEXT("instances"), Instances);
+		Units.Add(MakeShared<FJsonValueObject>(Row));
+	}
+	Root->SetArrayField(TEXT("units"), Units);
+	FString Json; auto Writer = TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&Json);
+	FJsonSerializer::Serialize(Root, Writer);
+	return Json;
 }
 
 namespace TCWheelTracksImpl

@@ -169,9 +169,28 @@ look=asset('/Game/Models/Materials/Look/MPC_TCLook')
 params=[expr(water,unreal.MaterialExpressionCollectionParameter,collection=look,parameter_name=n) for n in ['HemiTop','HemiBottom','Env']]
 base=rgb(water,outs[0]);normal=rgb(water,outs[1]);sheen=rgb(water,outs[2])
 rough=component(water,outs[3],'r');spec=component(water,outs[3],'g')
+# Source Standard lighting is evaluated below. An unlit carrier permits the
+# negative intermediate required to invert bed-depth haze without clipping shadows.
+water.set_editor_property('shading_model',unreal.MaterialShadingModel.MSM_UNLIT)
+water.set_editor_property('allow_negative_emissive_color',True)
 code=str(source.get_editor_property('code'))
-light=custom(water,code,[('Color',base,''),('Roughness',rough,''),('Metallic',const(water,0),''),('Specular',spec,''),('NormalWS',normal,''),('Emissive',sheen,''),('VertexNormal',expr(water,unreal.MaterialExpressionVertexNormalWS),''),('CameraVector',expr(water,unreal.MaterialExpressionCameraVectorWS),''),('Env',expr(water,unreal.MaterialExpressionTextureObjectParameter,parameter_name='LookEnv',texture=asset('/Game/Models/Materials/Look/T_TCLookEnv')),''),('HemiTop',params[0],''),('HemiBottom',params[1],''),('Look',params[2],'')],T.CMOT_FLOAT3)
+water_shader=REPO/'unreal/Source/ThreeCrossroads/World/TCWater.Shader.inl'
+direct=water_shader.read_text().split('R"TCWATER(',1)[1].split(')TCWATER"',1)[0]
+code=code.replace('return Emissive + indirect;',direct+'\nreturn waterRadiance;')
+haze=expr(water,unreal.MaterialExpressionVectorParameter,parameter_name='WaterHaze',default_value=unreal.LinearColor(0,0,0,0))
+fog_params=expr(water,unreal.MaterialExpressionVectorParameter,parameter_name='WaterFog',default_value=unreal.LinearColor(0,0,0,0))
+opaque_depth=expr(water,unreal.MaterialExpressionSceneDepth)
+sun_dir=expr(water,unreal.MaterialExpressionVectorParameter,parameter_name='SunDirection',default_value=unreal.LinearColor(0,0,1,0))
+sun_colour=expr(water,unreal.MaterialExpressionVectorParameter,parameter_name='SunColour',default_value=unreal.LinearColor(0,0,0,0))
+shadow_radius=expr(water,unreal.MaterialExpressionScalarParameter,parameter_name='ShadowRadius',default_value=2.0)
+low=expr(water,unreal.MaterialExpressionScalarParameter,parameter_name='Low',default_value=0.0)
+# A Custom input's default vector pin is RGB. Append direction alpha explicitly.
+sun_rgba=expr(water,unreal.MaterialExpressionAppendVector)
+connect(sun_dir,'RGB',sun_rgba,'A');connect(sun_dir,'A',sun_rgba,'B')
+REPORT['sources'][str(water_shader.relative_to(REPO))]=hashlib.sha256(water_shader.read_bytes()).hexdigest()
+light=custom(water,code,[('Color',base,''),('Roughness',rough,''),('Metallic',const(water,0),''),('Specular',spec,''),('NormalWS',normal,''),('Emissive',sheen,''),('VertexNormal',expr(water,unreal.MaterialExpressionVertexNormalWS),''),('CameraVector',expr(water,unreal.MaterialExpressionCameraVectorWS),''),('Env',expr(water,unreal.MaterialExpressionTextureObjectParameter,parameter_name='LookEnv',texture=asset('/Game/Models/Materials/Look/T_TCLookEnv')),''),('HemiTop',params[0],''),('HemiBottom',params[1],''),('Look',params[2],''),('WPos',expr(water,unreal.MaterialExpressionWorldPosition),''),('SunDirection',sun_rgba,''),('SunColour',sun_colour,''),('ShadowRadius',shadow_radius,''),('Low',low,''),('WaterHaze',haze,''),('WaterFog',fog_params,''),('OpaqueDepth',opaque_depth,'')],T.CMOT_FLOAT3)
 prop(light,'',P.MP_EMISSIVE_COLOR);prop(const(water,0),'',P.MP_AMBIENT_OCCLUSION)
+prop(const(water,0),'',P.MP_BASE_COLOR);prop(const(water,0),'',P.MP_SPECULAR)
 save(water)
 REPORT['water_indirect_hlsl_sha256']=hashlib.sha256(code.encode()).hexdigest()
 content=Path(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_content_dir()))

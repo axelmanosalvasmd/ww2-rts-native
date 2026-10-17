@@ -3,6 +3,12 @@
 #include "ThreeCrossroads.h"
 #include "Net/TCMatchState.h"
 #include "Client/TCGraphics.h"
+#include "Client/TCLighting.h"
+#include "Components/DirectionalLightComponent.h"
+#include "Camera/PlayerCameraManager.h"
+#include "GameFramework/PlayerController.h"
+#include "EngineUtils.h"
+#include "HAL/IConsoleManager.h"
 #include "Engine/World.h"
 #include "Engine/Texture2D.h"
 #include "GameFramework/Actor.h"
@@ -175,6 +181,7 @@ void FTCWater::Detach()
 {
 	if (AActor* A = Actor.Get()) A->Destroy();
 	Actor.Reset(); Mesh.Reset(); MID.Reset(); MaskTex.Reset();
+	Lighting.Reset();
 	Core = TCWaterCore::FWater();
 	W = H = 0; Triangles = 0;
 }
@@ -337,6 +344,45 @@ void FTCWater::Flush(const FTCMatchState& State, double NowSeconds, bool bReveal
 		if (Core.GeometryChanged) SendGeometry();
 	}
 	if (!MID.IsValid() && Material.IsValid()) BindMaterial();
+	// The source Standard BRDF and PCF are evaluated in the water material. Only the
+	// existing sun and its native depth atlas are consumed, with no second light.
+	if (!Lighting.IsValid() && Actor.IsValid())
+	{
+		TActorIterator<ATCLighting> It(Actor->GetWorld());
+		if (It) Lighting = *It;
+	}
+	if (MID.IsValid() && Lighting.IsValid() && Lighting->Sun)
+	{
+		const FTCMood& Look = Lighting->Shown();
+		const FVector Dir = -Lighting->Sun->GetForwardVector();
+		MID->SetVectorParameterValue(TEXT("SunDirection"), FLinearColor(Dir.X, Dir.Y, Dir.Z, Lighting->Sun->ShadowAmount));
+		MID->SetVectorParameterValue(TEXT("SunColour"), Look.Sun * Look.SunI);
+		MID->SetVectorParameterValue(TEXT("WaterHaze"), Look.Haze);
+		MID->SetVectorParameterValue(TEXT("WaterFog"), FLinearColor(Lighting->FogNear(), Lighting->FogFar(), Lighting->HazeBeforeTone() ? 1.f : 0.f, 0));
+		const FTCGraphicsBudget& G = FTCGraphics::Get().Budget();
+		float Radius = G.bSoftShadows ? G.ShadowRadiusPerSoft * Look.Soft : G.ShadowRadius;
+		const APlayerController* PC = Actor->GetWorld()->GetFirstPlayerController();
+		if (G.bSoftShadows && PC && PC->PlayerCameraManager)
+		{
+			static const IConsoleVariable* Follow = IConsoleManager::Get().FindConsoleVariable(TEXT("tc.Look.ShadowView"));
+			static const IConsoleVariable* Filter = IConsoleManager::Get().FindConsoleVariable(TEXT("tc.Look.ShadowFilter"));
+			if ((!Follow || Follow->GetInt() != 0) && (!Filter || Filter->GetInt() != 0))
+			{
+				// FollowShadowView sizes its native 5x5 footprint to the source disk.
+				// Read the same view calculation, including the integer resolution rounding.
+				const APlayerCameraManager& Camera = *PC->PlayerCameraManager;
+				int32 VW = 0, VH = 0; PC->GetViewportSize(VW, VH);
+				const double Aspect = VW > 0 && VH > 0 ? double(VW) / VH : 16.0 / 9.0;
+				const FRotationMatrix Axes(Camera.GetCameraRotation());
+				const double TanX = FMath::Tan(FMath::DegreesToRadians(Camera.GetFOVAngle()) * .5);
+				const TCLook::FShadowView View = TCLook::ShadowView(Camera.GetCameraLocation() / 100.0,
+					Axes.GetUnitAxis(EAxis::X), Axes.GetUnitAxis(EAxis::Y), Axes.GetUnitAxis(EAxis::Z),
+					TanX, TanX / Aspect, 0, G.ShadowMapSize, Radius, true);
+				Radius = (float)TCWaterCore::ShadowAtlasRadius(Radius, View.Texel, View.Resolution, View.CascadeRadius);
+			}
+		}
+		MID->SetScalarParameterValue(TEXT("ShadowRadius"), Radius);
+	}
 	// round 15: gfx.onChange(setLow): a change of level mid-match redefines WATER_LOW at once
 	if (GfxWatch.TakeChanged() && MID.IsValid() && FTCGraphics::Get().IsLow() != bDrawnLow)
 	{

@@ -308,14 +308,14 @@ void FTCMatchOptions::Reset()
 	You = -1;
 	SeatList.Reset();
 	Pending.Reset();
-	Download.Reset(); NextMapTry = -1e9; PreviewImageKey.Reset(); PreviewImage.Reset();
+	Download.Reset(); MapRetry.Reset(); PreviewImageKey.Reset(); PreviewImage.Reset();
 }
 
 void FTCMatchOptions::TickPreview(const FString& SocketUrl, double Now)
 {
 	if (PreviewServer != SocketUrl)
 	{
-		PreviewServer = SocketUrl; MapFiles.Reset(); Download.Reset(); NextMapTry = -1e9;
+		PreviewServer = SocketUrl; MapFiles.Reset(); Download.Reset(); MapRetry.Reset();
 		PreviewImage.Reset(); PreviewImageKey.Reset();
 	}
 	if (Download && Download->bDone)
@@ -324,10 +324,10 @@ void FTCMatchOptions::TickPreview(const FString& SocketUrl, double Now)
 		Download.Reset();
 	}
 	const FString Key = WantedMap();
-	if (!InLobby() || Key.IsEmpty() || Download || Now < NextMapTry) return;
+	if (!InLobby() || Download || !MapRetry.Due(Key, Now)) return;
 	const FString Url = MapUrl(SocketUrl, Key);
 	if (Url.IsEmpty()) return;
-	NextMapTry = Now + 5.0;
+	MapRetry.Tried(Key, Now);
 	Download = MakeShared<FDownload>(); Download->Key = Key;
 	const auto Result = Download;
 	const auto Request = FHttpModule::Get().CreateRequest();
@@ -1821,6 +1821,25 @@ bool FTCMatchOptionsLobbyTest::RunTest(const FString& Parameters)
 		TestFalse(TEXT("a seat that is not an object"), O.ApplyLobby(*TCMOptT::Parse(TEXT("{\"t\":\"lobby\",\"state\":\"lobby\",\"players\":[1]}"))));
 		TestFalse(TEXT("nothing kept from a bad lobby"), O.HasLobby());
 	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCMatchOptionsPreviewRetryTest, "ThreeCrossroads.MatchOptions.PreviewRetry", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)
+bool FTCMatchOptionsPreviewRetryTest::RunTest(const FString&)
+{
+	FTCMapPreviewRetry Retry;
+	TestTrue(TEXT("first lobby map can fetch immediately"), Retry.Due(TEXT("default"), 100));
+	Retry.Tried(TEXT("default"), 100);
+	TestFalse(TEXT("the same map retains its five second retry delay"), Retry.Due(TEXT("default"), 104.9));
+	TestTrue(TEXT("selecting No Man's Land does not wait for Default's delay"), Retry.Due(TEXT("no-mans-land"), 100.1));
+	Retry.Tried(TEXT("no-mans-land"), 100.1);
+	TestFalse(TEXT("the selected map has its own retry delay"), Retry.Due(TEXT("no-mans-land"), 104.9));
+	TestFalse(TEXT("switching back cannot bypass a failed map's delay"), Retry.Due(TEXT("default"), 104.9));
+	TestTrue(TEXT("Default retries at its own deadline"), Retry.Due(TEXT("default"), 105));
+	TestFalse(TEXT("No Man's Land still waits for its deadline"), Retry.Due(TEXT("no-mans-land"), 105));
+	Retry.Reset();
+	TestTrue(TEXT("another server or room forgets retry delays"), Retry.Due(TEXT("no-mans-land"), 100.2));
+	TestFalse(TEXT("an absent map never fetches"), Retry.Due(FString(), 100.2));
 	return true;
 }
 

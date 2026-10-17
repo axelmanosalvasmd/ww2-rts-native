@@ -429,6 +429,7 @@ public:
 	bool Tag(UFont* Font, const FString& Text, double X, double Z, double Lift, const TCMarkersCore::FTagStyle& Style, float Fade = 1.f, const FLinearColor* Swatch = nullptr);
 	void Flush();
 	void SetWorldScene(TSharedPtr<FTCMarkerScene> InScene) { Scene = MoveTemp(InScene); }
+	void SetBeforeFog(bool bEnabled) { Flush(); bBeforeFog = bEnabled; }
 	void SetDepthTest(bool bEnabled) { Flush(); bDepthTest = bEnabled; }
 
 	// Pixels per metre at a world point (cm), measured across the view; 0 behind the camera.
@@ -441,7 +442,7 @@ public:
 
 private:
 	TSharedPtr<FTCMarkerScene> Scene;
-	bool bDepthTest = true;
+	bool bDepthTest = true, bBeforeFog = false;
 	void WorldTri(const FVector& A, const FVector& B, const FVector& C, const FLinearColor& Colour);
 	UCanvas* Canvas = nullptr;
 	TFunction<FVector(const FVector&)> Project;
@@ -485,6 +486,8 @@ namespace TCMarkersHud
 	void DrawCoverLayer(FTCMarkerPainter& P, const TArray<FTCCoverGlyph>& Glyphs, float Opacity, bool bDepthTest = true);
 	// makeUnit's veterancy stars over a bar centred at BarCentre (canvas pixels), PxPerMetre the bar group's scale.
 	void DrawBadge(UCanvas* Canvas, const FString& Type, int32 Owner, FVector2D BarCentre, float PxPerMetre);
+	// Source makeUnit bars. All colours pass through the same depth fog as the badge and stars.
+	void DrawHealthBar(UCanvas* Canvas, FVector2D Centre, float PxPerMetre, int32 Owner, float Fraction, int32 Suppression, const FVector& World);
 	void DrawCoverShield(UCanvas* Canvas, FVector2D BarCentre, float PxPerMetre, int32 Cover, bool bGarrisoned, const FVector& World);
 	FLinearColor WorldColour(UCanvas* Canvas, const FLinearColor& Colour, const FVector& World);
 	void DrawStars(UCanvas* Canvas, FVector2D BarCentre, float PxPerMetre, int32 Stars);

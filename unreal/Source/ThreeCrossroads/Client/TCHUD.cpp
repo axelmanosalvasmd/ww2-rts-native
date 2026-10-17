@@ -41,6 +41,11 @@
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/DirectionalLightComponent.h"
 #include "Components/SkyLightComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Materials/MaterialParameterCollection.h"
+#include "Materials/MaterialParameterCollectionInstance.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Client/TCLighting.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Engine/StaticMesh.h"
 #include "TextureResource.h"
@@ -96,6 +101,8 @@ class FTCHudPortraits
  TUniquePtr<FPreviewScene> Scene;
  TStrongObjectPtr<UTextureRenderTarget2D> Target;
  USceneCaptureComponent2D* Capture=nullptr;
+ UStaticMeshComponent* Floor=nullptr;
+ TArray<FLinearColor> ModelPixels, FloorPixels;
  TArray<UInstancedStaticMeshComponent*> Parts;
  TMap<FString,TStrongObjectPtr<UTexture2D>> Ready;
  TSet<FString> Asked, Failed;
@@ -119,6 +126,7 @@ class FTCHudPortraits
   if (Scene) return;
   Scene=MakeUnique<FPreviewScene>(FPreviewScene::ConstructionValues().SetEditor(false).SetCreatePhysicsScene(false).SetTransactional(false).SetLightBrightness(1.9f).SetSkyBrightness(.85f));
   Scene->SetLightColor(FColor(0xff,0xee,0xdb));
+  Scene->DirectionalLight->SetMobility(EComponentMobility::Movable);
   Scene->SkyLight->LowerHemisphereColor=FLinearColor(FColor(0x4c,0x42,0x32));
   Target.Reset(NewObject<UTextureRenderTarget2D>(GetTransientPackage()));
   Target->ClearColor=FLinearColor(0,0,0,1); Target->InitCustomFormat(176,132,PF_FloatRGBA,true); Target->UpdateResourceImmediate(true);
@@ -127,6 +135,26 @@ class FTCHudPortraits
   Capture->CaptureSource=ESceneCaptureSource::SCS_SceneColorHDR;
   Capture->FOVAngle=FMath::RadiansToDegrees(2*FMath::Atan(FMath::Tan(FMath::DegreesToRadians(11.f))*4.f/3));
   Scene->SkyLight->SetLightColor(FLinearColor(FColor(0xd0,0xd8,0xe0)));
+  // Imported model masters read their hemisphere from this preview world's collection, not its sky light.
+  if (UMaterialParameterCollection* Collection=LoadObject<UMaterialParameterCollection>(nullptr,TCLook::CollectionPath))
+  {
+   Scene->GetWorld()->AddParameterCollectionInstance(Collection,true);
+   if (UMaterialParameterCollectionInstance* Light=Scene->GetWorld()->GetParameterCollectionInstance(Collection))
+   {
+    Light->SetVectorParameterValue(TEXT("HemiTop"),FLinearColor(FColor(0xd0,0xd8,0xe0))*.85f);
+    Light->SetVectorParameterValue(TEXT("HemiBottom"),FLinearColor(FColor(0x4c,0x42,0x32))*.85f);
+    Light->SetVectorParameterValue(TEXT("Env"),FLinearColor(0,0,1,0));
+   }
+   // This preview world does not tick. Flush the collection now, as the match world's tick normally does.
+   Scene->GetWorld()->UpdateParameterCollectionInstances(true,false);
+  }
+  Scene->DirectionalLight->SetCastShadows(true);
+  Floor=NewObject<UStaticMeshComponent>(GetTransientPackage());
+  Floor->SetStaticMesh(LoadObject<UStaticMesh>(nullptr,TEXT("/Engine/BasicShapes/Plane.Plane")));
+  Floor->SetMobility(EComponentMobility::Movable);
+  Floor->SetCastShadow(false);
+  Scene->AddComponent(Floor,FTransform::Identity);
+  Floor->SetVisibility(false);
   UDirectionalLightComponent* Rim=NewObject<UDirectionalLightComponent>(GetTransientPackage());
   Rim->SetIntensity(.7f); Rim->SetLightColor(FLinearColor(FColor(0xbf,0xd0,0xe6))); Rim->SetCastShadows(false);
   Scene->AddComponent(Rim,FTransform((-FVector(.4,-1,.8)).Rotation()));
@@ -171,17 +199,28 @@ class FTCHudPortraits
   Capture->bOverride_CustomNearClippingPlane=true; Capture->CustomNearClippingPlane=FMath::Max(5.,Distance-Radius*2);
   const FVector Key=Centre+FVector(-.55,.75,1.1)*Radius*3;
   Scene->SetLightDirection((Centre-Key).Rotation());
+  // portraits.js floor: a radius*6 plane at min.y+.01, which contributes only a black 0.38-opacity shadow.
+  Floor->SetWorldLocation(FVector(Centre.X,Centre.Y,Bounds.Min.Z+1));
+  Floor->SetWorldScale3D(FVector(Radius*6/100,Radius*6/100,1));
+  Floor->SetVisibility(false);
   Scene->GetWorld()->SendAllEndOfFrameUpdates();
   return true;
  }
- void Develop()
+ void Develop(const TArray<FLinearColor>& ShadowPixels)
  {
-  TArray<FLinearColor> Samples; FReadSurfaceDataFlags Flags(RCM_MinMax); Flags.SetLinearToGamma(false);
-  if (!Target->GameThread_GetRenderTargetResource()->ReadLinearColorPixels(Samples,Flags) || Samples.Num()!=176*132) { Failed.Add(Active.Key); return; }
+  const TArray<FLinearColor>& Samples=ModelPixels;
+  if (Samples.Num()!=176*132 || FloorPixels.Num()!=Samples.Num() || ShadowPixels.Num()!=Samples.Num()) { Failed.Add(Active.Key); return; }
   TArray<FColor> Pixels; Pixels.Reserve(Samples.Num()); int32 Visible=0;
-  for (FLinearColor C : Samples)
+  for (int32 Index=0; Index<Samples.Num(); Index++)
   {
-   const float Alpha=FMath::Clamp(1-C.A,0.f,1.f); C=Neutral(C);
+   FLinearColor C=Samples[Index];
+   const float ModelAlpha=FMath::Clamp(1-C.A,0.f,1.f);
+   // Two floor passes remove the lit plane, leaving only its received shadow. This is Unreal's equivalent
+   // of THREE.ShadowMaterial: a transparent studio, never a newly invented opaque floor or backdrop.
+   const float Base=FloorPixels[Index].GetLuminance(), Lit=ShadowPixels[Index].GetLuminance();
+   const float Shadow=ModelAlpha<.01f && Base>1.e-6f ? .38f*FMath::Clamp(1-Lit/Base,0.f,1.f) : 0.f;
+   const float Alpha=ModelAlpha+Shadow*(1-ModelAlpha);
+   C=Neutral(C);
    FColor P=C.ToFColorSRGB(); P.A=FMath::RoundToInt(255*Alpha); Visible+=P.A>0;
    const float Y=.299f*P.R+.587f*P.G+.114f*P.B;
    P.R=FMath::RoundToInt(FMath::Lerp(float(P.R),Y,.2f)); P.G=FMath::RoundToInt(FMath::Lerp(float(P.G),Y,.2f)); P.B=FMath::RoundToInt(FMath::Lerp(float(P.B),Y,.2f)); Pixels.Add(P);
@@ -206,11 +245,32 @@ public:
   LastFrame=GFrameCounter;
   if (Stage==0 && Queue.Num()) { Active=Queue[0]; Queue.RemoveAt(0); if (Build(Models)) Stage=1; else Failed.Add(Active.Key); }
   else if (Stage==1) { Capture->CaptureScene(); Stage=2; }
-  else if (Stage==2) { Develop(); Stage=0; }
+  else if (Stage==2)
+  {
+   FReadSurfaceDataFlags Flags(RCM_MinMax); Flags.SetLinearToGamma(false);
+   Target->GameThread_GetRenderTargetResource()->ReadLinearColorPixels(ModelPixels,Flags);
+   for (UInstancedStaticMeshComponent* C : Parts) C->SetVisibility(false);
+   Floor->SetVisibility(true); Stage=3;
+  }
+  else if (Stage==3) { Capture->CaptureScene(); Stage=4; }
+  else if (Stage==4)
+  {
+   FReadSurfaceDataFlags Flags(RCM_MinMax); Flags.SetLinearToGamma(false);
+   Target->GameThread_GetRenderTargetResource()->ReadLinearColorPixels(FloorPixels,Flags);
+   for (UInstancedStaticMeshComponent* C : Parts) C->SetVisibility(true);
+   Stage=5;
+  }
+  else if (Stage==5) { Capture->CaptureScene(); Stage=6; }
+  else if (Stage==6)
+  {
+   TArray<FLinearColor> ShadowPixels; FReadSurfaceDataFlags Flags(RCM_MinMax); Flags.SetLinearToGamma(false);
+   Target->GameThread_GetRenderTargetResource()->ReadLinearColorPixels(ShadowPixels,Flags);
+   Develop(ShadowPixels); Floor->SetVisibility(false); Stage=0;
+  }
  }
 };
 
-void ATCHUD::DrawHudIcon(const FString& Key, const FBox2D& Box, FLinearColor Colour)
+void ATCHUD::DrawHudIcon(const FString& Key, const FBox2D& Box, FLinearColor Colour, const FBox2D& Clip)
 {
  UTexture2D* Atlas=HudIcons();
  if (!Atlas || !Atlas->GetResource()) return;
@@ -219,7 +279,10 @@ void ATCHUD::DrawHudIcon(const FString& Key, const FBox2D& Box, FLinearColor Col
  if (At==INDEX_NONE) return;
  const FVector2D Uv0(double(At%HudIconColumns)*HudIconSide/HudIconWidth,double(At/HudIconColumns)*HudIconSide/HudIconHeight);
  const FVector2D Uv1=Uv0+FVector2D(double(HudIconSide)/HudIconWidth,double(HudIconSide)/HudIconHeight);
- FCanvasTileItem Tile(Box.Min,Atlas->GetResource(),Box.GetSize(),Uv0,Uv1,Colour);
+ const FBox2D Visible=Clip.bIsValid?Box.Overlap(Clip):Box;
+ if (!Visible.bIsValid || Visible.GetSize().X<=0 || Visible.GetSize().Y<=0) return;
+ const FVector2D Step=(Uv1-Uv0)/Box.GetSize();
+ FCanvasTileItem Tile(Visible.Min,Atlas->GetResource(),Visible.GetSize(),Uv0+(Visible.Min-Box.Min)*Step,Uv0+(Visible.Max-Box.Min)*Step,Colour);
  Tile.BlendMode=SE_BLEND_Translucent; Canvas->DrawItem(Tile);
 }
 
@@ -271,7 +334,7 @@ void ATCHUD::DrawHint(UFont* Font)
  if (!PC->bLastOrderSent && NoteAge>=0 && NoteAge<2) Hint=FTCLocale::OrderNote(PC->LastOrderNote);
  if (Hint.IsEmpty()) return;
  const FTCMeasure Measure=FTCType::IsLoaded()?FTCType::Measure():FTCPaint::CanvasMeasure(Font);
- const float Left=FTCHudFit::LeftW+16, Right=Minimap.Rect().bIsValid?Minimap.Rect().Min.X/UiNow-8:Canvas->ClipX-8;
+ const float Left=FTCHudFit::LeftWidth(FVector2D(Canvas->ClipX,Canvas->ClipY),UiNow)+16, Right=Minimap.Rect().bIsValid?Minimap.Rect().Min.X/UiNow-8:Canvas->ClipX-8;
  const float W=FMath::Max(32.f,Right-Left);
  const TArray<FString> Lines=FTCPaint::Wrap(TC_T(Hint),W-20,14,false,Measure);
  const float H=Lines.Num()*18.9f+12;
@@ -376,7 +439,7 @@ void ATCHUD::DrawBottomLayout(const FTCHudFit::FBottomLayout& Layout, UFont* Fon
   }
   if (Image && Image->GetResource()) { FCanvasTileItem Tile(I.Box.Min,Image->GetResource(),I.Box.GetSize(),FLinearColor::White); Tile.BlendMode=SE_BLEND_Translucent; Canvas->DrawItem(Tile); }
   else if (I.bPortrait) { const float Side=I.Box.GetSize().Y*.78f; const FVector2D At=I.Box.GetCenter()-FVector2D(Side/2,Side/2); DrawHudIcon(I.Key,FBox2D(At,At+FVector2D(Side,Side)),TCCss::Dim); }
-  else DrawHudIcon(I.Key,I.Box,I.Colour);
+  else DrawHudIcon(I.Key,I.Box,I.Colour,I.Clip);
  }
  for (const FTCHudFit::FHit& H : Layout.Hits)
  {
@@ -404,8 +467,9 @@ namespace TCHudBottom
 		const FBox2D& Clip, const FTCMeasure& Measure, const TCHAR* Role, ETCPaintAlign Align = ETCPaintAlign::Left)
 	{
 		if (Shown.IsEmpty()) return;
-		const float W = Measure(Shown,Px,Bold,0), H = Px * 1.35f;
-		L.Paint.Text(Shown,X,Y,Px,C,Bold,Align,Role).Size = FVector2D(W,H);
+		const float W = Measure(Shown,Px,Bold,0), H = FCString::Strcmp(Role,TEXT("bottom:status-text"))==0?Px*1.25f:
+            (FCString::Strcmp(Role,TEXT("bottom:selection-title"))==0 || FCString::Strcmp(Role,TEXT("bottom:orders-title"))==0)?Px:Px*1.35f;
+        L.Paint.Text(Shown,X,Y,Px,C,Bold,Align,Role).Size = FVector2D(W,H);
 		const float Left = X - (Align == ETCPaintAlign::Centre ? W / 2 : Align == ETCPaintAlign::Right ? W : 0);
 		L.TextBounds.Add({Shown,Box(Left,Y,W,H),Clip});
 	}
@@ -476,7 +540,7 @@ namespace TCHudBottom
 		{
 			float H = OrderH;
 			for (int32 K=First; K<FMath::Min(First+4,Controls.Num()); K++)
-				if (!Controls[K].bSubmenu) H=FMath::Max(H,33.f+FTCPaint::Wrap(TC_T(Controls[K].Value),CellW-4,13,false,Measure).Num()*17.55f);
+				if (!Controls[K].bSubmenu) H=OrderH;
 			for (int32 K=First; K<FMath::Min(First+4,Controls.Num()); K++) GridControl(L,Controls[K],Box(X+(K-First)*(CellW+GridGap),Y,CellW,H),Measure,Scale);
 			Y+=H+GridGap;
 		}
@@ -486,7 +550,7 @@ namespace TCHudBottom
  {
   float H=OrderH; const float CW=(W-3*GridGap)/4;
   for (int32 K=First; K<FMath::Min(First+4,Controls.Num()); K++)
-   if (!Controls[K].bSubmenu) H=FMath::Max(H,33.f+FTCPaint::Wrap(TC_T(Controls[K].Value),CW-4,13,false,Measure).Num()*17.55f);
+   if (!Controls[K].bSubmenu) H=OrderH;
   return H;
  }
  void Pager(FBottomLayout& L, const FString& Kind, int32 First, int32 Max, float X, float Y, float W, const FTCMeasure& Measure, float Scale)
@@ -557,7 +621,7 @@ namespace TCHudBottom
 	{
 		L.Paint.Shift(0,By);
 		for (FBox2D& P : L.Paint.Panels) P=FBox2D(P.Min+By,P.Max+By);
-		for (FIcon& I : L.Icons) I.Box=FBox2D(I.Box.Min+By,I.Box.Max+By);
+		for (FIcon& I : L.Icons) { I.Box=FBox2D(I.Box.Min+By,I.Box.Max+By); if (I.Clip.bIsValid) I.Clip=FBox2D(I.Clip.Min+By,I.Clip.Max+By); }
 		for (FHit& H : L.Hits) H.Box=FBox2D(H.Box.Min+By,H.Box.Max+By);
 		for (FTextFit& T : L.TextBounds) { T.Box=FBox2D(T.Box.Min+By,T.Box.Max+By); T.Clip=FBox2D(T.Clip.Min+By,T.Clip.Max+By); }
 		auto Move=[&](FBox2D& B) { if (B.bIsValid) B=FBox2D(B.Min+By,B.Max+By); };
@@ -566,26 +630,30 @@ namespace TCHudBottom
 }
 
 FTCHudFit::FBottomLayout FTCHudFit::LeftPanel(float ViewH, const FString& Title, const TArray<FSelection>& Selection,
-	const TArray<FString>& Details, const TArray<FControl>& Orders, const TArray<FControl>& Menu, const FTCMeasure& Measure, float Scale, int32 Idle, int32 Destination, bool bTransfer, bool bDropdown, int32 SelectionFirst, float TopLimit, int32 MenuFirst, const TArray<FControl>& MenuTabs)
+	const TArray<FString>& Details, const TArray<FControl>& Orders, const TArray<FControl>& Menu, const FTCMeasure& Measure, float Scale, int32 Idle, int32 Destination, bool bTransfer, bool bDropdown, int32 SelectionFirst, float TopLimit, int32 MenuFirst, const TArray<FControl>& MenuTabs, float Width)
 {
 	using namespace TCHudBottom;
 	FBottomLayout L;
-	const float X=ScreenGap, W=LeftW, Inner=W-14;
+	const float X=ScreenGap, W=Width, Inner=W-14;
 	float Y=0;
 	if (!Selection.IsEmpty() || Idle>0)
 	{
 		Y=8;
-		float IdleW=0;
+		float IdleW=0, HeaderH=13;
 		if (Idle>0)
 		{
 		 FControl C; C.Label=FString::Printf(TEXT("Idle %d"),Idle); C.Command=Local(TEXT("idle"));
 		 C.Hover=TEXT("Find the next idle unit. Shift+click selects all idle units");
 		 IdleW=Measure(TC_T(C.Label),13,false,0)+14;
-		 RowButton(L,C,Box(X+W-7-IdleW,Y-2,IdleW,22),Measure,Scale);
+		 HeaderH=13.f*1.1f+4+2*Border(Scale);
+         RowButton(L,C,Box(X+W-7-IdleW,Y,IdleW,HeaderH),Measure,Scale);
+         L.Paint.Items.Last().Pos.Y=Y+(HeaderH-14.3f)/2;
+         L.Paint.Items.Last().Size.Y=14.3f;
+         L.TextBounds.Last().Box=Box(L.TextBounds.Last().Box.Min.X,L.Paint.Items.Last().Pos.Y,L.TextBounds.Last().Box.GetSize().X,14.3f);
 		}
 		const float TitleW=Inner-(IdleW>0?IdleW+6:0);
-		Text(L,FTCPaint::Ellipsis(TC_T(Title),TitleW,13,true,Measure),X+7,Y,13,true,TCCss::Text,Box(X+7,Y,TitleW,18),Measure,TEXT("bottom:selection-title")); Y+=23;
-        const FBottomLayout OrdersOnly=LeftPanel(ViewH-180,TEXT(""),{},Details,Orders,Menu,Measure,Scale,0,Destination,bTransfer,bDropdown,0,TopLimit,MenuFirst,MenuTabs);
+		Text(L,FTCPaint::Ellipsis(TC_T(Title),TitleW,13,true,Measure),X+8,Y+(HeaderH-13)/2,13,true,TCCss::Text,Box(X+8,Y,TitleW,HeaderH),Measure,TEXT("bottom:selection-title")); Y+=HeaderH+6;
+        const FBottomLayout OrdersOnly=LeftPanel(ViewH-180,TEXT(""),{},Details,Orders,Menu,Measure,Scale,0,Destination,bTransfer,bDropdown,0,TopLimit,MenuFirst,MenuTabs,Width);
         const float OrdersH=OrdersOnly.Orders.bIsValid?OrdersOnly.Orders.GetSize().Y:0.f;
         const float ListH=FMath::Max(0.f,FMath::Min(ViewH*.4f,ViewH-ScreenGap-FMath::Max(80.f,TopLimit)-OrdersH-6-Y-6));
         const float ListTop=Y;
@@ -597,14 +665,14 @@ FTCHudFit::FBottomLayout FTCHudFit::LeftPanel(float ViewH, const FString& Title,
             const FSelection& S=Selection[Index];
             FBottomLayout Row;
 			Row.Paint.Rect(X+7,Y,Inner,Border(Scale),TCCss::LineSoft);
-			const float Top=Y+5, NameX=X+7+48+8, NameW=Inner-48-8;
+			const float Top=Y+5, NameX=X+7+48+8, NameW=Inner-48-8-4;
 			Row.Paint.Rect(X+7,Top,48,36,TCCss::Rgba(0,0,0,.22f));
 			Row.Icons.Add({S.Type,Box(X+7,Top,48,36),FLinearColor::White,true,S.Owner});
 			const FString Count=FString::Printf(TEXT("×%d"),S.Count);
 			const float CountW=Measure(Count,14,true,0);
 			float NameY=Top;
 			Text(Row,FTCPaint::Ellipsis(TC_T(S.Name),NameW-CountW-4,14,true,Measure),NameX,NameY,14,true,TCCss::Text,Box(NameX,NameY,NameW-CountW-4,18.9f),Measure,TEXT("bottom:selection-name")); NameY+=18.9f;
-			Text(Row,Count,X+W-7,Top,14,true,TCCss::Dim,Box(X+W-7-CountW,Top,CountW,18.9f),Measure,TEXT("bottom:selection-count"),ETCPaintAlign::Right);
+			Text(Row,Count,X+W-11,Top,14,true,TCCss::Dim,Box(X+W-11-CountW,Top,CountW,18.9f),Measure,TEXT("bottom:selection-count"),ETCPaintAlign::Right);
 			const FString State=TC_T(FString::Printf(TEXT("%d/%d hp"),S.Hp,S.MaxHp));
             const float HealthW=Measure(State,13,false,0);
             Text(Row,State,NameX,NameY,13,false,TCCss::Dim,Box(NameX,NameY,NameW,18.9f),Measure,TEXT("bottom:selection-health"));
@@ -613,10 +681,10 @@ FTCHudFit::FBottomLayout FTCHudFit::LeftPanel(float ViewH, const FString& Title,
 			{
              if (Tag==TEXT("Auto-retreat")) { ChipX=NameX; NameY+=ChipH+3; ChipH=0; }
 			 const FString Shown=TC_T(Tag);
-			 const float CW=FMath::Min(NameW,Measure(Shown,13,false,0)+12);
+			 const float CW=FMath::Min(NameW,Measure(Shown,13,false,0)+10+2*Border(Scale));
 			 if (ChipX>NameX && ChipX+CW>NameX+NameW) { ChipX=NameX; NameY+=ChipH+3; ChipH=0; }
-			 const TArray<FString> Lines=FTCPaint::Wrap(Shown,CW-12,13,false,Measure);
-			 const float CH=Lines.Num()*17.55f+2;
+			 const TArray<FString> Lines=FTCPaint::Wrap(Shown,CW-10-2*Border(Scale)+.01f,13,false,Measure);
+			 const float CH=Lines.Num()*16.25f+2*Border(Scale);
 			 const FBox2D Chip=Box(ChipX,NameY,CW,CH);
 			 const bool Danger=Tag==TEXT("Pinned")||Tag==TEXT("AP round loaded")||Tag==TEXT("Low supplies")||Tag==TEXT("Stranded")||Tag==TEXT("Mandatory withdrawal")||Tag==TEXT("Cut off from supply");
 			 const bool Cover=Tag==TEXT("Hidden")||Tag==TEXT("Riding")||Tag==TEXT("Reinforcing")||Tag.Contains(TEXT("cover"))||Tag==TEXT("In trench")||Tag.StartsWith(TEXT("Garrisoned:"));
@@ -624,13 +692,16 @@ FTCHudFit::FBottomLayout FTCHudFit::LeftPanel(float ViewH, const FString& Title,
 			 const FLinearColor C=Danger?TCCss::RedHi:Cover?TCCss::Hex(0xa9b37b):Supp?TCCss::Brass:TCCss::Text;
 			 FLinearColor Edge=C; Edge.A=Danger?.6f:Cover?.45f:Supp?.5f:.24f;
 			 Row.Paint.Frame(Chip.Min.X,Chip.Min.Y,CW,CH,Edge,Border(Scale),TEXT("bottom:status-chip"));
-			 for (int32 I=0; I<Lines.Num(); I++) Text(Row,Lines[I],ChipX+6,NameY+1+I*17.55f,13,false,C,Chip,Measure,TEXT("bottom:status-text"));
+			 for (int32 I=0; I<Lines.Num(); I++) Text(Row,Lines[I],ChipX+5+Border(Scale),NameY+Border(Scale)+I*16.25f,13,false,C,Chip,Measure,TEXT("bottom:status-text"));
 			 ChipX+=CW+6; ChipH=FMath::Max(ChipH,CH);
 			}
-			NameY+=ChipH;
+            NameY+=ChipH;
+            const float PortraitY=Top+FMath::Max(0.f,(NameY-Top-36)/2);
+            Row.Icons[0].Box=Box(X+7,PortraitY,48,36);
+            Row.Paint.Items[1].Pos.Y=PortraitY;
 			FControl Pick; Pick.Label=S.Name; Pick.Hover=S.Hover; Pick.Command=Local(TEXT("type:" )+S.Type);
 			Row.Hits.Add({Box(X+7,Top,Inner,FMath::Max(36.f,NameY-Top)),Pick});
-            const float Bottom=FMath::Max(Top+36,NameY)+5;
+            const float Bottom=FMath::Max(Top+36,NameY)+4;
             if (Bottom>ListTop+ListH+.01f) { More=true; break; }
             L.Paint.Append(Row.Paint); L.Icons.Append(Row.Icons); L.Hits.Append(Row.Hits); L.TextBounds.Append(Row.TextBounds);
             Y=Bottom;
@@ -641,7 +712,7 @@ FTCHudFit::FBottomLayout FTCHudFit::LeftPanel(float ViewH, const FString& Title,
             L.Paint.Rect(X+W-4,ListTop+(H-Thumb)*First/FMath::Max(1,Selection.Num()-1),2,Thumb,TCCss::Line,TEXT("bottom:selection-scroll"));
         }
         L.SelectionList=Box(X+6,ListTop,Inner,FMath::Max(0.f,Y-ListTop));
-		Y+=6;
+		Y+=7;
 		L.Selection=Box(X,0,W,Y);
 		FTCPaint Foreground=MoveTemp(L.Paint); L.Paint=FTCPaint(); Panel(L,L.Selection,TEXT("bottom:selection"),Scale); L.Paint.Append(Foreground);
 		Y+=6;
@@ -650,7 +721,7 @@ FTCHudFit::FBottomLayout FTCHudFit::LeftPanel(float ViewH, const FString& Title,
 	{
 		const float Top=Y;
 		Y+=8;
-		Text(L,TC_T(FString(TEXT("Orders"))),X+7,Y,13,false,TCCss::Dim,Box(X+7,Y,Inner,18),Measure,TEXT("bottom:orders-title")); Y+=20;
+		Text(L,TC_T(FString(TEXT("Orders"))),X+7,Y,13,false,TCCss::Dim,Box(X+7,Y,Inner,18),Measure,TEXT("bottom:orders-title")); Y+=19;
 		const float Budget=ViewH-ScreenGap-FMath::Max(80.f,TopLimit)-Top-8;
         TArray<FControl> VisibleOrders=Orders;
         if (Menu.Num() && Orders.Num()>4)
@@ -662,17 +733,17 @@ FTCHudFit::FBottomLayout FTCHudFit::LeftPanel(float ViewH, const FString& Title,
         if (!bDropdown) Y=GridWindow(L,VisibleOrders,X+7,Y,Inner,FMath::Max(80.f,ViewH-ScreenGap-FMath::Max(80.f,TopLimit)-Y-FixedTail),MenuFirst,Measure,Scale);
 		if (bTransfer)
 		{
-		 Y+=6;
+		 Y+=5;
              const FString Label=TC_T(FString(TEXT("Control group")));
              FControl Transfer; Transfer.Label=TEXT("Move to group"); Transfer.Command=Local(TEXT("transfer"));
              Transfer.Hover=TEXT("Alt+1 to Alt+9 moves selected units and removes them from other groups");
              const float TransferW=Measure(TC_T(Transfer.Label),13,false,0)+14;
-             const float LabelW=Inner-TransferW-32-6;
+             const float LabelW=FMath::Min(Inner-TransferW-32-10,Measure(Label,14,false,0));
              const float LabelPx=FMath::Min(13.f,LabelW/FMath::Max(1.f,Measure(Label,13,false,0))*13.f);
              Text(L,Label,X+7,Y+4,LabelPx,false,TCCss::Dim,Box(X+7,Y,LabelW,25),Measure,TEXT("bottom:group-title"));
              FControl Choose; Choose.Label=FString::FromInt(Destination); Choose.Command=Local(TEXT("destination")); Choose.bSubmenu=true; Choose.bOn=bDropdown;
-             Choose.Hover=TEXT("Destination control group"); RowButton(L,Choose,Box(X+7+LabelW+3,Y,32,25),Measure,Scale);
-             RowButton(L,Transfer,Box(X+W-7-TransferW,Y,TransferW,25),Measure,Scale); Y+=28;
+             Choose.Hover=TEXT("Destination control group"); RowButton(L,Choose,Box(X+7+LabelW+5,Y,32,27),Measure,Scale);
+             RowButton(L,Transfer,Box(X+7+LabelW+42,Y,TransferW,27),Measure,Scale); Y+=27;
 		 if (bDropdown)
 		 {
 		  for (int32 G=1; G<=9; G++)
@@ -713,37 +784,28 @@ FTCHudFit::FBottomLayout FTCHudFit::RecruitPanel(float ViewW, float ViewH, float
 {
 	using namespace TCHudBottom;
 	FBottomLayout L;
-	const float Left=LeftW+2*ScreenGap, MaxW=FMath::Clamp(Right-Left,60.f,720.f), Inner=MaxW-16;
-	float Y=8;
+	const float Left=LeftWidth(FVector2D(ViewW,ViewH),Scale)+2*ScreenGap, MaxW=FMath::Max(60.f,Right-Left);
+    const float Edge=7+Border(Scale), Inner=MaxW-2*Edge;
+	float Y=Edge;
 	for (const FString& H : Headings) { Y+=Wrapped(L,TC_T(H),8,Y,Inner,13,true,TCCss::Text,Measure,TEXT("bottom:recruit-heading")); Y+=6; }
-    float X=8, RowH=0, Widest=0;
-    TArray<float> Natural;
-    float Total=0, Fixed=0;
-    for (const FControl& C : Tabs)
-    {
-        const float Base=20+(C.Icon.IsEmpty()?0:22)+(C.Key.IsEmpty()?0:KeyWidth(C.Key,Measure)+14);
-        const float W=Measure(TC_T(C.Label),13,true,0);
-        Fixed+=Base;
-        Natural.Add(W); Total+=W;
-    }
-    const float TabRoom=Inner-FMath::Max(0,Tabs.Num()-1)*4;
-    const float Fit=FMath::Clamp((TabRoom-Fixed)/FMath::Max(1.f,Total),0.f,1.f);
+    const float TabsTop=Y;
+    float X=Edge+1, RowH=0, Widest=0;
+    // Auto grid tracks keep their intrinsic width. The viewport crops the row, never its captions.
     for (int32 Index=0; Index<Tabs.Num(); Index++)
     {
         const FControl& C=Tabs[Index];
         const float KeyRoom=C.Key.IsEmpty()?0:KeyWidth(C.Key,Measure)+14;
-        const float CW=20+(C.Icon.IsEmpty()?0:22)+KeyRoom+Natural[Index]*Fit, H=29.55f;
+        const float CW=20+2*Border(Scale)+(C.Icon.IsEmpty()?0:22)+KeyRoom+Measure(TC_T(C.Label),13,true,0), H=26+2*Border(Scale);
         const FBox2D B=Box(X,Y,CW,H);
         L.Paint.Rect(X,Y,CW,H,C.bOn?TCCss::Rgba(214,178,94,.1f):TCCss::Hex(0x24282b),TEXT("bottom:tab"));
         L.Paint.Frame(X,Y,CW,H,C.bOn?TCCss::Brass:TCCss::LineSoft,Border(Scale));
-        Icon(L,C.Icon,X+10,Y+(H-17)/2,17,TCCss::Dim);
-        const float LabelX=X+10+(C.Icon.IsEmpty()?0:22), LabelW=FMath::Max(1.f,CW-20-(C.Icon.IsEmpty()?0:22)-KeyRoom);
-        const FString Caption=LabelW>=Measure(TEXT("…"),13,true,0)?FTCPaint::Ellipsis(TC_T(C.Label),LabelW,13,true,Measure):FString();
-        Text(L,Caption,LabelX,Y+6,13,true,C.bOn?TCCss::Brass:TCCss::Dim,B,Measure,TEXT("bottom:tab-label"));
+        Icon(L,C.Icon,X+10+Border(Scale),Y+(H-17)/2,17,TCCss::Dim);
+        const float LabelX=X+10+Border(Scale)+(C.Icon.IsEmpty()?0:22);
+        Text(L,TC_T(C.Label),LabelX,Y+5,13,true,C.bOn?TCCss::Brass:TCCss::Dim,B,Measure,TEXT("bottom:tab-label"));
         KeyBadge(L,C.Key,B.Max.X-9,B.Min.Y+6,B,Measure,true);
-        L.Hits.Add({B,C}); RowH=H; Widest=FMath::Max(Widest,X+CW+8); X+=CW+4;
+        L.Hits.Add({B,C}); RowH=H; Widest=FMath::Max(Widest,X+CW+Edge); X+=CW+5;
     }
-	if (Tabs.Num()) Y+=RowH+4;
+	if (Tabs.Num()) Y+=RowH+6;
 	int32 CardRow=0; const float CardsTop=Y;
  FBottomLayout Footer;
  const float FooterH=LogisticsText(Footer,Logistics,0,MaxW,Measure);
@@ -797,9 +859,7 @@ FTCHudFit::FBottomLayout FTCHudFit::RecruitPanel(float ViewW, float ViewH, float
 				// The reference's <=72px container rule keeps the full name in the hover text.
 				if (CW>72 || C.Command.Action!=ETCUiAction::Recruit) Ty+=Wrapped(L,TC_T(C.Label),X+3,Ty,CW-6-(C.Key.IsEmpty()?0:KeyWidth(C.Key,Measure)+12),13,true,C.bEnabled?TCCss::Text:TCCss::Dim,Measure,TEXT("bottom:card-name"));
 				L.Paint.Rect(X+1,Ty,CW-2,CW*.75f,TCCss::Rgba(0,0,0,.22f));
-				if (C.Command.Action==ETCUiAction::Recruit || C.Command.Action==ETCUiAction::Build)
-                    L.Icons.Add({C.Icon,Box(X+1,Ty,CW-2,CW*.75f),FLinearColor::White,true});
-                else Icon(L,C.Icon,X+CW*.185f,Ty+CW*.06f,CW*.63f,C.bEnabled?TCCss::Text:TCCss::Dim);
+                Icon(L,C.Icon,X+CW*.08f,Ty+CW*.06f,CW*.84f,C.bEnabled?TCCss::Text:TCCss::Dim);
 				Ty+=CW*.75f+3;
 				Wrapped(L,TC_T(C.Value),X+3,Ty,CW-6,14,true,TCCss::Text,Measure,TEXT("bottom:card-cost"));
 				KeyBadge(L,C.Key,B.Max.X-9,B.Min.Y+4,B,Measure,true);
@@ -813,7 +873,7 @@ FTCHudFit::FBottomLayout FTCHudFit::RecruitPanel(float ViewW, float ViewH, float
  if (AllRows) L.RecruitList=Box(8,CardsTop,Inner,Y-CardsTop);
 	Y=LogisticsText(L,Logistics,Y,MaxW,Measure);
 	if (Logistics.Num()) Widest=MaxW;
-	Y+=2;
+	Y+=Edge;
 	float AboveW=16;
 	for (const FControl& C : Above) AboveW+=Measure(TC_T(C.Label),13,false,0)+26+(C.Key.IsEmpty()?0:KeyWidth(C.Key,Measure)+18);
 	const float W=Lists.Num()?MaxW:FMath::Min(MaxW,FMath::Max(Widest,FMath::Max(AboveW,80.f)));
@@ -833,6 +893,17 @@ FTCHudFit::FBottomLayout FTCHudFit::RecruitPanel(float ViewW, float ViewH, float
 		L.Paint.Panels.Add(B);
 		AX=At+AW+8;
 	}
+    if (Tabs.Num())
+    {
+        const FBox2D Crop=Box(0,0,W,Y);
+        for (FTCPaintItem& I : L.Paint.Items) if (I.Pos.Y>=TabsTop && I.Pos.Y<TabsTop+RowH) I.Clip=Crop;
+        for (FIcon& I : L.Icons) I.Clip=Crop;
+        for (FTextFit& T : L.TextBounds) if (T.Box.Min.Y>=TabsTop && T.Box.Max.Y<=TabsTop+RowH+1)
+        { T.Box=T.Box.Overlap(Crop); T.Clip=Crop; }
+        for (FHit& H : L.Hits) H.Box=H.Box.Overlap(Crop);
+        L.Hits.RemoveAll([](const FHit& H){return !H.Box.bIsValid || H.Box.GetSize().X<=0 || H.Box.GetSize().Y<=0;});
+        L.TextBounds.RemoveAll([](const FTextFit& T){return !T.Box.bIsValid || T.Box.GetSize().X<=0 || T.Box.GetSize().Y<=0;});
+    }
 	Shift(L,FVector2D(Left+(MaxW-W)/2,ViewH-ScreenGap-Y));
 	if (Overlap(L.Recruit,Economy) && Economy.Min.X-8<Right && Economy.Min.X-8>Left+60)
 		return RecruitPanel(ViewW,ViewH,Economy.Min.X-8,Headings,Tabs,Lists,Above,Measure,Scale,Logistics,TotalCards,FirstCard,TopLimit);
@@ -1006,18 +1077,43 @@ FTCHudFit::FBottomLayout FTCHudFit::SandboxToolbar(FVector2D View, float CornerR
 	const TArray<FControl>& Controls, const TArray<FBox2D>& Avoid, const FTCMeasure& Measure, float Scale)
 {
 	using namespace TCHudBottom;
-	FBottomLayout L=Toolbar(View.X-16,Controls,Measure,Scale);
-	if (L.Paint.Panels.IsEmpty()) return L;
-	const FVector2D Size=L.Paint.Panels[0].GetSize();
-	FBox2D Spot=Box((View.X-Size.X)/2,View.Y-SandboxBottom-Size.Y,Size.X,Size.Y);
-	const bool Clear=Spot.Min.Y>=8 && !Avoid.ContainsByPredicate([&](const FBox2D& B) { return Overlap(Spot,B); });
-	if (!Clear)
-	{
-		const float X=CornerRight+8, Right=ScoreLeft-4;
-		L=Toolbar(FMath::Max(100.f,Right-X),Controls,Measure,Scale);
-		Spot=Box(X,8,L.Paint.Panels[0].GetSize().X,L.Paint.Panels[0].GetSize().Y);
-	}
-	Shift(L,Spot.Min);
+	FBottomLayout L;
+    if (Controls.Num()!=4) return L;
+    // index.html #sandbox: a bold label, two equally flexible selects, then Spawn. The select's
+    // intrinsic text comes from the original options, including excluded truck labels, without spawning one.
+    const float Hair=Border(Scale), PadX=10+Hair, PadY=6+Hair, Gap=6;
+    float UnitW=0;
+    for (const FTCSandboxUnit& U : FTCMatchControls::ReferenceSandboxUnits())
+        UnitW=FMath::Max(UnitW,Measure(TC_T(FString(U.Name)),14,false,0));
+    const float SideW=FMath::Max(Measure(TC_T(FString(TEXT("Enemy"))),14,false,0),Measure(TC_T(FString(TEXT("Mine"))),14,false,0));
+    const float LabelW=Measure(TC_T(Controls[0].Label),14,true,0);
+    const float ButtonW=Measure(TC_T(Controls[3].Label),14,false,0)+20+2*Hair;
+    const float H=31+2*(Hair-1), W=FMath::Min(float(View.X/2),2*PadX+3*Gap+LabelW+ButtonW+UnitW+SideW+2*(16+2*Hair+20));
+    const float SelectW=FMath::Max(1.f,(W-2*PadX-3*Gap-LabelW-ButtonW)/2);
+    const FBox2D B=Box((View.X-W)/2,View.Y-SandboxBottom-H-2*PadY,W,H+2*PadY);
+    Panel(L,B,TEXT("sandbox:panel"),Scale);
+    L.Paint.Items[0].Colour=TCCss::PanelSolid;
+    float X=B.Min.X+PadX; const float Y=B.Min.Y+PadY;
+    Text(L,TC_T(Controls[0].Label),X,Y+(H-18.9f)/2,14,true,TCCss::Text,B,Measure,TEXT("sandbox:label"));
+    X+=LabelW+Gap;
+    for (int32 I=1; I<4; I++)
+    {
+        const bool Select=I<3; const float CW=Select?SelectW:ButtonW;
+        const FBox2D Cell=Box(X,Y,CW,H);
+        L.Paint.Rect(X,Y,CW,H,TCCss::Hex(Select?0x15181a:0x24282b),TEXT("sandbox:control"));
+        L.Paint.Frame(X,Y,CW,H,TCCss::LineSoft,Hair);
+        const FBox2D Crop=Box(X+8,Y,CW-(Select?26:16),H);
+        Text(L,TC_T(Controls[I].Label),X+(Select?8:10)+Hair,Y+(H-18.9f)/2,14,false,TCCss::Text,Cell,Measure,TEXT("sandbox:value"));
+        L.Paint.Items.Last().Clip=Crop;
+        L.TextBounds.Last().Box=L.TextBounds.Last().Box.Overlap(Crop); L.TextBounds.Last().Clip=Crop;
+        if (Select)
+        {
+            const FVector2D Tip(X+CW-10,Y+H/2+2);
+            L.Paint.Line(Tip-FVector2D(3,3),Tip,TCCss::Text,Hair);
+            L.Paint.Line(Tip,Tip+FVector2D(3,-3),TCCss::Text,Hair);
+        }
+        L.Hits.Add({Cell,Controls[I]}); X+=CW+Gap;
+    }
 	return L;
 }
 
@@ -1027,7 +1123,7 @@ TArray<FString> FTCHudFit::LayoutErrors(const FBottomLayout& L, FVector2D View)
 	TArray<FString> Errors;
 	auto Inside=[](const FBox2D& A,const FBox2D& B) { return A.Min.X>=B.Min.X-.1 && A.Min.Y>=B.Min.Y-.1 && A.Max.X<=B.Max.X+.1 && A.Max.Y<=B.Max.Y+.1; };
 	const FBox2D Screen=Box(0,0,View.X,View.Y);
-	for (const FIcon& I : L.Icons) if (!Inside(I.Box,Screen)) Errors.Add(TEXT("icon outside screen: ")+I.Key);
+	for (const FIcon& I : L.Icons) if (!Inside(I.Clip.bIsValid?I.Box.Overlap(I.Clip):I.Box,Screen)) Errors.Add(TEXT("icon outside screen: ")+I.Key);
 	for (const FTextFit& T : L.TextBounds) if (!Inside(T.Box,T.Clip) || !Inside(T.Box,Screen)) Errors.Add(TEXT("text outside its box: ")+T.Text);
 	for (int32 I=0; I<L.TextBounds.Num(); I++)
 	{
@@ -1947,7 +2043,7 @@ float ATCHUD::DrawMatchPanel(UFont* Font, float Width, float TopLimit, bool bDra
 	const FString MenuNow=PC->bBuildMenuOpen?FString::Printf(TEXT("build:%d"),BuildTab):PC->bTrenchMenuOpen?TEXT("trench"):PC->Formation.bMenuOpen?TEXT("form"):TEXT("orders");
 	if (MenuContext!=MenuNow) { MenuContext=MenuNow; MenuFirst=0; }
 	const FString Title=PC->Selected.IsEmpty()?TEXT("Selection"):PC->Selected.Num()==1?TEXT("1 unit selected"):FString::Printf(TEXT("%d units selected"),PC->Selected.Num());
-	const FTCHudFit::FBottomLayout Layout=FTCHudFit::LeftPanel(Canvas->ClipY,Title,Selection,Details,Grid,Submenu,Measure,UiNow,Idle,GroupDestination,PC->Selected.Num()>0,bGroupDropdown,SelectionFirst,TopLimit,MenuFirst,MenuTabs);
+	const FTCHudFit::FBottomLayout Layout=FTCHudFit::LeftPanel(Canvas->ClipY,Title,Selection,Details,Grid,Submenu,Measure,UiNow,Idle,GroupDestination,PC->Selected.Num()>0,bGroupDropdown,SelectionFirst,TopLimit,MenuFirst,MenuTabs,Width);
 	float Top=Canvas->ClipY-Gap;
 	for (const FBox2D& B : Layout.Paint.Panels) Top=FMath::Min(Top,(float)B.Min.Y);
 	if (!bDraw) return Top;
@@ -1977,7 +2073,8 @@ float ATCHUD::DrawMatchPanel(UFont* Font, float Width, float TopLimit, bool bDra
         const FTCHudFit::FBottomLayout Econ=FTCHudFit::EconomyPanel(Canvas->ClipX,Money,FTCObjectives::EconomyLine(S),Population,Support,Measure,UiNow,Resources,Air,MaxH,AirFirst);
         EconomyBox=Econ.Economy;
         AirMax=Econ.AirMax; AirFirst=FMath::Clamp(AirFirst,0,AirMax); AirScrollBox=Econ.AirList.bIsValid?ToScreen(Econ.AirList):FBox2D(ForceInit);
-        DrawBottomLayout(Econ,Font);
+        DeferredEconomy=Econ;
+        // The feed draws this after measuring its foreground cards, before drawing those cards.
 	}
 	return Top;
 }
@@ -2481,6 +2578,26 @@ void ATCHUD::DrawMinimapOverlays()
 	DrawMinimapPings();
 }
 
+void ATCHUD::PostRender()
+{
+	// World geometry stays camera-dependent when the interface is hidden. AHUD skips
+	// DrawHUD in that case, which previously froze pixel-width ribbons at the last zoom.
+	if (!bShowHUD && Canvas && Canvas->SceneView)
+	{
+		if (ATCGameMode* M = GetWorld()->GetAuthGameMode<ATCGameMode>())
+		{
+			TCMarkersHud::SetHudExclusion(FBox2D(ForceInit));
+			FTCMarkerPainter Marks = TCMarkersHud::Painter(Canvas, *M);
+			UFont* Font = FTCType::Font();
+			TCMarkersHud::DrawHqCamps(Marks, *M, Font);
+			TCMarkersHud::DrawNodes(Marks, *M, Font);
+			TCMarkersHud::DrawWorldRegions(Marks, *M, Font);
+			DrawCapturePoints(Font);
+		}
+	}
+	Super::PostRender();
+}
+
 void ATCHUD::DrawHUD()
 {
 	Super::DrawHUD();
@@ -2651,25 +2768,13 @@ void ATCHUD::DrawHUD()
 		BeginUi(Ui);
 		// round 15: the recruit card always sits beside the match panel at the bottom, between it and the minimap
 		// (#buy at every UI scale); the match panel narrows only when the window leaves the card less than RecruitMinW
-		const float MatchW = FTCHudFit::LeftW;
-		// round 16: the match panel stays under the strip (and its notice lines, the boss bar and the follow chip) where
-		// they share columns; under the sandbox panel too when that sits under the strip over it. The sandbox panel takes
-		// #sandbox's place (230 px over the bottom, centred) when that is clear of the strip, the match panel and the
-		// recruit card (last frame's), else it goes under the strip
+		const float MatchW = FTCHudFit::LeftWidth(FVector2D(Canvas->ClipX,Canvas->ClipY),UiNow);
+		// Preserve the source central Sandbox anchor and DOM order, behind the selection and recruitment panels.
+		// The selection scroll limit still leaves room for the score strip when their columns meet.
 		const float StripLowUi = StripLow / UiNow;
 		const bool bShareStrip = StripRight > StripLeft && StripLeft / UiNow < 8.f + MatchW;
 		float PanelLimit = bShareStrip ? StripLowUi + 4.f : 0.f;
 		SandboxBox = FBox2D(ForceInit);
-		const float MatchTop = DrawMatchPanel(Font, MatchW, PanelLimit) * UiNow; // screen pixels
-		const int32 PanelsBeforeRecruit = Panels.Num();
-		DrawRecruitPanel(Font, 8.f + MatchW + Gap, Canvas->ClipY - Gap);
-		// round 14: camera.js band: from the top panels down to the recruit bar (#buy), the whole height when it is empty
-		float RecruitTop = Canvas->ClipY * UiNow; // screen pixels, as the panels are kept
-		RecruitBox = FBox2D(ForceInit);
-		for (int32 K = PanelsBeforeRecruit; K < Panels.Num(); K++) { RecruitTop = FMath::Min(RecruitTop, (float)Panels[K].Min.Y); RecruitBox += Panels[K]; }
-		TArray<FBox2D> Occupied;
-		for (const FBox2D& B : Panels) Occupied.Add(FBox2D(B.Min/UiNow,B.Max/UiNow));
-		if (Minimap.Rect().bIsValid) Occupied.Add(FBox2D(Minimap.Rect().Min/UiNow-FVector2D(4,4),Minimap.Rect().Max/UiNow+FVector2D(4,4)));
 		const FTCMeasure BottomMeasure=FTCType::IsLoaded()?FTCType::Measure():FTCPaint::CanvasMeasure(Font);
 		FTCHudFit::FBottomLayout SandboxLayout;
 		if (SandboxRows.Num())
@@ -2684,9 +2789,17 @@ void ATCHUD::DrawHUD()
 				}
 			}
 			SandboxLayout=FTCHudFit::SandboxToolbar(FVector2D(Canvas->ClipX,Canvas->ClipY),CornerRight,
-				StripCard.bIsValid?StripCard.Min.X/UiNow:Canvas->ClipX/2,Controls,Occupied,BottomMeasure,UiNow);
+				StripCard.bIsValid?StripCard.Min.X/UiNow:Canvas->ClipX/2,Controls,{},BottomMeasure,UiNow);
 			if (SandboxLayout.Paint.Panels.Num()) SandboxBox=SandboxLayout.Paint.Panels[0];
 		}
+		if (SandboxBox.bIsValid) DrawBottomLayout(SandboxLayout,Font);
+		const float MatchTop = DrawMatchPanel(Font, MatchW, PanelLimit) * UiNow; // screen pixels
+		const int32 PanelsBeforeRecruit = Panels.Num();
+		DrawRecruitPanel(Font, 8.f + MatchW + Gap, Canvas->ClipY - Gap);
+		// round 14: camera.js band: from the top panels down to the recruit bar (#buy), the whole height when it is empty
+		float RecruitTop = Canvas->ClipY * UiNow; // screen pixels, as the panels are kept
+		RecruitBox = FBox2D(ForceInit);
+		for (int32 K = PanelsBeforeRecruit; K < Panels.Num(); K++) { RecruitTop = FMath::Min(RecruitTop, (float)Panels[K].Min.Y); RecruitBox += Panels[K]; }
 		FVector2D Band(BandTop, RecruitTop);
 		if (bStartBand)
 		{
@@ -2708,7 +2821,6 @@ void ATCHUD::DrawHUD()
 		// under it. The open menu is the browser's dropdown over the HUD (z-index 20): under the strip when it fits there
 		// beside the strip's first card, else straight under the Menu button over the strip; drawn last of the panels,
 		// so its buttons take the clicks (CommandAt reads the last drawn first)
-		if (SandboxBox.bIsValid) DrawBottomLayout(SandboxLayout,Font);
 		// the corner's place now (drawn after the status column and the alert feed, over them): the status column keeps
 		// to the closed Menu panel (CornerRight), the open menu covering it as the browser's dropdown covers the HUD
 		const FVector2D CtlSize = MeasureControlRows(Font, CornerRows);
@@ -2876,6 +2988,40 @@ void ATCHUD::DrawHUD()
 #if WITH_DEV_AUTOMATION_TESTS
 #include "Misc/AutomationTest.h"
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCHudSourceDockingTest, "ThreeCrossroads.HUD.SourceDocking", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)
+bool FTCHudSourceDockingTest::RunTest(const FString&)
+{
+ using namespace FTCHudFit;
+ const FTCMeasure Measure=FTCType::Measure();
+ for (FVector2D Pixels : {FVector2D(1280,720),FVector2D(1920,1080)})
+ for (ETCLanguage Language : {ETCLanguage::English,ETCLanguage::Spanish})
+ for (float Scale : {1.f,1.5f})
+ {
+  FTCLocale::FScopedLanguage Lang(Language); const FVector2D View=Pixels/Scale;
+  const float Width=LeftWidth(View,Scale);
+  TestEqual(TEXT("source media width is independent of HUD zoom"),Width,Pixels.X>=1600?268.f:248.f);
+  TArray<FControl> Tabs;
+  for (const TCHAR* Caption : {TEXT("Infantry"),TEXT("Support weapons"),TEXT("Vehicles"),TEXT("Aircraft")})
+  { FControl T; T.Label=Caption; T.Icon=TEXT("rifle"); Tabs.Add(T); }
+  const float Minimap=Pixels.X>=1600?228.f:184.f, Right=View.X-Minimap-16;
+  const FBottomLayout Recruit=RecruitPanel(View.X,View.Y,Right,{},Tabs,{}, {},Measure,Scale);
+  const float Left=Width+16;
+  TestTrue(TEXT("closed recruitment centred between source selection and minimap"),FMath::IsNearlyEqual(Recruit.Recruit.GetCenter().X,double((Left+Right)/2),.01));
+  const TArray<FString> Captions=Recruit.Paint.TextsOf(TEXT("bottom:tab-label"));
+  TestEqual(TEXT("four category captions retained"),Captions.Num(),4);
+  for (int32 I=0; I<Tabs.Num(); I++) TestEqual(TEXT("captions crop without invented ellipsis"),Captions[I],TC_T(Tabs[I].Label));
+  for (const FTCPaintItem& I : Recruit.Paint.Items) if (I.Role==TEXT("bottom:tab-label")) TestTrue(TEXT("category has an actual pixel crop"),I.Clip.bIsValid);
+  const FBottomLayout Sandbox=SandboxToolbar(View,200,200,Tabs,{TCHudBottom::Box(0,0,View.X,View.Y)},Measure,Scale);
+  TestTrue(TEXT("crowding keeps the source central sandbox row"),FMath::IsNearlyEqual(Sandbox.Paint.Panels[0].GetCenter().X,View.X/2,.01));
+  TestTrue(TEXT("sandbox retains bottom:230px"),FMath::IsNearlyEqual(Sandbox.Paint.Panels[0].Max.Y,View.Y-230,.01));
+  const FBox2D Glyph=TCHudBottom::Box(0,0,10,10), Cover=TCHudBottom::Box(4,0,6,10);
+  const TArray<FBox2D> Visible=FTCType::VisibleText(Glyph,{Cover});
+  TestTrue(TEXT("cost glyph is cropped at the foreground card, including partial letters"),Visible.Num()==1 && Visible[0].GetSize().Equals(FVector2D(4,10)));
+  TestTrue(TEXT("fully covered cost text cannot show through the card"),FTCType::VisibleText(Glyph,{Glyph}).IsEmpty());
+ }
+ return !HasAnyErrors();
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCHudBottomLayoutTest, "ThreeCrossroads.HUD.BottomLayout", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)
 bool FTCHudBottomLayoutTest::RunTest(const FString&)
 {
@@ -2915,7 +3061,7 @@ bool FTCHudBottomLayoutTest::RunTest(const FString&)
 		Order(TEXT("Trench"),TEXT("e_zigzag"),TEXT(""),TEXT("Trench"),ETCUiAction::TrenchMenu);
 		Order(TEXT("Grenade"),TEXT("grenade"),TEXT("F A"),TEXT(""),ETCUiAction::Ability);
 		for (FControl& C : Orders) if (C.Command.Action==ETCUiAction::Formation || C.Command.Action==ETCUiAction::BuildMenu || C.Command.Action==ETCUiAction::TrenchMenu) C.bSubmenu=true;
-		FBottomLayout L=LeftPanel(View.Y,TEXT("1 unit selected"),Selected,{},Orders,{},Measure,Scale,3,1,true,Dropdown);
+		FBottomLayout L=LeftPanel(View.Y,TEXT("1 unit selected"),Selected,{},Orders,{},Measure,Scale,3,1,true,Dropdown,0,80,0,{},LeftWidth(View,Scale));
 		const TCHAR* Names[]={TEXT("Infantry"),TEXT("Support weapons"),TEXT("Vehicles"),TEXT("Aircraft")};
 		const TCHAR* Icons[]={TEXT("rifle"),TEXT("at"),TEXT("tank"),TEXT("fighter")};
 		TArray<FControl> Tabs;
@@ -2970,7 +3116,10 @@ bool FTCHudBottomLayoutTest::RunTest(const FString&)
         for (const FTCPaintItem& I : Pause.Items) if (I.Role==TEXT("banner:pause")) SandboxAvoid.Add(FBox2D(I.Pos/Scale,(I.Pos+I.Size)/Scale));
 		TArray<FControl> Sandbox;
 		for (const TCHAR* Label : {TEXT("Sandbox"),TEXT("Rifle Squad"),TEXT("Enemy"),TEXT("Spawn")}) { FControl C; C.Label=Label; Sandbox.Add(C); }
-		Append(SandboxToolbar(View,70,Score.Min.X,Sandbox,SandboxAvoid,Measure,Scale));
+        const FBottomLayout SandboxRow=SandboxToolbar(View,70,Score.Min.X,Sandbox,SandboxAvoid,Measure,Scale);
+        const FBox2D SandboxPanel=SandboxRow.Paint.Panels[0];
+        TestTrue(TEXT("source sandbox row stays centred even when it overlaps another panel"),FMath::IsNearlyEqual(SandboxPanel.GetCenter().X,View.X/2,.01));
+        TestTrue(TEXT("source sandbox bottom is 230 CSS pixels above viewport bottom"),FMath::IsNearlyEqual(SandboxPanel.Max.Y,View.Y-SandboxBottom,.01));
 		const FString Case=FString::Printf(TEXT("%g x %g %s %g%% %s %d groups logistics %d"),Pixels.X,Pixels.Y,Language==ETCLanguage::Spanish?TEXT("es"):TEXT("en"),Scale*100,Open?TEXT("open"):TEXT("tabs"),Groups,WithLogistics);
 		FTCAlerts Alerts;
 		for (const TCHAR* Type : {TEXT("rifle"),TEXT("tank"),TEXT("mortar"),TEXT("medic"),TEXT("mg"),TEXT("attacker"),TEXT("flamer"),TEXT("medium")})
@@ -3033,7 +3182,7 @@ bool FTCHudPanelDetailsTest::RunTest(const FString&)
   const FTCPaintItem* Health=L.Paint.Find(TEXT("bottom:selection-health"));
   TArray<const FTCPaintItem*> Status;
   for (const FTCPaintItem& I : L.Paint.Items) if (I.Role==TEXT("bottom:status-text")) Status.Add(&I);
-  TestTrue(TEXT("cover shares health row and auto-retreat follows on its own row"),Health && Status.Num()==2 && FMath::IsNearlyEqual(Status[0]->Pos.Y,Health->Pos.Y+1,.01) && Status[1]->Pos.Y>Status[0]->Pos.Y+17);
+  TestTrue(TEXT("cover shares health row and auto-retreat follows on its own row"),Health && Status.Num()==2 && FMath::IsNearlyEqual(Status[0]->Pos.Y,Health->Pos.Y+TCHudBottom::Border(Scale),.01) && Status[1]->Pos.Y>Status[0]->Pos.Y+17);
   const FBottomLayout Util=IconBar(false,false,Measure,Scale);
   TestEqual(TEXT("four source toolbar controls"),Util.Hits.Num(),4);
   for (const FHit& H : Util.Hits) TestTrue(TEXT("toolbar hit stays in source panel"),H.Box.Min.X>=8 && H.Box.Min.Y>=8 && H.Box.Max.X<=160 && H.Box.Max.Y<=46);

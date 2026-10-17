@@ -269,6 +269,7 @@ verify() {
 		ThreeCrossroads/Content/Models/Motion/MI_InfantryCrowdLook_DE.uasset ThreeCrossroads/Content/Models/Motion/M_InfantryCrowdKitLookFaded.uasset \
 		ThreeCrossroads/Content/WarMap/WarMapData.json ThreeCrossroads/Content/WarMap/T_TCWarMapSymbols.uasset \
 		ThreeCrossroads/Content/Markers/M_TCMarkerGround.uasset ThreeCrossroads/Content/Markers/M_TCMarkerThrough.uasset ThreeCrossroads/Content/Markers/T_TCUnitBadges.uasset \
+		ThreeCrossroads/Content/Markers/M_TCMarkerBillboard.uasset ThreeCrossroads/Content/Fog/M_TCFogOverlay.uasset ThreeCrossroads/Content/Fog/MPC_TCFog.uasset \
 		ThreeCrossroads/Content/World/Materials/Instances/MI_TCWorld_Surface_canvas_Painted.uasset ThreeCrossroads/Content/World/Materials/Instances/MI_TCWorld_Surface_darkwood_Painted.uasset \
 		ThreeCrossroads/Content/Effects/Materials/M_TCFxSection.uasset \
 		ThreeCrossroads/Content/Effects/Textures/T_HQCloth.uasset ThreeCrossroads/Content/Effects/Materials/M_TCHQCloth.uasset \

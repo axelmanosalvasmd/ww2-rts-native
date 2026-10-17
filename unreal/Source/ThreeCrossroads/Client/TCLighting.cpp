@@ -110,11 +110,17 @@ namespace TCLook
 
 	FLinearColor ToneMapped(const FLinearColor& Linear, float Exposure) { return ToDisplay(ACESFilmic(Linear, Exposure)); }
 
+	float BillboardFog(float Depth, float Near, float Far)
+	{
+		// Three r186 fog_fragment.glsl.js: smoothstep(fogNear, fogFar, vFogDepth).
+		const float T = Far > Near ? FMath::Clamp((Depth - Near) / (Far - Near), 0.f, 1.f) : 0.f;
+		return T * T * (3.f - 2.f * T);
+	}
+
 	FLinearColor BillboardColour(const FLinearColor& Linear, float Depth, float Near, float Far,
 		const FLinearColor& Haze, float Exposure, bool bBeforeTone)
 	{
-		const float T = Far > Near ? FMath::Clamp((Depth - Near) / (Far - Near), 0.f, 1.f) : 0.f;
-		const float Fog = T * T * (3.f - 2.f * T);
+		const float Fog = BillboardFog(Depth, Near, Far);
 		FLinearColor C;
 		if (bBeforeTone) C = ACESFilmic(FMath::Lerp(Linear, Haze, Fog), Exposure);
 		else
@@ -1656,6 +1662,10 @@ bool FTCLookBillboardFogTest::RunTest(const FString&)
     using namespace TCLook;
     const FLinearColor Haze = HexLinear(0xc9cbc6);
     FLinearColor Ink = HexLinear(0x16191b); Ink.A = .88f;
+    const float Depths[] = { 0, 20, 40, 60, 80, 100, 120 };
+    const float SourceFog[] = { 0, 0, .15625f, .5f, .84375f, 1, 1 };
+    for (int32 I = 0; I < UE_ARRAY_COUNT(Depths); I++)
+        TestEqual(TEXT("source smoothstep fog depth curve"), BillboardFog(Depths[I],20,100), SourceFog[I]);
     for (const bool High : {false,true})
     {
         const auto Near = BillboardColour(Ink, 20, 20, 100, Haze, .9f, High);

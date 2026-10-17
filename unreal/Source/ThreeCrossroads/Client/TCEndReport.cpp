@@ -94,6 +94,7 @@ void FTCPaint::Shift(int32 First, FVector2D By)
 	for (int32 I = FMath::Max(0, First); I < Items.Num(); I++)
 	{
 		Items[I].Pos += By;
+		if (Items[I].Clip.bIsValid) Items[I].Clip = FBox2D(Items[I].Clip.Min + By, Items[I].Clip.Max + By);
 		if (Items[I].Kind == ETCPaintKind::Line) Items[I].Size += By;
 	}
 }
@@ -189,7 +190,10 @@ void FTCPaint::Draw(UCanvas* Canvas, UFont* Font) const
 		{
 		case ETCPaintKind::Rect:
 		{
-			FCanvasTileItem T(I.Pos, GWhiteTexture, I.Size, I.Colour);
+            FVector2D Lo=I.Pos, Hi=I.Pos+I.Size;
+            if (I.Clip.bIsValid) { Lo.X=FMath::Max(Lo.X,I.Clip.Min.X); Lo.Y=FMath::Max(Lo.Y,I.Clip.Min.Y); Hi.X=FMath::Min(Hi.X,I.Clip.Max.X); Hi.Y=FMath::Min(Hi.Y,I.Clip.Max.Y); }
+            if (Hi.X<=Lo.X || Hi.Y<=Lo.Y) break;
+            FCanvasTileItem T(Lo, GWhiteTexture, Hi-Lo, I.Colour);
 			T.BlendMode = SE_BLEND_Translucent;
 			Canvas->DrawItem(T);
 			break;
@@ -212,9 +216,11 @@ void FTCPaint::Draw(UCanvas* Canvas, UFont* Font) const
 			const float T = I.Thickness;
 			const FVector2D P = I.Pos, S = I.Size;
 			const FBox2D Sides[] = { FBox2D(P, P + FVector2D(S.X, T)), FBox2D(P + FVector2D(0, S.Y - T), P + S), FBox2D(P + FVector2D(0, T), P + FVector2D(T, S.Y - T)), FBox2D(P + FVector2D(S.X - T, T), P + FVector2D(S.X, S.Y - T)) };
-			for (const FBox2D& B : Sides)
-			{
-				FCanvasTileItem Tile(B.Min, GWhiteTexture, B.GetSize(), I.Colour);
+            for (FBox2D B : Sides)
+            {
+                if (I.Clip.bIsValid) B=B.Overlap(I.Clip);
+                if (!B.bIsValid || B.GetSize().X<=0 || B.GetSize().Y<=0) continue;
+                FCanvasTileItem Tile(B.Min, GWhiteTexture, B.GetSize(), I.Colour);
 				Tile.BlendMode = SE_BLEND_Translucent;
 				Canvas->DrawItem(Tile);
 			}

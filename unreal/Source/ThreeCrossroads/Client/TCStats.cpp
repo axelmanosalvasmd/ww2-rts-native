@@ -8,6 +8,9 @@
 #include "Engine/Canvas.h"
 #include "Engine/Font.h"
 #include "Fonts/SlateFontInfo.h"
+#include "Fonts/FontCache.h"
+#include "EngineFontServices.h"
+#include "TextureResource.h"
 #include "Misc/App.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
@@ -15,6 +18,27 @@
 
 // ---------------------------------------------------------------------------------------------------------------------
 // FTCTypeFace: the widths of a TrueType file (round 17, hudui)
+
+TArray<FBox2D> FTCType::VisibleText(const FBox2D& Quad, const TArray<FBox2D>& Occlusions)
+{
+ TArray<FBox2D> Visible={Quad};
+ for (const FBox2D& Cover : Occlusions)
+ {
+  TArray<FBox2D> Next;
+  for (const FBox2D& B : Visible)
+  {
+   const FBox2D Cut=B.Overlap(Cover);
+   if (!Cut.bIsValid || Cut.GetSize().X<=0 || Cut.GetSize().Y<=0) { Next.Add(B); continue; }
+   auto Add=[&](FVector2D Min,FVector2D Max) { if (Max.X>Min.X && Max.Y>Min.Y) Next.Add(FBox2D(Min,Max)); };
+   Add(B.Min,FVector2D(B.Max.X,Cut.Min.Y));
+   Add(FVector2D(B.Min.X,Cut.Max.Y),B.Max);
+   Add(FVector2D(B.Min.X,Cut.Min.Y),FVector2D(Cut.Min.X,Cut.Max.Y));
+   Add(FVector2D(Cut.Max.X,Cut.Min.Y),FVector2D(B.Max.X,Cut.Max.Y));
+  }
+  Visible=MoveTemp(Next);
+ }
+ return Visible;
+}
 
 namespace
 {
@@ -428,6 +452,38 @@ FTCMeasure FTCType::HeavyMeasure()
 	return [](const FString& T, float Px, bool bBold, float Tracking) { TArray<float> P; Pens(*(bBold?HeadingFace():Face(false)),T,Px,Tracking,P); return P.Last(); };
 }
 
+namespace
+{
+ // The same Slate atlas and bearings as FCanvasTextItem's runtime cache. Crop the glyph quad and UVs,
+ // including a partial last letter, as CSS overflow:hidden does. No substitute caption or ellipsis.
+ void ClippedGlyph(UCanvas* Canvas, TCHAR Character, const FSlateFontInfo& Info, FVector2D At,
+  float Scale, FLinearColor Colour, const FBox2D& Clip, const TArray<FBox2D>& Occlusions)
+ {
+  const TSharedPtr<FSlateFontCache> Cache=FEngineFontServices::Get().GetFontCache();
+  if (!Cache || !Canvas->Canvas) return;
+  FCharacterList& List=Cache->GetCharacterList(Info,Canvas->Canvas->GetDPIScale());
+  const FCharacterEntry Entry=List.GetCharacter(Character,Info.FontFallback);
+  if (!Entry.Valid || !Entry.USize || !Entry.VSize) return;
+  ISlateFontTexture* Atlas=Cache->GetFontTexture(Entry.TextureIndex);
+  FTextureResource* Texture=Atlas?Atlas->GetEngineTexture():nullptr;
+  if (!Texture) return;
+  const FVector2D Min=At+FVector2D(Entry.HorizontalOffset*Scale,
+   -Entry.VerticalOffset*Scale+(Entry.GlobalDescender+List.GetMaxHeight())*Scale/Entry.BitmapRenderScale);
+  const FVector2D Size(Entry.USize*Scale*Entry.BitmapRenderScale,Entry.VSize*Scale*Entry.BitmapRenderScale);
+  const FVector2D Lo=Clip.bIsValid?FVector2D(FMath::Max(Min.X,Clip.Min.X),FMath::Max(Min.Y,Clip.Min.Y)):Min;
+  const FVector2D Hi=Clip.bIsValid?FVector2D(FMath::Min(Min.X+Size.X,Clip.Max.X),FMath::Min(Min.Y+Size.Y,Clip.Max.Y)):Min+Size;
+  if (Hi.X<=Lo.X || Hi.Y<=Lo.Y) return;
+  const FVector2D UV(double(Entry.StartU)/Texture->GetSizeX(),double(Entry.StartV)/Texture->GetSizeY());
+  const FVector2D UVSize(double(Entry.USize)/Texture->GetSizeX(),double(Entry.VSize)/Texture->GetSizeY());
+  for (const FBox2D& B : FTCType::VisibleText(FBox2D(Lo,Hi),Occlusions))
+  {
+   FCanvasTileItem Tile(B.Min,Texture,B.GetSize(),UV+(B.Min-Min)/Size*UVSize,UV+(B.Max-Min)/Size*UVSize,Colour);
+   Tile.BlendMode=SE_BLEND_TranslucentAlphaOnly;
+   Canvas->DrawItem(Tile);
+  }
+ }
+}
+
 void FTCType::Draw(const FTCPaint& P, UCanvas* Canvas, UFont* Fallback, float Oversample, bool bTabular)
 {
 	if (!Canvas) return;
@@ -442,7 +498,7 @@ void FTCType::Draw(const FTCPaint& P, UCanvas* Canvas, UFont* Fallback, float Ov
 		if (I.Kind != ETCPaintKind::Text) { One.Items[0] = I; One.Draw(Canvas, Fallback); continue; }
 		if (I.Text.IsEmpty() || I.Colour.A <= 0.f) continue;
 		// an h2 (the sheet's title) is the browser's default bold, 700; other bold texts are 600
-		const bool bHeading = I.bBold && (I.Role.EndsWith(TEXT(":title")) || I.Role == TEXT("boss:name") || I.Role == TEXT("alert:loss-heading") || I.Role == TEXT("alert:loss-detail"));
+		const bool bHeading = I.bBold && ((I.Role.EndsWith(TEXT(":title")) && !I.Role.StartsWith(TEXT("bottom:"))) || I.Role == TEXT("boss:name") || I.Role == TEXT("alert:loss-heading") || I.Role == TEXT("alert:loss-detail"));
 		const FTCTypeFace* Face = bHeading ? HeadingFace() : FTCType::Face(I.bBold);
 		FTCType::Pens(*Face,I.Text,I.FontPx,I.Tracking,Pens,bTabular);
 		const float W = Pens.Last();
@@ -458,6 +514,11 @@ void FTCType::Draw(const FTCPaint& P, UCanvas* Canvas, UFont* Fallback, float Ov
             if (DrawHudSymbol(I.Text[C],Canvas,FVector2D(X0+Pens[C],Y),I.FontPx,I.Colour)) continue;
 			FSlateFontInfo GlyphInfo=Info;
 			if (!Face->Glyph(I.Text[C]) && SymbolsFace() && SymbolsFace()->Glyph(I.Text[C])) GlyphInfo.TypefaceFontName=TEXT("HudSymbols");
+			if (I.Clip.bIsValid || P.TextOcclusions.Num())
+			{
+				ClippedGlyph(Canvas,I.Text[C],GlyphInfo,FVector2D(X0+Pens[C],Y),1.f/K,I.Colour,I.Clip,P.TextOcclusions);
+				continue;
+			}
 			FCanvasTextItem T(FVector2D(X0 + Pens[C], Y), FText::FromString(FString::Chr(I.Text[C])), GlyphInfo, I.Colour);
 			T.Scale = FVector2D(1.f / K, 1.f / K); // the runtime atlas is alpha only: the item's own blend (AlphaOnly)
 			Canvas->DrawItem(T);

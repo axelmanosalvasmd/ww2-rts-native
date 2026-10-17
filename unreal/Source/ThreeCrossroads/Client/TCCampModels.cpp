@@ -131,48 +131,58 @@ void FTCMarkerScene::Begin(const ATCGameMode& M)
 		if (!A) return;
 		Actor = A;
 		auto* Root = NewObject<USceneComponent>(A); A->SetRootComponent(Root); A->AddInstanceComponent(Root); Root->RegisterComponent();
-		for (int32 I = 0; I < 2; I++)
+		for (int32 I = 0; I < 3; I++)
 		{
 			auto* C = NewObject<UProceduralMeshComponent>(A);
 			C->SetupAttachment(Root); C->SetCollisionEnabled(ECollisionEnabled::NoCollision); C->SetCastShadow(false);
-			C->SetTranslucentSortPriority(I ? 4 : 2);
+			C->SetTranslucentSortPriority(I == 2 ? 0 : I ? 4 : 2);
 			A->AddInstanceComponent(C); C->RegisterComponent();
-			if (I) Through = C; else Ground = C;
+			if (I == 2) Borders = C; else if (I) Through = C; else Ground = C;
 		}
 	}
 	if (Frame != GFrameCounter)
 	{
 		Frame = GFrameCounter; Section = 0;
-		Ground->ClearAllMeshSections(); Through->ClearAllMeshSections();
-		DepthBatch.Reset(); ThroughBatch.Reset();
+		Ground->ClearAllMeshSections(); Through->ClearAllMeshSections(); Borders->ClearAllMeshSections();
+		DepthBatch.Reset(); ThroughBatch.Reset(); BorderBatch.Reset();
 		UpdateFog(M);
 		SyncModels(M);
 	}
 }
 
-void FTCMarkerScene::Triangle(const FVector& A, const FVector& B, const FVector& C, const FLinearColor& Colour, bool bDepthTest)
+void FTCMarkerScene::Triangle(const FVector& A, const FVector& B, const FVector& C, const FLinearColor& Colour, bool bDepthTest, bool bBeforeFog)
 {
 	if (Colour.A <= 0) return;
-	FBatch& Batch = bDepthTest ? DepthBatch : ThroughBatch;
+	FBatch& Batch = bBeforeFog ? BorderBatch : bDepthTest ? DepthBatch : ThroughBatch;
 	const int32 Start = Batch.Vertices.Num();
 	Batch.Vertices.Append({ A, B, C }); Batch.Indices.Append({ Start, Start + 1, Start + 2 });
 	Batch.Colours.Append({ Colour, Colour, Colour });
+	Batch.UV.Append({ FVector2D(-3,0), FVector2D(-3,0), FVector2D(-3,0) });
+}
+
+void FTCMarkerScene::RibbonTriangle(const FVector& A, const FVector& B, const FVector& C, const FLinearColor& Colour, bool bDepthTest, const FVector2D& U, const FVector2D& V, const FVector2D& W)
+{
+	if (Colour.A <= 0) return;
+	Triangle(A,B,C,Colour,bDepthTest);
+	FBatch& Batch = bDepthTest ? DepthBatch : ThroughBatch;
+	const int32 K=Batch.UV.Num()-3;
+	Batch.UV[K]=U; Batch.UV[K+1]=V; Batch.UV[K+2]=W;
 }
 
 void FTCMarkerScene::Flush()
 {
 	if (!Actor.IsValid()) return;
-	for (int32 I = 0; I < 2; I++)
+	for (int32 I = 0; I < 3; I++)
 	{
-		FBatch& B = I ? ThroughBatch : DepthBatch;
+		FBatch& B = I == 2 ? BorderBatch : I ? ThroughBatch : DepthBatch;
 		if (B.Vertices.IsEmpty()) continue;
-		auto* C = I ? Through.Get() : Ground.Get();
+		auto* C = I == 2 ? Borders.Get() : I ? Through.Get() : Ground.Get();
 		// A/B verification only: the same ground triangles with scene depth disabled. No game state changes.
 		static const bool bGroundThrough = FParse::Param(FCommandLine::Get(), TEXT("TCMarkersGroundThrough"));
-		const TCHAR* Path = (I || bGroundThrough) ? TEXT("/Game/Markers/M_TCMarkerThrough.M_TCMarkerThrough") : TEXT("/Game/Markers/M_TCMarkerGround.M_TCMarkerGround");
+		const TCHAR* Path = (I == 1 || bGroundThrough) ? TEXT("/Game/Markers/M_TCMarkerThrough.M_TCMarkerThrough") : TEXT("/Game/Markers/M_TCMarkerGround.M_TCMarkerGround");
 		UMaterialInterface* Mat = LoadObject<UMaterialInterface>(nullptr, Path);
 		if (!Mat) { UE_LOG(LogTC, Error, TEXT("markers: missing %s; run the marker material generator"), Path); B.Reset(); continue; }
-		C->CreateMeshSection_LinearColor(Section, B.Vertices, B.Indices, {}, {}, B.Colours, {}, false, false);
+		C->CreateMeshSection_LinearColor(Section, B.Vertices, B.Indices, {}, B.UV, B.Colours, {}, false, false);
 		C->SetMaterial(Section, Mat); Section++; B.Reset();
 	}
 }
@@ -195,25 +205,27 @@ void FTCMarkerScene::UpdateFog(const ATCGameMode& M)
 {
 	const int32 W = M.State.Map.W, H = M.State.Map.H;
 	if (W <= 0 || H <= 0) return;
+	bool bChanged = false;
 	if (!FogTexture.IsValid() || W != FogW || H != FogH)
 	{
 		if (auto* Old = FogTexture.Get()) Old->RemoveFromRoot();
 		auto* T = UTexture2D::CreateTransient(W, H, PF_G8);
 		if (!T) return;
-		T->AddToRoot(); T->SRGB = false; T->Filter = TF_Nearest;
+		T->AddToRoot(); T->SRGB = false; T->Filter = TF_Bilinear; // fog.js LinearFilter, like the other world surfaces
 		T->AddressX = TA_Clamp; T->AddressY = TA_Clamp; T->NeverStream = true; T->UpdateResource();
 		FogTexture = T; FogW = W; FogH = H; FogBytes.Init(0, W * H);
+		bChanged = true; // a clear (all-zero alpha) texture still needs its first upload
 		for (auto& Pair : FogMaterials) if (auto* Mid = Pair.Value.Get())
 		{
 			Mid->SetTextureParameterValue(TEXT("FogMap"), T);
 			Mid->SetVectorParameterValue(TEXT("FogSize"), FLinearColor(W * 2.f, H * 2.f, 0, 1));
 		}
 	}
-	bool bChanged = false;
 	const bool bReveal = M.Terrain && M.Terrain->IsEndRevealed();
 	for (int32 C = 0; C < FogBytes.Num(); C++)
 	{
-		const uint8 Value = TCFogLook::Byte(M.State, bReveal, C);
+		// World materials consume fog.js alpha, not the legacy brightness multiplier. Clear is zero.
+		const uint8 Value = TCFogLook::AlphaByte(M.State, bReveal, C);
 		bChanged |= FogBytes[C] != Value; FogBytes[C] = Value;
 	}
 	if (!bChanged) return;
@@ -366,6 +378,25 @@ bool FTCCampPlacementTest::RunTest(const FString&)
 	TestTrue(TEXT("separate camp remains visible"), FTCMarkerScene::CampSlotDrawn(3, SharedSpawns));
 	for (const TCHAR* Name : { TEXT("burlap"), TEXT("wood"), TEXT("canvas_Painted"), TEXT("wood_Painted"), TEXT("darkwood_Painted") })
 		TestNotNull(*FString::Printf(TEXT("reference camp surface %s"), Name), Surface(Name));
+	UWorld* FogWorld = UWorld::CreateWorld(EWorldType::Game, false, TEXT("TCCampFog"));
+	if (TestNotNull(TEXT("camp fog fixture world"), FogWorld))
+	{
+		ATCGameMode* Match = FogWorld->SpawnActor<ATCGameMode>();
+		if (TestNotNull(TEXT("camp fog fixture match"), Match))
+		{
+			Match->State.Map.W = 3; Match->State.Map.H = 1;
+			Match->State.FogVisible = { 1, 0, 0 }; Match->State.FogExplored = { 1, 1, 0 };
+			FTCMarkerScene Camp;
+			Camp.UpdateFog(*Match);
+			TestTrue(TEXT("camp surfaces bind raw fog alpha: clear 0, remembered 120, unseen 185"), Camp.FogBytes == TArray<uint8>({ 0, 120, 185 }));
+			if (TestNotNull(TEXT("camp alpha texture"), Camp.FogTexture.Get()))
+				TestTrue(TEXT("camp fog has source bilinear filtering"), Camp.FogTexture->Filter == TF_Bilinear);
+			Match->State.bFogLifted = true;
+			Camp.UpdateFog(*Match);
+			TestTrue(TEXT("spectator and lifted camps stay clear"), Camp.FogBytes == TArray<uint8>({ 0, 0, 0 }));
+		}
+		FogWorld->DestroyWorld(false);
+	}
 #if WITH_EDITOR
 	// Check the built mesh, including its consumed index order. An extra reversal exposes the unlit inside faces.
 	auto CheckFaces = [&](UStaticMesh* Mesh)

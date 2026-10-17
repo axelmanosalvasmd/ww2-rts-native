@@ -15,8 +15,8 @@
 // (TCFogFrontier.Oracle.inl). The engine part (FTCFogFrontier) feeds it from FTCMatchState and draws what the
 // reference's overlay draws, as a raw G8 alpha texture with LinearFilter and the source mist shader. The legacy
 // multiplier texture remains for native consumers outside this renderer. On World Conquest it also draws unknown ground
-// itself: an opaque plane at level 0 in the overlay's colour (fog.js SHADE, 10 / 255), as the browser draws its
-// placeholder ground under the opaque overlay.
+// itself: an opaque plane at public level 0 using the terrain's placeholder paint beneath the filtered overlay.
+// The fog shade is used only when the terrain material is unavailable.
 //
 // Recipient knowledge: everything here comes from what the server sent this client (its fog mask and the units its
 // snapshot holds). The unknown ground is a flat plane at level 0 over every cell this client does not know: it shows
@@ -41,6 +41,13 @@ namespace TCFogFrontierCore
 	inline double Saturate(double V) { return std::min(1.0, std::max(0.0, V)); }
 	inline double Fract(double V) { return V - std::floor(V); }
 	inline double Mix(double A, double B, double T) { return A + (B - A) * T; }
+	// fog.js frontier(), not a polygon contour. LinearFilter interpolates these cell-centre alphas.
+	inline int FrontierAlpha(int DistanceSquared)
+	{
+		if (DistanceSquared < 0) return 0;
+		const double T = std::min(1.0, (std::sqrt((double)DistanceSquared) - 0.5) / Frontier);
+		return (int)JsRound(255 * (1 - T * T * (3 - 2 * T)));
+	}
 	inline double MistHash(double X, double Z)
 	{
 		X = Fract(X * 0.1031); Z = Fract(Z * 0.1030);
@@ -165,9 +172,7 @@ namespace TCFogFrontierCore
 			for (int J = std::max(0, Y - Frontier); J <= std::min(H - 1, Y + Frontier); J++)
 				for (int I = std::max(0, X - Frontier); I <= std::min(W - 1, X + Frontier); I++)
 					if (!Known(J * W + I)) { const int D = (I - X) * (I - X) + (J - Y) * (J - Y); if (Best < 0 || D < Best) Best = D; }
-			if (Best < 0) return 0;
-			const double T = std::min(1.0, (std::sqrt((double)Best) - 0.5) / Frontier);
-			return (int)JsRound(255 * (1 - T * T * (3 - 2 * T)));
+			return FrontierAlpha(Best);
 		}
 		void Touch(int C)
 		{
@@ -352,6 +357,7 @@ public:
 	const TCFogFrontierCore::FFog& CoreState() const { return Core; }
 #if WITH_DEV_AUTOMATION_TESTS
 	UProceduralMeshComponent* UnknownOverlayForTests() const { return CoverOverlay.MeshComponent(); }
+	UProceduralMeshComponent* UnknownGroundForTests() const { return CoverMesh.Get(); }
 #endif
 
 	// The unknown ground (World Conquest): drawn when true and a holder is attached.

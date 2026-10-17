@@ -2446,6 +2446,10 @@ void ATCEffects::Draw(double Clock)
 	TArray<FTCFxSpriteDraw> Sprites;
 	Fx.SpriteDraws(Sprites);
 	LastSprites = Sprites.Num();
+	// Reproducible visibility control: retain decoded units, submitted meshes and FX simulation,
+	// and suppress only the atlas sprite batch in comparison captures. Normal play always draws it.
+	static const bool bHideSprites = FParse::Param(FCommandLine::Get(), TEXT("TCFxHideSprites"));
+	if (bHideSprites) Sprites.Reset();
 	if (SpriteBatch) SpriteBatch->Publish(MoveTemp(Sprites));
 	// the craters, burn marks and stains (fx.js decals)
 	int32 Decals = 0;

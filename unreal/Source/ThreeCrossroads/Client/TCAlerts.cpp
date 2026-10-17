@@ -859,6 +859,10 @@ bool FTCAlerts::ReceivePing(const FJsonObject& M, const FTCMatchState& S, double
 
 void FTCAlerts::Frame(double Now)
 {
+    // The opt-in capture clock must also cover the effects renderer's Frame call. Otherwise it removes
+    // routine lines by real time while the HUD and minimap still draw the held loss presentation.
+    static const double HeldAge=[] { double Value=-1; FParse::Value(FCommandLine::Get(),TEXT("TCHudAlertAge="),Value); return Value; }();
+    if (HeldAge>=0) for (const FTCAlertLine& L : LineList) if (L.IsLoss()) { Now=L.Born+HeldAge; break; }
 	Echoes.RemoveAll([Now](const FEcho& E) { return Now - E.Now > 2.0; });
 	LineList.RemoveAll([Now](const FTCAlertLine& L) { return TCAlertRules::LifeOf(L.Alert.Kind) - (Now - L.Born) <= 0; });
 	PingRings.Frame(Now);
@@ -893,7 +897,7 @@ void ATCGameMode::OnCombatStart()
 	}
 	if (Effects) Effects->Bind(&State, &UnitTable, Terrain, Units, &AlertFeed);
 	// main.js startGame: alerts.startMatch (a new match id empties the history), pings.reset, effects reset
-	AlertFeed.bPointAlerts = false; // TakePointAlerts raises the point alerts already
+	AlertFeed.bPointAlerts = true; // alerts.js raises point changes after unit hits in this same snapshot pass
 	AlertFeed.StartMatch(State);
 	if (Effects) Effects->OnStart(State);
 	ShooterLogSeen = 0;
@@ -1096,6 +1100,37 @@ namespace TCAlertTest
 		AlertText = FString::Join(AlertLog, TEXT("\n"));
 		LineText = FString::Join(LineLog, TEXT("\n"));
 	}
+}
+
+// Source alerts.js snapshot order is observable: hits, points, losses, air, ready. The newest routine
+// toast is the last routine push, while Space still gives the separate loss column priority.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCAlertSourceOrderTest, "ThreeCrossroads.Alerts.SourceOrder", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)
+bool FTCAlertSourceOrderTest::RunTest(const FString&)
+{
+ FTCUnitTable Table; FString Error; if (!Table.Load(Error)) { AddError(Error); return false; }
+ auto Read=[](const FString& Json) { TSharedPtr<FJsonObject> O; FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Json),O); return O; };
+ for (bool OnScreen : {false,true})
+ {
+  FTCMatchState S;
+  S.ApplyLobby(*Read(TEXT(R"({"t":"lobby","state":"play","you":0,"spectator":false,"mode":"conquest","players":[{"name":"Me"},{"name":"Foe"}]})")));
+  S.ApplyStart(*Read(TEXT(R"({"t":"start","matchId":31,"you":0,"spawn":{"x":10,"z":10},"names":["Me","Foe"],"teams":[0,1],"factions":[0,1],"map":{"name":"fixture","w":1,"h":1,"rows":[""],"points":[{"x":0,"y":0}]}})")));
+  FTCAlerts Feed; Feed.StartMatch(S);
+  FTCAlertContext C; C.Table=&Table; C.Now=1; C.OnScreen=[OnScreen](double,double){return OnScreen;};
+  auto Before=Read(TEXT(R"({"t":"s","tick":2,"all":true,"units":[[1,"rifle",0,10,10,0,0,100,0,0,0,0,0,0,1],[2,"mg",0,80,80,0,0,100,0,0,0,0,0,0,1]],"points":[[-1,0,0]],"shots":[]})"));
+  S.ApplySnapshot(*Before); Feed.Snapshot(S,Before.Get(),C);
+  auto After=Read(TEXT(R"({"t":"s","tick":4,"all":true,"units":[[1,"rifle",0,10,10,0,0,90,0,0,0,0,0,0,1]],"points":[[0,0,1]],"shots":[{"k":"rifle","f":9,"fo":1,"t":1,"to":0,"x":10,"z":10}]})"));
+  S.ApplySnapshot(*After); C.Now=2;
+  const TArray<FTCAlertPush> Events=Feed.Snapshot(S,After.Get(),C);
+  TArray<FString> Texts; for (const FTCAlertPush& A : Events) Texts.Add(A.Text);
+  TArray<FString> Expected; if (!OnScreen) Expected.Add(TEXT("Our base is under attack!"));
+  Expected.Add(TEXT("Point captured")); Expected.Add(TEXT(".30 cal MG lost"));
+  TestEqual(TEXT("same event text and source push order, with camera quiet rule"),Texts,Expected);
+  TestEqual(TEXT("newest routine is capture, not damage from earlier in the same snapshot"),Feed.Lines()[1].Alert.Text,FString(TEXT("Point captured")));
+  TestEqual(TEXT("unit loss stays above the routine toast"),Feed.Lines()[0].Alert.Kind,FString(TEXT("unitLost")));
+  FVector2D At; TestTrue(TEXT("Space visits the loss before the routine capture"),Feed.Newest(At) && At.Equals(FVector2D(80,80)));
+  TestEqual(TEXT("duplicate snapshots cannot redeliver a toast"),Feed.Snapshot(S,After.Get(),C).Num(),0);
+ }
+ return !HasAnyErrors();
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCAlertsRecordedTest, "ThreeCrossroads.Alerts.Recorded", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)

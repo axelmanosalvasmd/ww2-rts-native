@@ -397,10 +397,10 @@ bool ATCGameMode::SpotOnScreen(double X, double Z) const
 	const ATCPlayerController* PC = Cast<ATCPlayerController>(GetWorld()->GetFirstPlayerController());
 	if (!PC || !Terrain) return false;
 	FVector2D Px;
-	if (!PC->ProjectWorldLocationToScreen(ATCTerrain::ToWorld(X, Z, Terrain->HeightAt(X, Z)), Px)) return false;
+	if (!PC->ProjectWorldLocationToScreen(ATCTerrain::ToWorld(X, Z, Terrain->HeightAt(X, Z) + 1.0), Px)) return false;
 	int32 W = 0, H = 0;
 	PC->GetViewportSize(W, H);
-	return W > 0 && H > 0 && Px.X >= 0 && Px.Y >= 0 && Px.X < W && Px.Y < H;
+	return W > 0 && H > 0 && Px.X >= 0 && Px.Y >= 0 && Px.X <= W && Px.Y <= H;
 }
 
 void ATCGameMode::TakeSlice8Notices()
@@ -460,7 +460,7 @@ void ATCGameMode::OnMessage(const FJsonObject& M, int32 Bytes)
 		// the idle keys' plan lookup (client/selection.js idle reads v.plan) and the point alerts (client/alerts.js)
 		PlanKinds.Reset();
 		for (const FTCPlan& P : State.Plans) PlanKinds.Add(P.Id, P.Kind);
-		TakePointAlerts();
+		// alerts.js compares points inside OnCombatSnapshot, after unit hits and before losses.
 		OnCombatSnapshot(M); // alerts.js (units, losses, air, ready, say), the combat effects and their sounds (Client/TCAlerts.cpp)
 		TutorialSnapshot(M); // round 14: the goal box, banners, damaged buildings, the Tutorial's progress (Client/TCTutorial.cpp)
 		LogObjectives(false);

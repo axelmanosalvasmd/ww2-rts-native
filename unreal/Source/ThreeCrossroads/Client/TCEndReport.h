@@ -46,6 +46,7 @@ struct FTCPaintItem
 	float Tracking = 0.f;                    // CSS letter-spacing in pixels
 	ETCPaintAlign Align = ETCPaintAlign::Left;
 	FString Role;                            // what the item is, for tests and logs ('alert:text', 'report:th', ...)
+	FBox2D Clip = FBox2D(ForceInit);           // optional CSS overflow crop, in the item's UI coordinates
 };
 
 struct FTCPaintHit
@@ -64,6 +65,8 @@ public:
 	TArray<FTCPaintItem> Items;
 	TArray<FTCPaintHit> Hits;
 	TArray<FBox2D> Panels;
+	// Near-solid foreground HUD cards occlude underlying labels, while retaining their translucent backgrounds.
+	TArray<FBox2D> TextOcclusions;
 
 	FTCPaintItem& Rect(float X, float Y, float W, float H, const FLinearColor& C, const TCHAR* Role = TEXT(""));
 	FTCPaintItem& Gradient(float X, float Y, float W, float H, const FLinearColor& Top, const FLinearColor& Bottom, const TCHAR* Role = TEXT(""));

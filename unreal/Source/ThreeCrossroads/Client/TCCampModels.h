@@ -16,19 +16,23 @@ class THREECROSSROADS_API FTCMarkerScene
 public:
 	~FTCMarkerScene();
 	void Begin(const ATCGameMode& Match);
-	void Triangle(const FVector& A, const FVector& B, const FVector& C, const FLinearColor& Colour, bool bDepthTest);
+	void Triangle(const FVector& A, const FVector& B, const FVector& C, const FLinearColor& Colour, bool bDepthTest, bool bBeforeFog = false);
+	void RibbonTriangle(const FVector& A, const FVector& B, const FVector& C, const FLinearColor& Colour, bool bDepthTest, const FVector2D& U, const FVector2D& V, const FVector2D& W);
 	void Flush();
 	static bool TentForMode(const FString& Mode, bool bWorldMap);
 	static FString CampMode(const FString& StartMode, const FString& LobbyMode);
 	static bool BagInside(double X, double Z, double W, double H);
 	static bool CampSlotDrawn(int32 Slot, const TArray<TOptional<FVector2D>>& Spawns);
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+	friend class FTCCampPlacementTest;
+#endif
 	TWeakObjectPtr<AActor> Actor;
-	TWeakObjectPtr<UProceduralMeshComponent> Ground, Through;
+	TWeakObjectPtr<UProceduralMeshComponent> Ground, Through, Borders;
 	uint64 Frame = MAX_uint64;
 	int32 Section = 0;
-	struct FBatch { TArray<FVector> Vertices; TArray<int32> Indices; TArray<FLinearColor> Colours; void Reset() { Vertices.Reset(); Indices.Reset(); Colours.Reset(); } };
-	FBatch DepthBatch, ThroughBatch;
+	struct FBatch { TArray<FVector> Vertices; TArray<int32> Indices; TArray<FLinearColor> Colours; TArray<FVector2D> UV; void Reset() { Vertices.Reset(); Indices.Reset(); Colours.Reset(); UV.Reset(); } };
+	FBatch DepthBatch, ThroughBatch, BorderBatch;
 	FTCModelLibrary Library;
 	TArray<TWeakObjectPtr<UInstancedStaticMeshComponent>> Models;
 	FString ModelKey;

@@ -16,8 +16,25 @@ for name, through in [('M_TCMarkerGround', False), ('M_TCMarkerThrough', True)]:
     mat.set_editor_property('disable_depth_test', through)
     mat.set_editor_property('translucency_pass', unreal.MaterialTranslucencyPass.MTP_BEFORE_DOF)
     vertex = mel.create_material_expression(mat, unreal.MaterialExpressionVertexColor, -300, 0)
-    assert mel.connect_material_property(vertex, '', unreal.MaterialProperty.MP_EMISSIVE_COLOR)
-    assert mel.connect_material_property(vertex, 'A', unreal.MaterialProperty.MP_OPACITY)
+    uv=mel.create_material_expression(mat,unreal.MaterialExpressionTextureCoordinate,-300,100)
+    node=mel.create_material_expression(mat,unreal.MaterialExpressionCustom,0,0)
+    node.set_editor_property('description','TCMarkerProfile')
+    node.set_editor_property('output_type',unreal.CustomMaterialOutputType.CMOT_FLOAT4)
+    node.set_editor_property('code', "if (Line.x < -2.0) return float4(Ink, Alpha);\nfloat lv=abs(Line.x), aa=max(fwidth(Line.x),1e-3);\nfloat band=1.0-smoothstep(1.0-aa,1.0,lv);\nfloat body=max(1.0-smoothstep(Line.y-aa,Line.y,lv),step(1.0,lv));\nreturn float4(lerp(float3(.012,.016,.014),Ink.rgb,body),Alpha*band*lerp(.55,1.0,body));")
+    ins=[]
+    for pin_name in ['Ink','Alpha','Line']:
+        pin=unreal.CustomInput();pin.set_editor_property('input_name',pin_name);ins.append(pin)
+    node.set_editor_property('inputs',ins)
+    assert mel.connect_material_expressions(vertex,'',node,'Ink')
+    assert mel.connect_material_expressions(vertex,'A',node,'Alpha')
+    assert mel.connect_material_expressions(uv,'',node,'Line')
+    assert mel.connect_material_property(node,'',unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    alpha=mel.create_material_expression(mat,unreal.MaterialExpressionComponentMask,200,0)
+    for k in ['r','g','b']:alpha.set_editor_property(k,False)
+    alpha.set_editor_property('a',True)
+    assert mel.connect_material_expressions(node,'',alpha,'')
+    assert mel.connect_material_property(alpha,'',unreal.MaterialProperty.MP_OPACITY)
+    mat.set_editor_property('enable_responsive_aa',True)
     mel.recompile_material(mat)
     unreal.EditorAssetLibrary.save_loaded_asset(mat)
     assert mat.get_editor_property('disable_depth_test') == through
@@ -83,3 +100,57 @@ if source:
 with open(os.path.join(content, 'Markers', 'MarkerAssets.json'), 'w') as handle:
     json.dump(report, handle, indent=2, sort_keys=True)
     handle.write('\n')
+
+
+"""Reproducible marker UI material. Also appended to the lead's existing marker generator."""
+import json
+import os
+import re
+import unreal
+
+root = '/Game/Markers'
+tools = unreal.AssetToolsHelpers.get_asset_tools()
+mel = unreal.MaterialEditingLibrary
+path = root + '/M_TCMarkerBillboard'
+mat = unreal.load_asset(path) or tools.create_asset('M_TCMarkerBillboard', root, unreal.Material, unreal.MaterialFactoryNew())
+mel.delete_all_material_expressions(mat)
+mat.set_editor_property('material_domain', unreal.MaterialDomain.MD_UI)
+mat.set_editor_property('blend_mode', unreal.BlendMode.BLEND_TRANSLUCENT)
+source = os.path.join(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_dir()), 'Source/ThreeCrossroads/Client/TCMarkers.Billboard.inl')
+shader = re.search(r'R"TCBILLBOARD\((.*?)\)TCBILLBOARD"', open(source).read(), re.S).group(1)
+custom = mel.create_material_expression(mat, unreal.MaterialExpressionCustom)
+custom.set_editor_property('description', 'TCMarkerBillboard')
+custom.set_editor_property('code', shader)
+custom.set_editor_property('output_type', unreal.CustomMaterialOutputType.CMOT_FLOAT4)
+inputs = []
+for name in ('Badge', 'UV', 'Fog', 'Haze', 'Exposure', 'BeforeTone'):
+    pin = unreal.CustomInput()
+    pin.set_editor_property('input_name', name)
+    inputs.append(pin)
+custom.set_editor_property('inputs', inputs)
+badge = mel.create_material_expression(mat, unreal.MaterialExpressionTextureObjectParameter)
+badge.set_editor_property('parameter_name', 'Badge')
+badge.set_editor_property('texture', unreal.load_asset(root + '/T_TCUnitBadges'))
+uv = mel.create_material_expression(mat, unreal.MaterialExpressionTextureCoordinate)
+nodes = {'Badge': badge, 'UV': uv}
+for name, value in [('Fog', 0.0), ('Exposure', 1.0), ('BeforeTone', 1.0)]:
+    node = mel.create_material_expression(mat, unreal.MaterialExpressionScalarParameter)
+    node.set_editor_property('parameter_name', name)
+    node.set_editor_property('default_value', value)
+    nodes[name] = node
+haze = mel.create_material_expression(mat, unreal.MaterialExpressionVectorParameter)
+haze.set_editor_property('parameter_name', 'Haze')
+haze.set_editor_property('default_value', unreal.LinearColor(.5, .5, .5, 1))
+nodes['Haze'] = haze
+for name, node in nodes.items():
+    assert mel.connect_material_expressions(node, '', custom, name)
+for alpha, prop in [(False, unreal.MaterialProperty.MP_EMISSIVE_COLOR), (True, unreal.MaterialProperty.MP_OPACITY)]:
+    mask = mel.create_material_expression(mat, unreal.MaterialExpressionComponentMask)
+    for channel in ('r', 'g', 'b'):
+        mask.set_editor_property(channel, not alpha)
+    mask.set_editor_property('a', alpha)
+    assert mel.connect_material_expressions(custom, '', mask, '')
+    assert mel.connect_material_property(mask, '', prop)
+mel.recompile_material(mat)
+assert unreal.EditorAssetLibrary.save_loaded_asset(mat)
+unreal.log('MARKERS source texture RGB fog and tone mapping, original alpha retained: ' + path)

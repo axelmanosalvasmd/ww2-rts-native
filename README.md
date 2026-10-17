@@ -58,7 +58,7 @@ git lfs install --local
 
 You need Rust (stable) for `rust/`, Node.js to run the reference game and its tests, Git LFS, and Unreal Engine 5.8 only for `unreal/`.
 
-## Unreal client (slices 1a to 1w)
+## Unreal client (slices 1a to 1x)
 
 Built and run on Linux with the installed Unreal 5.8.3; Windows and Mac are not built yet. The project uses the engine's empty Entry map and spawns everything from C++.
 
@@ -213,7 +213,7 @@ The integrated Linux editor passes 154 Vulkan automation tests. Eight Node harne
 
 Final slice 1v verification also completes all sixteen explicit-Graphics mode rows (11 natural decisions), the Linux Development package with verified hashes and headless/rendered seated pairs, and a Low cooked building-breach replay. Fresh live/package counters total 159,545 adopted/agreeing across 124 final logs; failed tries and recorded presentations are excluded. Forty-six curated browser/native pairs document the remaining visual differences. See DESIGN.md for the measured results and limits.
 
-## Unreal slice 1w assets
+## Unreal slice 1x assets
 
 The HUD atlas keeps the original index.html and source glyph art. Regenerate it from an isolated reference server with `node unreal/Tools/hudfit/export-icons.mjs "$TC_ORIGIN" "$TC_SCRATCH/icon-profile" reference/ww2-rts unreal/Source/ThreeCrossroads/Client/TCHUD.Icons.inl` (TC_ORIGIN is its loopback HTTP URL; TC_SCRATCH is your scratch folder). The world fog materials reuse the original relief, scenery and water materials, so run the existing world, relief, ground, water and look generators first, then run the fog generator:
 
@@ -223,8 +223,20 @@ The HUD atlas keeps the original index.html and source glyph art. Regenerate it 
   -script="$PWD/unreal/Tools/world/make-fog-materials.py"
 ```
 
-The generated Fog assets are cooked by DefaultGame.ini. The new raw-alpha masters and shared scenery binding must ship together. Their source remains text; generated binary assets stay build outputs. FPS and map editor remain deferred.
+The generated Fog assets are cooked by DefaultGame.ini. Run `unreal/Tools/markers/make-marker-materials.py` before the fog generator to include the source-fogged billboard and analytic ribbon materials. The raw-alpha masters, shared scenery binding and billboard material must ship together. Their source remains text; generated binary assets stay build outputs. FPS and map editor remain deferred.
 
 Slice 1w integration verification: required-FFI Build.sh and all 165 Vulkan automation cases pass (163 clean, two successful-warning outcomes), plus eight Node harness tests, 165 original lobby-preview cases and four Great Bridge streams of 4,200 adopted/agreeing snapshots. All sixteen reference-host mode rows complete with explicit Graphics (fifteen High, one Low), including 11 natural decisions; host-ended caps stay separate. Fresh integrated live/package counters total 140,144 adopted/agreeing across 38 final logs, zero decoder errors. All -try logs, console duplicates and recorded presentations are excluded from fresh totals.
 
 Linux Development package hashes pass before and after runtime. The headless and High rendered pairs total 2,008 adopted/agreeing snapshots; a cooked Low World frontier/Barracks recording adds 85 separately. Forty-one original browser/native pairs document HUD, shadows, weather, World and water differences. Current-main Rust fd714e36 fails to compile on EliminationState serde, so the requested fresh Rust lifecycle and 33-map lanes are blocked and unrun. ABI 2 pin/header are unchanged. Packaged physical input, other platforms, visual acceptance, ghosted Low HQ rings, camp/shadow/portrait differences and crowded-scene missing-versus-occluded soldiers remain open. No parity row is accepted.
+
+## Unreal slice 1x verification
+
+Required-FFI real Build.sh succeeds. All 169 Vulkan automation outcomes succeed (167 clean, two expected successful-warning outcomes), plus eight Node tests, 165 source preview cases and four Great Bridge streams of 4,200 adopted/agreeing snapshots. All sixteen reference-host mode rows complete with explicit Graphics (fifteen High, one Low), including 11 natural decisions; host-ended caps remain separate. Final ordinary live/package counters total 142,593 adopted/agreeing across 109 native logs, zero refused, apply errors, resync or disagreements. All -try paths, console duplicates, driver logs, recorded presentations and the separate controlled fault are excluded from this ordinary total; agreeing means shadow agree.
+
+The integrated two-native R1, absent-seat and complete 33-map sweep use ordinary Rust CLI b113bb959f95499f04b47213bd27efb805f18e95 and total 5,357 adopted / 0 refused / 5,357 shadow agreeing. No Man's Land starts for both seats. Moves, foreign ownership rejection, same-token reconnect, healthy Restart and absent-seat return/resume pass. A separate cfg(test) host calls the existing fault latch at tick 200: 200/0/200, no later snapshots, Restart refused with one dedicated terminal notice. This is controlled fault evidence, not a naturally faulting ordinary CLI. The child's nine executable TCP tests and existing slice22 OS-input checks remain separately attributed. Newer main runtime changes are not covered by the b113bb95 lifecycle lanes. The approved ABI 2 FFI pin 9e618217de2ac1d0a806c6804eda50c1c9da497f and header SHA256 bf203f16eca88562cfc6e53efccc48bf260d3a44750d7300f00694723ec69499 remain unchanged.
+
+A new Linux Development slice23 package passes the 20 GB gate, static asset/library checks and SHA256SUMS before and after runtime. Fresh headless and High rendered seated pairs total 2,008 adopted/agreeing, all actual clients exit 0. A fresh-browser cooked Low World frontier, wreck and Barracks replay adds 85 separately and five exact-camera pairs. The old extra concentric HQ rings are absent in that close cooked Barracks pose. Cooked High/Low HQ sandbags remain dark grey instead of source tan, and the cooked Low resource crate is grey instead of brown; editor captures do not reproduce this defect. All 31 changed compiled sources and six generated assets match the build inputs copied into the package project; generated assets remain build outputs. Runtime success does not establish visual acceptance.
+
+Remaining integrated image differences include UI150 Sandbox/score paint order, cost fragments in card gaps, portrait/font/docking, extra Off controls, Logistics/veteran layouts, an extra camp-wide MP/s plate and minimap view-outline differences. Camp shading, pole/shadows, historical smoke/fire, ring state/coverage and Low AA/upscaling differ. Dark cooked HQ bags/resource crates are an unresolved package rendering defect. The Low land frontier retains a native tan line at the upper-left edge; native hidden-HUD unit badges are absent. Water caster/atlas filtering, a faint offshore shade patch and saturated-bed fog inversion remain open. Original art, sounds, voices and keyed Spanish are reused; missing keys, including the fault sentence, remain English. Human acceptance, other platforms, exhaustive dynamic Spanish/input/menu/air matrices and long-term World memory remain unverified. No parity row is accepted. No benchmark is run. No Rust ingress widening, World admission, fault policy, public hosting, FPS or editor port.
+
+The timed Great Bridge spectator retains one Unreal Dataflow Date-initialization finding, logged twice before joining. It completes all four tour captures and exits 0 with zero LogTC/decoder errors. No engine source or test is changed and the lane is not retried.
