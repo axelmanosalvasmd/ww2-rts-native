@@ -600,3 +600,36 @@ fn room_ai_horde_binary_starts_selected_level_and_internal_horde_views() {
     host.barrier();
     assert!(!server.log().contains("NATIVE_FAULT"));
 }
+
+#[test]
+fn hosted_horde_binary_trusted_start_and_restart_reach_horde_owner() {
+    let server = BinaryServer::start(true, SEED);
+    let mut host = Client::join(server.address, "a");
+    let mut guest = Client::join(server.address, "b");
+    host.send(json!({"t":"mode","v":"horde"}));
+    let lobby = host.until(|m| m["t"] == "lobby" && m["mode"] == "horde");
+    assert_eq!(lobby["mapName"], "bastogne");
+    let mut previous_id = None;
+    for command in ["start", "restart"] {
+        host.send(json!({"t":command}));
+        let a = host.until(|m| m["t"] == "start");
+        let b = guest.until(|m| m["t"] == "start");
+        assert_eq!(a["names"], json!(["a", "b", "Horde"]));
+        assert_eq!(a["teams"], json!([0, 0, 1]));
+        assert_eq!(a["matchId"], b["matchId"]);
+        if let Some(previous) = previous_id {
+            assert_ne!(a["matchId"], previous);
+        }
+        previous_id = Some(a["matchId"].clone());
+        for client in [&mut host, &mut guest] {
+            for _ in 0..3 {
+                let snapshot = client.until(|m| m["t"] == "s");
+                assert_eq!(snapshot["mode"]["kind"], "horde");
+                assert_eq!(snapshot["online"], json!([true, true]));
+            }
+        }
+        host.barrier();
+        assert!(!server.log().contains("NATIVE_FAULT"));
+    }
+    assert!(!server.log().contains("NATIVE_FAULT"));
+}

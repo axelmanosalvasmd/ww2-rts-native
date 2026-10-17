@@ -35,14 +35,30 @@ impl StartRequest {
         } else {
             crate::authoritative_maps::load(&self.map).map_err(|e| e.to_string())?
         };
-        let options = self.options.clone();
-        match options.mode {
+        let mut options = self.options.clone();
+        let mode = match options.mode {
+            Mode::Default | Mode::Conquest => "conquest",
+            Mode::Classic => "classic",
+            Mode::Annihilation => "annihilation",
+            Mode::Assault => "assault",
+            Mode::Tutorial => "tutorial",
+            _ => "",
+        };
+        options.logistics &= logistics_enabled_for(mode, map.source());
+        let result = match options.mode {
             Mode::Default | Mode::Conquest => Match::new(map, options),
             Mode::Assault => Match::new_assault(map, options, self.defender),
             Mode::Annihilation => Match::new_annihilation(map, options),
             Mode::Classic => Match::new_classic(map, options),
             Mode::Tutorial => Match::new_tutorial(map, options),
             _ => Err("trusted asynchronous mode is not admitted".into()),
+        };
+        if self.raw_map.is_none() {
+            result
+                .map_err(crate::authoritative_maps::AuthoredMapError::Match)
+                .map_err(|error| error.to_string())
+        } else {
+            result
         }
     }
 }
@@ -151,24 +167,11 @@ impl Hub {
             .map_editor
             .as_ref()
             .and_then(|editor| editor.raw(&room.map));
-        let edited = raw_map
-            .as_ref()
-            .map(|raw| {
-                ww2_core::map::AuthoritativeMap::from_json(
-                    &serde_json::to_vec(raw).map_err(|e| e.to_string())?,
-                )
-                .map_err(|e| e.to_string())
-            })
-            .transpose()?;
-        let map = if let Some(map) = &edited {
-            map
-        } else {
-            crate::authoritative_maps::load(&room.map).map_err(|e| e.to_string())?
-        };
+        // Preserve asynchronous creation failure: raw map loading belongs to generate.
         let mut options = room.native_match_options(
             trusted.seed.wrapping_add(self.next_epoch),
             players,
-            map.source(),
+            raw_map.as_ref().unwrap_or(&Value::Null),
         )?;
         options.weather_seed = Some(weather_seed()?);
         Ok(StartRequest {

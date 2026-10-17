@@ -12,17 +12,27 @@ use crate::{
 use serde_json::json;
 
 fn scene() -> (Match, u32) {
+    scene_for_mode(Mode::Default)
+}
+
+fn scene_for_mode(mode: Mode) -> (Match, u32) {
     let map = AuthoritativeMap::from_value(json!({
         "name":"Concrete runtime", "w":60,"h":60,"rows":vec![".".repeat(60);60],
         "heights":vec!["0".repeat(60);60],
-        "spawns":[{"x":4,"y":4},{"x":55,"y":55}],"points":[{"x":30,"y":30}]
+        "spawns":[{"x":4,"y":4},{"x":55,"y":55}],"defend":[0],
+        "points":[{"x":30,"y":30}]
     }))
     .unwrap();
-    let mut m = Match::new(
+    let constructor = if mode == Mode::Horde {
+        Match::new_horde
+    } else {
+        Match::new
+    };
+    let mut m = constructor(
         &map,
         MatchOptions {
             seed: 701,
-            mode: Mode::Default,
+            mode,
             players: (0..2)
                 .map(|slot| PlayerConfig {
                     name: format!("p{slot}"),
@@ -65,7 +75,7 @@ fn tiers(m: &mut Match, tier: u8) {
         crate::production::ProductionState::new(vec![
             crate::economy::TechState::new(tier, 0, 0, 0)
                 .unwrap();
-            2
+            m.start.players.len()
         ])
         .unwrap();
     for u in m
@@ -91,10 +101,11 @@ fn relocate(m: &mut Match, id: u32, at: Point) {
     m.grid.update(id, u);
 }
 fn collect(m: &mut Match, delivery: &mut DeliveryState) {
+    let count = m.start.players.len();
     let frame = delivery
-        .capture_with_lists(m, &[false; 2], &[false; 2], &[])
+        .capture_with_lists(m, &vec![false; count], &vec![false; count], &[])
         .unwrap();
-    for slot in 0..2 {
+    for slot in 0..count {
         let json = frame.recipient(slot).unwrap().into_json();
         assert!(json["units"].is_array());
     }
@@ -166,7 +177,13 @@ fn base48_exact_tier_defaults_and_all_four_command_families_include_gates() {
 
 #[test]
 fn eng12_paid_gate_jobs_square_three_cells_and_keep_existing_work_encodings() {
-    let (mut m, id) = scene();
+    for mode in [Mode::Default, Mode::Horde] {
+        paid_gate_jobs(mode);
+    }
+}
+
+fn paid_gate_jobs(mode: Mode) {
+    let (mut m, id) = scene_for_mode(mode);
     let command = dig(id, false);
     assert_eq!(m.execute_command(0, &command, false).unwrap(), None);
     let job = m.field_works.jobs()[&id].clone();
@@ -178,17 +195,32 @@ fn eng12_paid_gate_jobs_square_three_cells_and_keep_existing_work_encodings() {
     assert_eq!(m.start.economy.players[0].mp, 350.);
     assert_eq!(m.story[0].mp_spent, 150.);
     let mut delivery = DeliveryState::new(&m).unwrap();
-    let frame = delivery.capture(&mut m, &[true; 2], &[false; 2]).unwrap();
+    let count = m.start.players.len();
+    let frame = delivery
+        .capture(&mut m, &vec![true; count], &vec![false; count])
+        .unwrap();
     assert_eq!(
         frame.recipient(0).unwrap().fields["works"],
         json!([[-1, 0, 30., 25., 0.7, "gate"]])
     );
-    assert_eq!(frame.recipient(1).unwrap().fields["works"], json!([]));
+    for slot in 1..count {
+        assert_eq!(
+            frame.recipient(slot).unwrap().fields["works"],
+            if mode == Mode::Horde && slot < count - 1 {
+                json!([[-1, 0, 30., 25., 0.7, "gate"]])
+            } else {
+                json!([])
+            }
+        );
+    }
     m.apply_field_work_unit_dt(id, 9.99).unwrap();
     assert_eq!(m.world.game.chars[job.cells[0].cell], b'.');
+    collect(&mut m, &mut delivery);
     m.apply_field_work_unit_dt(id, 0.01).unwrap();
+    collect(&mut m, &mut delivery);
     for _ in 0..2 {
         m.apply_field_work_unit_dt(id, 10.).unwrap();
+        collect(&mut m, &mut delivery);
     }
     assert!(!m.world.game.units[&id].dig);
     assert_eq!(m.story[0].built, 1.);
@@ -202,11 +234,22 @@ fn eng12_paid_gate_jobs_square_three_cells_and_keep_existing_work_encodings() {
         assert_eq!(m.commands.units[&gate.id].gate.unwrap().open, None);
     }
     collect(&mut m, &mut delivery);
+    for _ in 0..3 {
+        m.advance_tick().unwrap();
+        collect(&mut m, &mut delivery);
+        assert!(m.tick_state.fault().is_none());
+    }
 }
 
 #[test]
 fn eng12_queued_gate_checks_tier_then_pays_only_when_it_starts() {
-    let (mut m, id) = scene();
+    for mode in [Mode::Default, Mode::Horde] {
+        queued_gate_checks(mode);
+    }
+}
+
+fn queued_gate_checks(mode: Mode) {
+    let (mut m, id) = scene_for_mode(mode);
     tiers(&mut m, 1);
     assert_eq!(
         m.execute_command(0, &dig(id, true), false).unwrap(),
@@ -868,7 +911,6 @@ fn eng12_unrepresented_modes_and_logistics_cannot_publish_paid_or_waiting_gates(
     for (mode, game_mode, logistics) in [
         (Mode::Tutorial, Some(crate::game::ModeKind::Tutorial), false),
         (Mode::World, Some(crate::game::ModeKind::World), false),
-        (Mode::Horde, Some(crate::game::ModeKind::Horde), false),
         (Mode::Classic, None, false),
         (Mode::Default, Some(crate::game::ModeKind::Classic), false),
         (Mode::Default, None, true),

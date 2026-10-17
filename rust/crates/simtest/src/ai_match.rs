@@ -289,6 +289,20 @@ mod tests {
                     .any(|input| input.slot == slot && input.tick > 298)
             );
         }
+        let repeat = play_match(&map, options(7), &["easy"; 3], 3600).unwrap();
+        assert_eq!(run.snapshot_passes, repeat.snapshot_passes);
+        assert_eq!(run.inputs, repeat.inputs);
+        assert_eq!(run.recipients, repeat.recipients);
+        assert_eq!(
+            run.state.start.random.snapshot(),
+            repeat.state.start.random.snapshot()
+        );
+        assert!(repeat.state.tick_state.fault().is_none());
+        assert!(
+            run.inputs
+                .iter()
+                .all(|input| input.command.is_some() == input.accepted.is_some())
+        );
     }
 
     #[test]

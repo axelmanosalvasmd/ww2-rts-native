@@ -201,7 +201,7 @@ fn tick_and_collect(state: &mut Match, delivery: Option<&mut DeliveryState>) {
     let selected: Vec<_> = (0..state.start.players.len())
         .map(|slot| SelectedSeat {
             slot,
-            full: false,
+            full: true,
             omit: false,
         })
         .collect();

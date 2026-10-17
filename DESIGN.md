@@ -5125,6 +5125,26 @@ Building memory follows the prototype's `isConstructionMode` gate: Classic and W
 
 Classic full ticks and non-ordinary recipient snapshots remain guarded. CMB-130 is dropped from this batch's claim: building memory runs in Classic/World only; waits on #301 Classic runner and World admission. Its component tests retain last-observed identity, type, owner, position and construction progress, shared team sight, hidden changes, unseen destruction and ground/airborne invalidation. Default/Conquest regressions cover seeing a barracks, retreating, hidden changes, retirement, VP finish and revisit with no memory or ghosts. Ability, base dispatch, research and bunker checks retain their full-match continuations and every-seat snapshots. No ABI, wire shape, contract or public command admission changes.
 
+## World fort capture follows main's bounded component (2026-10-16)
+
+PR #336 keeps main's World region, elimination and finish behavior from #301, including fort-owner transfers in the bounded component. Tick admission still refuses an imminent fort transfer before commands. The constructor's existing fort ranks retain a read-only regression test. The atomicity witness stages a damaged fort and an eliminated owner's construction plan, then requires the combined income, capture and elimination phase to refuse before changing units, owners, footprints, wallets or regions. World construction, Gate physics, recipient snapshots and hosted admission remain guarded. BASE-54 remains uncounted in this branch.
+
+## Borrowed building placement (2026-10-16)
+
+Ordinary Build admission uses one read-only building-placement query. It borrows terrain, actors, visibility and optional node, territory and rail-yard facts, so previews can use the same rule without adding match state. Equal-distance nodes retain their input index, matching the prototype's stable sort. The query returns the selected footprint and snapped centre even when a later rule refuses it. Visibility precedes territory, rail, node overlap, coast and physical occupancy. World facts are exercised as components; they do not admit World construction, hosted rooms or recipient delivery. Fortifications retain their separate existing query.
+
+## Horde core reveal, shared facilities and scripted policy (2026-10-16)
+
+`Match::update_horde_vision` refreshes ordinary sight and then adds the existing Horde wave markers in sorted unit-ID order. Only the canonical defender team receives the markers during an active wave. A zero remaining budget and `left <= 3` mark ground attackers; Kaiju markers ignore those two thresholds. Aircraft never gain a wave marker. The component reads existing wave state and changes no fog, recipient or hosting policy.
+
+Shared Horde production reuses the existing buyer debit, unit publisher, building rally and construction transactions. Horde startup initializes the existing seat-owned routing memories after stamping its shared base. Routing, recorded purchases and construction phases validate the canonical Horde team layout before using those components. The builder's team may supply the shared prerequisite and assist a living allied site, while only the site's owner may cancel it and receive the refund. No new Match or Unit fields are needed.
+
+The scripted policy receives detached seat facts and feeds movements through #343's bounded queue. It uses Normal scheduling, immediate visible contacts, automatic retreat arming, the nearest visible bunker measured from the Horde spawn, support priorities, ready aircraft and ground abilities. It does not buy, research, issue health retreats, choose human situations or call paradrops. Its private stationary history is derived from successive delivered positions; deterministic ties use unit IDs. This is the AI-57 decision component. Generic engineering and house-shelling chores belong to their separate AI rows and are not claimed here.
+
+Kaiju breath reuses #325's firing component. Added checks cover full-range and radius boundaries, one terrain debit per overlapping cell, scar values and seeded ignition predicates. The pinned prototype's unchanged trench check and direct breath component were run from an external temporary copy at `e4e579a`; the read-only submodule remains unchanged.
+
+Full Horde ticks, complete Horde snapshots and hosted rooms stay guarded. Support, aircraft and ability command attempts from the policy do not open their Horde actuation paths. Ordinary-match witnesses retain the new private policy state through actual capture, income and victory, collect every seat's recipient snapshot on every tick, and continue after finish. FFI, headers, wire schemas, contracts, privacy, public ingress, World admission and logistics tick/snapshot guards are unchanged.
+
 ## MAC-AI seat scheduling and detached Classic economy (2026-10-16)
 
 The AI schedule delivers all requested observations before any seat acts and

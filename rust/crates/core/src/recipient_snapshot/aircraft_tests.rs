@@ -45,8 +45,7 @@ fn scene() -> Match {
         },
     )
     .unwrap();
-    // Exercise the state-only slice. Automatic weapon actuators and aviation
-    // shot encodings remain outside its admitted runtime/contract scope.
+    // Keep automatic weapon actuators idle while testing aircraft state rows.
     for control in state.commands.units.values_mut() {
         control.hold_fire = true;
         control.auto_cast = false;

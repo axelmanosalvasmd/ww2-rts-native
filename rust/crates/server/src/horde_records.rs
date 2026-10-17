@@ -1,10 +1,6 @@
 //! Horde record persistence, matching reference server.js:66-86 and :753.
 use serde_json::{Map, Value, json};
-use std::{
-    fs,
-    path::PathBuf,
-    sync::{Arc, Mutex},
-};
+use std::{fs, path::PathBuf, sync::mpsc};
 
 #[derive(Clone, Debug)]
 pub(crate) struct Run {
@@ -49,21 +45,62 @@ impl State {
     }
 }
 
-/// Clone the store when configuring workers so lookup, comparison and writes
-/// share one lock. Independently constructed stores have independent caches.
+enum Request {
+    Lookup {
+        key: String,
+        reply: mpsc::Sender<Option<Value>>,
+    },
+    Record {
+        key: String,
+        run: Run,
+        reply: mpsc::Sender<Value>,
+    },
+}
+
+/// Created by the front configuration and cloned into game workers. Only the
+/// owner's thread reads or writes the file; workers send lookups and finished runs.
 #[derive(Clone)]
 pub struct RecordStore {
-    state: Arc<Mutex<State>>,
+    requests: mpsc::Sender<Request>,
 }
 
 impl RecordStore {
     pub fn new(path: impl Into<PathBuf>) -> Self {
-        Self {
-            state: Arc::new(Mutex::new(State {
-                path: path.into(),
-                records: None,
-            })),
-        }
+        let mut state = State {
+            path: path.into(),
+            records: None,
+        };
+        let (requests, receiver) = mpsc::channel();
+        std::thread::Builder::new()
+            .name("horde-record-owner".into())
+            .spawn(move || {
+                while let Ok(request) = receiver.recv() {
+                    match request {
+                        Request::Lookup { key, reply } => {
+                            let value = state.records().get(&key).filter(|v| !v.is_null()).cloned();
+                            let _ = reply.send(value);
+                        }
+                        Request::Record { key, run, reply } => {
+                            let best = state.records().get(&key).filter(|v| !v.is_null()).cloned();
+                            let record = run.beats(best.as_ref());
+                            let mut result = run.json();
+                            if record {
+                                state.records().insert(key, result.clone());
+                                let bytes = serde_json::to_vec_pretty(state.records())
+                                    .expect("Horde records JSON");
+                                if let Err(error) = fs::write(&state.path, bytes) {
+                                    eprintln!("horde records not saved: {error}");
+                                }
+                            }
+                            result["record"] = json!(record);
+                            result["best"] = best.unwrap_or(Value::Null);
+                            let _ = reply.send(result);
+                        }
+                    }
+                }
+            })
+            .expect("Horde record owner");
+        Self { requests }
     }
 
     fn key(map: &str, count: usize, army: &str) -> String {
@@ -72,17 +109,18 @@ impl RecordStore {
 
     /// The caller supplies "standard" when the army setting is absent.
     pub(crate) fn lookup(&self, map: &str, count: usize, army: &str) -> Option<Value> {
-        self.state
-            .lock()
-            .expect("Horde record lock")
-            .records()
-            .get(&Self::key(map, count, army))
-            .filter(|value| !value.is_null())
-            .cloned()
+        let (reply, response) = mpsc::channel();
+        self.requests
+            .send(Request::Lookup {
+                key: Self::key(map, count, army),
+                reply,
+            })
+            .expect("Horde record owner");
+        response.recv().expect("Horde record response")
     }
 
-    /// Sandbox runs have no Horde record result. Failed writes retain the new
-    /// in-memory best, as the prototype does, and are reported to stderr.
+    /// Sandbox runs never reach the persistence owner. Failed writes retain the
+    /// in-memory best and report the filesystem error, matching the prototype.
     pub(crate) fn record(
         &self,
         map: &str,
@@ -94,21 +132,15 @@ impl RecordStore {
         if sandbox {
             return None;
         }
-        let mut state = self.state.lock().expect("Horde record lock");
-        let key = Self::key(map, count, army);
-        let best = state.records().get(&key).filter(|v| !v.is_null()).cloned();
-        let record = run.beats(best.as_ref());
-        let mut result = run.json();
-        if record {
-            state.records().insert(key, result.clone());
-            let bytes = serde_json::to_vec_pretty(state.records()).expect("Horde records JSON");
-            if let Err(error) = fs::write(&state.path, bytes) {
-                eprintln!("horde records not saved: {error}");
-            }
-        }
-        result["record"] = json!(record);
-        result["best"] = best.unwrap_or(Value::Null);
-        Some(result)
+        let (reply, response) = mpsc::channel();
+        self.requests
+            .send(Request::Record {
+                key: Self::key(map, count, army),
+                run,
+                reply,
+            })
+            .expect("Horde record owner");
+        Some(response.recv().expect("Horde record response"))
     }
 }
 

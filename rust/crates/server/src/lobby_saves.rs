@@ -1,5 +1,20 @@
-//! Save admission and transactional restoration for ordinary rooms.
+//! Save admission and transactional restoration for ordinary AI and Horde human rooms.
 use super::*;
+
+fn saved_mode_supported(mode: &str, state: &Match, seats: usize) -> bool {
+    match mode {
+        "conquest" => matches!(state.options.mode, Mode::Default | Mode::Conquest),
+        "assault" => state.options.mode == Mode::Assault,
+        "annihilation" => state.options.mode == Mode::Annihilation,
+        "classic" => state.options.mode == Mode::Classic,
+        "horde" => {
+            state.options.mode == Mode::Horde
+                && (1..=5).contains(&seats)
+                && state.horde.as_ref().is_some_and(|h| h.slot == seats)
+        }
+        _ => false,
+    }
+}
 
 impl Hub {
     pub(super) fn save_command(
@@ -91,10 +106,8 @@ impl Hub {
             return Err("faulted match".into());
         }
         let state = native.runtime.state();
-        if !matches!(
-            state.options.mode,
-            Mode::Default | Mode::Conquest | Mode::Assault | Mode::Annihilation | Mode::Classic
-        ) || state.options.sandbox
+        if !saved_mode_supported(&room.mode, state, room.players.len())
+            || (state.options.sandbox && state.options.mode != Mode::Horde)
             || state.world_runtime.is_some()
         {
             return Err("save needs an unavailable room capability".into());
@@ -148,10 +161,7 @@ impl Hub {
         if state.authored_scenario.is_some() && saved["version"] != crate::saves::AUTHORED_VERSION {
             return Err("authored scenarios require save version 2".into());
         }
-        if !matches!(
-            state.options.mode,
-            Mode::Default | Mode::Conquest | Mode::Assault | Mode::Annihilation | Mode::Classic
-        ) || state.options.sandbox
+        if state.options.sandbox && state.options.mode != Mode::Horde
             || state.world_runtime.is_some()
         {
             return Err("save needs an unavailable room capability".into());
@@ -160,6 +170,13 @@ impl Hub {
             .as_array()
             .filter(|s| !s.is_empty() && s.len() <= MAX_PLAYERS)
             .ok_or("invalid saved roster")?;
+        if !saved_mode_supported(
+            saved["settings"]["mode"].as_str().unwrap(),
+            &state,
+            seats.len(),
+        ) {
+            return Err("saved mode disagrees with the match".into());
+        }
         let present = room
             .players
             .iter()
@@ -332,17 +349,30 @@ impl Hub {
             starting: None,
             result: None,
         };
+        // prepare_native_room rebuilds the internal Horde brain from the loaded
+        // recipient view. The canonical wave, RNG and recorded inputs stay saved.
+        // Prototype saves.js:20-21 also permits omitted AI memories to start afresh.
         let mut prepared =
             self.prepare_native_room(&staged, state, now, false, Some(&saved["map"]))?;
         prepared
             .attached
             .runtime
             .restore_ai_memories(&saved["ai"])?;
-        let slots = (0..staged.players.len()).collect::<Vec<_>>();
-        let names = staged
+        let slots = (0..prepared.attached.runtime.state().start.players.len()).collect::<Vec<_>>();
+        let names = prepared
+            .attached
+            .runtime
+            .state()
+            .start
             .players
             .iter()
-            .map(|p| p.name.clone())
+            .enumerate()
+            .map(|(slot, player)| {
+                staged
+                    .players
+                    .get(slot)
+                    .map_or_else(|| player.config.name.clone(), |person| person.name.clone())
+            })
             .collect::<Vec<_>>();
         prepared.starts = prepared.attached.runtime.collect_starts(
             &slots,
@@ -387,3 +417,7 @@ impl Hub {
         Ok(self.publish_native(code, prepared))
     }
 }
+
+#[cfg(test)]
+#[path = "horde_save_tests.rs"]
+mod horde_tests;

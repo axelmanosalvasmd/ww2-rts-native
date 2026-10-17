@@ -225,7 +225,7 @@ async fn front_static_or_maps(
 ) -> Response<Body> {
     serve_static_or_maps(
         front.static_files.as_ref(),
-        front.map_editor,
+        front.map_editor.clone(),
         uri,
         method,
         headers,

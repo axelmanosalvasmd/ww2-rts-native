@@ -1429,3 +1429,38 @@ fn intent_ai66_classic_human_view_requires_matching_mode_and_keeps_quiet_policy_
     assert!(game.human_commander_observation(&mut memory).is_err());
     assert_eq!((memory, game.start.random.clone()), before);
 }
+
+#[test]
+fn intent_ai28_delivered_stock_uses_public_two_decimal_precision() {
+    let mut m = runtime_match();
+    m.options.logistics = true;
+    m.initialize_logistics().unwrap();
+    let id = *m
+        .world
+        .game
+        .units
+        .iter()
+        .find(|(_, u)| u.owner == 0 && m.rules.kinds[u.kind].name == "rifle")
+        .unwrap()
+        .0;
+    let stock = m.logistics.get_mut(id).unwrap();
+    stock.provisions = 59.6;
+    stock.fuel = Some(36.4);
+    stock.ammo = stock.ammo_max * 0.499;
+    let view = m
+        .human_commander_observation(
+            &mut crate::match_human_observation::HumanObservationMemory::new(0),
+        )
+        .unwrap();
+    let delivered = view.packet.input().runtime.as_ref().unwrap().units[&id]
+        .stock
+        .as_ref()
+        .unwrap();
+    assert_eq!(delivered.provisions, 59.6);
+    assert_eq!(delivered.fuel, Some(36.4));
+    assert_eq!(delivered.ammo, Some(0.5));
+    let commands = HumanPolicy::new(0, 771)
+        .plan(screen(&view), Level::Normal)
+        .unwrap();
+    assert!(!commands.iter().any(|c| c["t"] == "retreat"));
+}

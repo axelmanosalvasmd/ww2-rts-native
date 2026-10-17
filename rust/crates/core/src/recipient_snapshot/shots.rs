@@ -1196,3 +1196,85 @@ mod tests {
 #[cfg(test)]
 #[path = "shots_event_tests.rs"]
 mod event_tests;
+
+#[cfg(test)]
+mod integrated_aviation_tests {
+    use super::*;
+
+    #[test]
+    fn aviation_events_keep_exact_shapes_order_and_nonlocal_owner_privacy() {
+        use crate::match_aviation::AviationEvent;
+        let fixture: Value =
+            serde_json::from_str(include_str!("../../tests/fixtures/recipient-delivery.json"))
+                .unwrap();
+        let mut state = super::super::tests::initialize(&fixture["initial"]);
+        let aa = AviationEvent::AntiAir {
+            shooter: 1,
+            target: 4,
+            owner: 0,
+            target_owner: 1,
+            at: Point { x: 600., z: 600. },
+        };
+        let down = AviationEvent::PlaneDown {
+            target: 4,
+            owner: 1,
+            at: Point { x: 600., z: 600. },
+            direction: 1.25,
+        };
+        let shots = [ShotRef::Aviation(&aa), ShotRef::Aviation(&down)];
+        assert_eq!(
+            event(&state, shots[0]).unwrap(),
+            json!({"f":1,"t":4,"fo":0,"to":1,"x":600.,"z":600.,"k":"aa"})
+        );
+        assert_eq!(
+            event(&state, shots[1]).unwrap(),
+            json!({"k":"planedown","t":4,"to":1,"x":600.,"z":600.,"dir":1.25,"kill":true})
+        );
+        let selected = (0..3)
+            .map(|slot| SelectedSeat {
+                slot,
+                full: false,
+                omit: false,
+            })
+            .collect::<Vec<_>>();
+        let rows = project_shots(&state, &selected, &shots).unwrap();
+        // Allies see identities; an unrelated seat outside vision sees no event.
+        for (_, rows) in &rows[..2] {
+            assert_eq!(
+                *rows,
+                json!([
+                    {"f":1,"t":4,"fo":0,"to":1,"x":600.,"z":600.,"k":"aa"},
+                    {"k":"planedown","t":4,"to":1,"x":600.,"z":600.,"dir":1.25,"kill":true}
+                ])
+            );
+        }
+        assert_eq!(rows[2].1, json!([]));
+        state.world.game.players[2].visible = vec![4];
+        let rows = project_shots(&state, &selected, &shots).unwrap();
+        assert_eq!(
+            rows[2].1,
+            json!([
+                {"t":4,"fo":0,"to":1,"x":600.,"z":600.,"k":"aa"},
+                {"k":"planedown","t":4,"to":1,"x":600.,"z":600.,"dir":1.25,"kill":true}
+            ])
+        );
+        // Retained retirement events may outlive the target; owner remains public.
+        state.world.game.units.remove(&4);
+        state.world.game.players[2].visible.clear();
+        let rows = project_shots(&state, &selected, &shots).unwrap();
+        assert_eq!(
+            rows[0].1,
+            json!([
+                {"f":1,"fo":0,"to":1,"x":600.,"z":600.,"k":"aa"},
+                {"k":"planedown","to":1,"x":600.,"z":600.,"dir":1.25,"kill":true}
+            ])
+        );
+        let invalid = AviationEvent::PlaneDown {
+            target: 0,
+            owner: 1,
+            at: Point { x: 600., z: 600. },
+            direction: 1.25,
+        };
+        assert!(event(&state, ShotRef::Aviation(&invalid)).is_err());
+    }
+}

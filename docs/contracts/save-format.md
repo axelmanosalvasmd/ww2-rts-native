@@ -47,7 +47,7 @@ The setting keys and values are:
 
 | Key | Value |
 | --- | --- |
-| `mode` | Room mode, currently admitted as `conquest`. |
+| `mode` | Room mode, currently admitted as `conquest` or `horde`. |
 | `worldSize` | World-size setting string. |
 | `mapName` | Authored map key. |
 | `mapSpawns` | Raw authored spawn objects, preserving `x`, `y` and optional `assault`. |
@@ -57,7 +57,7 @@ The setting keys and values are:
 | `logistics` | Match logistics switch. |
 | `tech` | Match technology switch. |
 
-The list is identical to `server.js:419`. In particular, `sandbox` is not a setting key. Sandbox restoration remains refused. Ordinary logistics checkpoints preserve reserves, convoy stores, cargo, routes and supply state through the existing versioned match checkpoint.
+The list is identical to `server.js:419`. In particular, `sandbox` is not a setting key. Sandbox Horde restoration preserves the checkpoint flag; ordinary sandbox restoration remains refused. Ordinary logistics checkpoints preserve reserves, convoy stores, cargo, routes and supply state through the existing versioned match checkpoint.
 
 ## Game checkpoint encoding
 
@@ -187,3 +187,20 @@ for older native comparison plans. This stays inside the existing tagged
 external AI owner, with its fresh-observation requirement after load. It adds
 no match checkpoint or envelope key. The populated comparison-plan round trip
 is covered by `if27_horde_pending_memory_round_trips_order_budget_and_supersession`.
+
+## Combined hosted Horde continuation
+
+Horde rooms with one through five defenders use the same transactional envelope.
+The internal Horde seat is part of `g`, not `seats`. Wave state, canonical RNG,
+queued commands, pending effects and ending hold survive; saved mode and internal
+slot must agree with the defender roster. Raw saved maps remain sufficient after
+an authored source file disappears. Sandbox Horde preserves the sandbox flag and
+still suppresses ranked records.
+
+The unified delivered-frame owner restores roster-AI planner entries and seeds
+the internal director fresh from its loaded recipient packet. The internal
+entry is null (or the whole `ai` field is null for human-only defender rosters),
+matching the incoming #426 missing-memory fallback. This does not claim the
+previous director's private planner queue survives. Every simulation seat is
+captured before publication, while only actual connections receive starts.
+Authored envelopes remain v2 and ordinary envelopes v1.

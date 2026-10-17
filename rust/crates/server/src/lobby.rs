@@ -761,6 +761,13 @@ impl Room {
                 me.deny(t, "blocked", now);
                 return false;
             }
+            if t == "end" {
+                if self.end_native(now).is_err() {
+                    self.players[seated.expect("seated host")].deny(t, "blocked", now);
+                    return false;
+                }
+                return true;
+            }
             let message = match t {
                 "pause" => native.runtime.pause_host(&me.name, now),
                 _ => Ok(Some(native.runtime.resume(now))),
@@ -1978,6 +1985,17 @@ impl Hub {
                         }
                     }
                 }
+                // All requested human and internal Horde views refresh before either owner acts.
+                let think_at = Instant::now();
+                if let Err(error) = room.native.as_mut().unwrap().runtime.think(sent) {
+                    room.native
+                        .as_mut()
+                        .unwrap()
+                        .runtime
+                        .fault_stop(format!("Horde AI scheduling: {error}"));
+                    continue;
+                }
+                let horde_think = think_at.elapsed().as_secs_f64() * 1000.0;
                 let think_at = Instant::now();
                 if let Err(error) = room.native.as_mut().unwrap().runtime.tick_ai(sent) {
                     room.native
@@ -1987,7 +2005,7 @@ impl Hub {
                         .fault_stop(format!("room AI: {error}"));
                     continue;
                 }
-                let think = think_at.elapsed().as_secs_f64() * 1000.0;
+                let think = horde_think + think_at.elapsed().as_secs_f64() * 1000.0;
                 let sample = TickSample {
                     sent,
                     durations: [
@@ -2211,10 +2229,9 @@ impl Hub {
                 .start_trusted(code, connection_id, command == "restart", now)
                 .map(|_| ()),
             "sit"
-                if self
-                    .rooms
-                    .get(code)
-                    .is_some_and(|room| room.players.len() >= 2) =>
+                if self.rooms.get(code).is_some_and(|room| {
+                    room.players.len() >= if room.mode == "horde" { 5 } else { 2 }
+                }) =>
             {
                 return true;
             }
@@ -3201,6 +3218,8 @@ pub(crate) use async_start::StartRequest;
 #[path = "async_start_tests.rs"]
 mod async_start_tests;
 
+#[path = "horde_host.rs"]
+mod horde_host;
 #[cfg(test)]
 #[path = "results2_tests.rs"]
 mod results2_tests;

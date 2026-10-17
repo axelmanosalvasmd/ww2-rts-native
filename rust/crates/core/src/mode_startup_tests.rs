@@ -403,6 +403,17 @@ fn mode01_non_world_mode_rows_match_the_prototype_public_fields() {
             Mode::Classic | Mode::Annihilation | Mode::Horde | Mode::Assault
         ) {
             let count = m.start.players.len();
+            let cache = SnapshotCache::new(&m).unwrap();
+            for slot in 0..count {
+                if mode == Mode::Conquest {
+                    assert!(!cache.recipient(slot).unwrap().fields.contains_key("mode"));
+                }
+                assert_eq!(
+                    cache.recipient(slot).unwrap(),
+                    crate::recipient_snapshot::recipient_uncached(&m, slot).unwrap(),
+                    "cached/uncached {mode:?} seat {slot}"
+                );
+            }
             let mut delivery = DeliveryState::new(&m).unwrap();
             let selected = (0..count)
                 .map(|slot| SelectedSeat {
@@ -444,11 +455,6 @@ fn mode01_non_world_mode_rows_match_the_prototype_public_fields() {
                     "{mode:?} seat {slot}"
                 );
             }
-        } else {
-            assert!(matches!(
-                SnapshotCache::new(&m),
-                Err(SnapshotError::UnsupportedMode)
-            ));
         }
     }
     let mut default = create(Mode::Conquest, ArmySize::Standard).unwrap();

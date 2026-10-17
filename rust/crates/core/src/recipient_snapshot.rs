@@ -392,13 +392,7 @@ fn project_recipient(
     fields.extend(owners);
     fields.extend(public);
     fields.insert("falling".into(), falling::project(state, slot)?);
-    if state.options.mode == crate::economy::Mode::Horde {
-        if !state.firing.flights.is_empty() {
-            fields.insert("flights".into(), projectiles::for_seat(state, slot)?);
-        }
-    } else {
-        fields.insert("flights".into(), flights::project(state, slot)?);
-    }
+    fields.insert("flights".into(), flights::project(state, slot)?);
     if let Some(logistics) = logistics::project(state, slot)? {
         fields.insert("logistics".into(), logistics);
     }

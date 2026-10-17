@@ -948,15 +948,32 @@ fn mode55_lobby_record_uses_current_map_defender_count_and_army_after_reload() {
     assert_eq!(room.lobby(host.id, &hub.maps, "")["hordeBest"], Value::Null);
     room.mode = "conquest".into();
     assert_eq!(room.lobby(host.id, &hub.maps, "")["hordeBest"], Value::Null);
-    // Persistence does not enable public Horde start.
+    // The composed hosted runtime now admits this eligible one-defender lobby.
     room.mode = "horde".into();
     hub.message("ABC", &host, &mut true, json!({"t":"start"}), 1);
     assert!(
         messages(&mut hub, &mut rx)
             .iter()
-            .any(|m| m["t"] == "deny" && m["cmd"] == "start")
+            .any(|m| m["t"] == "start")
     );
-    assert!(hub.rooms["ABC"].native.is_none());
+    let native = hub.rooms.get_mut("ABC").unwrap().native.as_mut().unwrap();
+    native.runtime.advance_tick(&[false; 2]).unwrap();
+    let seats = (0..2)
+        .map(|slot| SelectedSeat {
+            slot,
+            full: false,
+            omit: false,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        native
+            .runtime
+            .collect_frame(&seats, FrameKind::Current)
+            .unwrap()
+            .len(),
+        2
+    );
+    assert!(native.runtime.fault().is_none());
 }
 
 #[path = "reset_restore_tests.rs"]

@@ -19,6 +19,11 @@ fn scene() -> Match {
         gravity: 0.0,
         stamp: 0.0,
     };
+    let start_cell = state
+        .world
+        .game
+        .cell_of(solution.origin.x, solution.origin.z)
+        .unwrap();
     state.firing.flights.insert(
         7,
         LiveFlight {

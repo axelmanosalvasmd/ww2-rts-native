@@ -233,8 +233,18 @@ impl RoomRuntime {
             .clone_failure(self.state.start.players.len())
     }
     pub(crate) fn save_ai_memories(&self) -> Value {
-        self.delivered_ai
-            .save_memories(self.state.start.players.len())
+        let mut memories = self
+            .delivered_ai
+            .save_memories(self.state.start.players.len());
+        if let Some(horde) = &self.state.horde {
+            if let Some(rows) = memories.as_array_mut() {
+                rows[horde.slot] = Value::Null;
+                if rows.iter().all(Value::is_null) {
+                    return Value::Null;
+                }
+            }
+        }
+        memories
     }
     pub(crate) fn restore_ai_memories(&mut self, saved: &Value) -> Result<(), String> {
         self.delivered_ai

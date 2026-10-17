@@ -10,8 +10,8 @@ acknowledgement remains required before merge.
 first eligible map in sorted catalogue order, ignores ineligible selections, and
 changes Endless to Standard. `start` and `restart` use a freshly read authored
 map and refuse without replacing the previous lobby or runtime when its
-`defend` list is gone (`server.js:365-376`). The native immutable embedded source
-is the default. Hosts can set `WW2_AUTHORED_MAPS_DIR` to read the exact catalogue
+`defend` list is gone (`server.js:365-376`). When a map editor is configured, its current saved map is the startup source, including newly authored keys. The native immutable embedded source
+is the default without an editor. Hosts can set `WW2_AUTHORED_MAPS_DIR` to read the exact catalogue
 key plus `.json` from a private directory on every Horde start/restart. Missing
 or invalid files refuse without falling back to the embedded map. A failed map
 read/parse or construction sends every commander
@@ -64,7 +64,4 @@ static contact. Throw events match `shared/sim.js:5424-5427` and use
 shooter-field rules apply (`shared/sim.js:5998-6009`). Grenade tickets and salvo
 schedules remain internal and add no wire row.
 
-Horde record persistence and `result.horde`/`hordeBest` remain the separate
-MODE-55 work. This batch delivers the ordinary story/result fields and does not
-claim the record extension. Spectator and save admission retain their existing
-separate guards.
+Hosted result records and save continuation are documented in [hosted-results.md](hosted-results.md) and [save-format.md](save-format.md). Spectator admission retains its existing guard.

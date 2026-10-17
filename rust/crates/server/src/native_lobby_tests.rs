@@ -265,6 +265,7 @@ fn absent_and_unready_connections_are_distinct_and_expiry_precedes_callbacks() {
     h.poll_native(50, 50_000_000);
     let native = &h.rooms["ABC"].native.as_ref().unwrap().runtime;
     assert_eq!(native.state().world.game.tick, 2);
+    // Away tracks a missing identity transport, distinct from online readiness.
     assert!(
         native
             .state()

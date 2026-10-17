@@ -221,3 +221,26 @@ All wider admitted-mode, pending-start, complete logistics and typed authored-v2
 guards remain. Existing duplicate test registrations and obsolete copies of
 legacy mode guards are not reintroduced. The detached comparison implementation
 nested in the incoming view file is test-only; its original tests remain.
+
+## Cross-chain #426
+
+Exact parent `df6c1f9e377f5e8fc079194aec1a9870be2c10ad`. Retains hosted Horde saves,
+records/results, complete ending holds, fresh restart seeds and deterministic
+recorded weather seeds. Horde save/load is composed with the already-admitted
+ordinary modes and typed authored-v2 owner rather than narrowing those modes.
+
+The #423 unified production owner remains. Incoming split-owner helper files are
+represented by the existing expanded delivered-owner suite; their duplicate
+source copies are not separate production selectors. Horde save/result tests now
+inspect the same active owner through ai_commander/ai_decoded_view. Director
+memory uses #426's fresh-from-recipient fallback; roster AI memory still restores.
+All brain-freeze, saved-clock, queued-order, aircraft/event and ending assertions
+remain. The canonical start capture includes the internal seat after restoration.
+
+Async generation keeps private edited map capture, but defers map loading and
+constructor errors until generation, preserving failed-request rollback. Existing
+positive Tutorial/sandbox and host/token guards remain. New failed-restart,
+aviation privacy, support-retirement/cooldown, stock precision and binary Horde
+witnesses are retained in addition to the stronger current suites. The seeded
+long-run test keeps its exact 3,600-tick/every-seat assertions and adds repeat
+input, recipient and RNG equality from the incoming branch.
