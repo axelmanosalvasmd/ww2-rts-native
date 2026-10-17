@@ -236,7 +236,6 @@ fn authored_checkpoint_rejects_missing_clock_legacy_owner_and_tampered_history()
     assert!(state.save_json().is_err());
 }
 
-
 #[test]
 fn authored_checkpoint_requires_nullable_execution_and_arrival_identity_fields() {
     let data = json!({"version":1,"triggers":[{"id":"future","scope":"match",
@@ -249,23 +248,48 @@ fn authored_checkpoint_requires_nullable_execution_and_arrival_identity_fields()
     let restored = Match::from_save_json(saved.clone()).unwrap();
     let record = &restored.authored_scenario.as_ref().unwrap().executions["future@match"];
     assert_eq!(record.count, 0);
-    assert_eq!(record.execution, None, "explicit null remains valid before execution");
+    assert_eq!(
+        record.execution, None,
+        "explicit null remains valid before execution"
+    );
     let mut missing = saved;
-    let owner = missing[1].as_array_mut().unwrap().iter_mut()
-        .find(|entry| entry[0] == json!(["string","authored_scenario"])).unwrap();
-    let records = owner[1][1][1].as_array_mut().unwrap().iter_mut()
-        .find(|entry| entry[0] == json!(["string","executions"])).unwrap();
+    let owner = missing[1]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|entry| entry[0] == json!(["string", "authored_scenario"]))
+        .unwrap();
+    let records = owner[1][1][1]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|entry| entry[0] == json!(["string", "executions"]))
+        .unwrap();
     let record = &mut records[1][1][0][1];
-    record[1].as_array_mut().unwrap().retain(|entry| entry[0] != json!(["string","execution"]));
-    assert!(Match::from_save_json(missing).err().unwrap().contains("execution"));
+    record[1]
+        .as_array_mut()
+        .unwrap()
+        .retain(|entry| entry[0] != json!(["string", "execution"]));
+    assert!(
+        Match::from_save_json(missing)
+            .err()
+            .unwrap()
+            .contains("execution")
+    );
 
     for identity in [None, Some("authored-unit".to_owned())] {
-        let unit = ArrivalUnit {kind:"rifle".into(), authored:identity.clone()};
+        let unit = ArrivalUnit {
+            kind: "rifle".into(),
+            authored: identity.clone(),
+        };
         let saved = crate::save_codec::to_value(&unit).unwrap();
         let restored: ArrivalUnit = crate::save_codec::from_value(saved.clone()).unwrap();
         assert_eq!(restored.authored, identity);
         let mut missing = saved;
-        missing[1].as_array_mut().unwrap().retain(|entry| entry[0] != json!(["string","authored"]));
+        missing[1]
+            .as_array_mut()
+            .unwrap()
+            .retain(|entry| entry[0] != json!(["string", "authored"]));
         assert!(crate::save_codec::from_value::<ArrivalUnit>(missing).is_err());
     }
 }
