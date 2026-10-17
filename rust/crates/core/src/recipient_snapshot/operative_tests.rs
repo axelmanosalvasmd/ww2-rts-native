@@ -5,7 +5,7 @@ use crate::{
     game::{CELL, Point},
     map::AuthoritativeMap,
     match_runtime::{MatchOptions, PlayerConfig},
-    recipient_snapshot::{SelectedSeat, SnapshotCache, SnapshotCapability},
+    recipient_snapshot::{SelectedSeat, SnapshotCache, SnapshotCapability, recipient_uncached},
     weather::WeatherChoice,
 };
 use serde_json::json;
@@ -186,7 +186,9 @@ fn operative_rows_use_cached_masks_and_reject_unbacked_runtime_state() {
     state.world.game.reveal = true;
     let cache = SnapshotCache::new(&state).unwrap();
     for slot in 0..3 {
-        let fields = cache.recipient(slot).unwrap().fields;
+        let projection = cache.recipient(slot).unwrap();
+        assert_eq!(projection, recipient_uncached(&state, slot).unwrap());
+        let fields = projection.fields;
         let row = fields["units"]
             .as_array()
             .unwrap()
@@ -204,6 +206,13 @@ fn operative_rows_use_cached_masks_and_reject_unbacked_runtime_state() {
         );
     }
     state.companions.soldiers.remove(&id);
+    assert!(matches!(
+        recipient_uncached(&state, 0),
+        Err(SnapshotError::Unsupported {
+            capability: SnapshotCapability::Operatives,
+            ..
+        })
+    ));
     assert!(matches!(
         SnapshotCache::new(&state),
         Err(SnapshotError::Unsupported {
@@ -330,6 +339,13 @@ fn operative_grenade_flight_and_launch_rows_match_literal_shapes_and_fog_rules()
     });
     state.firing.events.clear();
     state.world.game.reveal = true;
+    let cache = SnapshotCache::new(&state).unwrap();
+    for slot in 0..3 {
+        assert_eq!(
+            cache.recipient(slot).unwrap(),
+            recipient_uncached(&state, slot).unwrap()
+        );
+    }
     let mut delivery = DeliveryState::new(&state).unwrap();
     let frame = delivery
         .capture_selected_with_tick_events(
@@ -387,6 +403,104 @@ fn operative_grenade_flight_and_launch_rows_match_literal_shapes_and_fog_rules()
             "v":[4.,3.,0],"gravity":2.,"time":0,"launched":0,"expires":1.,"until":0.15,
         }])
     );
+}
+
+#[test]
+fn mixed_ordinary_and_operative_grenades_keep_each_recipient_live_and_refuse_corruption() {
+    use crate::{companions::Input, match_firing::AbilityBlast, match_tick::TickEvent};
+    let (mut state, operative_id) = scene();
+    let ordinary = state
+        .world
+        .game
+        .units
+        .values()
+        .find(|u| u.id != operative_id && u.owner == 0 && state.rules.kinds[u.kind].name == "rifle")
+        .unwrap();
+    let ordinary_id = ordinary.id;
+    let at = ordinary.at();
+    let blast = AbilityBlast::from_unit(ordinary.kind, &state.rules).unwrap();
+    let ordinary_flight = state
+        .launch_ability_flight(ordinary_id, at, blast, None, None)
+        .unwrap();
+    let operative_flight = state
+        .throw_companion(
+            operative_id,
+            &Input {
+                forward: 0.,
+                strafe: 0.,
+                yaw: 0.,
+                pitch: 0.,
+                fire: false,
+                ads: false,
+                crouch: false,
+                sprint: false,
+                weapon: 0,
+            },
+            false,
+        )
+        .unwrap();
+    state.world.game.reveal = true;
+    let events = std::mem::take(&mut state.firing.events)
+        .into_iter()
+        .map(TickEvent::Firing)
+        .collect::<Vec<_>>();
+    let selected = (0..3)
+        .map(|slot| SelectedSeat {
+            slot,
+            full: true,
+            omit: false,
+        })
+        .collect::<Vec<_>>();
+    let mut delivery = DeliveryState::new(&state).unwrap();
+    let frame = delivery
+        .capture_selected_with_tick_events(&mut state, &selected, &events)
+        .unwrap()
+        .unwrap();
+    let expected = frame.recipient(0).unwrap().into_json()["flights"].clone();
+    assert_eq!(expected.as_array().unwrap().len(), 2);
+    for (flight, shooter) in [
+        (ordinary_flight, ordinary_id),
+        (operative_flight, operative_id),
+    ] {
+        let row = expected
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row["flight"] == flight)
+            .unwrap();
+        assert_eq!(row["f"], json!(shooter));
+        assert_eq!(row["fo"], json!(0));
+        assert_eq!(row["effect"], json!("boom"));
+    }
+    for slot in 0..3 {
+        assert_eq!(
+            frame.recipient(slot).unwrap().into_json()["flights"],
+            expected
+        );
+    }
+    let mut operative = OperativeDelivery::new(&state, 0).unwrap();
+    assert_eq!(
+        operative.capture(&mut state, true, &events).unwrap()["flights"],
+        expected
+    );
+    state
+        .firing
+        .flights
+        .get_mut(&operative_flight)
+        .unwrap()
+        .effect = Some("shell");
+    let before = delivery.clone();
+    let world = format!("{:?}", state.world);
+    assert!(matches!(
+        delivery.capture_selected_with_tick_events(&mut state, &selected, &[]),
+        Err(SnapshotError::Unsupported {
+            capability: SnapshotCapability::ShotsAndFlights,
+            ..
+        })
+    ));
+    assert_eq!(delivery, before);
+    assert_eq!(format!("{:?}", state.world), world);
+    assert!(state.tick_state.fault().is_none());
 }
 
 #[test]

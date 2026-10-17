@@ -1,0 +1,1 @@
+- Preserve spectator command guards, named armies and convoy delivery when refreshing the room command stack on main. Rewrite `base_commands_remain_outside_public_r1_ingress` to require queued reservation without immediate world mutation, matching the base commands already admitted by the stack.

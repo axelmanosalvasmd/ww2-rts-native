@@ -59,6 +59,7 @@ pub(crate) fn end_horde_break(state: &mut Match, host: bool, paused: bool) -> Re
 pub struct RoomRuntime {
     state: Match,
     delivery: DeliveryState,
+    watchers: ww2_core::recipient_snapshot::SpectatorDelivery,
     lists: RoomListCache,
     meter: TickMeter,
     batch: u64,
@@ -108,8 +109,30 @@ impl RoomRuntime {
             })
             .collect())
     }
+    pub(crate) fn collect_watcher_start(
+        &self,
+        startup: &crate::native_startup::NativeStartup,
+        names: &[String],
+        match_id: u64,
+    ) -> Result<Value, String> {
+        self.running()?;
+        let envelope = startup.envelope(&self.state, names, match_id)?;
+        let mut fresh = ww2_core::recipient_snapshot::SpectatorDelivery::default();
+        let mut snapshot = fresh
+            .capture(&self.state, &[], true)
+            .map_err(|e| format!("watcher start: {e:?}"))?;
+        snapshot["fog"] = Value::Null;
+        let mut start = envelope.message(0, snapshot);
+        start.as_object_mut().unwrap().remove("fog");
+        Ok(start)
+    }
+    pub(crate) fn collect_watcher_frame(&mut self) -> Result<Value, String> {
+        self.running()?;
+        self.watchers
+            .capture(&self.state, &self.pending_events, false)
+            .map_err(|e| format!("watcher snapshot: {e:?}"))
+    }
     pub fn new(mut state: Match, now_ms: u64) -> Result<Self, String> {
-        state.tick_state.restrict_aircraft_weapons_for_delivery();
         state.validate_tick_state()?;
         state
             .restrict_to_ordinary_snapshots()
@@ -121,6 +144,7 @@ impl RoomRuntime {
         Ok(Self {
             state,
             delivery,
+            watchers: Default::default(),
             lists: RoomListCache::default(),
             meter,
             batch: 0,
@@ -135,6 +159,42 @@ impl RoomRuntime {
             #[cfg(test)]
             snapshot_production_calls: 0,
         })
+    }
+    pub(crate) fn save_json(&self) -> Result<Value, String> {
+        self.running()?;
+        if self.held >= 120 {
+            return Err("completed ending cannot be saved".into());
+        }
+        Ok(
+            json!({"state":self.state.save_json()?, "pendingEvents":Match::save_events_json(&self.pending_events)?,"held":self.held}),
+        )
+    }
+    pub(crate) fn restore_saved_hold(&mut self, held: &Value) -> Result<(), String> {
+        let held = held
+            .as_u64()
+            .and_then(|v| u16::try_from(v).ok())
+            .filter(|v| *v < 120)
+            .ok_or("invalid saved ending hold")?;
+        if held > 0 && self.state.finish.is_none() {
+            return Err("saved hold has no finish".into());
+        }
+        self.held = held;
+        Ok(())
+    }
+    pub(crate) fn restore_saved_events(&mut self, value: Value) -> Result<(), String> {
+        let events = Match::events_from_save_json(value)?;
+        let mut probe = Self::new(Match::from_save_json(self.state.save_json()?)?, 0)?;
+        probe.pending_events = events.clone();
+        let selected = (0..self.state.world.game.players.len())
+            .map(|slot| SelectedSeat {
+                slot,
+                full: true,
+                omit: false,
+            })
+            .collect::<Vec<_>>();
+        probe.collect_frame(&selected, FrameKind::Scheduled)?;
+        self.pending_events = events;
+        Ok(())
     }
     pub fn state(&self) -> &Match {
         &self.state
@@ -289,6 +349,25 @@ impl RoomRuntime {
             .map_err(|e| e.to_string())?;
         Ok(ListScope::Shared(versions))
     }
+
+    /// Existing JSON v0 latency telemetry, derived from scheduled snapshot ticks.
+    pub(crate) fn latency_stats(&self) -> Value {
+        json!([
+            ww2_core::math::round(self.meter.stats().snapshot_tick.p95 * 10.0) / 10.0,
+            self.meter.snap_every()
+        ])
+    }
+    pub(crate) fn open_loaded_pause(
+        &mut self,
+        slot: usize,
+        by: &str,
+        now_ms: u64,
+    ) -> Result<(), String> {
+        self.pause = None;
+        self.auto_paused.clear();
+        self.pause(slot, by, PauseReason::Host, now_ms)?;
+        Ok(())
+    }
     pub fn paused(&self) -> bool {
         self.pause.is_some()
     }
@@ -432,3 +511,7 @@ impl RoomRuntime {
 #[cfg(test)]
 #[path = "room_runtime_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "spectator_mission_tests.rs"]
+mod spectator_mission_tests;

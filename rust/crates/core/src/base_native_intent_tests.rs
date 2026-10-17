@@ -546,8 +546,91 @@ fn base46_regional_base_is_never_buyable_and_has_no_recruit_list() {
 
 #[test]
 fn base47_tech_off_blocks_research_and_removes_purchase_tier_gate() {
-    let mut m = ordinary(false);
-    denied(&mut m, 0, json!({"t":"tech","kind":"tier"}), "blocked");
+    use crate::recipient_snapshot::{DeliveryState, SelectedSeat};
+    // sim.js:799-800 and test-tech.js: tech changes admission and delivered state.
+    for enabled in [true, false] {
+        let mut opts = options(Mode::Conquest, enabled);
+        opts.army = ArmySize::Large;
+        let mut m = Match::new(&map(), opts).unwrap();
+        for slot in 0..m.start.players.len() {
+            let research = m.production.player(slot).unwrap();
+            assert_eq!(research.tech().tier(), 1);
+            for line in [Technology::Infantry, Technology::Guns, Technology::Armor] {
+                assert_eq!(research.tech().level(line), 0);
+            }
+            assert!(research.jobs().is_empty());
+        }
+        let mut delivery = DeliveryState::new(&m).unwrap();
+        let selected = (0..m.start.players.len())
+            .map(|slot| SelectedSeat {
+                slot,
+                full: false,
+                omit: false,
+            })
+            .collect::<Vec<_>>();
+        let before = m.start.economy.players[0].mp;
+        let next = m.next_unit_id;
+        if enabled {
+            denied(&mut m, 0, json!({"t":"buy","unit":"mortar"}), "tier");
+            assert_eq!(m.start.economy.players[0].mp, before);
+            assert_eq!(m.next_unit_id, next);
+        } else {
+            for kind in ["tier", "inf", "guns", "armor"] {
+                denied(&mut m, 0, json!({"t":"tech","kind":kind}), "blocked");
+            }
+            assert_eq!(
+                dispatch(&mut m, 0, json!({"t":"buy","unit":"mortar"})),
+                None
+            );
+            assert_eq!(m.rules.kinds[m.world.game.units[&next].kind].name, "mortar");
+            assert_eq!(m.world.game.units[&next].owner, 0);
+            assert_eq!(
+                m.start.economy.players[0].mp,
+                before - economy::price_of(Mode::Conquest, "mortar").unwrap().mp
+            );
+        }
+        let worker = own(&m, 0, "rifle");
+        let build = json!({"t":"build","kind":"motorpool","ids":[worker],"x":35,"z":32});
+        if enabled {
+            denied(&mut m, 0, build, "tier");
+        } else {
+            let site = m.next_unit_id;
+            assert_eq!(dispatch(&mut m, 0, build), None);
+            assert_eq!(
+                m.rules.kinds[m.world.game.units[&site].kind].name,
+                "motorpool"
+            );
+            assert_eq!(m.world.game.units[&site].built, Some(0.));
+            assert_eq!(
+                m.start.economy.players[0].mp,
+                before - economy::price_of(Mode::Conquest, "mortar").unwrap().mp - 200.
+            );
+        }
+        for step in 0..=6 {
+            let events = if step == 0 {
+                Vec::new()
+            } else {
+                m.advance_tick().unwrap().events
+            };
+            let frame = delivery
+                .capture_selected_with_tick_events(&mut m, &selected, &events)
+                .unwrap()
+                .unwrap();
+            for seat in &selected {
+                let snapshot = frame.recipient(seat.slot).unwrap().into_json();
+                assert_eq!(snapshot["t"], "s");
+                if enabled {
+                    assert_eq!(
+                        snapshot["tech"],
+                        json!({"tier":1,"armory":{"inf":0,"guns":0,"armor":0},"lab":[]})
+                    );
+                } else {
+                    assert!(snapshot.get("tech").is_none());
+                }
+            }
+        }
+        assert!(m.tick_state.fault().is_none());
+    }
     let (_, mut w) = component();
     let mut p = ProductionState::new(vec![TechState::new(1, 0, 0, 0).unwrap(); 3]).unwrap();
     let units = [view(1, 0, "barracks")];
@@ -556,6 +639,36 @@ fn base47_tech_off_blocks_research_and_removes_purchase_tier_gate() {
     p.queue_unit(&c, &mut w, 0, Faction::Usa, "mortar", Some(1))
         .unwrap();
     assert_eq!(p.building(1).unwrap().jobs()[0].kind, "mortar");
+}
+
+#[test]
+fn base47_horde_initial_research_gives_every_defender_company_and_enemy_battalion_hq() {
+    let map = AuthoritativeMap::from_json(
+        &serde_json::to_vec(&json!({
+            "name":"Horde tech intent", "w":60,"h":60,"rows":vec![".".repeat(60);60],
+            "spawns":[{"x":30,"y":5},{"x":10,"y":54},{"x":50,"y":54}],
+            "defend":[0],"points":[{"x":30,"y":30},{"x":35,"y":30,"mp":0}]
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let m = Match::new_horde(&map, options(Mode::Horde, true)).unwrap();
+    let horde = m.horde.as_ref().unwrap();
+    assert_eq!(horde.defenders, 2);
+    assert_eq!(horde.slot, 2);
+    assert_eq!(m.start.players.len(), 3);
+    for slot in 0..m.start.players.len() {
+        let research = m.production.player(slot).unwrap();
+        assert_eq!(
+            research.tech().tier(),
+            if slot < horde.defenders { 2 } else { 3 }
+        );
+        for line in [Technology::Infantry, Technology::Guns, Technology::Armor] {
+            assert_eq!(research.tech().level(line), 0);
+        }
+        assert!(research.jobs().is_empty());
+    }
+    // Constructor state only. Horde's ordinary tick and recipient guards remain closed.
 }
 
 #[test]
@@ -603,27 +716,6 @@ fn base48_tier_gating_refuses_mortar_before_wallet_debit() {
         "bomber",
     ] {
         assert_eq!(economy::tier_of(kind).unwrap(), 3);
-    }
-}
-
-#[test]
-fn base52_conquest_starts_with_its_own_forces() {
-    let m = ordinary(true);
-    for owner in 0..2 {
-        let names = m
-            .world
-            .game
-            .units
-            .values()
-            .filter(|u| u.owner == owner)
-            .map(|u| m.rules.kinds[u.kind].name.as_str())
-            .collect::<Vec<_>>();
-        assert_eq!(names.iter().filter(|&&k| k == "hq").count(), 1);
-        let hq = &m.world.game.units[&own(&m, owner, "hq")];
-        assert_eq!(hq.built, Some(1.));
-        assert_eq!(hq.cells.as_ref().unwrap().len(), 9);
-        assert_eq!(names.iter().filter(|&&k| k == "rifle").count(), 2);
-        assert!(names.contains(&"mg") && names.contains(&"barracks"));
     }
 }
 
@@ -765,50 +857,5 @@ fn base03_army_keys_scale_population_income_and_starting_wallets() {
     }
 }
 
-#[test]
-fn base02_available_startup_profiles_scale_wallets_by_army_income() {
-    let source = map();
-    let mut json = source.source().clone();
-    json["defend"] = json!([0]);
-    let map = AuthoritativeMap::from_json(&serde_json::to_vec(&json).unwrap()).unwrap();
-    let rules = crate::rules::Rules::compiled().unwrap();
-    for (army, income) in [
-        (ArmySize::Standard, 1.0),
-        (ArmySize::Large, 3.0),
-        (ArmySize::Massive, 6.0),
-        (ArmySize::Endless, 20.0),
-    ] {
-        let mut opts = options(Mode::Conquest, false);
-        opts.army = army;
-        let plan = crate::match_runtime::StartPlan::prepare(&map, &opts, &rules).unwrap();
-        assert_eq!(
-            plan.economy
-                .players
-                .iter()
-                .map(|p| p.mp)
-                .collect::<Vec<_>>(),
-            vec![150.0 * income; 2]
-        );
-        opts.mode = Mode::Assault;
-        let plan =
-            crate::match_runtime::StartPlan::prepare_assault(&map, &opts, &rules, 1).unwrap();
-        assert_eq!(
-            plan.economy
-                .players
-                .iter()
-                .map(|p| p.mp)
-                .collect::<Vec<_>>(),
-            vec![320.0 * income, 250.0 * income]
-        );
-        opts.mode = Mode::Horde;
-        let plan = crate::match_runtime::StartPlan::prepare_horde(&map, &opts, &rules).unwrap();
-        assert_eq!(
-            plan.economy
-                .players
-                .iter()
-                .map(|p| p.mp)
-                .collect::<Vec<_>>(),
-            vec![250.0 * income, 0.0]
-        );
-    }
-}
+#[path = "mode_startup_tests.rs"]
+mod mode_startup;

@@ -25,7 +25,7 @@ pub trait Placed {
 
 type Cell = (i64, i64);
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, serde::Serialize, serde::Deserialize)]
 struct Record {
     id: UnitId,
     cell: Cell,
@@ -34,15 +34,19 @@ struct Record {
     order: u64,
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct SpatialGrid {
     size: f64,
+    #[serde(serialize_with = "crate::save_state::sorted_hash_map")]
     buckets: HashMap<Cell, Vec<Record>>,
+    #[serde(serialize_with = "crate::save_state::sorted_hash_map")]
     heavy_buckets: HashMap<Cell, Vec<Record>>,
     records: BTreeMap<UnitId, Record>,
+    #[serde(serialize_with = "crate::save_state::sorted_hash_map")]
     owners: HashMap<i32, BTreeSet<UnitId>>,
     next_order: u64,
     /// Buckets that gained a unit since the last rebuild, sorted back into order by `rebuild`.
+    #[serde(serialize_with = "crate::save_state::sorted_hash_set")]
     moved: HashSet<(bool, Cell)>,
 }
 

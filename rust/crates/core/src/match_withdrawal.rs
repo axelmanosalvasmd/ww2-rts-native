@@ -1,4 +1,8 @@
 //! The ordered forced-supply withdrawal turn from the pinned simulation.
+#[cfg(test)]
+#[path = "withdrawal_guard_intent_tests.rs"]
+mod intent_tests;
+
 use crate::{
     game::{MOVE, Point, Unit},
     match_runtime::Match,
@@ -13,8 +17,25 @@ fn distance(a: Point, b: Point) -> f64 {
 }
 
 impl Match {
+    /// Movement can stall or resume an existing forced withdrawal before firing.
+    pub(crate) fn sync_supply_withdrawal_progress(&mut self, id: u32) {
+        let Some(reserves) = self.logistics.get_mut(id) else {
+            return;
+        };
+        let unit = self
+            .world
+            .game
+            .units
+            .get_mut(&id)
+            .expect("current withdrawal unit");
+        if reserves.forced && !unit.path.is_empty() && !self.commands.units[&id].supply_hold {
+            reserves.stranded = unit.stuck > 1.0;
+            unit.retreating = !reserves.stranded;
+        }
+    }
+
     /// Call after this live unit's reserves advance and before its movement turn.
-    /// Field work has one detailed owner; construction/project metadata is not yet represented.
+    /// Construction, digging and projects cancel through their canonical owners.
     pub fn advance_supply_withdrawal(&mut self, id: u32) -> Result<(), String> {
         let mut unit = self
             .world
@@ -72,8 +93,11 @@ impl Match {
         {
             return Err("invalid withdrawal metadata".into());
         }
-        if unit.build || unit.entrench || unit.dig != self.field_works.is_active(id) {
-            return Err("unrepresented withdrawal construction or project job".into());
+        crate::match_construction::validate_build_activity(&unit, control)?;
+        if unit.dig != self.field_works.is_active(id)
+            || unit.entrench != self.field_works.membership(id).is_some()
+        {
+            return Err("inconsistent withdrawal work state".into());
         }
         let stores = self.convoys.as_ref().map(|c| &c.stores);
         if stores.is_some_and(|stores| {
@@ -135,9 +159,11 @@ impl Match {
                     unit.garrison = None;
                 });
             }
-            crate::match_runtime::cancel_field_work_state(&mut self.field_works, &mut unit)?;
-            unit.build = false;
-            unit.entrench = false;
+            crate::match_runtime::cancel_owned_work_state(
+                &mut self.field_works,
+                &mut unit,
+                self.commands.units.get_mut(&id).unwrap(),
+            )?;
             unit.board = 0;
             unit.attack = false;
             let c = self.commands.units.get_mut(&id).unwrap();

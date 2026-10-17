@@ -8,7 +8,7 @@ use std::collections::{BTreeMap, VecDeque};
 use crate::game::Point;
 use crate::grid::UnitId;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum RequestKind {
     Recovery,
     World,
@@ -53,14 +53,14 @@ impl RequestKind {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Request {
     pub unit: UnitId,
     pub kind: RequestKind,
     pub goal: Point,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, serde::Serialize, serde::Deserialize)]
 pub struct TickConfig {
     pub budget: usize,
     pub retry_limit: u32,
@@ -143,7 +143,7 @@ pub enum Disposition {
     AlreadyQueued,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct SchedulerStats {
     /// Requests queued because the tick budget was exhausted. Search-internal
     /// deferrals belong to the caller's pathfinder statistics.
@@ -158,12 +158,12 @@ pub struct TickReport {
     pub discarded: usize,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, serde::Serialize, serde::Deserialize)]
 struct Pending {
     token: u64,
     request: Request,
 }
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, serde::Serialize, serde::Deserialize)]
 struct Failure {
     incarnation: u64,
     request: Request,
@@ -171,7 +171,7 @@ struct Failure {
     count: u32,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct PathRequests {
     queue: VecDeque<Pending>,
     pending: BTreeMap<UnitId, Pending>,
@@ -358,3 +358,7 @@ impl PathRequests {
 fn valid_goal(p: Point) -> bool {
     p.x.is_finite() && p.z.is_finite()
 }
+
+#[cfg(test)]
+#[path = "path_requests_if26_tests.rs"]
+mod if26_tests;

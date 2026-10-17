@@ -13,7 +13,7 @@ use crate::{
     math, projectiles, vision,
 };
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FiringUnit {
     /// Chosen target, with zero meaning no target.
     pub target_id: UnitId,
@@ -21,7 +21,7 @@ pub struct FiringUnit {
     pub retarget: f64,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FiringState {
     pub units: BTreeMap<UnitId, FiringUnit>,
     pub flights: BTreeMap<u64, LiveFlight>,
@@ -52,7 +52,7 @@ impl Default for FiringState {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct LiveSalvo {
     pub at: Point,
     pub owner: usize,
@@ -62,12 +62,13 @@ pub struct LiveSalvo {
     pub spread: f64,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum LaunchEvent {
     Flight {
         id: u64,
         kind: usize,
-        effect: Option<&'static str>,
+        #[serde(deserialize_with = "crate::save_state::optional_static_string")]
+        effect: Option<crate::save_state::StaticStr>,
         shooter: UnitId,
         owner: usize,
         at: projectiles::Point3,
@@ -111,22 +112,23 @@ pub enum LaunchEvent {
 }
 
 /// Existing ordinary shot fields used by the operative producer.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SmallArmsEvent {
-    pub effect: &'static str,
+    #[serde(deserialize_with = "crate::save_state::static_string")]
+    pub effect: crate::save_state::StaticStr,
     pub shooter: UnitId,
     pub owner: usize,
     pub at: projectiles::Point3,
     pub hit: Option<SmallArmsHit>,
 }
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SmallArmsHit {
     pub target: UnitId,
     pub owner: usize,
     pub man: Option<u32>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ContactEvent {
     pub kind: usize,
     pub flight: u64,
@@ -142,12 +144,14 @@ pub struct ContactEvent {
     pub killed: bool,
     pub terminal: bool,
     pub explosive: bool,
-    pub effect: Option<&'static str>,
+    #[serde(deserialize_with = "crate::save_state::optional_static_string")]
+    pub effect: Option<crate::save_state::StaticStr>,
     pub blast: Option<f64>,
     pub normal: projectiles::Point3,
     pub direction: projectiles::Point3,
     pub impulse: f64,
-    pub material: &'static str,
+    #[serde(deserialize_with = "crate::save_state::static_string")]
+    pub material: crate::save_state::StaticStr,
 }
 // JSON.stringify renders both zero signs as 0; keep trajectory math untouched.
 pub(crate) fn normalize_json_zero(value: &mut serde_json::Value) {
@@ -271,7 +275,7 @@ impl LaunchEvent {
 
 /// A round retains its launch solution when its shooter or intended target moves.
 /// Shooter XP and hit metadata stay in CombatState while this ID remains referenced.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct LiveFlight {
     pub id: u64,
     pub owner: usize,
@@ -302,7 +306,8 @@ pub struct LiveFlight {
     pub scar: f64,
     pub blast_radius: Option<f64>,
     pub blast_source: Option<ExplosionSource>,
-    pub effect: Option<&'static str>,
+    #[serde(deserialize_with = "crate::save_state::optional_static_string")]
+    pub effect: Option<crate::save_state::StaticStr>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -961,26 +966,28 @@ impl Match {
         start_fraction: f64,
         end_fraction: f64,
     ) -> Result<Option<FlightContact>, String> {
-        self.flight_contact_filtered(p, a, b, Some((start_fraction, end_fraction)), |_| true)
+        self.flight_contact_for(p, a, b, start_fraction, end_fraction, None)
     }
-    pub(crate) fn recipient_flight_contact(
+    /// Snapshot extrapolation uses current poses and only visible unit bodies.
+    /// Terrain remains canonical, matching flightUntil at the prototype pin.
+    pub(crate) fn visible_flight_contact(
         &self,
         p: &LiveFlight,
         a: projectiles::Point3,
         b: projectiles::Point3,
-        visible: impl Fn(UnitId) -> bool,
+        slot: usize,
     ) -> Result<Option<FlightContact>, String> {
-        self.flight_contact_filtered(p, a, b, None, visible)
+        self.flight_contact_for(p, a, b, 1.0, 1.0, Some(slot))
     }
-    fn flight_contact_filtered(
+    fn flight_contact_for(
         &self,
         p: &LiveFlight,
         a: projectiles::Point3,
         b: projectiles::Point3,
-        fractions: Option<(f64, f64)>,
-        visible: impl Fn(UnitId) -> bool,
+        start_fraction: f64,
+        end_fraction: f64,
+        recipient: Option<usize>,
     ) -> Result<Option<FlightContact>, String> {
-        let (start_fraction, end_fraction) = fractions.unwrap_or((1.0, 1.0));
         let g = &self.world.game;
         let level_height = n(self.firing_config()?, "levelHeight", 2.5);
         let mut best: Option<FlightContact> = None;
@@ -1034,7 +1041,7 @@ impl Match {
                 && t.air.is_none()
                 && !t.riding
                 && t.id != p.shooter
-                && visible(t.id)
+                && recipient.is_none_or(|slot| crate::recipient_snapshot::seen_by(self, slot, t.id))
                 && (p.blast_source.is_some() || !g.allied(p.owner, t.owner))
         });
         candidates.sort_unstable();
@@ -1044,9 +1051,15 @@ impl Match {
             if def.building && t.cells.as_ref().is_some_and(|c| !c.is_empty()) {
                 continue;
             }
-            let old = fractions
-                .and_then(|_| self.firing.prior.get(&id).copied())
-                .unwrap_or_else(|| t.pose());
+            let old = if recipient.is_some() {
+                t.pose()
+            } else {
+                self.firing
+                    .prior
+                    .get(&id)
+                    .copied()
+                    .unwrap_or_else(|| t.pose())
+            };
             let before = projectiles::BodyPosition {
                 x: old.x + (t.x - old.x) * start_fraction,
                 z: old.z + (t.z - old.z) * start_fraction,
@@ -1581,13 +1594,8 @@ impl Match {
             .units
             .get(&id)
             .ok_or("missing canonical unit control")?;
-        if kind.air
-            || kind.rail
-            || control.operative
-            || control.fire_at.is_some()
-            || control.nade.is_some()
-        {
-            return Err("air, rail, operative and ability/terrain firing are unsupported".into());
+        if kind.air || kind.rail || control.operative || control.nade.is_some() {
+            return Err("air, rail, operative and aimed ability firing are unsupported".into());
         }
         if u.riding {
             return Ok(());
@@ -1647,6 +1655,9 @@ impl Match {
             self.firing.initialize(id).target_id = 0;
             self.commands.units.get_mut(&id).unwrap().aim = rot;
             return Ok(());
+        }
+        if self.commands.units[&id].fire_at.is_some() {
+            return self.fire_at_weapon(id);
         }
         let current = self.firing.get(id).copied().unwrap_or_default();
         if hold_fire && attack == 0 {
@@ -2243,7 +2254,7 @@ impl FiringState {
 
 /// Physical grenade bookkeeping from the source late phase. This ticket holds
 /// no trajectory or blast payload; those belong to its one canonical flight.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct GrenadeTicket {
     pub at: Point,
     pub remaining: f64,
@@ -2662,6 +2673,9 @@ mod map_feature_tests;
 #[path = "map_intent_batch2_tests.rs"]
 mod map_intent_batch2;
 
+mod fire_at;
+#[cfg(test)]
+mod fire_at_tests;
 #[cfg(test)]
 #[path = "match_kaiju_tests.rs"]
 mod match_kaiju_tests;

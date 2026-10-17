@@ -42,7 +42,7 @@ pub const SHOAL: u16 = 2048;
 pub type Team = i32;
 
 /// `g.mode.kind`. Conquest has no mode object, so it is `None` in `Game::mode`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ModeKind {
     Annihilation,
     Assault,
@@ -53,7 +53,7 @@ pub enum ModeKind {
 }
 
 /// `u.air.state` for a plane.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum PlaneState {
     Base,
     Rearm,
@@ -63,14 +63,14 @@ pub enum PlaneState {
 }
 
 /// A point on the ground (`{ x, z }`).
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Point {
     pub x: f64,
     pub z: f64,
 }
 
 /// A point and a heading (`{ x, z, rot }`).
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Pose {
     pub x: f64,
     pub z: f64,
@@ -78,7 +78,7 @@ pub struct Pose {
 }
 
 /// A unit stepping aside for another (`u.traffic`, `shared/local-traffic.js`).
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Traffic {
     /// Where it is heading now.
     pub goal: Point,
@@ -92,7 +92,7 @@ pub struct Traffic {
 }
 
 /// The route's next one-lane stretch, as last looked for (`u.laneScan`).
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct LaneScan {
     /// Which route it was looked for on: the unit's `path_gen` then.
     pub path: u64,
@@ -103,7 +103,7 @@ pub struct LaneScan {
 }
 
 /// A walled-in vehicle backing or pulling forward to where it can turn (`u.motionClearance`).
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Clearance {
     pub goal: Pose,
     pub reverse: bool,
@@ -113,7 +113,7 @@ pub struct Clearance {
     pub until: f64,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Unit {
     pub id: UnitId,
     /// Index into `Rules::kinds`.
@@ -241,7 +241,7 @@ impl Placed for Unit {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Player {
     pub slot: usize,
     pub team: Team,
@@ -258,7 +258,7 @@ impl Player {
 
 /// A smoke cloud. `id` stands for the JavaScript object's identity: the fog pass's kept sources remember
 /// which clouds they saw by identity, not by value.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Smoke {
     pub id: u32,
     /// Remaining lifetime (`t`); absent on vision-only fixture clouds.
@@ -268,7 +268,7 @@ pub struct Smoke {
     pub r: f64,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum StrikeKind {
     Recon,
     /// Every other off-map support: the passes only look at recon flights.
@@ -276,7 +276,7 @@ pub enum StrikeKind {
 }
 
 /// An off-map support strike (`g.strikes`).
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Strike {
     pub live: bool,
     pub kind: StrikeKind,
@@ -290,7 +290,7 @@ pub struct Strike {
 }
 
 /// One cell of a structure (`g.structuralCells`): a building is aimed at by its standing cells.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Section {
     /// `state === 'failed'`.
     pub failed: bool,
@@ -300,7 +300,7 @@ pub struct Section {
 }
 
 /// A burnt-out vehicle (`g.wrecks`): cover for infantry once it has settled.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Wreck {
     /// Durable unit identity, absent in query-only fixtures.
     pub id: Option<u32>,
@@ -312,7 +312,7 @@ pub struct Wreck {
     pub moving: bool,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Game {
     pub w: usize,
     pub h: usize,

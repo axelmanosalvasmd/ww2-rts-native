@@ -13,7 +13,7 @@ use crate::{
     random::StreamId,
 };
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum SupportKind {
     Recon,
     Strafe,
@@ -62,14 +62,14 @@ impl std::fmt::Display for SupportError {
     }
 }
 impl std::error::Error for SupportError {}
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SupportTiming {
     pub kind: SupportKind,
     pub delay: f64,
     pub left: f64,
     pub next: f64,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FighterCover {
     pub team: i32,
     pub owner: usize,
@@ -77,7 +77,7 @@ pub struct FighterCover {
     pub radius: f64,
     pub remaining: f64,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum SupportEvent {
     Shell(Point),
     Bomb(Point),
@@ -102,7 +102,7 @@ pub enum SupportEvent {
     },
     Environment(environment::Effect),
 }
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SupportState {
     pub covers: Vec<FighterCover>,
     pub events: Vec<SupportEvent>,

@@ -48,7 +48,7 @@ pub trait ObservationFacts {
     fn footprint(&mut self, cell: usize, slot: usize, team: i32) -> Option<FootprintFact>;
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ObservedRow {
     pub row: CellRow,
     /// Present only for a mine known to this recipient, including known enemy mines.
@@ -117,7 +117,7 @@ impl From<KnowledgeError> for ObservedError {
 
 /// Keep this producer with its player across snapshots and reconnects. Recreate
 /// it and the corresponding RouteKnowledge when a new initial map is installed.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct ObservedMemory {
     slot: usize,
     identity: u64,
@@ -137,6 +137,10 @@ struct PreparedRefresh {
     accepted: Vec<(CellRow, Option<bool>)>,
 }
 impl ObservedMemory {
+    pub(crate) fn relocate_save_storage(&mut self, bindings: &BTreeMap<usize, usize>) {
+        self.initial_ptr = bindings.get(&self.initial_ptr).copied().unwrap_or(0);
+    }
+
     pub fn new(world: &World, slot: usize, identity: u64) -> Result<Self, ObservedError> {
         validate_world(world)?;
         Ok(Self {
@@ -493,6 +497,45 @@ mod tests {
         let input = serde_json::json!({"name":"Guard","w":20,"h":20,"rows":vec![".".repeat(20);20],"spawns":[{"x":0,"y":0},{"x":19,"y":19}],"points":[{"x":10,"y":10}]});
         World::from_map(&AuthoritativeMap::from_json(&serde_json::to_vec(&input).unwrap()).unwrap())
             .unwrap()
+    }
+    #[test]
+    fn if26_terrain_json_comparison_ignores_zero_sign_and_preserves_nearby_fields() {
+        let mut w = world();
+        let mut memory = ObservedMemory::new(&w, 0, 7).unwrap();
+        let frame = ObservationFrame {
+            team: 0,
+            skip_fog: false,
+        };
+        w.game.wear.as_mut().unwrap()[30] = -0.0;
+        w.log_cell(30, false).unwrap();
+        assert_eq!(memory.refresh(&mut w, frame, &mut Seen).unwrap(), 1);
+        memory.take_changes();
+        let revision = memory.revision();
+        w.game.wear.as_mut().unwrap()[30] = 0.0;
+        w.log_cell(30, false).unwrap();
+        assert_eq!(memory.refresh(&mut w, frame, &mut Seen).unwrap(), 0);
+        assert_eq!(memory.revision(), revision);
+        assert!(memory.outbox().is_empty());
+        for value in [1.0_f32, f32::from_bits(1.0_f32.to_bits() + 1)] {
+            w.game.wear.as_mut().unwrap()[30] = value;
+            w.log_cell(30, false).unwrap();
+            assert_eq!(memory.refresh(&mut w, frame, &mut Seen).unwrap(), 1);
+            let changes = memory.take_changes();
+            assert_eq!(changes.len(), 1);
+            assert_eq!(changes[0].row.data.ground_wear, value);
+        }
+        let row = &memory.full_rows()[0];
+        let mut absent = row.row.clone();
+        absent.data.trench_front = None;
+        let mut present = absent.clone();
+        present.data.trench_front = Some(0.0);
+        let remembered = ObservedRow {
+            row: absent,
+            mine_owned: None,
+            revision: 1,
+        };
+        assert!(!remembered.same_content(&present, None));
+        assert!(!remembered.same_content(&remembered.row, Some(false)));
     }
     #[test]
     fn preparation_preserves_deferred_registration_and_unchanged_key_actions() {

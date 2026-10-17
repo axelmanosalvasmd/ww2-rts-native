@@ -30,7 +30,9 @@ pub use projects::{
     ProjectRequest, Segment, SegmentPreparation, entrench_plan, line_fort, segment_cost,
 };
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
 pub enum FortKind {
     Trench,
     Sandbags,
@@ -120,12 +122,12 @@ impl std::fmt::Display for Error {
     }
 }
 impl std::error::Error for Error {}
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct WorkCell {
     pub cell: usize,
     pub ch: u8,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Dig {
     pub project: Option<ProjectId>,
     pub kind: FortKind,
@@ -154,7 +156,7 @@ pub struct StartRequest {
     pub at: Point,
     pub direction: Option<f64>,
 }
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FieldWorksRuntime {
     jobs: BTreeMap<u32, Dig>,
     pits: BTreeSet<usize>,
@@ -335,6 +337,39 @@ fn mine_known(w: &World, c: usize, team: i32) -> bool {
             .is_some_and(|p| p.team == team)
         || w.mine_seen.get(&c).copied().unwrap_or(0) >> ((team as u32) & 31) & 1 == 1
 }
+/// The recipient planner and canonical admission share the same complete visibility footprint.
+pub(crate) fn visible_placement(
+    game: &crate::game::Game,
+    kind: FortKind,
+    at: Point,
+    direction: f64,
+    mut sees: impl FnMut(Point) -> bool,
+) -> Result<bool, Error> {
+    if !position(at) || !direction.is_finite() {
+        return Ok(false);
+    }
+    let definition = &definitions()?.forts[&kind];
+    let direction = if kind == FortKind::Gate {
+        square_direction(direction)
+    } else {
+        direction
+    };
+    let sx = math::cos(direction);
+    let sz = math::sin(direction);
+    for (along, forward, _) in offsets(kind, definition.count) {
+        if let Some(cell) = game.cell_of(
+            at.x + (sx * along + sz * forward) * 2.,
+            at.z + (sz * along - sx * forward) * 2.,
+        ) && !sees(Point {
+            x: (cell % game.w) as f64 * 2. + 1.,
+            z: (cell / game.w) as f64 * 2. + 1.,
+        }) {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
 /// Visibility is checked on every planned in-map cell before reading its buildability.
 pub fn placement(
     w: &World,
@@ -356,14 +391,8 @@ pub fn placement(
     let sx = math::cos(direction);
     let sz = math::sin(direction);
     let plan = offsets(kind, d.count);
-    for &(along, forward, _) in &plan {
-        if let Some(cell) = w.game.cell_of(
-            at.x + (sx * along + sz * forward) * 2.,
-            at.z + (sz * along - sx * forward) * 2.,
-        ) && !sees(center(w, cell))
-        {
-            return Err(Error::Refused(Reason::NotVisible));
-        }
+    if !visible_placement(&w.game, kind, at, direction, &mut sees)? {
+        return Err(Error::Refused(Reason::NotVisible));
     }
     let mut cells = Vec::new();
     for (along, forward, ch) in plan {

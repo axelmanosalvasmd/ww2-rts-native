@@ -24,13 +24,13 @@ pub const RAIL_LOAD: f64 = 8.0;
 pub const RAIL_UNLOAD: f64 = 2.0;
 pub const RAIL_EVERY: f64 = 20.0;
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct RailPoint {
     pub cell: usize,
     pub at: Point,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct RailRun {
     pub path: Vec<RailPoint>,
     pub next: usize,
@@ -174,17 +174,14 @@ impl WorldRails {
         }
         let mut best: BTreeMap<usize, (usize, Option<(usize, usize)>)> = BTreeMap::new();
         best.insert(source, (0, None));
-        let mut visited = BTreeSet::new();
-        while let Some((cost, at)) = best
-            .iter()
-            .filter(|(region, _)| !visited.contains(*region))
-            .map(|(&region, &(distance, _))| (distance, region))
-            .min()
-        {
+        let mut todo = vec![source];
+        while !todo.is_empty() {
+            crate::sort::sort_by(&mut todo, |a, b| best[&b].0 as f64 - best[&a].0 as f64);
+            let at = todo.pop()?;
+            let cost = best[&at].0;
             if at == target {
                 break;
             }
-            visited.insert(at);
             for (index, line) in self.lines.iter().enumerate() {
                 let next = if line.a == at {
                     line.b
@@ -210,6 +207,7 @@ impl WorldRails {
                     continue;
                 }
                 best.insert(next, (distance, Some((at, index))));
+                todo.push(next);
             }
         }
         best.get(&target)?;
@@ -686,7 +684,10 @@ impl Match {
     ) -> Result<Option<Denial>, String> {
         if self.options.mode != Mode::World
             || self.world.game.mode != Some(ModeKind::World)
-            || self.world_runtime.is_none()
+            || self
+                .world_runtime
+                .as_ref()
+                .is_none_or(|runtime| runtime.rails.stations.is_empty())
             || !at.x.is_finite()
             || !at.z.is_finite()
         {
@@ -698,14 +699,21 @@ impl Match {
         let team = player.team;
         let game = &self.world.game;
         let mut eligible = Vec::new();
+        let mut commanded = Vec::new();
         let mut selected = BTreeSet::new();
+        let command = crate::match_commands::Command::Rail {
+            ids: Vec::new(),
+            at,
+        };
         for &raw in ids {
-            let Some(unit) = u32::try_from(raw).ok().and_then(|id| game.units.get(&id)) else {
+            let Some(id) = self.eligible_command_unit(raw, owner, &command) else {
                 continue;
             };
+            let unit = &game.units[&id];
             if !selected.insert(unit.id) {
                 continue;
             }
+            commanded.push(id);
             let kind = self
                 .rules
                 .kinds
@@ -722,7 +730,7 @@ impl Match {
             }
         }
         if eligible.is_empty() {
-            return Ok(Some(Denial::Needs));
+            return Ok(self.rail_command_result(&commanded, Some(Denial::Needs)));
         }
         let runtime = self.world_runtime.as_ref().expect("checked World runtime");
         let stations = &runtime.rails.stations;
@@ -736,7 +744,7 @@ impl Match {
                     .is_some_and(|r| r.team == team)
             })
             .collect();
-        let origin = own.iter().copied().min_by(|(ai, a), (bi, b)| {
+        let origin = crate::sort::first_by(own.iter().copied(), |(_, a), (_, b)| {
             let distance = |s: &WorldStation| {
                 eligible
                     .iter()
@@ -746,32 +754,29 @@ impl Match {
                     })
                     .fold(f64::INFINITY, f64::min)
             };
-            distance(a).total_cmp(&distance(b)).then(ai.cmp(bi))
+            distance(a) - distance(b)
         });
         let Some((origin_index, origin)) = origin else {
-            return Ok(Some(Denial::Needs));
+            return Ok(self.rail_command_result(&commanded, Some(Denial::Station)));
         };
         if eligible.iter().all(|id| {
             let u = &game.units[id];
             math::hypot(u.x - origin.x, u.z - origin.z) > RAIL_REACH
         }) {
-            return Ok(Some(Denial::Needs));
+            return Ok(self.rail_command_result(&commanded, Some(Denial::Station)));
         }
-        let destination = own
-            .iter()
-            .copied()
-            .filter(|(i, _)| *i != origin_index)
-            .min_by(|(ai, a), (bi, b)| {
-                math::hypot(a.x - at.x, a.z - at.z)
-                    .total_cmp(&math::hypot(b.x - at.x, b.z - at.z))
-                    .then(ai.cmp(bi))
-            });
+        let destination = crate::sort::first_by(
+            own.iter().copied().filter(|(i, _)| *i != origin_index),
+            |(_, a), (_, b)| {
+                math::hypot(a.x - at.x, a.z - at.z) - math::hypot(b.x - at.x, b.z - at.z)
+            },
+        );
         let Some((destination_index, destination)) = destination else {
-            return Ok(Some(Denial::Needs));
+            return Ok(self.rail_command_result(&commanded, Some(Denial::Station)));
         };
         let destination_region = destination.region;
         if origin.next.get(&team).is_some_and(|&next| next > game.tick) {
-            return Ok(Some(Denial::Cooldown));
+            return Ok(self.rail_command_result(&commanded, Some(Denial::Cooldown)));
         }
         let teams: Vec<_> = runtime.regions.iter().map(|r| r.team).collect();
         let Some(path) = runtime.rails.route(
@@ -782,21 +787,20 @@ impl Match {
             &game.chars,
             game.w,
         ) else {
-            return Ok(Some(Denial::Blocked));
+            return Ok(self.rail_command_result(&commanded, Some(Denial::RailCut)));
         };
         if path.is_empty() {
-            return Ok(Some(Denial::Blocked));
+            return Ok(self.rail_command_result(&commanded, Some(Denial::RailCut)));
         }
         eligible.retain(|id| {
             let u = &game.units[id];
             math::hypot(u.x - origin.x, u.z - origin.z) <= RAIL_REACH
         });
-        eligible.sort_by(|a, b| {
-            let ua = &game.units[a];
-            let ub = &game.units[b];
+        crate::sort::sort_by(&mut eligible, |a, b| {
+            let ua = &game.units[&a];
+            let ub = &game.units[&b];
             math::hypot(ua.x - origin.x, ua.z - origin.z)
-                .total_cmp(&math::hypot(ub.x - origin.x, ub.z - origin.z))
-                .then(a.cmp(b))
+                - math::hypot(ub.x - origin.x, ub.z - origin.z)
         });
         eligible.truncate(RAIL_CARS);
         let mut garrison_exits = BTreeMap::new();
@@ -955,7 +959,21 @@ impl Match {
                 .carrier = Some(train_id);
             self.combat.get_mut(train_id).unwrap().cargo.push(id);
         }
-        Ok(None)
+        Ok(self.rail_command_result(&commanded, None))
+    }
+
+    /// Source mine() resets following before semantic refusals, including for
+    /// air and naval units later excluded from the train. Native validation
+    /// errors retain their pre-command state.
+    fn rail_command_result(
+        &mut self,
+        commanded: &[UnitId],
+        result: Option<Denial>,
+    ) -> Option<Denial> {
+        for id in commanded {
+            self.commands.units.get_mut(id).unwrap().follow = 0;
+        }
+        result
     }
 
     /// One train's deterministic movement and final physical passenger placement.
@@ -1082,6 +1100,10 @@ pub fn rail_yard(
 }
 
 #[cfg(test)]
+#[path = "match_world_rails_command_tests.rs"]
+mod command_tests;
+
+#[cfg(test)]
 mod intent_tests {
     use super::*;
     use crate::{
@@ -1093,6 +1115,42 @@ mod intent_tests {
         weather::WeatherChoice,
     };
     use serde_json::json;
+
+    #[test]
+    fn if25_rail_route_equal_cost_pops_last_stable_todo_entry() {
+        let mut rails = WorldRails {
+            stations: [0, 3]
+                .map(|region| WorldStation {
+                    region,
+                    cell: region,
+                    x: region as f64 * CELL + 1.0,
+                    z: 1.0,
+                    next: BTreeMap::new(),
+                })
+                .to_vec(),
+            lines: [(0, 1), (0, 2), (1, 3), (2, 3)]
+                .map(|(a, b)| WorldRailLine {
+                    a,
+                    b,
+                    cells: vec![a, b],
+                    regions: vec![a, b],
+                    bridges: vec![],
+                })
+                .to_vec(),
+            ..WorldRails::default()
+        };
+        let route = |rails: &WorldRails| {
+            rails
+                .route(7, 0, 1, &[7; 4], &[b'.'; 4], 4)
+                .unwrap()
+                .into_iter()
+                .map(|p| p.cell)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(route(&rails), vec![0, 2, 3]);
+        rails.lines.swap(0, 1);
+        assert_eq!(route(&rails), vec![0, 1, 3]);
+    }
 
     #[test]
     fn mov81_open_route_chooses_shortest_owned_lines_and_rejects_cut_bridge() {
@@ -1203,7 +1261,7 @@ mod intent_tests {
         assert_eq!(done.step, RailStep::Finished);
     }
 
-    fn world_with_rail_passenger() -> (Match, UnitId, UnitId) {
+    pub(super) fn world_for_rail_orders() -> Match {
         let fixture: serde_json::Value =
             serde_json::from_str(include_str!("../tests/fixtures/world-contact.json")).unwrap();
         let mut raw = fixture["map"].clone();
@@ -1240,6 +1298,11 @@ mod intent_tests {
         )
         .unwrap();
         m.world_runtime.as_mut().unwrap().regions[1].team = 0;
+        m
+    }
+
+    fn world_with_rail_passenger() -> (Match, UnitId, UnitId) {
+        let mut m = world_for_rail_orders();
         let kind = m.rules.kind("conscript").unwrap();
         let id = m.next_unit_id;
         let draft = StagedUnit::ordinary_with_actor(
@@ -1292,7 +1355,7 @@ mod intent_tests {
         assert_eq!(
             m.apply_rail_order(0, &[i64::from(id)], Point { x: 193.0, z: 65.0 })
                 .unwrap(),
-            Some(Denial::Cooldown)
+            Some(Denial::Needs)
         );
         (m, id, train)
     }

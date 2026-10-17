@@ -1,0 +1,2 @@
+- Trusted Conquest rooms now start and restart with Standard, Large, Massive or Endless armies, preserving the lobby choice in the match and private host receipt.
+- Replace partial startup tests with non-World constructor checks for starting wallets, army scaling, bases and forces. Add forced fallback-pad and trapped-unit coverage, plus both-seat delivery and real-server army-setting tests. The binary refusal test now permits the three newly admitted army settings. World startup remains deferred.

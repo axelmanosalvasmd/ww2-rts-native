@@ -73,7 +73,7 @@ fn play(fixture: &Value) {
     assert!(replacement.view.units().next().is_some());
     assert_eq!(server.receipts().len(), 1);
     for receipt in server.receipts() {
-        assert_eq!(receipt["options"]["logistics"], false);
+        assert_eq!(receipt["options"]["logistics"], true);
         assert_eq!(receipt["options"]["sandbox"], false);
         assert_eq!(receipt["options"]["seed"], SEED);
     }

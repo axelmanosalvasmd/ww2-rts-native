@@ -1,0 +1,2 @@
+- Boarding now takes assigned squads out of houses and stops their construction, paid digging and shared entrenchment work. Unassigned workers keep their jobs, and boarding refunds no paid work or unfinished site.
+- Add ordinary and Classic retreat tests that traverse successive route legs to home. Ordinary tests collect every seat's snapshots; Classic delivery and World room admission remain guarded. Replace the old blanket boarding-refusal checks with malformed-work-state checks and lifecycle coverage.

@@ -2,14 +2,14 @@
 use crate::grid::UnitId;
 use std::collections::BTreeMap;
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct RecoveryUnit {
     pub hp_was: Option<f64>,
     pub wound_at: Option<i64>,
     pub heal_at: Option<i64>,
     pub reinforcement: f64,
 }
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct RecoveryState {
     units: BTreeMap<UnitId, RecoveryUnit>,
 }
@@ -120,7 +120,21 @@ impl Match {
     /// Read-only whole-operation admission for callers that stage several crew repairs.
     /// Returns a conservative mutation reservation; no health or terrain is published.
     pub(crate) fn preflight_building_repair(&self, id: UnitId, amount: f64) -> Result<u64, String> {
-        if self.validate_actor_mode().is_err()
+        if self.options.mode == crate::economy::Mode::Horde {
+            self.validate_horde_economy()?;
+            self.validate_building_activity_rows()?;
+            if !self.commands.units.iter().any(|(worker, control)| {
+                control.build_target == Some(id)
+                    && self
+                        .world
+                        .game
+                        .units
+                        .get(worker)
+                        .is_some_and(|unit| unit.build)
+            }) {
+                return Err("invalid Conquest repair request".into());
+            }
+        } else if self.validate_actor_mode().is_err()
             || !matches!(
                 self.options.mode,
                 crate::economy::Mode::Default
@@ -129,9 +143,10 @@ impl Match {
                     | crate::economy::Mode::Annihilation
                     | crate::economy::Mode::Classic
             )
-            || !amount.is_finite()
-            || amount < 0.0
         {
+            return Err("invalid Conquest repair request".into());
+        }
+        if !amount.is_finite() || amount < 0.0 {
             return Err("invalid Conquest repair request".into());
         }
         let unit = self
@@ -182,20 +197,6 @@ impl Match {
     /// Repair existing sections in source order. Dead buildings cannot be restored.
     pub fn repair_building_sections(&mut self, id: UnitId, amount: f64) -> Result<f64, String> {
         self.preflight_building_repair(id, amount)?;
-        if self.validate_actor_mode().is_err()
-            || !matches!(
-                self.options.mode,
-                crate::economy::Mode::Default
-                    | crate::economy::Mode::Conquest
-                    | crate::economy::Mode::Assault
-                    | crate::economy::Mode::Annihilation
-                    | crate::economy::Mode::Classic
-            )
-            || !amount.is_finite()
-            || amount < 0.
-        {
-            return Err("invalid Conquest repair request".into());
-        }
         let unit = self
             .world
             .game

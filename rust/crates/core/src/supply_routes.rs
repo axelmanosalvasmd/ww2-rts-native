@@ -26,12 +26,12 @@ pub struct Handoff {
     pub store: Point,
     pub radius: f64,
 }
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Threat {
     pub at: Point,
     pub range: f64,
 }
-#[derive(Default)]
+#[derive(Default, serde::Serialize, serde::Deserialize)]
 struct OwnerRoutes {
     key: Option<(u64, u64)>,
     threats: Vec<Threat>,
@@ -49,7 +49,7 @@ struct OwnerRoutes {
 }
 /// Scratch belongs to one Match and its stable recipient/world identities.
 /// Construct fresh scratch when replacing a Match or its equal-version terrain.
-#[derive(Default)]
+#[derive(Default, serde::Serialize, serde::Deserialize)]
 pub struct SupplyRouting {
     owners: BTreeMap<usize, OwnerRoutes>,
     handoff_paths: Pathfinding,
@@ -60,6 +60,26 @@ fn distance(a: Point, b: Point) -> f64 {
     math::hypot(a.x - b.x, a.z - b.z)
 }
 impl SupplyRouting {
+    /// Owned terrain and vehicle buffers referenced by saved convoy path caches.
+    /// BTreeMap owner order keeps the checkpoint bindings stable.
+    pub(crate) fn save_storage_pointers(&self) -> Vec<usize> {
+        let mut pointers = self.handoff_paths.storage_pointers();
+        for owner in self.owners.values() {
+            pointers.push(owner.flags.as_ptr() as usize);
+            pointers.extend(owner.ordinary_paths.storage_pointers());
+            pointers.extend(owner.danger_paths.storage_pointers());
+        }
+        pointers
+    }
+
+    pub(crate) fn relocate_save_storage(&mut self, bindings: &BTreeMap<usize, usize>) {
+        self.handoff_paths.relocate_save_storage(bindings);
+        for owner in self.owners.values_mut() {
+            owner.ordinary_paths.relocate_save_storage(bindings);
+            owner.danger_paths.relocate_save_storage(bindings);
+        }
+    }
+
     pub fn route(
         &mut self,
         request: RouteRequest,
@@ -348,9 +368,8 @@ impl SupplyRouting {
             self.handoff_key = Some(cache_key);
             self.handoffs.clear();
         }
-        let path_key =
-            [start.x, start.z, edge.x, edge.z, radius].map(|n| math::round(n * 4.0) as i64);
-        if let Some(&answer) = self.handoffs.get(&path_key) {
+        let path_key = crate::numeric_keys::handoff_key([start.x, start.z, edge.x, edge.z, radius]);
+        if let Some(answer) = path_key.and_then(|key| self.handoffs.get(&key).copied()) {
             return Ok(answer);
         }
         let route = self
@@ -372,7 +391,9 @@ impl SupplyRouting {
         }
         let answer =
             !route.waypoints.is_empty() && distance(at, edge) < 1.0 && length <= radius * 2.0;
-        self.handoffs.insert(path_key, answer);
+        if let Some(path_key) = path_key {
+            self.handoffs.insert(path_key, answer);
+        }
         Ok(answer)
     }
 }

@@ -27,7 +27,7 @@ const SOURCE_RADIUS: f64 = 15.0;
 const TRUCK_RADIUS: f64 = 12.0;
 const UNLOAD: f64 = 8.0;
 const REFILL: f64 = 40.0;
-const GRACE: f64 = 10.0;
+pub(crate) const GRACE: f64 = 10.0;
 const LOAD: f64 = 4.0;
 const ROUTES: usize = 3;
 fn items(s: Stock) -> [f64; KEYS] {
@@ -73,7 +73,7 @@ fn moved(from: &mut Stock, to: &mut Stock, limits: Stock) -> f64 {
     total
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
 pub enum StoreId {
     Source(u32),
     Cache(UnitId),
@@ -92,7 +92,7 @@ impl StoreId {
         }
     }
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Store {
     pub id: StoreId,
     pub owner: usize,
@@ -312,7 +312,7 @@ fn friendly(ctx: Context<'_>, a: usize, b: usize) -> bool {
         .zip(ctx.players.get(b))
         .is_some_and(|(a, b)| a.team == b.team)
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum TruckState {
     Idle,
     Collecting,
@@ -343,12 +343,12 @@ impl TruckState {
         }
     }
 }
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
 pub enum TargetId {
     Unit(UnitId),
     Store(StoreId),
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Target {
     pub id: TargetId,
     pub unit: Option<UnitId>,
@@ -360,13 +360,13 @@ pub struct Target {
     pub priority: Option<f64>,
     pub relief: Option<bool>,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Retry {
     pub key: (i64, i64),
     pub wait: f64,
     pub at: u64,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Truck {
     pub state: TruckState,
     pub cargo: Stock,
@@ -380,7 +380,7 @@ pub struct Truck {
     pub route_failure: Option<RouteFailure>,
     pub retry: Option<Retry>,
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum RouteFailure {
     Dangerous,
     Blocked,
@@ -424,7 +424,7 @@ pub trait World {
     fn retire(&mut self, id: UnitId);
     fn apply(&mut self, id: UnitId, operation: UnitOperation);
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Event {
     pub id: u64,
     pub owner: usize,
@@ -434,7 +434,7 @@ pub struct Event {
     pub message: String,
     pub seconds: f64,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Assignment {
     pub targets: Vec<TargetId>,
     pub target: usize,
@@ -443,7 +443,7 @@ pub struct Assignment {
     pub blocked: bool,
     pub no_stock: bool,
 }
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ConvoyState {
     pub stores: Vec<Store>,
     pub next_spawn: BTreeMap<usize, f64>,
