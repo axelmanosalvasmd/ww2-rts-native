@@ -104,3 +104,10 @@ The same first build exposed an omitted `#[cfg(test)]` on the retained `logistic
 Independent source-only review inspected every nonautomatic hunk of both runtime composition merges and accepted the current tree with its declared follow-ups. It confirmed exactly seven and sixteen changed files relative to the respective automatic conflict trees, all module registrations, event/privacy arms and both parents' setup/configuration semantics. This inspection ran no tests.
 
 The repaired focused run passed nine C-entry cases (18 skipped) on the uncommitted follow-up tree. That run is diagnostic evidence, not final-head qualification. Final follow-up also centralizes the prototype's truthy explicit-scenario selection for validation, startup and shell creation, preventing null migration output from becoming an invalid mission.
+
+
+### Final-head qualification diagnostics
+
+Candidate `fd8d35d69e1b72140ad2fd8d6e2f03f9dee5e033` (Rust tree `568bc59324b77f33a9e37929ddab66e66aad9526`) passed formatting and all 52 FFI tests, including both 60-match verdict batches. Its core selection stopped at two genuine failures after 264 passes. These are producing-head receipts only, not qualification of a later repair.
+
+`eng12_unrepresented_modes_and_logistics_cannot_publish_paid_or_waiting_gates` exposed an invalid Horde-shaped state admitted by the expanded actor predicate without an actual Horde owner. Gate admission now additionally requires canonical Horde validation before payment; the refusal witness remains unchanged. The other failure, `intent_ai50_gate_order_completes_in_each_real_ordinary_mode_with_supported_seat_snapshots`, still expected the old non-Conquest snapshot refusal. Its original payment, work, completion and post-completion assertions remain, and every supported ordinary mode now collects every-seat delivery throughout those phases. No test registration is removed.
