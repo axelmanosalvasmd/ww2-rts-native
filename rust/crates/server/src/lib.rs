@@ -1,4 +1,4 @@
-//! Lobby transport and trusted native room attachment. Public match start remains unavailable.
+//! Lobby transport, native room attachment, and supported public match startup.
 pub mod authoritative_maps;
 mod commander_ingress;
 mod diagnostics;

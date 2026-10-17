@@ -6,6 +6,7 @@ use crate::tick_timing::{CatchUpClock, TickSample};
 use serde_json::{Value, json};
 use std::{
     collections::BTreeMap,
+    hash::BuildHasher,
     io::Write,
     sync::{
         Arc,
@@ -450,18 +451,25 @@ impl Room {
             return Err("native result precedes final hold callback".into());
         }
         let result = native.runtime.finished_result()?;
-        if result.teams.len() != self.players.len()
-            || result.names.len() != self.players.len()
-            || result.story.len() != self.players.len()
+        let count =
+            self.players.len() + usize::from(native.runtime.state().tutorial_state().is_some());
+        if result.teams.len() != count || result.names.len() != count || result.story.len() != count
         {
             return Err("native result seat rows disagree with the stable roster".into());
         }
         let outcomes = result.teams.iter().map(|team| json!({"team":team,
             "outcome":if result.winner == -1 { "draw" } else if result.winner == *team { "victory" } else { "defeat" }})).collect::<Vec<_>>();
-        let report = result_message(
-            result,
-            self.players.iter().map(|p| p.name.clone()).collect(),
-        )?;
+        let names = result
+            .names
+            .iter()
+            .enumerate()
+            .map(|(slot, name)| {
+                self.players
+                    .get(slot)
+                    .map_or_else(|| name.clone(), |p| p.name.clone())
+            })
+            .collect();
+        let report = result_message(result, names)?;
         let status = crate::NativeRoomStatus {
             epoch: native.epoch,
             tick: native.runtime.state().world.game.tick,
@@ -1025,6 +1033,7 @@ pub(crate) struct Hub {
     public_url: String,
     accounts: BTreeMap<u64, SnapshotAccount>,
     next_epoch: u64,
+    match_seed: u64,
     clock: CatchUpClock,
     stopped: Arc<AtomicBool>,
     trusted: Option<crate::TrustedRoomConfig>,
@@ -1042,6 +1051,7 @@ impl Hub {
             public_url,
             accounts: BTreeMap::new(),
             next_epoch: 0,
+            match_seed: std::collections::hash_map::RandomState::new().hash_one(()),
             clock: CatchUpClock::new(0),
             stopped: Arc::new(AtomicBool::new(false)),
             trusted: None,
@@ -1111,14 +1121,29 @@ impl Hub {
         if room.players.is_empty() || room.players.iter().any(|p| p.ai) {
             return Err("native attachment needs human commander seats".into());
         }
-        if state.start.players.len() != room.players.len()
-            || state.options.players.len() != room.players.len()
-            || state.world.game.players.len() != room.players.len()
+        let tutorial = state
+            .tutorial_state()
+            .is_some_and(|t| t.enemy() == room.players.len());
+        let count = room.players.len() + usize::from(tutorial);
+        if state.start.players.len() != count
+            || state.options.players.len() != count
+            || state.world.game.players.len() != count
             || room.players.iter().enumerate().any(|(slot, person)| {
                 let start = &state.start.players[slot].config;
                 let config = &state.options.players[slot];
                 let live = &state.world.game.players[slot];
-                start.team != person.team as i32
+                let team = if tutorial {
+                    0
+                } else if let Some(assault) = state.assault {
+                    if person.team as i32 == assault.defender_team {
+                        assault.defender_team
+                    } else {
+                        assault.attacker_team
+                    }
+                } else {
+                    person.team as i32
+                };
+                start.team != team
                     || config.team != start.team
                     || live.slot != slot
                     || live.team != start.team
@@ -1655,11 +1680,14 @@ impl Hub {
                     native.ingress.discard_feedback();
                     continue;
                 }
-                let connected = room
+                let mut connected = room
                     .players
                     .iter()
                     .map(|p| p.connection.as_ref().is_some_and(Connection::ready))
                     .collect::<Vec<_>>();
+                if native.runtime.state().tutorial_state().is_some() {
+                    connected.push(true);
+                }
                 let pause = match native.runtime.poll_pause(&connected, now_ms) {
                     Ok(pause) => pause,
                     Err(error) => {
@@ -1691,12 +1719,15 @@ impl Hub {
                     }
                     continue;
                 }
-                let away = room
+                let mut away = room
                     .players
                     .iter()
                     .map(|person| person.connection.is_none())
                     .collect::<Vec<_>>();
                 let native = room.native.as_mut().unwrap();
+                if native.runtime.state().tutorial_state().is_some() {
+                    away.push(false);
+                }
                 if let Err(error) = native.runtime.set_away(&away) {
                     native.runtime.fault_stop(error);
                     continue;
@@ -1878,7 +1909,86 @@ impl Hub {
         Ok(self.publish_native(code, prepared))
     }
 
-    fn trusted_command(&mut self, code: &str, connection_id: u64, msg: &Value, now: u64) -> bool {
+    fn start_public(&mut self, code: &str, now: u64) -> Result<u64, String> {
+        let room = self.rooms.get(code).ok_or("room absent")?;
+        if room.native.is_some()
+            || room.players.is_empty()
+            || room.players.len() > room.capacity(&self.maps)
+        {
+            return Err("invalid start roster".into());
+        }
+        let mode = match room.mode.as_str() {
+            "conquest" => Mode::Conquest,
+            "tutorial" => Mode::Tutorial,
+            "assault" => Mode::Assault,
+            _ => return Err("room mode is not admitted".into()),
+        };
+        let army = match room.army.as_str() {
+            "standard" => ArmySize::Standard,
+            "large" => ArmySize::Large,
+            "massive" => ArmySize::Massive,
+            "endless" => ArmySize::Endless,
+            _ => return Err("invalid army".into()),
+        };
+        let players = room
+            .players
+            .iter()
+            .map(|p| {
+                Ok(PlayerConfig {
+                    name: p.name.clone(),
+                    team: p.team as i32,
+                    faction: Faction::try_from(p.faction as u8).map_err(|e| e.to_string())?,
+                })
+            })
+            .collect::<Result<Vec<_>, String>>()?;
+        // Host entropy is recorded once in MatchOptions; the core only sees the seed.
+        let map = crate::authoritative_maps::load(&room.map).map_err(|e| e.to_string())?;
+        let options = MatchOptions {
+            seed: self.match_seed.wrapping_add(self.next_epoch),
+            mode,
+            players,
+            shuffle: true,
+            army,
+            weather: WeatherChoice::from_reference(Some(&room.weather)),
+            weather_seed: None,
+            living_weather: true,
+            map_key: Some(room.map.clone()),
+            tech: true,
+            supply: true,
+            logistics: logistics_enabled_for(&room.mode, map.source()),
+            sandbox: room.sandbox,
+        };
+        let state = match mode {
+            Mode::Tutorial => Match::new_tutorial(map, options)?,
+            Mode::Assault => Match::new_assault(map, options, room.defender as i32)?,
+            _ => Match::new(map, options)?,
+        };
+        let prepared = self.prepare_native(code, state, now, false)?;
+        Ok(self.publish_native(code, prepared))
+    }
+
+    fn setup_command(&mut self, code: &str, connection_id: u64, msg: &Value, now: u64) -> bool {
+        if self.trusted.is_none() && msg["t"] == "start" {
+            // Invalid Start preconditions are ignored, as in the prototype.
+            let ready = self.rooms.get(code).is_some_and(|room| {
+                room.is_host(connection_id)
+                    && room.native.is_none()
+                    && !room.players.is_empty()
+                    && room.players.len() <= room.capacity(&self.maps)
+                    && (room.mode != "assault"
+                        || (room.players.iter().any(|p| p.team == room.defender)
+                            && room.players.iter().any(|p| p.team != room.defender)))
+            });
+            if ready && let Err(error) = self.start_public(code, now) {
+                if let Some(room) = self.rooms.get_mut(code) {
+                    for person in &mut room.players {
+                        person.deny("start", "scenario", now);
+                    }
+                }
+                let _ = writeln!(std::io::stderr().lock(), "NATIVE_REFUSED {error}");
+            }
+            return true;
+        }
         if self.trusted.as_ref().is_none_or(|p| p.code != code) {
             return false;
         }
@@ -2000,7 +2110,7 @@ impl Hub {
             if self.save_command(code, connection.id, &msg, now) {
                 return;
             }
-            if self.trusted_command(code, connection.id, &msg, now) {
+            if self.setup_command(code, connection.id, &msg, now) {
                 return;
             }
             if msg["t"] == "resync"
@@ -2068,6 +2178,7 @@ impl Hub {
             self.room_order.push(code.into());
         }
         let saves = self.saves.clone();
+        let tutorial_created = !self.rooms.contains_key(code) && msg["listing"]["tutorial"] == true;
         let room = self.rooms.entry(code.into()).or_insert_with(|| {
             let tutorial = msg["listing"]["tutorial"] == true;
             Room {
@@ -2261,8 +2372,15 @@ impl Hub {
         // Source hello does not await lobby's map-list read, so reconnect start
         // and drop-resume are emitted before the later lobby broadcast.
         room.broadcast(&self.maps, &self.public_url);
-        if msg["listing"]["tutorial"] == true && room.mode == "tutorial" {
+        if tutorial_created
+            && room
+                .players
+                .first()
+                .is_some_and(|p| p.connection.as_ref().is_some_and(|c| c.id == connection.id))
+            && let Err(error) = self.start_public(code, now)
+        {
             connection.send(json!({"t":"deny","cmd":"start","reason":"scenario"}));
+            let _ = writeln!(std::io::stderr().lock(), "NATIVE_REFUSED {error}");
         }
     }
     pub fn disconnected(&mut self, code: &str, id: u64, now: u64) {
@@ -2346,7 +2464,7 @@ fn result_number(value: f64) -> Value {
 fn result_message(result: MatchResult, names: Vec<String>) -> Result<Value, String> {
     if !matches!(
         result.mode,
-        "conquest" | "assault" | "annihilation" | "classic"
+        "conquest" | "assault" | "annihilation" | "classic" | "tutorial"
     ) {
         return Err("result serializer requires represented ordinary mode".into());
     }
@@ -2701,6 +2819,8 @@ mod tests {
         let (a, mut rx) = client(1);
         join(&mut h, &a, "a", false, 0);
         let _ = rx.try_recv();
+        h.message("ABC", &a, &mut true, json!({"t":"mode","v":"world"}), 0);
+        let _ = rx.try_recv();
         for _ in 0..6 {
             h.message("ABC", &a, &mut true, json!({"t":"start"}), 10);
         }
@@ -2806,3 +2926,7 @@ mod async_start_tests;
 #[cfg(test)]
 #[path = "results2_tests.rs"]
 mod results2_tests;
+
+#[cfg(test)]
+#[path = "tutorial_room_tests.rs"]
+mod tutorial_room_tests;

@@ -30,3 +30,7 @@ Base: `61947c5b8a8438eb6ccbefa02e7d269c4e032472`. This branch merges exact PR he
 The first four-merge build at `89b6ca27` failed before execution: two incoming test helpers omitted `Output::Watcher` arms, and the async server fixture omitted `static_files`. Those fixture integration errors were repaired.
 
 The next full three-package attempt at `88ad16b0` reached the added operative rollback test, whose hello fixture omitted required names. The source repair supplies them and strengthens the test to prove accepted companion input and delivery restoration. Source review also found that pending operative and spectator reconnects needed affected-connection restoration after failed generation. Historical PR results do not qualify this branch. Final exact-head validation follows below.
+
+The repaired server package at `406a457f` passes all 224 tests, including both pending-recipient regressions. The full initial checkpoint had 1,400 passes, one failed fixture and 477 unrun tests; the final full three-package run remains required.
+
+#387 resolutions retain the existing flight contact/projector and port incoming exact flight tests to it. Shared mode validation and StartPlan now include Tutorial alongside all previously admitted modes. Keep all existing ordinary result timeline guards and add Tutorial's non-Conquest timeline. The base-field fixture retains unconditional exact flight comparisons. The public lifecycle refusal test removes only the newly supported Start denial; the startup row test now checks Tutorial for every seat.

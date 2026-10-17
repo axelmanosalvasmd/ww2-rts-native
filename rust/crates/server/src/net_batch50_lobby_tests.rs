@@ -857,9 +857,9 @@ fn away_seat_stops_ordinary_wallet_income_and_cannot_command() {
 }
 
 #[test]
-fn public_lifecycle_remains_an_explicit_refusal_without_trusted_configuration() {
+fn unimplemented_public_lifecycle_commands_remain_explicit_refusals() {
     let (mut hub, mut host, _guest) = room();
-    for (index, name) in ["start", "restart", "end", "leave", "handAi", "nextwave"]
+    for (index, name) in ["restart", "end", "leave", "handAi", "nextwave"]
         .iter()
         .enumerate()
     {

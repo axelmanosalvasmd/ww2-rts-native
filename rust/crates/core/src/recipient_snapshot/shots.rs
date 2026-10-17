@@ -21,6 +21,7 @@ pub enum ShotRef<'a> {
     Support(&'a SupportEvent),
     Environment(&'a Effect),
     Scenario(&'a SayAction),
+    Tutorial(&'a crate::match_tutorial::TutorialLine),
     AuthoredMission(&'a Value),
 }
 
@@ -33,6 +34,7 @@ impl<'a> TryFrom<&'a TickEvent> for ShotRef<'a> {
             TickEvent::Support(value) => Ok(Self::Support(value)),
             TickEvent::Environment(value) => Ok(Self::Environment(value)),
             TickEvent::Scenario(value) => Ok(Self::Scenario(value)),
+            TickEvent::Tutorial(value) => Ok(Self::Tutorial(value)),
             TickEvent::AuthoredMission(value) => Ok(Self::AuthoredMission(value)),
             TickEvent::Aviation(value) => Ok(Self::Aviation(value)),
         }
@@ -206,6 +208,13 @@ fn event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
 
 fn raw_event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
     match shot {
+        ShotRef::Tutorial(value) => {
+            if state.tutorial_state().is_none() {
+                return Err(SnapshotError::Rules);
+            }
+            numbers(&[value.at.x, value.at.z])?;
+            Ok(value.shot_json())
+        }
         ShotRef::AuthoredMission(value) => {
             let mission = state
                 .authored_mission
@@ -510,6 +519,7 @@ pub(super) fn trajectory_until(
     Ok(until)
 }
 
+
 fn project_shots(
     state: &Match,
     selected: &[SelectedSeat],
@@ -624,6 +634,130 @@ pub(super) fn project_shots_perspective(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ordinary_throw_uses_prototype_shape_and_local_visibility() {
+        let fixture: Value =
+            serde_json::from_str(include_str!("../../tests/fixtures/recipient-snapshot.json"))
+                .unwrap();
+        let mut state = super::super::tests::initialize(&fixture["cases"][0]);
+        let shot = LaunchEvent::Throw {
+            shooter: 1,
+            owner: 0,
+            at: Point { x: 35., z: 35. },
+        };
+        let selected = (0..3)
+            .map(|slot| SelectedSeat {
+                slot,
+                full: false,
+                omit: false,
+            })
+            .collect::<Vec<_>>();
+        state.world.game.reveal = true;
+        let rows = project_shots(&state, &selected, &[ShotRef::Firing(&shot)]).unwrap();
+        assert!(rows.iter().all(|(_, row)| *row
+            == json!([{"f":1,"fo":0,"x":35.,"z":35.,"k":"throw","physical":true,"local":true}])));
+        state.world.game.reveal = false;
+        state.world.game.players[2].visible.clear();
+        let rows = project_shots(&state, &selected, &[ShotRef::Firing(&shot)]).unwrap();
+        assert_eq!(
+            rows[2].1,
+            json!([{"x":35.,"z":35.,"k":"throw","physical":true,"local":true}])
+        );
+        let hidden = LaunchEvent::Throw {
+            shooter: 1,
+            owner: 0,
+            at: Point { x: -10., z: -10. },
+        };
+        let rows = project_shots(&state, &selected, &[ShotRef::Firing(&hidden)]).unwrap();
+        assert!(rows.iter().all(|(_, row)| *row == json!([])));
+    }
+
+    #[test]
+    fn live_flight_shape_visibility_and_extrapolation_match_prototype() {
+        let fixture: Value =
+            serde_json::from_str(include_str!("../../tests/fixtures/recipient-snapshot.json"))
+                .unwrap();
+        let mut state = super::super::tests::initialize(&fixture["cases"][0]);
+        let kind = state.world.game.units[&1].kind;
+        let blast = crate::match_firing::AbilityBlast::from_unit(kind, &state.rules).unwrap();
+        let id = state
+            .launch_ability_flight(1, Point { x: 35., z: 35. }, blast, Some(2.), None)
+            .unwrap();
+        state.firing.take_events();
+        let time = state.world.game.tick as f64 * state.rules.movement.tick;
+        let p = state.firing.flights.get_mut(&id).unwrap();
+        p.solution = Flight {
+            origin: Point3::new(35., 10., 35.),
+            velocity: Point3::new(10., 0., 0.),
+            gravity: 0.,
+            stamp: time,
+        };
+        p.launched = time;
+        p.expires = time + 2.;
+        p.effect = None;
+        state.world.game.reveal = true;
+        // These are exactly the keys/values of sim.js:5985-5994 for this flight.
+        let expected = json!({"flight":id,"kind":"rifle","seq":0,"x":35.,"y":10.,"z":35.,
+            "v":[10.,0,0],"gravity":0,"time":time,"launched":time,"expires":time+2.,"until":time+0.15,
+            "f":1,"fo":0});
+        assert_eq!(super::super::flights::project(&state, 0).unwrap(), json!([expected.clone()]));
+        state.world.game.reveal = false;
+        state.world.game.players[2].visible.clear();
+        let mut hidden = expected;
+        hidden.as_object_mut().unwrap().remove("f");
+        hidden.as_object_mut().unwrap().remove("fo");
+        assert_eq!(super::super::flights::project(&state, 2).unwrap(), json!([hidden]));
+        // A shot over an unseen cell stays hidden even to its own shooter.
+        state.firing.flights.get_mut(&id).unwrap().solution.origin = Point3::new(-10., 10., -10.);
+        assert_eq!(super::super::flights::project(&state, 0).unwrap(), json!([]));
+        state.world.game.reveal = true;
+        state.firing.flights.get_mut(&id).unwrap().launched = time + 1.;
+        assert_eq!(super::super::flights::project(&state, 0).unwrap(), json!([]));
+        let p = state.firing.flights.get_mut(&id).unwrap();
+        p.launched = time;
+        p.solution.origin = Point3::new(35., 1., 25.);
+        // Clear the fixture house under the start, then bound the preview at x=36.
+        state
+            .world
+            .set_cell(12 * state.world.game.w + 17, b'.')
+            .unwrap();
+        state
+            .world
+            .set_cell(12 * state.world.game.w + 18, b'K')
+            .unwrap();
+        let rows = super::super::flights::project(&state, 0).unwrap();
+        assert!(
+            (rows[0]["until"].as_f64().unwrap() - (time + 0.1)).abs() < 1e-12,
+            "{rows}"
+        );
+        assert_eq!(state.world.game.tick, 125);
+        assert_eq!(state.firing.flights.len(), 1);
+        state
+            .world
+            .set_cell(12 * state.world.game.w + 18, b'.')
+            .unwrap();
+        state.world.game.reveal = false;
+        state.world.game.units.get_mut(&1).unwrap().x = 32.;
+        state.world.game.units.get_mut(&1).unwrap().z = 25.;
+        state.world.game.units.get_mut(&3).unwrap().x = 36.5;
+        state.world.game.units.get_mut(&3).unwrap().z = 25.;
+        state.grid.rebuild(&state.world.game.units);
+        state.routing_fog = crate::fog::Fog::default();
+        state.world.game.players[0].visible = vec![1, 3];
+        let visible = super::super::flights::project(&state, 0).unwrap()[0]["until"]
+            .as_f64()
+            .unwrap();
+        state.world.game.players[0].visible = vec![1];
+        let hidden = super::super::flights::project(&state, 0).unwrap()[0]["until"]
+            .as_f64()
+            .unwrap();
+        assert!(visible < hidden, "a visible blocker bounds extrapolation");
+        assert!(
+            (hidden - (time + 0.15)).abs() < 1e-12,
+            "a hidden blocker must not affect until"
+        );
+    }
 
     #[test]
     fn actual_legacy_say_keeps_public_order_and_rejects_a_later_bad_row() {

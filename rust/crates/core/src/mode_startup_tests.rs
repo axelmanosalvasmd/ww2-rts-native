@@ -386,7 +386,7 @@ fn mode01_non_world_mode_rows_match_the_prototype_public_fields() {
                     ]
                 );
             }
-        } else if matches!(mode, Mode::Assault | Mode::Annihilation) {
+        } else if matches!(mode, Mode::Assault | Mode::Annihilation | Mode::Tutorial) {
             let cache = SnapshotCache::new(&m).unwrap();
             for slot in 0..m.start.players.len() {
                 assert_eq!(

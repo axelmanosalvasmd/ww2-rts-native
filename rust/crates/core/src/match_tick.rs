@@ -102,6 +102,7 @@ pub enum TickEvent {
     Aviation(crate::match_aviation::AviationEvent),
     Environment(crate::environment::Effect),
     Scenario(crate::legacy_scenario::SayAction),
+    Tutorial(crate::match_tutorial::TutorialLine),
     AuthoredMission(serde_json::Value),
 }
 
@@ -923,6 +924,7 @@ impl crate::match_runtime::Match {
         } else {
             Vec::new()
         };
+        events.extend(tutorial_lines.iter().cloned().map(TickEvent::Tutorial));
         Ok(TickReport {
             tutorial_lines,
             tick,

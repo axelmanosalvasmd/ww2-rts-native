@@ -62,6 +62,7 @@ impl NativeStartup {
         let mode_matches = matches!(
             (settings.mode, state.options.mode, state.world.game.mode),
             ("conquest", Mode::Default | Mode::Conquest, None)
+                | ("tutorial", Mode::Tutorial, Some(ww2_core::game::ModeKind::Tutorial))
                 | (
                     "assault",
                     Mode::Assault,
@@ -127,6 +128,7 @@ impl NativeStartup {
             return Err("native startup mission definition disagrees with the bound map".into());
         }
         let plan = match state.options.mode {
+            Mode::Tutorial => StartPlan::prepare_tutorial(authored, &state.options, &state.rules)?,
             Mode::Assault => StartPlan::prepare_assault(
                 authored,
                 &state.options,
@@ -166,6 +168,13 @@ impl NativeStartup {
         names: &[String],
         match_id: u64,
     ) -> Result<StartEnvelope, String> {
+        let mut names = names.to_vec();
+        if state
+            .tutorial_state()
+            .is_some_and(|t| t.enemy() == names.len())
+        {
+            names.push(state.options.players[names.len()].name.clone());
+        }
         if names.len() != self.count
             || state.start.players.len() != self.count
             || state.world.game.players.len() != self.count

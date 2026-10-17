@@ -183,8 +183,7 @@ impl crate::match_runtime::Match {
             .filter_map(|(&c, &bits)| ((bits >> team & 1) != 0 && g.chars[c] == b'N').then_some(c))
             .collect();
         match (self.options.mode, g.mode) {
-            _ if crate::match_actor::ordinary_ground_mode(g, self.options.mode)
-                && self.options.mode != crate::economy::Mode::Tutorial =>
+            _ if crate::match_actor::ordinary_ground_mode(g, self.options.mode) =>
             {
                 let wrecks = self.observed_wreck_rows(owner)?;
                 Ok(RecipientLists {
@@ -305,7 +304,6 @@ impl crate::match_runtime::Match {
     pub fn ordinary_snapshot_raw_lists(&self) -> Result<OrdinaryRawLists, String> {
         let game = &self.world.game;
         if !crate::match_actor::ordinary_ground_mode(game, self.options.mode)
-            || self.options.mode == crate::economy::Mode::Tutorial
         {
             return Err("global ordinary lists require represented ordinary mode".into());
         }
