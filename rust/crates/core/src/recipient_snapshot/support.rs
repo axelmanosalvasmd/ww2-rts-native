@@ -143,6 +143,7 @@ mod tests {
         for slot in 0..3 {
             let mut expected = case["outputs"][slot].clone();
             expected["flights"] = case["fullOutputs"][slot]["flights"].clone();
+            expected["air"] = case["fullOutputs"][slot]["air"].clone();
             super::super::tests::equal(
                 &Value::Object(cache.recipient(slot).unwrap().fields),
                 &expected,

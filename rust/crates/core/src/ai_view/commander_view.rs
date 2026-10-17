@@ -282,6 +282,8 @@ impl CommanderViewMemory {
                 sight
             },
             horde: mode == Mode::Horde,
+            defender: matches!(mode, Mode::Horde | Mode::Assault)
+                && view.mode["defenderTeam"].as_i64() == me["team"].as_i64(),
             ground_flights: false,
             ..Context::default()
         };

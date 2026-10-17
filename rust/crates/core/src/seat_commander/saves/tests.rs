@@ -220,9 +220,18 @@ fn if27_v1_null_memory_and_human_resumption_reset_without_changing_game_schema()
 #[test]
 fn if27_horde_pending_memory_round_trips_order_budget_and_supersession() {
     use crate::game::Point;
-    use crate::horde_commander::{HordeCommander, Live, OwnPlan, OwnUnit, View, Wave};
+    use crate::horde_commander::{
+        DeliveredIntent, DeliveredPlan, HordeCommander, Live, OwnPlan, OwnUnit, View, Wave,
+    };
     let plan = OwnPlan {
-        delivered: None,
+        delivered: Some(DeliveredIntent {
+            plan: Some(DeliveredPlan {
+                kind: 0,
+                at: Point { x: 40.0, z: 40.0 },
+            }),
+            orders: vec![],
+            digging: false,
+        }),
         path_generation: 2,
         goal: None,
         route_end: None,

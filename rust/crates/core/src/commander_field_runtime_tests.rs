@@ -8,7 +8,7 @@ use crate::{
     match_commands::Command,
     match_runtime::{Match, MatchOptions, PlayerConfig},
     orders::OrderKey,
-    recipient_snapshot::{DeliveryState, SelectedSeat, SnapshotCache, SnapshotError},
+    recipient_snapshot::{DeliveryState, SelectedSeat},
     weather::WeatherChoice,
 };
 use serde_json::{Value, json};
@@ -289,7 +289,7 @@ fn intent_ai50_gate_order_completes_in_each_real_ordinary_mode_with_supported_se
         let cells: Vec<_> = job.cells.iter().map(|cell| cell.cell).collect();
         let mut completed = false;
         for _ in 0..1200 {
-            tick_and_collect(&mut state, delivery.as_mut());
+            tick_and_collect(&mut state, &mut delivery);
             if !state.field_works.is_active(builder) && count(&state, "gate") == before + 3 {
                 completed = true;
                 break;
@@ -305,7 +305,7 @@ fn intent_ai50_gate_order_completes_in_each_real_ordinary_mode_with_supported_se
             assert_eq!(gate.cells.as_deref(), Some([cell as u32].as_slice()));
         }
         for _ in 0..12 {
-            tick_and_collect(&mut state, delivery.as_mut());
+            tick_and_collect(&mut state, &mut delivery);
         }
         assert_eq!(count(&state, "gate"), before + 3);
         assert!(!state.world.game.units[&builder].dig);
@@ -352,7 +352,7 @@ fn intent_ai50_wall_fronts_queue_and_complete_through_ordinary_conquest_snapshot
         "x":55.0,"z":46.0,"x2":55.0,"z2":36.0,"queue":true}),
     );
     let mut delivery = DeliveryState::new(&state).unwrap();
-    tick_and_collect(&mut state, Some(&mut delivery));
+    tick_and_collect(&mut state, &mut delivery);
     assert!(state.field_works.membership(builder).is_some());
     assert!(state.field_works.membership(other).is_some());
     assert!(
@@ -364,7 +364,7 @@ fn intent_ai50_wall_fronts_queue_and_complete_through_ordinary_conquest_snapshot
     let mut saw_paid = false;
     let mut completed = false;
     for _ in 0..2200 {
-        tick_and_collect(&mut state, Some(&mut delivery));
+        tick_and_collect(&mut state, &mut delivery);
         saw_paid |= state
             .field_works
             .jobs()
@@ -393,6 +393,6 @@ fn intent_ai50_wall_fronts_queue_and_complete_through_ordinary_conquest_snapshot
     assert!(walls.iter().any(|wall| wall.z < 46.0));
     assert!(walls.iter().all(|wall| wall.z <= 47.0 || wall.z >= 53.0));
     for _ in 0..12 {
-        tick_and_collect(&mut state, Some(&mut delivery));
+        tick_and_collect(&mut state, &mut delivery);
     }
 }

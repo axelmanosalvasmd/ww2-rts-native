@@ -196,7 +196,10 @@ impl Match {
                         "nonempty skirmish training queue",
                     ));
                 }
-                if unit.owner >= count || !self.building_rallies.contains_key(&id) {
+                if (self.options.logistics && self.options.mode == Mode::World)
+                    || unit.owner >= count
+                    || !self.building_rallies.contains_key(&id)
+                {
                     return Err(ProductionStepError::InvalidState(
                         "training publication context",
                     ));
@@ -467,6 +470,11 @@ impl Match {
             .building(building)
             .is_some_and(|b| !b.jobs().is_empty())
         {
+            if self.options.logistics && self.options.mode == Mode::World {
+                return Err(ProductionStepError::InvalidState(
+                    "World training reserves initialization unsupported",
+                ));
+            }
             if !self.building_rallies.contains_key(&building) {
                 return Err(ProductionStepError::InvalidState(
                     "canonical training rally missing",
@@ -638,12 +646,12 @@ impl Match {
         control.aim = placed.aim;
         control.rally_drift = placed.rally.is_some();
         control.route_end = route_end;
-        let mut reserves = crate::match_logistics::initial_unit_reserves(
-            self.options.logistics,
-            &placed.unit,
-            &self.rules,
-        )
-        .map_err(ProductionStepError::Control)?;
+        let mut reserves = if self.options.mode == Mode::World {
+            None
+        } else {
+            self.prepare_new_unit_reserves(&placed.unit)
+                .map_err(ProductionStepError::Control)?
+        };
         let units = units(&self.world.game, &self.rules, count)?;
         let context = context(
             &self.options,

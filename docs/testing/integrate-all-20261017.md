@@ -127,3 +127,23 @@ contact clocks are also populated by the active ordinary delivered-frame adapter
 not just the independently retained Horde adapter. Its restore accepts older
 memory without stationary clocks through a default-empty field. Aircraft mission
 selection is invoked once, avoiding duplicate orders from the two composed paths.
+
+## Cross-chain #431
+
+Exact parent `96841c7dad4afb48706256eb247f4b18132689b4`. Canonical reserve/convoy
+validation and delivered owner lists compose with the existing World refusal,
+all ordinary modes and companion/operative validation. Duplicate validation
+branches use the new common logistics checker, with World still rejected first.
+
+Both full-tick and NET-54 suites remain registered. Manual-convoy witnesses keep
+real ticks and complete delivery plus incoming immutable preflight assertions.
+The forced-withdrawal witness now uses actual enabled physical logistics and
+checks each owner's reserve row, instead of relying on disabled synthetic
+reserves. Cached/uncached and partial-API capability checks are retained alongside
+complete-mode frames. Classic retreat complete-frame checks and all atomicity
+assertions remain. Authored scenarios keep the typed v2 event owner.
+
+The aimed-approach firing repair is retained. Production uses transactional new
+reserve preparation; World training with logistics remains refused. Presence
+mapping remains socket absence and non-AI. The active ordinary delivered adapter
+also carries the incoming Assault defender fact from its delivered mode row.

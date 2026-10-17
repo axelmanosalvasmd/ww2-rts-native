@@ -4,15 +4,12 @@ use crate::{game::Point, match_commands::Command, production::JobStatus};
 pub(super) fn capture(state: &Match) -> Result<Vec<Map<String, Value>>, SnapshotError> {
     let mut owners = vec![Map::new(); state.world.game.players.len()];
     for owner in &mut owners {
-        for name in ["plans", "orders", "queues", "productionJobs"] {
+        for name in ["plans", "orders", "queues", "productionJobs", "air"] {
             owner.insert(name.into(), Value::Array(Vec::new()));
         }
     }
     for (slot, owner) in owners.iter_mut().enumerate() {
         owner.insert("movement".into(), super::movement_for(state, slot)?);
-        if !state.aviation.planes.is_empty() {
-            owner.insert("air".into(), json!([]));
-        }
     }
     let catalog = Catalog::compiled().map_err(|_| SnapshotError::Rules)?;
     for u in state.world.game.units.values() {

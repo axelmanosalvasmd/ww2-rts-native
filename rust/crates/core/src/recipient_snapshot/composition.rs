@@ -104,7 +104,15 @@ pub(super) fn complete(
 ) -> SupportedSeatSnapshot {
     projection.fields.insert("t".into(), json!("s"));
     if let Some(nodes) = lists.and_then(|lists| lists.nodes.as_ref()) {
-        projection.fields.insert("nodes".into(), json!(nodes));
+        projection.fields.insert(
+            "nodes".into(),
+            json!(
+                nodes
+                    .iter()
+                    .map(|row| json!([row[0], row[1], row[2], u8::from(row[3] != 0.0)]))
+                    .collect::<Vec<_>>()
+            ),
+        );
     }
     // Admission inspected each actual canonical actor/list owner. Their
     // absent output is a represented source result for this bounded frame.
@@ -225,6 +233,7 @@ pub(super) fn admit_actors(state: &Match, outside_events: &[Effect]) -> Result<(
     state
         .preflight_legacy_scenario()
         .map_err(|_| refused(SnapshotCapability::Scenario))?;
+    super::logistics::validate(state)?;
     Ok(())
 }
 

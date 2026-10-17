@@ -2348,11 +2348,7 @@ impl crate::match_runtime::Match {
                 c.move_result = Some(MoveResult::Completed {
                     tick: self.world.game.tick,
                 });
-            } else if !self
-                .convoys
-                .as_ref()
-                .and_then(|s| s.trucks.get(&id))
-                .is_some_and(|c| !c.manual)
+            } else if !self.automatic_convoy(id)
                 && u.path.is_empty()
                 && crate::math::hypot(u.x - goal.x, u.z - goal.z) > 0.25
                 && u.repath <= 0.0
@@ -2673,6 +2669,7 @@ impl crate::match_runtime::Match {
         let owner = unit.owner;
         let kind = unit.kind;
         let before = unit.at();
+        let automatic_convoy = self.automatic_convoy(id);
         let dt = self.rules.movement.tick;
         let limit_travel = self.logistics.get(id).is_some()
             || self

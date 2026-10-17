@@ -601,16 +601,10 @@ impl SeatMemory {
 impl crate::match_runtime::Match {
     /// Build a consumer from the same public start metadata given to ordinary clients.
     pub fn ordinary_ai_view_memory(&self, slot: usize) -> Result<SeatMemory> {
-        let horde = self.options.mode == crate::economy::Mode::Horde
-            && self.world.game.mode == Some(crate::game::ModeKind::Horde);
-        if !horde
-            && !matches!(
-                self.options.mode,
-                crate::economy::Mode::Default | crate::economy::Mode::Conquest
-            )
-        {
-            return Err("AI delivery requires Default, Conquest or canonical Horde".into());
+        if !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode) {
+            return Err("AI delivery requires a canonical ordinary match".into());
         }
+        self.validate_actor_mode()?;
         let map = PublicMap {
             width: self.world.game.w,
             height: self.world.game.h,

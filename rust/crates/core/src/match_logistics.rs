@@ -6,6 +6,8 @@ mod causal_tests;
 #[cfg(test)]
 mod full_tick_tests;
 #[cfg(test)]
+mod net54_tests;
+#[cfg(test)]
 mod runtime_tests;
 
 use crate::{
@@ -82,6 +84,72 @@ pub(crate) fn initial_unit_reserves(
 }
 
 impl Match {
+    pub(crate) fn automatic_convoy(&self, id: u32) -> bool {
+        self.convoys
+            .as_ref()
+            .and_then(|c| c.trucks.get(&id))
+            .is_some_and(|c| !c.manual)
+    }
+
+    /// Full ordinary ticks require the constructor's paired reserve/convoy state.
+    /// World logistics still needs its separate territory/network integration.
+    pub(crate) fn validate_logistics_runtime(&self) -> Result<(), String> {
+        if self.options.logistics != self.convoys.is_some() {
+            return Err("logistics option and convoy state disagree".into());
+        }
+        if self.convoys.is_some() {
+            if !matches!(
+                self.options.mode,
+                crate::economy::Mode::Default
+                    | crate::economy::Mode::Conquest
+                    | crate::economy::Mode::Classic
+                    | crate::economy::Mode::Annihilation
+            ) {
+                return Err("physical logistics requires a supported ordinary mode".into());
+            }
+            self.validate_supply()?;
+            let mut expected = logistics::LogisticsState::default();
+            for unit in self.world.game.units.values() {
+                let definition = Definition::from_catalog(&self.rules.kinds[unit.kind].name)
+                    .map_err(|e| e.to_string())?;
+                let eligible = expected
+                    .initialize_unit(
+                        reserve_context(true),
+                        facts(unit, &self.rules),
+                        Some(&definition),
+                    )
+                    .is_some();
+                if eligible != self.logistics.get(unit.id).is_some() {
+                    return Err("unit reserve metadata does not match logistics eligibility".into());
+                }
+            }
+            for (id, reserve) in self.logistics.iter() {
+                if !self.world.game.units.contains_key(&id)
+                    || [
+                        Some(reserve.ammo),
+                        Some(reserve.ammo_max),
+                        Some(reserve.ammo_price),
+                        reserve.ammo_credit,
+                        Some(reserve.provisions),
+                        reserve.fuel,
+                        reserve.emergency,
+                        reserve.warning,
+                        reserve.supply_rate,
+                        reserve.cut_for,
+                    ]
+                    .into_iter()
+                    .flatten()
+                    .any(|n| !n.is_finite() || n < 0.0)
+                {
+                    return Err("invalid canonical reserve metadata".into());
+                }
+            }
+        } else if self.logistics.iter().next().is_some() {
+            return Err("reserves require enabled logistics".into());
+        }
+        Ok(())
+    }
+
     #[cfg(test)]
     pub(crate) fn test_supply_truck(&mut self, owner: usize) -> u32 {
         self.with_supply_world(|_, state, _, world| {
@@ -680,7 +748,7 @@ impl Match {
             .ok_or("missing army population scale")?;
         let ctx = supply_convoys::Context {
             enabled: true,
-            construction: self.options.mode == crate::economy::Mode::Classic,
+            construction: self.options.mode.is_construction(),
             tick: self.world.game.tick as u64,
             winner: false,
             army_pop: pop,

@@ -164,6 +164,32 @@ pub struct RecipientLists {
 }
 
 impl crate::match_runtime::Match {
+    /// Public resource nodes in prototype sim.js:5932,6019. World discovery stays separate.
+    pub(crate) fn ordinary_snapshot_nodes(&self) -> Result<Option<Vec<[f64; 4]>>, String> {
+        if !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode) {
+            return Err("ordinary nodes require a canonical ordinary match".into());
+        }
+        if self.options.mode != crate::economy::Mode::Classic {
+            return Ok(None);
+        }
+        self.validate_elimination_state()?;
+        Ok(Some(
+            self.elimination
+                .as_ref()
+                .ok_or("missing Classic nodes")?
+                .nodes
+                .iter()
+                .map(|node| {
+                    [
+                        rounded(node.at.x),
+                        rounded(node.at.z),
+                        node.rate,
+                        f64::from(u8::from(node.fuel)),
+                    ]
+                })
+                .collect(),
+        ))
+    }
     /// Capture list facts after current canonical state changes. No delivery cursor is drained.
     /// Ordinary wreck memory is per seat; World wreck memory is shared by team.
     pub fn recipient_snapshot_lists(&mut self, owner: usize) -> Result<RecipientLists, String> {
@@ -342,6 +368,7 @@ impl crate::match_runtime::Match {
             self.validate_horde_economy()?;
         } else if !crate::match_actor::ordinary_ground_mode(game, self.options.mode) {
             return Err("global ordinary lists require represented ordinary mode".into());
+            self.validate_actor_mode()?;
         }
         let mut ids = std::collections::BTreeSet::new();
         let mut rows = Vec::with_capacity(game.wrecks.len());

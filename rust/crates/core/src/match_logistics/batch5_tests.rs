@@ -35,7 +35,21 @@ fn move_to(truck: u32, at: Point, queue: bool) -> Command {
         face: None,
     }
 }
+fn assert_supported_snapshot(m: &mut Match) {
+    let before = format!("{:?}", (&m.world.game.units, &m.convoys, &m.commands.units));
+    let tick = m.world.game.tick;
+    m.validate_logistics_runtime().unwrap();
+    m.preflight_ordinary_snapshot().unwrap();
+    assert_eq!(m.world.game.tick, tick);
+    assert!(m.tick_state.fault().is_none());
+    assert_eq!(
+        format!("{:?}", (&m.world.game.units, &m.convoys, &m.commands.units)),
+        before
+    );
+}
+
 fn assert_delivery(m: &mut Match) {
+    assert_supported_snapshot(m);
     assert!(m.tick_state.fault().is_none());
     let mut delivery = DeliveryState::new(m).unwrap();
     let selected = (0..m.start.players.len())
@@ -251,7 +265,7 @@ fn intent_log39_match_unreachable_existing_source_refuses_before_route_publicati
 }
 
 #[test]
-fn intent_log43_match_scheduler_owner_alerts_stay_below_full_snapshot_guard() {
+fn intent_log43_match_scheduler_owner_alerts_support_owner_snapshots() {
     let mut m = arena(true);
     let id = troop(&m);
     let reserves = m.logistics.get_mut(id).unwrap();

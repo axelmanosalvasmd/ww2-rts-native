@@ -34,3 +34,5 @@ The ABI 2 approval is limited to the six recipient-view calls in `rust-unreal-ab
 [Additive ABI 2.1/2.2 queries](abi-queries.md) are an implementation candidate authorized by owner decision `julio-373-merged-decisions-20261016` on #5. Existing ABI 2 functions and layouts remain unchanged; exact signatures require runtime review before Unreal adoption.
 
 IF-11 adds five stateless motion/flight queries in minor revision 2, stacked on #418. The same additive-only authorization and signature review before Unreal adoption apply.
+
+[Ordinary owner lists](owner-lists-v0.md) records the existing prototype snapshot shapes for private economy, production, aircraft and physical logistics. It adds no ABI or command interface and does not change the protocol draft's approval status.

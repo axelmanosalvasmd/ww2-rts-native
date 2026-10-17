@@ -501,6 +501,8 @@ fn base45_paid_cache_requires_logistics_and_serves_only_when_finished() {
     assert!(m.world.game.units.contains_key(&truck));
     assert!(m.tick_state.fault().is_none());
     let after_tick_mp = m.start.economy.players[0].mp;
+    m.validate_logistics_runtime().unwrap();
+    m.preflight_ordinary_snapshot().unwrap();
     for _ in 0..241 {
         m.world.game.tick += 1;
         let mut frame = m.begin_construction_tick().unwrap();

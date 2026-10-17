@@ -227,6 +227,7 @@ fn validate_snapshot(state: &Match) -> Result<(), SnapshotError> {
     {
         return Err(SnapshotError::UnsupportedMode);
     }
+    logistics::validate(state)?;
     if state.options.mode == Mode::Tutorial {
         state
             .validate_tutorial_state()
@@ -1249,6 +1250,7 @@ pub(crate) mod tests {
                 let projection = cache.recipient(slot).unwrap();
                 let mut expected = expected.clone();
                 expected["flights"] = case["fullOutputs"][slot]["flights"].clone();
+                expected["air"] = case["fullOutputs"][slot]["air"].clone();
                 equal(
                     &Value::Object(projection.fields),
                     &expected,

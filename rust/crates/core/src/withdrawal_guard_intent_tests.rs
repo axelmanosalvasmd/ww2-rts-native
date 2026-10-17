@@ -1,4 +1,4 @@
-//! LOG-14 guards over canonical reserves and recipient delivery. World logistics stays guarded.
+//! LOG-14 guards over canonical reserves and ordinary physical logistics ticks.
 use crate::{
     catalog::Catalog,
     economy::{Faction, Mode},
@@ -10,7 +10,7 @@ use crate::{
     match_runtime::{Match, MatchOptions, PlayerConfig},
     match_support::{SupportEvent, SupportKind, SupportTiming},
     random::MatchRandom,
-    recipient_snapshot::{DeliveryState, SnapshotCache, SnapshotCapability},
+    recipient_snapshot::{DeliveryState, SelectedSeat, SnapshotCache, SnapshotCapability},
     unit_spawn::initial_unit,
     weather::WeatherChoice,
     world_generation::{WorldSize, generate_world},
@@ -45,6 +45,9 @@ fn options(mode: Mode) -> MatchOptions {
     }
 }
 fn scene() -> Match {
+    scene_with_logistics(false)
+}
+fn scene_with_logistics(enabled: bool) -> Match {
     let map = AuthoritativeMap::from_json(
         &serde_json::to_vec(&json!({
             "name":"withdrawal guards", "w":80, "h":80,
@@ -55,7 +58,9 @@ fn scene() -> Match {
         .unwrap(),
     )
     .unwrap();
-    let mut m = Match::new(&map, options(Mode::Conquest)).unwrap();
+    let mut opts = options(Mode::Conquest);
+    opts.logistics = enabled;
+    let mut m = Match::new(&map, opts).unwrap();
     for control in m.commands.units.values_mut() {
         control.auto_cast = false;
         control.auto_retreat = false;
@@ -84,6 +89,11 @@ fn add(m: &mut Match, name: &str, owner: usize, at: Point) -> u32 {
     m.firing.initialize(id);
     m.abilities.initialize(id);
     m.recovery.initialize(id);
+    if m.options.logistics
+        && let Some(reserves) = m.prepare_new_unit_reserves(&unit).unwrap()
+    {
+        m.logistics.insert(id, reserves);
+    }
     m.world.game.units.insert(id, unit);
     m.grid.rebuild(&m.world.game.units);
     id
@@ -146,7 +156,7 @@ fn log14_forced_progress_resync_requires_path_and_no_supply_hold() {
 
 #[test]
 fn log14_forced_progress_survives_ordinary_ticks_and_each_seat_snapshot() {
-    let mut m = scene();
+    let mut m = scene_with_logistics(true);
     let id = add(&mut m, "rifle", 0, point(70.0, 70.0));
     force(&mut m, id, false);
     let unit = m.world.game.units.get_mut(&id).unwrap();
@@ -157,48 +167,61 @@ fn log14_forced_progress_survives_ordinary_ticks_and_each_seat_snapshot() {
     m.commands.units.get_mut(&id).unwrap().supply_started = true;
     m.commands.units.get_mut(&id).unwrap().route_end = Some(point(100.0, 70.0));
     let before = m.world.game.units[&id].x;
+    let selected = (0..m.start.players.len())
+        .map(|slot| SelectedSeat {
+            slot,
+            full: false,
+            omit: false,
+        })
+        .collect::<Vec<_>>();
+    let mut delivery = DeliveryState::new(&m).unwrap();
     for tick in 1..=4 {
-        m.advance_tick().unwrap();
+        let report = m.advance_tick().unwrap();
         assert_eq!(m.tick_state.fault(), None);
         assert_eq!(m.logistics.get(id).unwrap().stranded, tick == 1);
         assert_eq!(m.world.game.units[&id].retreating, tick != 1);
-        let cache = SnapshotCache::new(&m).unwrap();
-        for seat in 0..m.start.players.len() {
-            let projection = cache.recipient(seat).unwrap();
-            assert!(!projection.missing.contains(&SnapshotCapability::Logistics));
-            assert!(!projection.fields.contains_key("logistics"));
-            if seat == 0 {
-                let row = projection.fields["units"]
+        {
+            let cache = SnapshotCache::new(&m).unwrap();
+            for seat in 0..m.start.players.len() {
+                let projection = cache.recipient(seat).unwrap();
+                assert!(!projection.missing.contains(&SnapshotCapability::Logistics));
+            }
+        }
+        let frame = delivery
+            .capture_selected_with_tick_events(&mut m, &selected, &report.events)
+            .unwrap()
+            .unwrap();
+        for seat in &selected {
+            let snapshot = frame.recipient(seat.slot).unwrap().into_json();
+            assert_eq!(snapshot["t"], "s");
+            let reserves = snapshot["logistics"]["units"].as_array().unwrap();
+            let own = reserves.iter().find(|row| row["id"] == id);
+            if seat.slot == 0 {
+                let reserve = own.expect("owner receives its forced withdrawal reserve");
+                assert_eq!(reserve["forced"], true);
+                assert_eq!(reserve["stranded"], tick == 1);
+                let unit = snapshot["units"]
                     .as_array()
                     .unwrap()
                     .iter()
-                    .find(|row| row[0].as_u64() == Some(u64::from(id)))
+                    .find(|row| row[0] == id)
                     .unwrap();
-                assert_eq!(row[12].as_u64().unwrap() & 1 != 0, tick != 1);
+                assert_eq!(unit[12].as_u64().unwrap() & 1 != 0, tick != 1);
+            } else {
+                assert!(own.is_none(), "nonowners never receive the forced reserve");
             }
         }
-        let reserves = m.logistics.get(id).unwrap().clone();
-        {
-            let mut delivery = DeliveryState::new(&m).unwrap();
-            let frame = delivery
-                .capture_quiescent(&mut m, &[true; 2], &[false; 2], &[])
-                .unwrap();
-            for seat in 0..2 {
-                let snapshot = frame.recipient(seat).unwrap().into_json();
-                assert_eq!(snapshot["t"], "s");
-                assert!(snapshot.get("logistics").is_none());
-            }
-        }
-        assert_eq!(m.logistics.get(id).unwrap(), &reserves);
     }
     assert!(m.world.game.units[&id].x > before);
-    // Enabling logistics still requires its canonical convoy owner.
-    assert!(m.convoys.is_none());
-    m.options.logistics = true;
-    assert_eq!(
-        m.validate_tick_state().unwrap_err(),
-        "logistics requires initialized convoy state"
+    // A mismatched option remains a read-only refusal after supported ticks.
+    m.options.logistics = false;
+    let tick = m.world.game.tick;
+    assert!(
+        m.validate_tick_state()
+            .unwrap_err()
+            .contains("logistics option and convoy state disagree")
     );
+    assert_eq!(m.world.game.tick, tick);
 }
 
 #[test]

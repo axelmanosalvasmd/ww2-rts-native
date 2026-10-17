@@ -1,6 +1,14 @@
 use super::*;
 use crate::{logistics::Stock, supply_convoys::GRACE};
 
+pub(super) fn validate(state: &Match) -> Result<(), SnapshotError> {
+    state
+        .validate_logistics_runtime()
+        .map_err(|_| SnapshotError::Unsupported {
+            unit: 0,
+            capability: SnapshotCapability::Logistics,
+        })
+}
 fn number(n: f64) -> Result<Value, SnapshotError> {
     if !n.is_finite() {
         return Err(SnapshotError::InvalidNumber);
@@ -41,6 +49,10 @@ pub(super) fn project(state: &Match, slot: usize) -> Result<Option<Value>, Snaps
     let mut trucks = Vec::new();
     for u in g.units.values().filter(|u| u.owner == slot) {
         if let Some(r) = state.logistics.get(u.id) {
+            finite(&[r.ammo, r.ammo_max])?;
+            if let Some(cut_for) = r.cut_for {
+                finite(&[cut_for])?;
+            }
             let cut_for = r.cut_for.unwrap_or(0.0);
             let cut = cut_for >= GRACE;
             let grace = (cut_for > 0.0 && cut_for < GRACE).then(|| (GRACE - cut_for).ceil());
@@ -89,6 +101,7 @@ pub(super) fn project(state: &Match, slot: usize) -> Result<Option<Value>, Snaps
     }
     let mut events = Vec::new();
     for e in convoys.events.iter().filter(|e| e.owner == slot) {
+        finite(&[e.seconds])?;
         let mut event = json!({
             "id": e.id, "type": e.kind, "count": e.count, "message": e.message
         });

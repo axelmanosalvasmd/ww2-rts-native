@@ -357,6 +357,40 @@ fn mode01_non_world_mode_rows_match_the_prototype_public_fields() {
             _ => unreachable!(),
         };
         assert_eq!(mode_row(&m).unwrap(), expected, "{mode:?}");
+        let cache = SnapshotCache::new(&m).unwrap();
+        for slot in 0..m.start.players.len() {
+            assert_eq!(
+                cache.recipient(slot).unwrap(),
+                crate::recipient_snapshot::recipient_uncached(&m, slot).unwrap(),
+                "cached/uncached {mode:?} seat {slot}"
+            );
+        }
+        // Also retain the partial API's explicitly missing component contract.
+        let count = m.start.players.len();
+        let mut partial_delivery = DeliveryState::new(&m).unwrap();
+        let partial = partial_delivery
+            .capture(&mut m, &vec![true; count], &vec![false; count])
+            .unwrap();
+        assert_eq!(
+            partial.slots().collect::<Vec<_>>(),
+            (0..count).collect::<Vec<_>>()
+        );
+        for slot in 0..count {
+            let projection = partial.recipient(slot).unwrap();
+            if mode == Mode::Conquest {
+                assert!(!projection.fields.contains_key("mode"));
+            } else {
+                assert_eq!(projection.fields["mode"], expected);
+            }
+            assert_eq!(
+                projection.missing,
+                vec![
+                    crate::recipient_snapshot::SnapshotCapability::WrecksAndFoundMines,
+                    crate::recipient_snapshot::SnapshotCapability::ShotsAndFlights,
+                    crate::recipient_snapshot::SnapshotCapability::TeamEffects,
+                ]
+            );
+        }
         if mode == Mode::Conquest {
             let cache = SnapshotCache::new(&m).unwrap();
             for slot in 0..m.start.players.len() {

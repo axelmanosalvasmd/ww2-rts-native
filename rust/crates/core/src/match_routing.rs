@@ -1188,6 +1188,7 @@ pub fn prepare_ordinary_recipient_lists(
     let grid = SpatialGrid::new(&g.units, 16.0);
     let mut results = Vec::with_capacity(owners.len());
     let mut replacements = Vec::with_capacity(owners.len());
+    let nodes = state.ordinary_snapshot_nodes()?;
     for &owner in owners {
         let prior = &state.recipients[owner].wreck_memory;
         let accepted = collect_wrecks(
@@ -1229,7 +1230,7 @@ pub fn prepare_ordinary_recipient_lists(
             crate::recipient_lists::RecipientLists {
                 wrecks,
                 found_mines,
-                nodes: state.ordinary_snapshot_nodes()?,
+                nodes: nodes.clone(),
             },
         ));
     }

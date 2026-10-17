@@ -3,6 +3,8 @@
 //! This integration grows by attaching the independently verified phase adapters.
 //! Reports identify phases still absent; a clock advance is not playable-match proof.
 #[cfg(test)]
+mod phase_additional_tests;
+#[cfg(test)]
 mod phase_dependency_tests;
 
 use std::collections::BTreeMap;
@@ -316,12 +318,7 @@ impl crate::match_runtime::Match {
         if world && (self.options.logistics || self.convoys.is_some()) {
             return Err("World logistics tick phases are not connected".into());
         }
-        if !world && self.options.logistics != self.convoys.is_some() {
-            return Err("logistics requires initialized convoy state".into());
-        }
-        if !world && self.options.logistics {
-            self.validate_supply()?;
-        }
+        self.validate_logistics_runtime()?;
         self.preflight_legacy_scenario()?;
         self.tick_state.paths.validate()?;
         let boundary = game.tick as u64 + 1;
@@ -540,6 +537,9 @@ impl crate::match_runtime::Match {
             None
         };
         let mut moved = Vec::new();
+        if self.convoys.is_some() {
+            phases.push(TickPhase::UnitReserves);
+        }
         let mut last_id = None;
         loop {
             // The source iterates its live Map. Monotonic IDs let births made
@@ -601,7 +601,7 @@ impl crate::match_runtime::Match {
             let unit = &self.world.game.units[&id];
             let terrain_suppression = unit.supp;
             let factor = movement::supp_speed(unit.supp);
-            if self.options.logistics {
+            if self.convoys.is_some() {
                 self.advance_unit_reserves(id)?;
                 self.advance_supply_withdrawal(id)?;
             }
@@ -871,7 +871,7 @@ impl crate::match_runtime::Match {
         .map_err(|e| format!("living weather: {e:?}"))?;
         drop(smokes);
         phases.push(TickPhase::LivingWeather);
-        // Expiring smoke still blocks ignition during the source fire phase.
+        // Expiring smoke still suppresses replacement smoke during the source fire phase.
         self.tick_environment_phase(EnvironmentPhase::FireFlood(&unit_order), events)?;
         self.world
             .game

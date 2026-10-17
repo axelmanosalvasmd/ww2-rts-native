@@ -113,8 +113,17 @@ impl CommanderMemory {
             .get(self.slot)
             .ok_or("missing delivered commander seat")?;
         let mode = Mode::from_kind(view.mode["kind"].as_str());
-        if !matches!(mode, Mode::Default | Mode::Conquest | Mode::Horde) {
-            return Err("delivered commander requires Conquest or Horde".into());
+        if !matches!(
+            mode,
+            Mode::Default
+                | Mode::Conquest
+                | Mode::Classic
+                | Mode::Assault
+                | Mode::Annihilation
+                | Mode::Horde
+                | Mode::Tutorial
+        ) {
+            return Err("delivered commander requires an ordinary mode".into());
         }
         let faction = Faction::try_from(byte(&me["faction"])?).map_err(|e| e.to_string())?;
         let players = view
@@ -168,7 +177,7 @@ impl CommanderMemory {
                 rule_number(weather_rule, "sight")?
             },
             horde: mode == Mode::Horde && view.mode["slot"].as_u64() == Some(self.slot as u64),
-            defender: mode == Mode::Horde
+            defender: matches!(mode, Mode::Horde | Mode::Assault)
                 && view.mode["defenderTeam"].as_i64() == Some(i64::from(team)),
             height: view.height.clone(),
             ..Context::default()
@@ -580,6 +589,10 @@ mod tests {
     #[test]
     fn delivered_defender_packet_keeps_own_intent_economy_and_received_terrain() {
         let (mut delivery, mut snap) = delivery();
+        for row in snap["units"].as_array_mut().unwrap() {
+            row[11] = json!(7);
+            row[12] = json!(2048 | 4096 | 8192 | 16384);
+        }
         snap["cells"] = json!([[5,"N",2,0,{"ground":"D","object":".","mineOwned":true}]]);
         let view = delivery.decode(&snap).unwrap();
         let result = CommanderMemory::new(0, 40, 40)
@@ -594,6 +607,11 @@ mod tests {
         assert_eq!(input.manpower, 420.0);
         assert_eq!(context.munitions, 160.0);
         assert_eq!(context.support["artillery"], 5.0);
+        assert!(context.units[&1].hold_fire && context.units[&1].auto_cast);
+        assert_eq!(context.units[&1].cooldown, 7.0);
+        assert!(!context.units[&3].hold_fire && !context.units[&3].auto_cast);
+        assert_eq!(context.units[&3].cooldown, 0.0);
+        assert!(!context.units.contains_key(&2));
         assert_eq!(
             input.research.as_ref().unwrap().busy,
             vec![Technology::Guns]

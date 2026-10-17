@@ -178,3 +178,12 @@ The AI codec does not increment the envelope version or change its seven keys or
 
 Merged policy state also persists field-work bridge, fill and demine crews, armor sightings, World rail timing and fort steps through the same tagged AI codec. Older non-null policy memory lacking the new field and World owners defaults those owners, preserving v1 compatibility. World room admission remains closed.
 Scripted Horde policy remembers its observed stationary positions and timers. Older commander memory without that policy starts it fresh. Its old decoded policy packet is cleared with the old delivered view on load, so the next action still requires a fresh delivered observation.
+
+The native Horde comparison plan also retains its optional `delivered` intent:
+optional display `plan`, display `orders`, and the `digging` flag. Display plans
+carry the existing recipient `kind` and point `at`, never hidden work or target
+data (`shared/sim.js:6016-6062`). Missing `delivered` content decodes as `None`
+for older native comparison plans. This stays inside the existing tagged
+external AI owner, with its fresh-observation requirement after load. It adds
+no match checkpoint or envelope key. The populated comparison-plan round trip
+is covered by `if27_horde_pending_memory_round_trips_order_budget_and_supersession`.

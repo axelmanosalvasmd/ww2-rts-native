@@ -698,6 +698,12 @@ impl Match {
             self.building_rallies.remove(&unit.id);
             self.recruit_metadata.remove(&unit.id);
             self.logistics.remove(unit.id);
+            if let Some(convoys) = self.convoys.as_mut() {
+                // Administrative elimination deletes source units directly. Drop
+                // their attached state without charging a combat truck loss.
+                convoys.trucks.remove(&unit.id);
+                convoys.stores.retain(|store| store.entity != Some(unit.id));
+            }
             self.aviation.remove(unit.id);
             for node in &mut self.elimination.as_mut().unwrap().nodes {
                 if node.depot == Some(unit.id) {
