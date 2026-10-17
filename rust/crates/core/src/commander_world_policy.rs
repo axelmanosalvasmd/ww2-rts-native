@@ -40,7 +40,7 @@ pub struct Facts {
     /// Current visibility cells delivered to this seat, not explored-cell history.
     pub visible_cells: BTreeSet<usize>,
 }
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct State {
     pub rail_at: BTreeMap<u32, i64>,
     pub fort_steps: BTreeMap<u32, u8>,

@@ -19,12 +19,12 @@ pub struct Facts {
     pub found_mines: Vec<Point>,
     pub free_nodes: Vec<Point>,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 struct Sent {
     tick: i64,
     dug: bool,
 }
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct State {
     bridges: BTreeSet<usize>,
     bridge_crew: BTreeMap<u32, Sent>,
