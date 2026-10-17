@@ -263,11 +263,7 @@ fn base59_classic_snapshots_publish_exact_nodes_and_private_research_rallies_thr
                 row["mode"],
                 json!({"kind":"classic","timeLeft":124.,"suddenDeath":false})
             );
-            if step == 0 {
-                assert!(row.get("ghosts").is_none());
-            } else {
-                assert!(row["ghosts"].is_array());
-            }
+            assert!(row["ghosts"].is_array());
             assert_eq!(row["tech"]["tier"], 1);
             if slot == 0 {
                 assert_eq!(row["rally"], json!([38.3, 48.4]));

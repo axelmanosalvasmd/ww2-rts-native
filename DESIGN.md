@@ -1,3 +1,7 @@
+## External AI memory across native checkpoints (2026-10-16)
+
+The separate AI save owner now has a core codec for policy and observation memory. Ordinary commander attention and queued motor inputs reset on load, matching the prototype's unsaved commander WeakMap. Native strategic RNG and bounded Horde pending-order state remain with their policy owner; native routing caches continue to use the persistence choice recorded in `design.d/2026-10-16-save-load.md`. Existing save v1 bodies and null AI content remain compatible. Hosted AI room admission and AI-63 remain separate. `docs/contracts/save-format.md` specifies the representation and `if27_save_continuation_keeps_planner_memory_and_resets_commander_attention` exercises the load boundary and subsequent native ticks.
+
 ## Owner parity decisions A, B and C (2026-10-16)
 
 The [recorded owner decisions](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6217590741) approve the differences below, the Rust-only acceptance of the listed client rows, and World deferral for milestone R1. Julio recorded both owners' decisions after Axel's voice approval; Axel's written confirmation on #5 is requested in that comment. This section records the decisions for STATUS-ABC.
