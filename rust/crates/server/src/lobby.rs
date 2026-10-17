@@ -687,8 +687,10 @@ impl Room {
             }
             return true;
         }
-        if host && matches!(t, "pause" | "resume") && self.native.is_some() {
-            let native = self.native.as_mut().unwrap();
+        if host
+            && matches!(t, "pause" | "resume")
+            && let Some(native) = &mut self.native
+        {
             if native.runtime.fault().is_some()
                 || !me.connection.as_ref().is_some_and(Connection::ready)
             {
