@@ -12,7 +12,7 @@ Classic snapshot admission and waiting Ability projection to existing owners.
 | --- | --- | --- |
 | NET-43 | `net43_union_guest_pause_stamps_malformed_and_exact_recipient_local_denials` | Every newly admitted family, plus cancellation, uses stable guest authority, ignores forged issuer/tick/sequence, drops paused input, rejects malformed rows before reserving input, produces the exact prototype denial only to the issuer, and survives later ticks with every seat projected. |
 | NET-43 | `net43_attack_and_grouped_orders_keep_selection_and_parent_queue_semantics` | Successful guest Attack, missing/foreign selection filtering, grouped parent queue override, partial success, ignored disallowed group parts and retained waiting Attack. |
-| NET-43 | `net43_ability_autocast_and_waiting_kind_six_survive_room_delivery` | Successful guest Autocast, foreign selection exclusion, waiting aimed Ability with exact kind-6 owner row, private orders, immediate aimed Ability and later room frames. |
+| NET-43 | `net43_ability_autocast_and_waiting_kind_six_survive_room_delivery` | Successful guest Autocast, foreign selection exclusion, waiting aimed Ability with exact kind-6 owner row, private orders, immediate aimed Ability, sustained approach, actual throw/flight/expiry and later room frames. |
 | NET-43 | `net43_board_unload_and_aircraft_escort_run_through_ordinary_rooms` | Actual boarding, riding/cargo state, mixed aircraft Escort selection, successful Unload, aircraft Move/Stop and later room frames. |
 | NET-43 | `net43_build_and_worker_replacement_remain_live_after_admission` | Paid guest Build creates its site through the queue, retains construction through frames, accepts AutoRetreat and lets Stop clear the canonical assignment. |
 | NET-43 | `net43_classic_waiting_production_cancels_refunds_and_delivers_every_seat` | Actual authored Classic attachment with logistics disabled, two queued purchases, original waiting-job refund, active-job `notWaiting`, foreign `unseen`, owner-only job identities, Classic currency/mode/node rows, natural HQ loss through the queue, 120 ending callbacks with 60 frames per seat, and the final Classic result and territory timeline. |
@@ -62,3 +62,26 @@ callbacks also require actual frame delivery to both seats.
 The implementation agent ran no Cargo commands, by task instruction. Compilation,
 focused tests and final-head checks belong to the parent integration run. No
 passing execution or full NET-43 qualification is claimed by this note alone.
+
+## Observed aimed-approach fault and repair
+
+The parent run at frozen head `be3ff5c7` selected 70 focused tests: 67 passed and
+three failed (`/tmp/roomcmds2-focus4.log`), including the NET-43 ability room
+fault. A diagnostic rerun exposed the exact tick-12 reason:
+`air, rail, operative and aimed ability firing are unsupported`.
+
+The ordinary unit loop calls `step_aimed_ability` before movement and ordinary
+firing. An out-of-range aimed ability remains active while its unit approaches;
+the old firing guard then rejected that valid pending state. The prototype
+walks the aimed order at `shared/sim.js:5416-5430` and still runs ordinary
+targeting and firing at `shared/sim.js:5557-5580`, so the repair removes only the
+pending aimed-state restriction while retaining the aircraft, rail and operative
+firing guards.
+
+The same room test keeps all existing assertions and uses a target 30 metres
+from the original actor pose so the direct order remains pending across six
+ordinary approach callbacks, asserting movement during that interval before
+requiring the real throw, retained grenade flight, cooldown and flight/ticket
+expiry. Every callback still checks room fault state and snapshots for both
+seats; this agent ran no Cargo, Source or Node commands, and post-repair
+execution belongs to the parent run.

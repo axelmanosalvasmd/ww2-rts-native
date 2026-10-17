@@ -81,3 +81,8 @@ and operative connections retain their existing silence. Before hello and in
 the lobby, malformed tags and root arrays remain ignored, as do top-level JSON
 primitives. The repair adds feedback only for the current ready commander
 connection during active, unpaused play.
+
+Pending aimed abilities retain the ordinary movement and weapon lifecycle:
+the unit walks into ability range and still receives its normal targeting and
+firing turn (`shared/sim.js:5416-5430,5557-5580`). A pending aimed point is
+supported state, including while it persists across ticks before the throw.

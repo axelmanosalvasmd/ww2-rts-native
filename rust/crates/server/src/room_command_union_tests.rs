@@ -162,7 +162,13 @@ impl Room {
         self.hub.poll_native(self.now, self.nanos);
         self.nanos += 50_000_000;
         self.now += 50;
-        assert!(self.hub.native_status("ABC").unwrap().fault.is_none());
+        let status = self.hub.native_status("ABC").unwrap();
+        assert!(
+            status.fault.is_none(),
+            "room tick {} fault: {:?}",
+            status.tick,
+            status.fault
+        );
         if let Some(native) = self.hub.rooms["ABC"].native.as_ref() {
             let cache = SnapshotCache::new(native.runtime.state()).unwrap();
             for slot in 0..2 {
@@ -327,7 +333,7 @@ fn net43_ability_autocast_and_waiting_kind_six_survive_room_delivery() {
     room.accepted(1, json!({"t":"autocast","ids":[actor],"on":false}));
     room.accepted(1, json!({"t":"move","orders":[[actor,at.x-40.,at.z]]}));
     let aim = Point {
-        x: at.x - 20.,
+        x: at.x - 30.,
         z: at.z,
     };
     room.accepted(
@@ -361,6 +367,29 @@ fn net43_ability_autocast_and_waiting_kind_six_survive_room_delivery() {
         room.state().commands.units[&actor].nade.is_some()
             || room.state().abilities.get(actor).unwrap().cooldown > 0.
     );
+    let approaching = room.state().world.game.units[&actor].at();
+    assert!(room.state().commands.units[&actor].nade.is_some());
+    room.healthy();
+    assert!(room.state().commands.units[&actor].nade.is_some());
+    assert_ne!(room.state().world.game.units[&actor].at(), approaching);
+    let (mut threw, mut flew) = (false, false);
+    for _ in 0..240 {
+        let messages = room.step();
+        threw |= messages[1].iter().any(|message| {
+            message["shots"].as_array().is_some_and(|shots| {
+                shots.iter().any(|shot| shot["k"] == "throw" && shot["f"] == actor)
+            })
+        });
+        flew |= room.state().firing.flights.values().any(|flight| flight.shooter == actor);
+        if threw && room.state().firing.flights.is_empty() && room.state().firing.grenades.is_empty() {
+            break;
+        }
+    }
+    assert!(threw && flew, "the ordinary aimed approach must launch and deliver its grenade");
+    assert!(room.state().commands.units[&actor].nade.is_none());
+    assert!(room.state().abilities.get(actor).unwrap().cooldown > 0.);
+    assert!(room.state().firing.flights.is_empty());
+    assert!(room.state().firing.grenades.is_empty());
     room.healthy();
 }
 

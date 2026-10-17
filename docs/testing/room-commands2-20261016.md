@@ -87,7 +87,7 @@ Fresh main `6f02f83ad1f4fff6c7945ad3e5ac263a8bf41c58` was merged as `4ee4d51e2aa
 
 ## Main composition after combat filtering and AI saves
 
-Incoming main `52a8315f` includes #396 combat filtering, #392 numeric keys and #391 AI planning. The merge starts from `bb4d5d87`; its conflicted automatic tree is `f6f68188fdb7474ff013a2ec55f2777a155aaa22`. Every nonautomatic edit is listed here:
+Incoming main `52a8315f` includes #396 combat filtering, #392 numeric keys and #391 AI planning. The merge starts from `bb4d5d87`; its conflicted automatic tree is `d3844e8526a30d538d46eab77222c39ee1a913dc`. Every nonautomatic edit is listed here:
 
 - `DESIGN.md` (one conflict): retain the existing medic, house-shelling and FireAt decisions and the incoming external AI-memory decision.
 - `horde_commander.rs` (one conflict, plus serialization repair): retain delivered plans, `is_digging`, incoming `same_intent` and its numeric-key comparison, and incoming save derives. Add the same derives to `DeliveredPlan` and `DeliveredIntent`; default a missing `OwnPlan.delivered` to `None` for older AI memory.

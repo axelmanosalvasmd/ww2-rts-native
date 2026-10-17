@@ -1594,9 +1594,11 @@ impl Match {
             .units
             .get(&id)
             .ok_or("missing canonical unit control")?;
-        if kind.air || kind.rail || control.operative || control.nade.is_some() {
-            return Err("air, rail, operative and aimed ability firing are unsupported".into());
+        if kind.air || kind.rail || control.operative {
+            return Err("air, rail and operative firing are unsupported".into());
         }
+        // A pending aimed ability can still approach its destination while the
+        // ordinary targeting/firing phase runs (prototype sim.js:5416-5430,5557-5580).
         if u.riding {
             return Ok(());
         }
