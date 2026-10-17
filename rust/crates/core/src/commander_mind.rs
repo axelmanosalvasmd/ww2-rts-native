@@ -13,7 +13,7 @@ pub struct Sighting {
     pub worth: f64,
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Mind {
     roster: BTreeMap<u32, Point>,
     respect: BTreeMap<String, u8>,

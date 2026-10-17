@@ -249,6 +249,27 @@ fn cmb112_classic_and_world_charge_on_use_and_aimed_arrival() {
         assert_eq!(m.abilities.get(id).unwrap().cooldown, 0.);
 
         if mode == Mode::Classic {
+            let projection = SnapshotCache::new(&m).unwrap().recipient(0).unwrap();
+            let row = projection.fields["units"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|row| row[0] == json!(id))
+                .unwrap();
+            // The rejected aimed purchase leaves the owner's rifle ready to use.
+            assert_eq!(
+                &row.as_array().unwrap()[..3],
+                &[json!(id), json!("rifle"), json!(0)]
+            );
+            assert_eq!(row[11], json!(0.));
+            assert_eq!(projection.fields["ghosts"], json!([]));
+        } else {
+            assert!(matches!(
+                SnapshotCache::new(&m),
+                Err(SnapshotError::UnsupportedMode)
+            ));
+        }
+        if mode == Mode::Classic {
             m.firing.take_events();
             m.validate_tick_state().unwrap();
             for _ in 0..4 {
@@ -259,11 +280,6 @@ fn cmb112_classic_and_world_charge_on_use_and_aimed_arrival() {
                     cache.recipient(slot).unwrap();
                 }
             }
-        } else {
-            assert!(matches!(
-                SnapshotCache::new(&m),
-                Err(SnapshotError::UnsupportedMode)
-            ));
         }
     }
 }

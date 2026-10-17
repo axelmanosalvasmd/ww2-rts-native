@@ -125,6 +125,52 @@ fn remembered(m: &Match, team: i32) -> &[KnownBuilding] {
         .1
 }
 
+fn classic_vision_tick(m: &mut Match, delivery: &mut crate::recipient_snapshot::DeliveryState) {
+    loop {
+        let report = m.advance_tick().unwrap();
+        let refreshed = report.tick % 4 == 1;
+        let expected = (0..m.world.game.players.len())
+            .map(|slot| {
+                remembered(m, m.world.game.players[slot].team)
+                    .iter()
+                    .filter(|row| !m.world.game.players[slot].sees(row.id))
+                    .map(|row| {
+                        json!([
+                            row.id,
+                            m.rules.kinds[row.kind].name,
+                            row.owner,
+                            crate::math::round(row.at.x * 10.) / 10.,
+                            crate::math::round(row.at.z * 10.) / 10.,
+                            row.built.map(|n| crate::math::round(n * 10.) / 10.)
+                        ])
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+        let selected = (0..m.world.game.players.len())
+            .map(|slot| crate::recipient_snapshot::SelectedSeat {
+                slot,
+                full: false,
+                omit: false,
+            })
+            .collect::<Vec<_>>();
+        let frame = delivery
+            .capture_selected_with_tick_events(m, &selected, &report.events)
+            .unwrap()
+            .unwrap();
+        for (slot, ghosts) in expected.iter().enumerate() {
+            assert_eq!(
+                frame.recipient(slot).unwrap().into_json()["ghosts"],
+                json!(ghosts)
+            );
+        }
+        if refreshed {
+            break;
+        }
+    }
+    assert!(m.tick_state.fault().is_none());
+}
+
 #[test]
 fn cmb130_classic_remembers_last_seen_buildings_until_an_airborne_observer_revisits() {
     let mut m = scene_mode(&[0, 1, 0], Mode::Classic);
@@ -134,10 +180,14 @@ fn cmb130_classic_remembers_last_seen_buildings_until_an_airborne_observer_revis
         m.place_starting_building(owner, "hq", cell).unwrap();
     }
     let scout = add(&mut m, "rifle", 2, at(70., 70.));
-    let building = add(&mut m, "hq", 1, at(80., 70.));
+    let cell = m.world.game.cell_of(80., 70.).unwrap();
+    let building = m.next_unit_id;
+    let building_at = m.place_starting_building(1, "hq", cell).unwrap();
     m.world.game.units.get_mut(&building).unwrap().built = Some(0.25);
     rebuild(&mut m);
-    m.refresh_classic_visibility().unwrap();
+    m.initialize_recipient_routing().unwrap();
+    let mut delivery = crate::recipient_snapshot::DeliveryState::new(&m).unwrap();
+    classic_vision_tick(&mut m, &mut delivery);
     assert!(m.world.game.players[0].sees(building));
     assert_eq!(
         m.world.game.players[0].visible,
@@ -149,26 +199,26 @@ fn cmb130_classic_remembers_last_seen_buildings_until_an_airborne_observer_revis
             id: building,
             kind: m.rules.kind("hq").unwrap(),
             owner: 1,
-            at: at(80., 70.),
+            at: building_at,
             built: Some(0.25),
         }]
     );
     m.world.game.units.get_mut(&building).unwrap().built = Some(1.);
-    m.refresh_classic_visibility().unwrap();
+    classic_vision_tick(&mut m, &mut delivery);
     assert_eq!(remembered(&m, 0)[0].built, Some(1.));
     m.world.game.units.get_mut(&scout).unwrap().x = 5.;
     m.world.game.units.get_mut(&scout).unwrap().z = 5.;
     m.world.game.units.get_mut(&building).unwrap().built = Some(0.5);
     rebuild(&mut m);
-    m.refresh_classic_visibility().unwrap();
+    classic_vision_tick(&mut m, &mut delivery);
     assert!(!m.world.game.players[0].sees(building));
     assert_eq!(
         remembered(&m, 0)[0].built,
         Some(1.),
         "hidden changes cannot replace observed facts"
     );
-    m.world.game.units.remove(&building);
-    m.refresh_classic_visibility().unwrap();
+    m.world.game.units.get_mut(&building).unwrap().hp = 0.;
+    classic_vision_tick(&mut m, &mut delivery);
     assert_eq!(
         remembered(&m, 0).len(),
         1,
@@ -182,20 +232,41 @@ fn cmb130_classic_remembers_last_seen_buildings_until_an_airborne_observer_revis
     m.world.set_cell(c, b'K').unwrap();
     rebuild(&mut m);
     assert!(!los(&m.world.game, &m.rules, (60., 70.), (80., 70.)));
-    m.refresh_classic_visibility().unwrap();
+    classic_vision_tick(&mut m, &mut delivery);
     assert_eq!(remembered(&m, 0).len(), 1);
-    m.world.game.units.get_mut(&plane).unwrap().air = Some(PlaneState::Out);
-    m.refresh_classic_visibility().unwrap();
+    m.commands.units.get_mut(&plane).unwrap().hold_fire = true;
+    m.send_aircraft_mission(
+        0,
+        plane,
+        crate::match_aviation::PlaneMission {
+            kind: crate::match_aviation::MissionKind::Patrol,
+            target: None,
+            at: building_at,
+        },
+    )
+    .unwrap();
+    let observer = m.world.game.units.get_mut(&plane).unwrap();
+    observer.x = 60.;
+    observer.z = 70.;
+    rebuild(&mut m);
+    classic_vision_tick(&mut m, &mut delivery);
     assert!(remembered(&m, 0).is_empty());
-    m.initialize_recipient_routing().unwrap();
-    for _ in 0..5 {
-        m.advance_tick().unwrap();
+    for _ in 0..2 {
+        classic_vision_tick(&mut m, &mut delivery);
         assert!(m.tick_state.fault().is_none());
         assert!(remembered(&m, 0).is_empty());
     }
     let cache = SnapshotCache::new(&m).unwrap();
     for slot in 0..m.start.players.len() {
-        cache.recipient(slot).unwrap();
+        let projection = cache.recipient(slot).unwrap();
+        assert_eq!(projection.fields["ghosts"], json!([]));
+        assert!(
+            projection.fields["units"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|row| row[0] != json!(building))
+        );
     }
 }
 
