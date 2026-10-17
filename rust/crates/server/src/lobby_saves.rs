@@ -236,6 +236,7 @@ impl Hub {
                     disconnected: None,
                     denies: Vec::new(),
                     rtt: None,
+                    map_pings: Vec::new(),
                     diagnostics: Default::default(),
                     last_match: None,
                 }

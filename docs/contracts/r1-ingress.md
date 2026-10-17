@@ -87,17 +87,18 @@ host-end portions of MODE-90; other modes and Horde results remain unqualified.
 
 ## Held dependencies
 
-Sandbox, attack, fireat, ability, autocast, support, build, buy, board, unload,
-escort, rail and grouped orders retain their existing public refusal. Tutorial
-auto-start, convoy commands and recovery are also deferred. The prototype's
-research message is named `tech`; no `research` message is added.
 
-Broader ingress cannot safely open against this base: persistent firing flights,
-salvos and grenades are refused by
-`rust/crates/core/src/recipient_snapshot/composition.rs` in `admit_actors`, while
-`match_firing.rs` can create those actors after an accepted attack or aimed
-ability. Plane-backed support similarly exceeds the adapter's
-`SUPPORTED_SUPPORT_KINDS`. The flights/events stream must carry those complete
-lifecycles before these command families or unrestricted sandbox births open.
-Queued ability and fireat rows also need their prototype owner-only order
-encodings before their waiting state can be delivered.
+## PR 296 integration
+
+The RESOLVE-296 successor carries the ground-order and host-control behavior
+from #366 at `21a1e3fa`, including its core cover and garrison repairs and
+socket lifecycle test. Attack retains #366's `blocked` refusal on this base;
+#296's older `unseen` expectation is superseded until #369 delivers flights.
+
+Two #296 families remain additional to #366: `buy` (`unit`, optional `from`,
+`shared/sim.js:3781-3802`) and `support` (`kind`, `x`, `z`,
+`shared/sim.js:3680-3688`). They use the existing parser and core denial feedback.
+Aircraft purchases remain refused by the core's ordinary-snapshot guard.
+Only Artillery, Smoke and Cover support pass the snapshot lifecycle allowlist;
+all other kinds refuse with `unsupported` before reserving input. This keeps
+main's actor, lifecycle and World guards intact. NET-43 remains partial.
