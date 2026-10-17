@@ -78,6 +78,21 @@ pub(super) fn capture_perspective(
         }
         // Reuse Source's six-field ghost rows. Never consult a hidden live building here.
         if state.options.mode == Mode::Classic {
+            let classic = state.elimination.as_ref().ok_or(SnapshotError::Rules)?;
+            let nodes = classic
+                .nodes
+                .iter()
+                .map(|node| {
+                    finite(&[node.at.x, node.at.z, node.rate])?;
+                    Ok(json!([
+                        r(node.at.x),
+                        r(node.at.z),
+                        node.rate,
+                        u8::from(node.fuel)
+                    ]))
+                })
+                .collect::<Result<Vec<_>, SnapshotError>>()?;
+            fields.insert("nodes".into(), json!(nodes));
             let rows = state
                 .classic_known_buildings
                 .iter()
