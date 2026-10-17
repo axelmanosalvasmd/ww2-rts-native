@@ -156,7 +156,7 @@ fn tick_and_collect(state: &mut Match, delivery: Option<&mut DeliveryState>) {
         ));
         return;
     };
-    let classic_mode = (state.options.mode == Mode::Classic)
+    let snapshot_mode = (!matches!(state.options.mode, Mode::Default | Mode::Conquest))
         .then(|| crate::recipient_snapshot::mode_row(state).unwrap());
     let selected: Vec<_> = (0..state.start.players.len())
         .map(|slot| SelectedSeat {
@@ -182,8 +182,10 @@ fn tick_and_collect(state: &mut Match, delivery: Option<&mut DeliveryState>) {
         }
         assert!(snapshot["units"].is_array());
         assert!(snapshot["works"].is_array());
-        if let Some(expected) = &classic_mode {
+        if let Some(expected) = &snapshot_mode {
             assert_eq!(snapshot.get("mode"), Some(expected));
+        } else {
+            assert!(snapshot.get("mode").is_none());
         }
     }
 }
@@ -226,7 +228,7 @@ fn intent_ai50_gate_order_completes_in_each_real_ordinary_mode_with_supported_se
         );
         let mut delivery = if matches!(
             mode,
-            Mode::Default | Mode::Conquest | Mode::Classic | Mode::Annihilation
+            Mode::Default | Mode::Conquest | Mode::Classic | Mode::Assault | Mode::Annihilation
         ) {
             Some(DeliveryState::new(&state).unwrap())
         } else {

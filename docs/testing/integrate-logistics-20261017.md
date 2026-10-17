@@ -27,3 +27,9 @@ An independent source review found three stale Horde refusal tests in the mode-r
 At `c3fa3647`, the full three-package run executed 1,915 tests: 1,909 passed, six failed and ten were skipped. An earlier run was killed by the scope OOM limit during compilation, before tests; the completed run used two test threads. Future builds explicitly set `CARGO_BUILD_JOBS=2` because Nextest `-j` controls test concurrency. The memory cap stays 6 GiB with zero scope swap.
 
 The six failures led to one runtime guard repair and exact test rewrites: restore Horde Gate refusal; update two forced-stance fixture consumers to the imported LOG-13 intent; require malformed Horde metadata errors after canonical mode admission; and require successful immediate Conquest aircraft purchase while preserving the hosted Classic training refusal. All fixture files remain unchanged. The stance difference from the pinned capture is recorded in the integration design fragment.
+
+The focused post-fix run at `868355ed` passed all 76 selected core/simtest tests (1,636 skipped by selection), including all six repaired failures and related command, Gate, Horde, production, elimination and withdrawal checks. Independent source review accepted this commit with no findings and no execution.
+
+## Merge five: #414
+
+Preserve every module registration and the existing canonical Horde/Classic/Annihilation snapshot checks while adding Assault and its exact owner/timer validation. Ordinary lists reuse the existing node helper with Assault added to the whitelist. Retain per-team remembered ghosts rather than overwriting them. Lobby hosting keeps the shared option/constructor helpers and loaded false overrides, and save/load accepts the expanded ordinary-mode set without reinstating an obsolete logistics refusal. World, sandbox and roster guards remain. Test conflicts retain stronger complete delivery and actor checks while adding Assault.

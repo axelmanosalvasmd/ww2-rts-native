@@ -1072,6 +1072,12 @@ impl Hub {
         {
             return Err("native match seats disagree with the room roster".into());
         }
+        if state
+            .assault
+            .is_some_and(|assault| assault.defender_team != room.defender as i32)
+        {
+            return Err("native Assault defender disagrees with the room".into());
+        }
         let epoch = self
             .next_epoch
             .checked_add(1)
@@ -1837,8 +1843,9 @@ impl Hub {
                 "start requires one through capacity players and both Assault sides".into(),
             );
         }
-        if room.listed || room.mode != "conquest" || room.sandbox {
-            return Err("R1 requires private Conquest and sandbox off".into());
+        let mode = crate::native_startup::ordinary_mode(&room.mode);
+        if room.listed || mode.is_none() || room.sandbox {
+            return Err("R1 requires a private ordinary mode and sandbox off".into());
         }
         if room.players.len() != 2
             || room.players.iter().any(|p| p.ai || p.token.is_empty())
@@ -2330,12 +2337,16 @@ fn result_number(value: f64) -> Value {
     if value == 0.0 { json!(0) } else { json!(value) }
 }
 fn result_message(result: MatchResult, names: Vec<String>) -> Result<Value, String> {
-    if result.mode != "conquest" {
+    if crate::native_startup::ordinary_mode(result.mode).is_none() {
         return Err("result serializer requires represented ordinary mode".into());
     }
+    let conquest = result.mode == "conquest";
     let timeline = result.timeline.into_iter().map(|sample| match sample {
-        MatchSample::Conquest { t, vp } => Ok(json!({"t":result_number(t), "vp":vp.into_iter().map(result_number).collect::<Vec<_>>()})),
-        MatchSample::Territories { .. } => Err("ordinary result cannot serialize a territory timeline".to_owned()),
+        MatchSample::Conquest { t, vp } if conquest => Ok(json!({"t":result_number(t), "vp":vp.into_iter().map(result_number).collect::<Vec<_>>()})),
+        MatchSample::Territories { t, points, structures } if !conquest => Ok(json!({"t":result_number(t),
+            "points":points.into_iter().map(result_number).collect::<Vec<_>>(),
+            "structures":structures.into_iter().map(result_number).collect::<Vec<_>>()})),
+        _ => Err("ordinary result timeline disagrees with its mode".to_owned()),
     }).collect::<Result<Vec<_>, _>>()?;
     let story = result
         .story
@@ -2781,3 +2792,6 @@ mod mode_options_tests;
 #[cfg(test)]
 #[path = "room_command_ingress_tests.rs"]
 mod room_command_ingress_tests;
+#[cfg(test)]
+#[path = "mode_hosting_tests.rs"]
+mod mode_hosting_tests;

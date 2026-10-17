@@ -329,7 +329,7 @@ fn mode01_non_world_mode_rows_match_the_prototype_public_fields() {
     };
 
     // Prototype sim.js:5895-5898; Tutorial's initial goal is tutorial.js:11.
-    // Conquest, Classic and Annihilation deliver complete recipient snapshots.
+    // Conquest, Assault, Classic, Annihilation and Horde deliver complete snapshots.
     for mode in MODES {
         let mut m = create(mode, ArmySize::Standard).unwrap();
         let expected = match mode {
@@ -363,7 +363,10 @@ fn mode01_non_world_mode_rows_match_the_prototype_public_fields() {
                 let fields = cache.recipient(slot).unwrap().fields;
                 assert!(!fields.contains_key("mode"));
             }
-        } else if matches!(mode, Mode::Classic | Mode::Annihilation | Mode::Horde) {
+        } else if matches!(
+            mode,
+            Mode::Classic | Mode::Annihilation | Mode::Horde | Mode::Assault
+        ) {
             let count = m.start.players.len();
             let mut delivery = DeliveryState::new(&m).unwrap();
             let selected = (0..count)

@@ -10,3 +10,4 @@
 - Restore the explicit Horde Gate refusal after Horde joins the shared ground-mode predicate; retain all existing Gate refusal assertions.
 - Update the two command fixture consumers for LOG-13's admitted forced stances, retaining every checkpoint and unrelated exact value. The recorded Source files stay unchanged; the captured stance refusal and native intent difference are documented.
 - Preserve immediate Conquest aircraft purchases with exact payment, identity, metadata and private delivery checks. Keep Classic hosted aircraft training refused before payment. Malformed Horde component fixtures now require the exact metadata error after mode admission.
+- Combine ordinary-mode hosting with logistics-aware room options and save/load. Preserve loaded false overrides, canonical Horde validation, remembered Classic buildings and all module registrations while adding Assault delivery.

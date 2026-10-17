@@ -256,9 +256,6 @@ fn ordinary_binary_absent_seat_start_and_restart_auto_pause_then_same_token_resu
 fn ordinary_binary_refuses_unsupported_settings_before_any_start_publication() {
     let cases = [
         json!({"t":"mode","v":"world"}),
-        json!({"t":"mode","v":"assault"}),
-        json!({"t":"mode","v":"annihilation"}),
-        json!({"t":"mode","v":"classic"}),
         json!({"t":"mode","v":"horde"}),
         json!({"t":"mode","v":"tutorial"}),
         json!({"t":"sandbox","v":true}),
@@ -453,5 +450,33 @@ fn mode06_binary_named_armies_start_and_deliver_to_both_sockets() {
         host.barrier();
         assert_eq!(server.receipts()[0]["options"]["army"], key);
         assert!(!server.log().contains("NATIVE_FAULT"));
+    }
+}
+
+#[test]
+fn mode01_mode04_binary_ordinary_modes_start_snapshot_and_restart() {
+    for mode in ["conquest", "classic", "annihilation", "assault"] {
+        let server = BinaryServer::start(true, SEED);
+        let mut host = Client::join(server.address, "a");
+        let mut guest = Client::join(server.address, "b");
+        host.send(json!({"t":"mode","v":mode}));
+        host.barrier();
+        let (a, b) = begin(&mut host, &mut guest);
+        assert_eq!(a["matchId"], b["matchId"]);
+        for client in [&mut host, &mut guest] {
+            let snapshot = client.until(|m| m["t"] == "s");
+            if mode == "conquest" {
+                assert!(snapshot.get("mode").is_none());
+            } else {
+                assert_eq!(snapshot["mode"]["kind"], mode);
+            }
+        }
+        assert_eq!(server.receipts()[0]["options"]["mode"], mode);
+        host.send(json!({"t":"restart"}));
+        for client in [&mut host, &mut guest] {
+            let start = client.until(|m| m["t"] == "start");
+            assert!(start["matchId"].as_u64().unwrap() > a["matchId"].as_u64().unwrap());
+            client.until(|m| m["t"] == "s");
+        }
     }
 }

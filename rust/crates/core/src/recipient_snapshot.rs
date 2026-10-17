@@ -207,7 +207,7 @@ impl<'a> SnapshotCache<'a> {
 }
 
 fn validate_snapshot(state: &Match) -> Result<(), SnapshotError> {
-    if !matches!(
+    let ordinary = matches!(
         (state.options.mode, state.world.game.mode),
         (Mode::Default | Mode::Conquest, None)
             | (Mode::Classic, Some(crate::game::ModeKind::Classic))
@@ -216,9 +216,12 @@ fn validate_snapshot(state: &Match) -> Result<(), SnapshotError> {
                 Some(crate::game::ModeKind::Annihilation)
             )
             | (Mode::Horde, Some(crate::game::ModeKind::Horde))
-    ) || state.world.geography().is_some()
-        || state.assault.is_some()
+            | (Mode::Assault, Some(crate::game::ModeKind::Assault))
+    );
+    if !ordinary
+        || state.world.geography().is_some()
         || state.world_runtime.is_some()
+        || (state.options.mode == Mode::Assault) != state.assault.is_some()
     {
         return Err(SnapshotError::UnsupportedMode);
     }
@@ -231,6 +234,14 @@ fn validate_snapshot(state: &Match) -> Result<(), SnapshotError> {
         state
             .validate_horde_economy()
             .map_err(|_| SnapshotError::Rules)?;
+    }
+    if let Some(assault) = state.assault
+        && (!(0..6).contains(&assault.defender_team)
+            || !(-1..6).contains(&assault.attacker_team)
+            || assault.defender_team == assault.attacker_team
+            || !assault.time_left.is_finite())
+    {
+        return Err(SnapshotError::Rules);
     }
     let g = &state.world.game;
     let cells = g.w.checked_mul(g.h).ok_or(SnapshotError::Rules)?;

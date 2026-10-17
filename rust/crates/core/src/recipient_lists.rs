@@ -190,6 +190,7 @@ impl crate::match_runtime::Match {
                         | crate::economy::Mode::Conquest
                         | crate::economy::Mode::Classic
                         | crate::economy::Mode::Annihilation
+                        | crate::economy::Mode::Assault
                 ) =>
             {
                 let nodes = self.ordinary_snapshot_nodes()?;
@@ -348,6 +349,7 @@ impl crate::match_runtime::Match {
                 | crate::economy::Mode::Conquest
                 | crate::economy::Mode::Classic
                 | crate::economy::Mode::Annihilation
+                        | crate::economy::Mode::Assault
         ) || !crate::match_actor::ordinary_ground_mode(game, self.options.mode)
         {
             return Err("global ordinary lists require represented ordinary Game mode".into());
