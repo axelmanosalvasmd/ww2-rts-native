@@ -1,0 +1,1 @@
+- Rewrote `map15_map_loading_uses_the_existing_complete_scenario_validator` to assert the specific refusal for unsupported authored groups and verify the admitted timed-message subset starts, emits its public message and permits both recipient snapshots. The complete map-loader validation checks remain covered.

@@ -362,8 +362,10 @@ fn trusted_conquest_logistics_survives_room_ticks_and_both_recipient_snapshots()
                         message
                     }
                     Output::Json(_) => continue,
+                    Output::Watcher(_) => {
+                        panic!("watcher output reached a seated commander")
+                    }
                     Output::Close(code, reason) => panic!("unexpected close {code}: {reason}"),
-                    Output::Watcher(_) => panic!("unexpected watcher output"),
                 };
                 assert_eq!(message["logistics"]["enabled"], true);
                 let rows = message["logistics"]["units"].as_array().unwrap();

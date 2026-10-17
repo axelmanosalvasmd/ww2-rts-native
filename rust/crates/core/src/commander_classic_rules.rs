@@ -10,7 +10,7 @@ use crate::{
 use serde_json::{Value, json};
 use std::collections::BTreeSet;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Raid {
     pub target: u32,
     pub ids: Vec<u32>,
@@ -88,16 +88,12 @@ pub(crate) fn plan(
         if !known
             .iter()
             .any(|b| catalog.unit(&b.kind).is_ok_and(|d| flag(d, "produces")))
-            && let Some((_, p)) = input
-                .players
-                .iter()
-                .enumerate()
-                .filter(|(i, p)| p.team != me.team && !p.out && !context.hidden_spawns.contains(i))
-                .min_by(|(ai, a), (bi, b)| {
-                    distance(a.spawn, me.spawn)
-                        .total_cmp(&distance(b.spawn, me.spawn))
-                        .then(ai.cmp(bi))
-                })
+            && let Some((_, p)) = crate::sort::first_by(
+                input.players.iter().enumerate().filter(|(i, p)| {
+                    p.team != me.team && !p.out && !context.hidden_spawns.contains(i)
+                }),
+                |(_, a), (_, b)| distance(a.spawn, me.spawn) - distance(b.spawn, me.spawn),
+            )
         {
             result.support = Some(("recon", p.spawn));
         }
@@ -108,19 +104,15 @@ pub(crate) fn plan(
             *raid = None;
         }
         if raid.is_none()
-            && let Some(depot) = known
-                .iter()
-                .filter(|b| {
+            && let Some(depot) = crate::sort::first_by(
+                known.iter().copied().filter(|b| {
                     b.kind == "depot"
                         && !recent
                             .iter()
                             .any(|s| now - s.time < 30.0 && distance(s.at, b.at) < 25.0)
-                })
-                .min_by(|a, b| {
-                    distance(a.at, me.spawn)
-                        .total_cmp(&distance(b.at, me.spawn))
-                        .then(a.id.cmp(&b.id))
-                })
+                }),
+                |a, b| distance(a.at, me.spawn) - distance(b.at, me.spawn),
+            )
         {
             let mut free: Vec<_> = mine
                 .iter()
@@ -134,11 +126,12 @@ pub(crate) fn plan(
                         )
                 })
                 .collect();
-            free.sort_by(|a, b| {
-                (a.kind != "armoredcar")
-                    .cmp(&(b.kind != "armoredcar"))
-                    .then(distance(a.at, depot.at).total_cmp(&distance(b.at, depot.at)))
-                    .then(a.id.cmp(&b.id))
+            crate::sort::sort_by(&mut free, |a, b| {
+                crate::sort::then(
+                    f64::from(u8::from(a.kind != "armoredcar"))
+                        - f64::from(u8::from(b.kind != "armoredcar")),
+                    distance(a.at, depot.at) - distance(b.at, depot.at),
+                )
             });
             if free.len() >= 2 {
                 *raid = Some(Raid {
@@ -232,10 +225,8 @@ pub(crate) fn targets(
                 .map(|(i, p)| (None, i as u32, p.spawn)),
         );
     }
-    targets.sort_by(|a, b| {
-        distance(a.2, me.spawn)
-            .total_cmp(&distance(b.2, me.spawn))
-            .then(a.1.cmp(&b.1))
+    crate::sort::sort_by(&mut targets, |a, b| {
+        distance(a.2, me.spawn) - distance(b.2, me.spawn)
     });
     Ok(targets)
 }

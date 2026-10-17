@@ -1,9 +1,12 @@
 use super::*;
 
 /// Kinds whose complete tick and event lifecycle can be delivered by a room.
-/// Plane-backed strikes have representable state, but their arrival and payload
-/// events still require an agreed encoding before ingress can admit them.
 pub const SUPPORTED_SUPPORT_KINDS: &[crate::match_support::SupportKind] = &[
+    crate::match_support::SupportKind::Recon,
+    crate::match_support::SupportKind::Strafe,
+    crate::match_support::SupportKind::Bombing,
+    crate::match_support::SupportKind::Dive,
+    crate::match_support::SupportKind::Para,
     crate::match_support::SupportKind::Artillery,
     crate::match_support::SupportKind::Smoke,
     crate::match_support::SupportKind::Cover,
@@ -138,9 +141,11 @@ mod tests {
         }
         let cache = SnapshotCache::new(&state).unwrap();
         for slot in 0..3 {
+            let mut expected = case["outputs"][slot].clone();
+            expected["flights"] = case["fullOutputs"][slot]["flights"].clone();
             super::super::tests::equal(
                 &Value::Object(cache.recipient(slot).unwrap().fields),
-                &case["outputs"][slot],
+                &expected,
                 "actual support admission",
             );
         }
@@ -237,13 +242,7 @@ mod tests {
         state.world.game.strikes[0].runtime.as_mut().unwrap().kind =
             crate::match_support::SupportKind::Recon;
         assert!(SnapshotCache::new(&state).is_ok());
-        assert!(matches!(
-            state.preflight_ordinary_snapshot(),
-            Err(SnapshotError::Unsupported {
-                capability: SnapshotCapability::TeamEffects,
-                ..
-            })
-        ));
+        state.preflight_ordinary_snapshot().unwrap();
         assert_eq!(delivery, before);
     }
 }

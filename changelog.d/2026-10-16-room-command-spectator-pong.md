@@ -1,0 +1,1 @@
+- Update `intent_net46_spectator_army_commands_are_silent_and_never_queued` to expect the existing runtime pong timing tuple from #296. Preserve all spectator command-silence and no-queue assertions. The payload matches prototype `server.js:625-628`.

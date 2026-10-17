@@ -181,8 +181,23 @@ fn emit_destroy(
 }
 
 impl Match {
-    /// Preflight only the migrated public legacy-trigger subset used by the tick and snapshot.
+    /// Validate admitted mission owners before ticks, snapshots and checkpoint restoration.
     pub fn preflight_legacy_scenario(&self) -> Result<(), String> {
+        if let Some(mission) = &self.authored_mission {
+            if self.scenario.is_some() {
+                return Err("authored and legacy scenario owners cannot coexist".into());
+            }
+            mission.validate(self.world.game.players.len())?;
+            if self.world.game.tick < 0
+                || mission
+                    .last_tick()
+                    .is_some_and(|tick| tick > self.world.game.tick as u64)
+                || (self.finish.is_none()
+                    && mission.last_tick().unwrap_or(0) != self.world.game.tick as u64)
+            {
+                return Err("authored mission clock disagrees with match tick".into());
+            }
+        }
         let Some(scenario) = &self.scenario else {
             return Ok(());
         };
