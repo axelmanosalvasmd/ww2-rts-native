@@ -143,3 +143,76 @@ The first 374-test composed run passed 371 tests and exposed three integration g
 - `mode_startup_tests.rs::mode01_non_world_mode_rows_match_the_prototype_public_fields`: preserve every literal component field expectation, and replace the obsolete blanket non-Conquest refusal with exact mode projection for every seat in every admitted non-World mode. Malformed mode-pair and owner checks remain in their separate tests.
 
 The later main `6f02f83a` merge into `b9987e7b` was automatic with no file changes. Merge `3c5b08de` exactly matches automatic tree `f5ab02fb30e8b9844bdcdf84d89d436b97de11ff`; no additional merge hunk exists.
+
+## Main integration at 3c33cd04
+
+
+Parents: `aff9cb62b9d39dbbeb3c5a24a2c8aa672d2a4511` and main `3c33cd040b8fcaa71d2795b3b3030c749b522706`. Automatic conflict tree: `3e2fd05b2b13924446c054b8ef69d9b2f5314829`. All fourteen conflicting paths are accounted for below.
+
+
+### rust/crates/core/src/match_human_observation.rs
+
+1. Original merge-buffer line 112: Union Horde, Tutorial and AuthoredMission in HumanShot::Other. Keep every other incoming observation-memory/checkpoint and scheduling change.
+
+### rust/crates/core/src/match_tick.rs
+
+1. Original merge-buffer line 106: Union Horde, Tutorial and AuthoredMission TickEvent variants. Keep incoming authored mission phase and existing Horde/Tutorial phase emissions.
+
+### rust/crates/core/src/recipient_snapshot.rs
+
+1. Original merge-buffer line 1: Keep our admitted ordinary/projectile/aviation module description, which matches the composed runtime scope.
+
+2. Original merge-buffer line 142: Keep incoming call to extracted validate_snapshot plus its test cache-build counter. Move the complete ours validation block into that shared validator rather than retain the narrower incoming mode gate.
+
+3. Original merge-buffer line 285: Keep incoming shared project_recipient path, uncached recipient API, row filtering helper and extracted validator. Shared validation retains all ours mode, finish, elimination, Horde, firing/grenade/salvo, engineering, aircraft and projectile guards. Shared projection also emits ours live flights. Preserve pub(crate) seen_by visibility for existing consumers.
+
+### rust/crates/core/src/recipient_snapshot/public_state.rs
+
+1. Original merge-buffer line 83: Keep ours Classic-or-World ghost branch. Incoming authored_mission scenario projection remains separate above the legacy scenario fallback. World room admission stays refused by the common validator.
+
+### rust/crates/core/src/recipient_snapshot/shots.rs
+
+1. Original merge-buffer line 24: Union Horde, Tutorial and AuthoredMission ShotRef variants.
+
+2. Original merge-buffer line 41: Union Horde, Tutorial and AuthoredMission conversions. Keep ours Aviation conversion and existing aviation event projection rather than restore stale incoming Aviation refusal.
+
+3. Original merge-buffer line 224: Keep both ours Horde/Tutorial event validation arms and the incoming AuthoredMission arm, including definition acceptance and atTick checks.
+
+4. Original merge-buffer line 566: Preserve original ShotRef identity in the preprojected event list. Tutorial is public; Scenario and AuthoredMission use incoming mission policy filtering. This avoids assuming Tutorial lines carry scenarioRecipients/scenarioSide.
+
+## Nonconflicting manual edits
+
+1. `recipient_snapshot.rs::validate_snapshot`: replace the incoming extracted validator body with the complete ours SnapshotCache::new admission block, dedented without altering its conditions. This is necessary because the extraction otherwise accepts only Default/Conquest and Classic, dropping Tutorial, Horde, Assault and Annihilation. The extracted helper is called by cached and uncached paths, so each now receives the same validation.
+
+2. `recipient_snapshot.rs::project_recipient`: add the existing `flights::project(state, slot)` insertion next to falling. Both cached and new uncached projections retain the live-flight field and its exact adapter.
+
+3. `recipient_snapshot.rs::seen_by`: retain pub(crate) visibility. The incoming extracted block otherwise makes the existing helper private.
+
+4. `recipient_snapshot/shots.rs::project_shots_perspective`: keep ShotRef with each projected JSON row instead of reducing its identity to a boolean. Before mission policy handling, a Tutorial arm publishes the validated public line directly. The incoming Scenario/AuthoredMission branch keeps its exact public/side/team and spectator checks. Tutorial lines have no scenarioRecipients/scenarioSide, so applying the incoming mission branch to them would refuse the existing Tutorial journey.
+
+## Resolution decisions
+
+- commander_assault.rs conflicts 1 and 2: retain SavedReason and saved_reason. Both parents serialize the same optional reason field. The existing local codec restores all nine valid reasons and rejects unknown names on serialization and deserialization. This preserves the local checkpoint guard while satisfying incoming AI-memory serialization.
+- commander_tactics.rs conflicts 1 and 2: retain SavedCounter and saved_counter. The optional counter still serializes as its existing value, and restore accepts only at and mg. Both parents retain Serialize and Deserialize.
+- commander_tactics.rs conflict 3: keep the local shared rush_at helper, filtered construction_units and plan_with_classic dispatch with its strategic sightings, node memory, level and random arguments. Pass the incoming construction_view and mirrored filtered units into both World and ordinary/Classic construction. This retains queued-plan mirroring and the endangered-engineer guard without a stale construction_crew reference.
+- horde_commander.rs conflict 1: retain is_digging and incoming same_intent in one OwnPlan implementation; retain incoming OwnUnit serialization derives. Numeric JSON comparison, exact path_generation checks and destination/kind comparison for ongoing Dig jobs remain intact. Local delivered digging still excludes busy units.
+- human_commander_policy_tests.rs conflict 1: keep ai63_planner_checkpoint_retains_full_memory_without_random_streams and intent_ai12_refused_garrison_still_keeps_the_squad_busy_for_that_look, adding the separate test attribute between them. Both function bodies are unchanged.
+
+## Nonconflict manual edits
+
+- horde_commander.rs: add Serialize and Deserialize derives to DeliveredPlan and DeliveredIntent. The local OwnPlan.delivered field is retained, so these derives are required by incoming OwnPlan/View/HordeCommander checkpoint serialization and same_intent JSON comparison. No fields are removed or defaulted.
+
+
+
+`rust/crates/server/src/native_startup.rs`, hunk 1: combine with canonical startup checks
+`rust/crates/simtest/tests/common/companion_tick.rs`, hunk 1: combine both event variants
+`rust/crates/simtest/tests/legacy_scenario_tick.rs`, hunk 1: combine both event variants
+`rust/crates/simtest/tests/match_tick_events.rs`, hunk 1: combine both event variants
+`rust/crates/simtest/tests/match_tick_events.rs`, hunk 2: combine with canonical startup checks
+`docs/contracts/save-format.md`, hunk 1: keep hosted
+`docs/contracts/save-format.md`, hunk 2: combine with canonical startup checks
+`native_startup.rs`: preserve incoming authored-mission definition binding before all hosted/Tutorial/Assault/elimination StartPlan branches.
+`save-format.md`: retain the hosted AI envelope and continuation sections, add the separate incoming external AI codec, and remove incoming historical room-AI refusal statements superseded by hosted results. Keep non-authored v1 and authored v2 scope explicit.
+
+
+All parent test bodies and module registrations are retained. Formatting is applied after the merge. The canceled S1 run had not acquired a slot or executed Cargo. The earlier corrected S3 attempt stopped at a test compile error: RecipientProjection exposes fields, not into_json; its mode test now uses that API. The complete Tutorial journey continues to prove delivered frames independently of this component projection check.

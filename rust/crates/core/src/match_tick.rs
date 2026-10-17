@@ -105,6 +105,7 @@ pub enum TickEvent {
     Scenario(crate::legacy_scenario::SayAction),
     Horde(crate::match_horde::HordeEvent),
     Tutorial(crate::match_tutorial::TutorialLine),
+    AuthoredMission(serde_json::Value),
 }
 
 /// A failed phase keeps the effects already emitted at their original boundaries.
@@ -771,19 +772,30 @@ impl crate::match_runtime::Match {
         }
 
         if self.options.mode != crate::economy::Mode::World && !winner_decided {
-            crate::legacy_scenario_runtime::step_legacy_scenario_emitting(
-                self,
-                tick as u64,
-                &mut |emission| match emission {
-                    crate::legacy_scenario_runtime::LegacyScenarioEmission::Say(say) => {
-                        events.push(TickEvent::Scenario(say));
-                    }
-                    crate::legacy_scenario_runtime::LegacyScenarioEmission::Environment(effect) => {
-                        events.push(TickEvent::Environment(effect));
-                    }
-                },
-            )
-            .map_err(|error| format!("legacy scenario: {error}"))?;
+            if let Some(mission) = self.authored_mission.as_mut() {
+                events.extend(
+                    mission
+                        .step(tick as u64, self.world.game.players.len())?
+                        .into_iter()
+                        .map(TickEvent::AuthoredMission),
+                );
+            } else {
+                crate::legacy_scenario_runtime::step_legacy_scenario_emitting(
+                    self,
+                    tick as u64,
+                    &mut |emission| match emission {
+                        crate::legacy_scenario_runtime::LegacyScenarioEmission::Say(say) => {
+                            events.push(TickEvent::Scenario(say));
+                        }
+                        crate::legacy_scenario_runtime::LegacyScenarioEmission::Environment(
+                            effect,
+                        ) => {
+                            events.push(TickEvent::Environment(effect));
+                        }
+                    },
+                )
+                .map_err(|error| format!("legacy scenario: {error}"))?;
+            }
             phases.push(TickPhase::Scenario);
         }
 

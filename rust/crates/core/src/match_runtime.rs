@@ -208,9 +208,11 @@ impl StartPlan {
         }
         let world_mode = matches!(&profile, StartupProfile::World(_));
         let tutorial = matches!(&profile, StartupProfile::Tutorial);
-        // Validation permits saving authored missions. Their executor is not admitted yet.
-        if map.source().get("scenario").is_some() {
-            return Err("native startup does not yet execute authored scenarios".into());
+        // Admit only the timed message/objective subset owned by this runtime.
+        if crate::authored_mission::AuthoredMission::from_map(map)?.is_some()
+            && !matches!(options.mode, Mode::Default | Mode::Conquest)
+        {
+            return Err("authored missions require ordinary Conquest admission".into());
         }
         let horde_mode = matches!(&profile, StartupProfile::Horde);
         let defender_team = match &profile {
@@ -700,6 +702,8 @@ pub struct Match {
     pub recruit_metadata: BTreeMap<u32, RecruitMetadata>,
     pub(crate) produced_placer: crate::produced_units::ProducedPlacer,
     pub scenario: Option<crate::legacy_scenario::LegacyScenario>,
+    #[serde(default)]
+    pub authored_mission: Option<crate::authored_mission::AuthoredMission>,
     pub logistics: crate::logistics::LogisticsState,
     pub convoys: Option<crate::supply_convoys::ConvoyState>,
     pub supply_net: crate::supply_network::GroundSupplyNetwork,
@@ -841,7 +845,12 @@ impl Match {
             .collect::<Result<Vec<_>, String>>()?;
         let production =
             crate::production::ProductionState::new(initial_research).map_err(|e| e.to_string())?;
-        let scenario = if map.triggers().is_empty() {
+        let scenario = if map
+            .source()
+            .get("scenario")
+            .is_some_and(|value| !value.is_null())
+            || map.triggers().is_empty()
+        {
             None
         } else {
             let owners = start
@@ -890,6 +899,7 @@ impl Match {
             recruit_metadata: BTreeMap::new(),
             produced_placer: crate::produced_units::ProducedPlacer::new(),
             scenario,
+            authored_mission: crate::authored_mission::AuthoredMission::from_map(map)?,
             logistics: crate::logistics::LogisticsState::default(),
             convoys: None,
             supply_net: crate::supply_network::GroundSupplyNetwork::default(),

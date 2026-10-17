@@ -1,0 +1,1 @@
+- Preserve Tutorial dialogue, results and ending snapshots alongside main's combat privacy filters, authored missions and saved AI planning state. Keep all inherited event adapters, readiness checks and test registrations; record every conflict resolution in the RESULTS-TUTORIAL merge notes.
