@@ -515,33 +515,6 @@ fn near_cover(state: &Match, u: &Unit) -> Result<bool, SnapshotError> {
             && math::hypot(u.x - v.x, u.z - v.z) < 3.5
     }))
 }
-/// JSON omits fields that are undefined in the prototype's modeRow.
-fn ordinary_mode_row(state: &Match) -> Result<Option<Value>, SnapshotError> {
-    Ok(match state.options.mode {
-        Mode::Default | Mode::Conquest | Mode::Horde => None,
-        Mode::Assault => {
-            let mode = state.assault.ok_or(SnapshotError::Rules)?;
-            finite(&[mode.time_left])?;
-            Some(json!({"kind":"assault", "defenderTeam":mode.defender_team,
-                "attackerTeam":mode.attacker_team, "timeLeft":math::max(0., mode.time_left.ceil()),
-                "suddenDeath":false, "total":mode.total}))
-        }
-        Mode::Annihilation => {
-            let mode = state.elimination.as_ref().ok_or(SnapshotError::Rules)?;
-            Some(json!({"kind":"annihilation", "suddenDeath":false, "bunkers":mode.bunkers}))
-        }
-        Mode::Classic => {
-            let mode = state.elimination.as_ref().ok_or(SnapshotError::Rules)?;
-            let time = mode.time_left.ok_or(SnapshotError::Rules)?;
-            finite(&[time])?;
-            Some(
-                json!({"kind":"classic", "timeLeft":math::max(0., time.ceil()),
-                "suddenDeath":mode.sudden_death}),
-            )
-        }
-        _ => return Err(SnapshotError::UnsupportedMode),
-    })
-}
 
 fn economy_fields(state: &Match, slot: usize) -> Result<Map<String, Value>, SnapshotError> {
     let p = &state.start.economy.players[slot];
@@ -562,7 +535,8 @@ fn economy_fields(state: &Match, slot: usize) -> Result<Map<String, Value>, Snap
             fields.insert(key.into(), json!(r(value)));
         }
     }
-    if let Some(mode) = ordinary_mode_row(state)? {
+    let mode = mode_row(state)?;
+    if !mode.is_null() {
         fields.insert("mode".into(), mode);
     }
     fields.insert("tick".into(), json!(state.world.game.tick));

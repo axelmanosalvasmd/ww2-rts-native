@@ -66,7 +66,11 @@ impl NativeStartup {
             (settings.mode, state.options.mode, state.world.game.mode),
             ("conquest", Mode::Default | Mode::Conquest, None)
                 | ("horde", Mode::Horde, Some(ww2_core::game::ModeKind::Horde))
-                | ("tutorial", Mode::Tutorial, Some(ww2_core::game::ModeKind::Tutorial))
+                | (
+                    "tutorial",
+                    Mode::Tutorial,
+                    Some(ww2_core::game::ModeKind::Tutorial)
+                )
                 | (
                     "assault",
                     Mode::Assault,

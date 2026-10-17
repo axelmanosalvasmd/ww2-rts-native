@@ -27,6 +27,7 @@ impl Peer {
     fn drain(&mut self, hub: &mut Hub) -> Vec<Value> {
         let mut rows = vec![];
         while let Ok(output) = self.rx.try_recv() {
+            self.connection.complete_bytes(output.diagnostic_bytes());
             match output {
                 Output::Json(row) => rows.push(row),
                 Output::Snapshot(write) => {
@@ -34,6 +35,7 @@ impl Peer {
                     hub.complete_snapshot(&write, true, 0);
                 }
                 Output::Close(_, reason) => panic!("unexpected close: {reason}"),
+                Output::Watcher(_) => panic!("seated Tutorial received a spectator snapshot"),
             }
         }
         rows
@@ -68,7 +70,52 @@ fn tick_all(hub: &mut Hub) -> Vec<Value> {
     let frames = rt.collect_frame(&selected, FrameKind::Scheduled).unwrap();
     assert!(rt.fault().is_none());
     assert_eq!(frames.len(), count);
-    frames.into_iter().map(|f| f.message).collect()
+    let messages = frames.into_iter().map(|f| f.message).collect::<Vec<_>>();
+    if rt.state().tutorial_state().is_some() {
+        for message in &messages {
+            assert_tutorial_snapshot(rt.state(), message);
+        }
+    }
+    messages
+}
+
+// Literal goals from e4e579a shared/tutorial.js:9-65; mode/end/out from sim.js:5895-5897,6017-6019.
+fn assert_tutorial_snapshot(state: &Match, row: &Value) {
+    let goals = [
+        "Move your squads up to the hedgerow",
+        "Clear the enemy sentries out of the orchard",
+        "Take the crossroads: keep a squad by the flag",
+        "Recruit an AT gun: Tab, W, E, or click its card",
+        "Knock out the tank with your AT gun",
+        "Clear the farm trench. Rifles: F throws a grenade",
+        "Send a squad home to refill: select it and press R",
+        "Shell the stone house: press C, click it, aim, click",
+        "Cross the bridge and take the bridgehead",
+    ];
+    let tutorial = state.tutorial_state().unwrap();
+    let step = TutorialStep::ALL
+        .iter()
+        .position(|s| *s == tutorial.step())
+        .unwrap();
+    assert_eq!(
+        row["mode"],
+        json!({"kind":"tutorial", "suddenDeath":false,
+        "slot":state.world.game.players.len() - 1,"goal":goals[step],"step":step,"steps":9})
+    );
+    assert_eq!(
+        row["out"],
+        json!(vec![false; state.world.game.players.len()])
+    );
+    if let Some(finish) = state.finish {
+        assert_eq!(row["winner"], 0);
+        assert_eq!(
+            row["end"],
+            json!({"reason":"tutorial","x":finish.end_at.x,"z":finish.end_at.z})
+        );
+    } else {
+        assert_eq!(row["winner"], Value::Null);
+        assert!(row.get("end").is_none());
+    }
 }
 
 #[test]
@@ -325,12 +372,20 @@ fn reach(hub: &mut Hub, step: TutorialStep, lines: &mut Vec<Value>) {
 }
 
 #[test]
-fn tutorial_room_runs_all_steps_snapshots_dialogue_and_ending_hold() {
+fn mode90_mode96_tutorial_publishes_complete_results_and_exact_snapshots_through_hold() {
     use ww2_core::{game::Point, match_commands::Stance, match_end::EndReason};
     let mut hub = hub();
     let mut peer = Peer::new(1);
     peer.join(&mut hub, json!({"tutorial":true}));
     peer.drain(&mut hub);
+    for slot in 0..2 {
+        for key in StoryKey::ALL {
+            runtime(&mut hub)
+                .state_mut()
+                .record_story_tally(Some(slot), key, 0.6)
+                .unwrap();
+        }
+    }
     let mut lines = vec![];
     for tick in 1..=40 {
         let frames = tick_all(&mut hub);
@@ -504,26 +559,107 @@ fn tutorial_room_runs_all_steps_snapshots_dialogue_and_ending_hold() {
     );
     assert_eq!(state.finish.unwrap().reason, EndReason::Tutorial);
     assert_eq!(lines.len(), 18);
-    // The room itself must serialize its full Enemy result and release the runtime.
-    for callback in 0..120 {
-        let now = (callback + 1) * 50;
+    let end = state.finish.unwrap();
+    let end_tick = state.world.game.tick;
+    let expected_story = state
+        .story
+        .iter()
+        .map(|story| {
+            StoryKey::ALL
+                .into_iter()
+                .map(|key| {
+                    (
+                        key.as_str().to_owned(),
+                        json!(ww2_core::math::round(story.value(key))),
+                    )
+                })
+                .collect::<serde_json::Map<String, Value>>()
+        })
+        .collect::<Vec<_>>();
+    let expected_timeline = state
+        .timeline
+        .iter()
+        .map(|sample| match sample {
+            MatchSample::Territories {
+                t,
+                points,
+                structures,
+            } => json!({"t":result_number(*t),
+            "points":points.iter().copied().map(result_number).collect::<Vec<_>>(),
+            "structures":structures.iter().copied().map(result_number).collect::<Vec<_>>()}),
+            _ => panic!("Tutorial needs territory timeline"),
+        })
+        .collect::<Vec<_>>();
+    assert!(!expected_timeline.is_empty());
+    // A reconnect changes only the room name. Publication must prefer that live name.
+    let mut returned = Peer::new(2);
+    hub.message(
+        "TUT",
+        &returned.connection,
+        &mut false,
+        json!({"t":"hello","token":"1","name":"Returned"}),
+        0,
+    );
+    returned.drain(&mut hub);
+    peer = returned;
+    let mut scheduled = 0;
+    for callback in 1..=120 {
+        // CatchUpClock starts due at zero, so each poll consumes one callback.
+        let now = (callback - 1) * 50;
         hub.poll_native(now, now * 1_000_000);
-        peer.drain(&mut hub);
-        assert_eq!(hub.native_status("TUT").unwrap().fault, None);
+        let rows = peer.drain(&mut hub);
+        for row in rows.iter().filter(|row| row["t"] == "s") {
+            scheduled += 1;
+            // The final callback has already released the core runtime.
+            assert_eq!(
+                row["mode"],
+                json!({"kind":"tutorial","suddenDeath":false,
+                "slot":1,"goal":"Cross the bridge and take the bridgehead","step":8,"steps":9})
+            );
+            assert_eq!(
+                row["end"],
+                json!({"reason":"tutorial","x":end.end_at.x,"z":end.end_at.z})
+            );
+            assert_eq!(row["out"], json!([false, false]));
+            assert_eq!(row["winner"], 0);
+        }
+        let status = hub.native_status("TUT").unwrap();
+        assert_eq!(status.fault, None);
+        assert_eq!(status.held, callback as u16);
+        assert_eq!(status.tick, end_tick + callback as i64 / 2);
+        if callback < 120 {
+            assert!(hub.rooms["TUT"].result.is_none());
+            let rt = runtime(&mut hub);
+            let frames = rt
+                .collect_frame(
+                    &[SelectedSeat {
+                        slot: 1,
+                        full: false,
+                        omit: false,
+                    }],
+                    FrameKind::Current,
+                )
+                .unwrap();
+            assert_tutorial_snapshot(rt.state(), &frames[0].message);
+        } else {
+            let lobby = rows.iter().find(|row| row["t"] == "lobby").unwrap();
+            assert_eq!(lobby["state"], "lobby");
+            assert_eq!(
+                lobby["result"]["you"],
+                json!({"team":0,"outcome":"victory"})
+            );
+        }
     }
+    assert_eq!(scheduled, 60);
     let status = hub.native_status("TUT").unwrap();
     assert!(status.ending_complete);
     assert!(hub.rooms["TUT"].native.is_none());
     let result = &hub.rooms["TUT"].result.as_ref().unwrap().report;
-    assert_eq!(result["mode"], "tutorial");
-    assert_eq!(result["names"], json!(["Human 1", "Enemy"]));
-    assert_eq!(result["teams"], json!([0, 1]));
-    assert!(
-        result["timeline"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .all(|row| row.get("points").is_some() && row.get("structures").is_some())
+    assert_eq!(
+        *result,
+        json!({"winner":0,"teams":[0,1],"names":["Returned","Enemy"],
+        "reason":"tutorial","at":{"x":end.end_at.x,"z":end.end_at.z},"endTick":end_tick,
+        "story":expected_story,"timeline":expected_timeline,"winVp":null,"mode":"tutorial"})
     );
 }
 
@@ -566,4 +702,50 @@ fn assault_room_timer_victory_survives_every_seat_snapshot_and_result_delivery()
     assert_eq!(result["reason"], "timer");
     assert_eq!(result["winner"], 0);
     assert_eq!(result["names"], json!(["Human 1", "Human 2"]));
+}
+
+#[test]
+fn mode90_tutorial_host_end_publishes_only_ended_for_every_human() {
+    let mut hub = hub();
+    let mut peers = [Peer::new(1), Peer::new(2)];
+    for peer in &peers {
+        peer.join(&mut hub, json!({}));
+    }
+    peers[0].send(&mut hub, json!({"t":"mode","v":"tutorial"}));
+    // A completed earlier match must not leak its per-seat result through host End.
+    for (slot, person) in hub
+        .rooms
+        .get_mut("TUT")
+        .unwrap()
+        .players
+        .iter_mut()
+        .enumerate()
+    {
+        person.last_match =
+            Some(json!({"team":slot,"outcome":if slot == 0 { "victory" } else { "defeat" }}));
+    }
+    peers[0].send(&mut hub, json!({"t":"start"}));
+    for peer in &mut peers {
+        peer.drain(&mut hub);
+    }
+    for _ in 0..6 {
+        tick_all(&mut hub);
+    }
+    peers[1].send(&mut hub, json!({"t":"end"}));
+    assert!(hub.rooms["TUT"].native.is_some());
+    assert!(hub.rooms["TUT"].result.is_none());
+    for peer in &mut peers {
+        peer.drain(&mut hub);
+    }
+    peers[0].send(&mut hub, json!({"t":"end"}));
+    assert!(hub.rooms["TUT"].native.is_none());
+    assert_eq!(
+        hub.rooms["TUT"].result.as_ref().unwrap().report,
+        json!({"ended":true})
+    );
+    for peer in &mut peers {
+        let rows = peer.drain(&mut hub);
+        let lobby = rows.iter().find(|row| row["t"] == "lobby").unwrap();
+        assert_eq!(lobby["result"], json!({"ended":true,"you":null}));
+    }
 }

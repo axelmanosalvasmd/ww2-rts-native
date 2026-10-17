@@ -125,3 +125,11 @@ Parents: Tutorial merge `2297cc6f` and main `4a88afd8b1fd33f717532f8f31f1bc87bb8
 - `lobby.rs`, hunk 1: keep the public Start roster error. Main's old synchronous trusted-start body was matched into this new public constructor; the complete newer trusted admission and restart checks remain in async_start.rs, called by start_trusted. No host or restart guard is transferred to public preparation.
 
 All other main changes merge automatically. Final validation covers shared mode rows, hosted records/AI, Tutorial and the ordinary trusted socket path.
+
+Post-merge runtime repair: remove hosted results' separate ordinary_mode_row helper, whose fallback still refused Tutorial, and route economy_fields through main's shared mode_row. That shared producer validates all represented mode identities and emits the same ordinary/Horde objects plus Tutorial. This also prevents a second mode object from overwriting the canonical public projection.
+
+Post-merge test adapter repair: Tutorial Peer::drain explicitly rejects hosted Output::Watcher, preserving exhaustive handling without accepting spectator output in the seated fixture.
+
+Post-merge runtime correction: lobby result.you is now null when the current result has no story, matching prototype server.js:348. This prevents prior last_match outcomes from leaking after host End. The two-human Tutorial test retains prior victory/defeat outcomes before starting and ending the next room. Tutorial Peer::drain also completes output byte accounting before dispatch, matching the actual socket writer.
+
+Tutorial hold witness clock correction: CatchUpClock starts due at zero. Poll callback 1 at time zero, then advance by 50 ms, so each assertion measures one callback rather than consuming the initial two due ticks in the first poll. No runtime clock behavior changed.

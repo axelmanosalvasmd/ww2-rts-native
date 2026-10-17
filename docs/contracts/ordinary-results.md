@@ -7,7 +7,7 @@ runtime acknowledgement remains pending. No C interface or header changes.
 
 `recipient_snapshot` and trusted native attachment accept Default/Conquest,
 Assault, Annihilation and Classic. Public R1 start still selects Conquest.
-World and Tutorial snapshots remain guarded; hosted Horde is described in [hosted-horde.md](hosted-horde.md).
+World snapshots remain guarded. Tutorial delivery is described in [tutorial-room-start.md](tutorial-room-start.md); hosted Horde is described in [hosted-horde.md](hosted-horde.md).
 
 ## Snapshot fields
 

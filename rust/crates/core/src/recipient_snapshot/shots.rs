@@ -758,19 +758,31 @@ mod tests {
         let expected = json!({"flight":id,"kind":"rifle","seq":0,"x":35.,"y":10.,"z":35.,
             "v":[10.,0,0],"gravity":0,"time":time,"launched":time,"expires":time+2.,"until":time+0.15,
             "f":1,"fo":0});
-        assert_eq!(super::super::flights::project(&state, 0).unwrap(), json!([expected.clone()]));
+        assert_eq!(
+            super::super::flights::project(&state, 0).unwrap(),
+            json!([expected.clone()])
+        );
         state.world.game.reveal = false;
         state.world.game.players[2].visible.clear();
         let mut hidden = expected;
         hidden.as_object_mut().unwrap().remove("f");
         hidden.as_object_mut().unwrap().remove("fo");
-        assert_eq!(super::super::flights::project(&state, 2).unwrap(), json!([hidden]));
+        assert_eq!(
+            super::super::flights::project(&state, 2).unwrap(),
+            json!([hidden])
+        );
         // A shot over an unseen cell stays hidden even to its own shooter.
         state.firing.flights.get_mut(&id).unwrap().solution.origin = Point3::new(-10., 10., -10.);
-        assert_eq!(super::super::flights::project(&state, 0).unwrap(), json!([]));
+        assert_eq!(
+            super::super::flights::project(&state, 0).unwrap(),
+            json!([])
+        );
         state.world.game.reveal = true;
         state.firing.flights.get_mut(&id).unwrap().launched = time + 1.;
-        assert_eq!(super::super::flights::project(&state, 0).unwrap(), json!([]));
+        assert_eq!(
+            super::super::flights::project(&state, 0).unwrap(),
+            json!([])
+        );
         let p = state.firing.flights.get_mut(&id).unwrap();
         p.launched = time;
         p.solution.origin = Point3::new(35., 1., 25.);

@@ -433,8 +433,8 @@ impl Room {
             return Err("native result precedes final hold callback".into());
         }
         let result = native.runtime.finished_result()?;
-        let count = self.players.len()
-            + usize::from(result.mode == "horde" || result.mode == "tutorial");
+        let count =
+            self.players.len() + usize::from(result.mode == "horde" || result.mode == "tutorial");
         if result.teams.len() != count || result.names.len() != count || result.story.len() != count
         {
             return Err("native result seat rows disagree with the stable roster".into());
@@ -540,9 +540,12 @@ impl Room {
         });
         if let Some(last) = &self.result {
             let mut report = last.report.clone();
-            report["you"] = you
-                .and_then(|slot| self.players[slot].last_match.clone())
-                .unwrap_or(Value::Null);
+            report["you"] = if report.get("story").is_some() {
+                you.and_then(|slot| self.players[slot].last_match.clone())
+                    .unwrap_or(Value::Null)
+            } else {
+                Value::Null
+            };
             result["result"] = report;
         }
         if self.mode == "horde" {
@@ -1117,9 +1120,10 @@ impl Hub {
                 "native attachment needs commander seats; Horde spectators remain guarded".into(),
             );
         }
-        let tutorial = room.mode == "tutorial" && state
-            .tutorial_state()
-            .is_some_and(|t| t.enemy() == room.players.len());
+        let tutorial = room.mode == "tutorial"
+            && state
+                .tutorial_state()
+                .is_some_and(|t| t.enemy() == room.players.len());
         if tutorial && (room.players.iter().any(|p| p.ai) || !room.spectators.is_empty()) {
             return Err("Tutorial needs human commander seats without spectators".into());
         }
