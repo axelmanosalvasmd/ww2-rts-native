@@ -1,0 +1,5 @@
+- Refresh FireAt against main `9bc82d13`, preserving main's cached and uncached recipient filtering and the PR's live ground flights.
+- Conflict hunk 1, `DESIGN.md`: retain the complete FireAt lifetime and external AI checkpoint sections.
+- Conflict hunk 2, `rust/crates/core/src/recipient_snapshot.rs`, `SnapshotCache::recipient`: retain main's call to the shared `project_recipient` helper.
+- Additional integration hunk 3, `project_recipient`: move the unchanged live-flight insertion into the shared helper, so both recipient paths retain the same flight fields and privacy rules. All automatic guards and module registrations remain intact.
+- Strengthened `fire_at_live_flight_is_visible_without_disclosing_its_hidden_shooter` with cached/uncached equality while its real flight is visible and its shooter is hidden. Every existing assertion remains unchanged; no refusal test was rewritten.
