@@ -84,18 +84,9 @@ impl TickPathConfig {
 pub struct TickState {
     pub(crate) fault: Option<String>,
     started: bool,
-    aircraft_weapons_restricted: bool,
     paths: TickPathConfig,
 }
 impl TickState {
-    /// Recipient rooms cannot publish aircraft projectile flights until owner decision E.
-    /// This restriction does not change command admission or the standalone combat provider.
-    pub fn restrict_aircraft_weapons_for_delivery(&mut self) {
-        self.aircraft_weapons_restricted = true;
-    }
-    pub(crate) fn aircraft_weapons_allowed(&self) -> bool {
-        !self.aircraft_weapons_restricted
-    }
     pub fn fault(&self) -> Option<&str> {
         self.fault.as_deref()
     }
@@ -111,6 +102,7 @@ pub enum TickEvent {
     Aviation(crate::match_aviation::AviationEvent),
     Environment(crate::environment::Effect),
     Scenario(crate::legacy_scenario::SayAction),
+    AuthoredMission(serde_json::Value),
 }
 
 /// A failed phase keeps the effects already emitted at their original boundaries.
@@ -689,6 +681,7 @@ impl crate::match_runtime::Match {
                 continue;
             }
             self.apply_attack_move(id)?;
+            self.apply_fire_at_order(id)?;
             if self.options.mode != crate::economy::Mode::World {
                 self.apply_ground_attack(id)?;
             }
@@ -791,19 +784,30 @@ impl crate::match_runtime::Match {
         }
 
         if self.options.mode != crate::economy::Mode::World && !winner_decided {
-            crate::legacy_scenario_runtime::step_legacy_scenario_emitting(
-                self,
-                tick as u64,
-                &mut |emission| match emission {
-                    crate::legacy_scenario_runtime::LegacyScenarioEmission::Say(say) => {
-                        events.push(TickEvent::Scenario(say));
-                    }
-                    crate::legacy_scenario_runtime::LegacyScenarioEmission::Environment(effect) => {
-                        events.push(TickEvent::Environment(effect));
-                    }
-                },
-            )
-            .map_err(|error| format!("legacy scenario: {error}"))?;
+            if let Some(mission) = self.authored_mission.as_mut() {
+                events.extend(
+                    mission
+                        .step(tick as u64, self.world.game.players.len())?
+                        .into_iter()
+                        .map(TickEvent::AuthoredMission),
+                );
+            } else {
+                crate::legacy_scenario_runtime::step_legacy_scenario_emitting(
+                    self,
+                    tick as u64,
+                    &mut |emission| match emission {
+                        crate::legacy_scenario_runtime::LegacyScenarioEmission::Say(say) => {
+                            events.push(TickEvent::Scenario(say));
+                        }
+                        crate::legacy_scenario_runtime::LegacyScenarioEmission::Environment(
+                            effect,
+                        ) => {
+                            events.push(TickEvent::Environment(effect));
+                        }
+                    },
+                )
+                .map_err(|error| format!("legacy scenario: {error}"))?;
+            }
             phases.push(TickPhase::Scenario);
         }
 

@@ -77,6 +77,7 @@ impl Rig {
             worker.sender().await.unwrap();
         }
         let front = Front {
+            static_files: None,
             workers,
             stop: stopped.clone(),
         };

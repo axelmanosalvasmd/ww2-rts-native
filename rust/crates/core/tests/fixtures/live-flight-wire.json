@@ -1,0 +1,73 @@
+{
+  "pin": "e4e579a838aabae3b1d9dadbc17a0a87147bc52d",
+  "source": "shared/sim.js:5985-5995",
+  "rows": [
+    [
+      {
+        "flight": 7,
+        "kind": "rifle",
+        "effect": "shell",
+        "seq": 2,
+        "x": 25,
+        "y": 10,
+        "z": 25,
+        "v": [
+          20,
+          0,
+          0
+        ],
+        "gravity": 0,
+        "time": 1,
+        "launched": 0,
+        "expires": 3,
+        "until": 1.15,
+        "f": 1,
+        "fo": 0
+      }
+    ],
+    [
+      {
+        "flight": 7,
+        "kind": "rifle",
+        "effect": "shell",
+        "seq": 2,
+        "x": 25,
+        "y": 10,
+        "z": 25,
+        "v": [
+          20,
+          0,
+          0
+        ],
+        "gravity": 0,
+        "time": 1,
+        "launched": 0,
+        "expires": 3,
+        "until": 1.15,
+        "f": 1,
+        "fo": 0
+      }
+    ],
+    [
+      {
+        "flight": 7,
+        "kind": "rifle",
+        "effect": "shell",
+        "seq": 2,
+        "x": 25,
+        "y": 10,
+        "z": 25,
+        "v": [
+          20,
+          0,
+          0
+        ],
+        "gravity": 0,
+        "time": 1,
+        "launched": 0,
+        "expires": 3,
+        "until": 1.15
+      }
+    ]
+  ]
+}

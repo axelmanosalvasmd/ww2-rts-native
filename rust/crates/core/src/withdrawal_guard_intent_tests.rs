@@ -1,4 +1,4 @@
-//! LOG-14 guards over canonical reserves. World rooms and inconsistent convoy state stay guarded.
+//! LOG-14 guards over canonical reserves and recipient delivery. World logistics stays guarded.
 use crate::{
     catalog::Catalog,
     economy::{Faction, Mode},
@@ -178,24 +178,26 @@ fn log14_forced_progress_survives_ordinary_ticks_and_each_seat_snapshot() {
             }
         }
         let reserves = m.logistics.get(id).unwrap().clone();
-        let mut delivery = DeliveryState::new(&m).unwrap();
-        let frame = delivery
-            .capture_quiescent(&mut m, &[true; 2], &[false; 2], &[])
-            .unwrap();
-        for seat in 0..2 {
-            let snapshot = frame.recipient(seat).unwrap().into_json();
-            assert_eq!(snapshot["t"], "s");
-            assert!(snapshot.get("logistics").is_none());
+        {
+            let mut delivery = DeliveryState::new(&m).unwrap();
+            let frame = delivery
+                .capture_quiescent(&mut m, &[true; 2], &[false; 2], &[])
+                .unwrap();
+            for seat in 0..2 {
+                let snapshot = frame.recipient(seat).unwrap().into_json();
+                assert_eq!(snapshot["t"], "s");
+                assert!(snapshot.get("logistics").is_none());
+            }
         }
         assert_eq!(m.logistics.get(id).unwrap(), &reserves);
     }
     assert!(m.world.game.units[&id].x > before);
-    // Enabling physical logistics still requires its canonical convoy state.
+    // Enabling logistics still requires its canonical convoy owner.
+    assert!(m.convoys.is_none());
     m.options.logistics = true;
-    assert!(
-        m.validate_tick_state()
-            .unwrap_err()
-            .contains("logistics requires initialized convoy state")
+    assert_eq!(
+        m.validate_tick_state().unwrap_err(),
+        "logistics requires initialized convoy state"
     );
 }
 
