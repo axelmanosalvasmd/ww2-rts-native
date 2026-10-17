@@ -261,6 +261,10 @@ mod movement_tick_ground_tests;
 mod movement_tick_privacy_tests;
 #[cfg(test)]
 mod movement_tick_speed_tests;
+
+#[cfg(test)]
+mod economy_research_tests;
+
 mod numeric_keys;
 
 #[cfg(test)]

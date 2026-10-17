@@ -212,6 +212,9 @@ fn validate_snapshot(state: &Match) -> Result<(), SnapshotError> {
         || state.world.geography().is_some()
         || (state.options.mode != Mode::Assault && state.assault.is_some())
         || state.world_runtime.is_some()
+        || state.world.game.mode.is_some() && state.validate_ordinary_finish_state().is_err()
+        || matches!(state.options.mode, Mode::Annihilation | Mode::Classic)
+            && state.validate_elimination_state().is_err()
     {
         return Err(SnapshotError::UnsupportedMode);
     }
@@ -1276,6 +1279,10 @@ mod map_house_selected_tests;
 #[cfg(test)]
 #[path = "recipient_snapshot/net52_tests.rs"]
 mod net52_tests;
+
+#[cfg(test)]
+#[path = "economy_currency_tests.rs"]
+mod economy_currency_tests;
 
 #[cfg(test)]
 #[path = "recipient_snapshot/combat_filter_tests.rs"]

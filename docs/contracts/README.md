@@ -26,3 +26,5 @@ review remains required.
 Contract PRs must state native/reference baseline, version/status, fields and semantics, ownership/privacy, error/recovery behavior, compatibility transition, fixtures and verification evidence. Both owners must explicitly approve breaking changes before adoption. Mark a contract agreed only after approvals and merge. Do not put credentials or private sessions in fixtures.
 
 The ABI 2 approval is limited to the six recipient-view calls in `rust-unreal-abi.md` and their staged Unreal consumer update. It does not approve additional interfaces. The operative privacy decisions recorded in `protocol.md` have separate owner confirmation. The broader drafts remain drafts; merged jointly approved scope is authoritative.
+
+[Owner economy projection](economy-projection.md) records the prototype-identical internal currency fields and mode scope. It does not approve additional public mode admission or C interfaces.
