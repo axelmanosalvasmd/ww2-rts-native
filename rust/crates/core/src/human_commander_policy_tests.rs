@@ -867,8 +867,8 @@ fn intent_ai33_construction_spending_survives_ordinary_ticks_and_recipient_snaps
     let view = m.human_commander_observation(
         &mut crate::match_human_observation::HumanObservationMemory::new(0),
     );
-    // Delivery is on even ticks, so advance once to the next ordinary observation boundary.
-    assert!(view.is_err());
+    // The caller may deliver at this odd tick under the adaptive cadence.
+    assert_eq!(view.unwrap().tick, 1201);
     m.advance_tick().unwrap();
     m.human_commander_observation(
         &mut crate::match_human_observation::HumanObservationMemory::new(0),
@@ -1115,8 +1115,8 @@ fn ai63_planner_checkpoint_retains_full_memory_without_random_streams() {
             "valid assault reason {reason}"
         );
     }
-    // Checkpoints written before field and World planner memories default only
-    // those new owners, while retaining every previously saved planner field.
+    // Checkpoints written before node, field and World planner memories default
+    // only those new owners, while retaining every previously saved planner field.
     let mut legacy = saved.clone();
     let tactics = legacy[1]
         .as_array_mut()
@@ -1125,10 +1125,13 @@ fn ai63_planner_checkpoint_retains_full_memory_without_random_streams() {
         .find(|entry| entry[0] == json!(["string", "tactics"]))
         .unwrap();
     tactics[1][1].as_array_mut().unwrap().retain(|entry| {
-        entry[0] != json!(["string", "field"]) && entry[0] != json!(["string", "world"])
+        entry[0] != json!(["string", "node"])
+            && entry[0] != json!(["string", "field"])
+            && entry[0] != json!(["string", "world"])
     });
     let mut legacy_restored = HumanPolicy::new(2, 999);
     legacy_restored.restore_planner_memory(&legacy).unwrap();
+    assert!(legacy_restored.tactics.node.is_empty());
     assert_eq!(
         legacy_restored.tactics.field,
         crate::commander_field_policy::State::default()
@@ -1138,6 +1141,7 @@ fn ai63_planner_checkpoint_retains_full_memory_without_random_streams() {
         crate::commander_world_policy::State::default()
     );
     let mut expected_legacy = policy.tactics.clone();
+    expected_legacy.node.clear();
     expected_legacy.field = Default::default();
     expected_legacy.world = Default::default();
     // The saved checkpoint precedes the later assault-reason variations above.
@@ -1151,5 +1155,106 @@ fn ai63_planner_checkpoint_retains_full_memory_without_random_streams() {
     assert_eq!(restored, before);
 }
 
+#[test]
+fn intent_ai12_refused_garrison_still_keeps_the_squad_busy_for_that_look() {
+    use crate::{
+        match_commands::{Command, Denial},
+        orders::OrderKey,
+    };
+    let mut state = runtime_match();
+    state.start.economy.players[0].mp = 0.0;
+    let mut memory = crate::match_human_observation::HumanObservationMemory::new(0);
+    let delivered = state.human_commander_observation(&mut memory).unwrap();
+    let baseline = HumanPolicy::new(0, 771)
+        .plan(screen(&delivered), Level::Normal)
+        .unwrap();
+    let id = baseline
+        .iter()
+        .filter_map(|c| c["orders"].as_array())
+        .flatten()
+        .map(|row| row[0].as_u64().unwrap() as u32)
+        .find(|id| state.rules.kinds[state.world.game.units[id].kind].infantry)
+        .unwrap();
+    let at = state.world.game.units[&id].at();
+    assert_ne!(
+        state.world.game.chars[state.world.game.cell_of(at.x, at.z).unwrap()],
+        b'B'
+    );
+    let garrison = json!({"t":"garrison","ids":[id],"x":at.x,"z":at.z});
+    let original = delivered.clone();
+    let wallet = state.start.economy.players[0].mp;
+    // The human commander's submit returns no admission result. Planning treats
+    // the queued garrison as accepted even though this visible ground has no house.
+    let mut local = delivered.clone();
+    local.packet =
+        crate::commander_tactics::mirrored(&delivered.packet, std::slice::from_ref(&garrison))
+            .unwrap();
+    let later = HumanPolicy::new(0, 771)
+        .plan(screen(&local), Level::Normal)
+        .unwrap();
+    let moves_id = |commands: &[Value]| {
+        commands.iter().any(|c| {
+            c["orders"]
+                .as_array()
+                .is_some_and(|rows| rows.iter().any(|r| r[0] == id))
+        })
+    };
+    assert!(moves_id(&baseline));
+    assert!(!moves_id(&later));
+    assert_eq!(delivered, original);
+    assert_eq!(state.start.economy.players[0].mp, wallet);
+    assert!(state.commands.units[&id].enter.is_none());
+    state
+        .enqueue_command(
+            OrderKey {
+                tick: 1,
+                issuer: 0,
+                sequence: 0,
+            },
+            Command::from_json(&garrison).unwrap(),
+        )
+        .unwrap();
+    let mut delivery = crate::recipient_snapshot::DeliveryState::new(&state).unwrap();
+    for tick in 1..=6 {
+        let report = state.advance_tick().unwrap();
+        if tick == 1 {
+            assert_eq!(report.commands.len(), 1);
+            assert_eq!(report.commands[0].denial, Some(Denial::Blocked));
+        }
+        let selected = (0..2)
+            .map(|slot| crate::recipient_snapshot::SelectedSeat {
+                slot,
+                full: true,
+                omit: false,
+            })
+            .collect::<Vec<_>>();
+        let frame = delivery
+            .capture_selected_with_tick_events(&mut state, &selected, &report.events)
+            .unwrap()
+            .unwrap();
+        for slot in 0..2 {
+            assert_eq!(frame.recipient(slot).unwrap().into_json()["t"], "s");
+        }
+        assert!(state.tick_state.fault().is_none());
+    }
+    let fresh = state.human_commander_observation(&mut memory).unwrap();
+    assert!(
+        !fresh
+            .packet
+            .input()
+            .units
+            .iter()
+            .find(|u| u.id == id)
+            .unwrap()
+            .enter
+    );
+    let next = HumanPolicy::new(0, 771)
+        .plan(screen(&fresh), Level::Normal)
+        .unwrap();
+    assert!(
+        moves_id(&next),
+        "a new look must discard the refused reservation"
+    );
+}
 #[path = "commander_field_live_tests.rs"]
 mod field_live_tests;

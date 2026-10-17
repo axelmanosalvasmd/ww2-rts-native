@@ -42,6 +42,7 @@ mod commander_construction;
 mod commander_fortification;
 mod commander_forward_hq;
 pub mod commander_mind;
+mod commander_mirror;
 mod commander_shopping;
 pub mod commander_tactics;
 pub mod companion_ray;
@@ -246,3 +247,4 @@ mod results_restart_tests;
 
 pub mod commander_field_policy;
 pub mod commander_world_policy;
+mod numeric_keys;

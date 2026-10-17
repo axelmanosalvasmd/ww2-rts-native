@@ -261,12 +261,14 @@ pub(crate) fn plan(
         0.0
     };
     let mut remaining_mp = budget;
+    let mut remaining_fuel = context.fuel;
     if !context.horde && trains(buy)? {
         let p = price(buy)?;
         for _ in 0..if context.large_army { 4 } else { 1 } {
-            if remaining_mp - reserve >= p.mp {
+            if remaining_mp - reserve >= p.mp && remaining_fuel >= p.fuel {
                 commands.push(json!({"t":"buy","unit":buy}));
                 remaining_mp -= p.mp;
+                remaining_fuel -= p.fuel;
             }
         }
     }
@@ -403,6 +405,50 @@ mod tests {
             fuel: 2000.0,
             ..Context::default()
         }
+    }
+
+    #[test]
+    fn intent_ai12_each_large_army_purchase_reserves_its_own_fuel() {
+        let mode = Mode::Classic;
+        let price = economy::price_of(mode, "medium").unwrap();
+        assert!(price.fuel > 0.0);
+        let make = |fuel| {
+            observation(
+                &[
+                    "hq",
+                    "barracks",
+                    "motorpool",
+                    "engineer",
+                    "rifle",
+                    "rifle",
+                    "rifle",
+                    "rifle",
+                ],
+                &[],
+                Context {
+                    mode,
+                    fuel,
+                    large_army: true,
+                    faction: Faction::Usa,
+                    ..Context::default()
+                },
+            )
+        };
+        let input = make(price.fuel);
+        let before = input.clone();
+        let one = run(&input, price.mp * 4.0, &Mind::default(), Some("medium"));
+        assert_eq!(one.buy, "medium");
+        assert_eq!(one.commands.iter().filter(|c| c["t"] == "buy").count(), 1);
+        assert_eq!(one.remaining_mp, price.mp * 3.0);
+        assert_eq!(input, before);
+        let four = run(
+            &make(price.fuel * 4.0),
+            price.mp * 4.0,
+            &Mind::default(),
+            Some("medium"),
+        );
+        assert_eq!(four.commands.iter().filter(|c| c["t"] == "buy").count(), 4);
+        assert_eq!(four.remaining_mp, 0.0);
     }
 
     #[test]

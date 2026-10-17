@@ -225,7 +225,7 @@ fn hosted_recorded_plane_support_pays_once_and_delivers_every_seat_through_retir
                     assert_eq!(
                         arrivals,
                         vec![json!({
-                            "k":kind,"x":at.x,"z":at.z,"dir":0.0,"fo":0,"pub":true
+                            "k":kind,"x":at.x,"z":at.z,"dir":0,"fo":0,"pub":true
                         })]
                     );
                 }

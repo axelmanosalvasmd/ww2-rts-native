@@ -80,7 +80,7 @@ pub(super) fn capture_perspective(
             fields.insert("mode".into(), mode);
         }
         // Reuse Source's six-field ghost rows. Never consult a hidden live building here.
-        if matches!(state.options.mode, Mode::Classic | Mode::World) {
+        if state.options.mode == Mode::Classic {
             let rows = state
                 .classic_known_buildings
                 .iter()
