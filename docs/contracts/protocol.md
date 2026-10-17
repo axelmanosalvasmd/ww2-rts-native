@@ -38,11 +38,11 @@ These are new relative to the reference. The pinned browser client and Node serv
 
 ## Corrections the Rust server makes
 
-The three privacy choices below keep the existing message shapes. This stream records the 2026-10-16 owner clarifications for spectator behavior and the cached flag mask. Operative delivery is handled by its own stream.
+These began as privacy proposals. Both owners' recorded decisions on 2026-10-16 retain the reference behavior for items 1 and 2 and choose the cached reference path for item 3. See Axel's [owner confirmation](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6218552386) and Julio's [clarification](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6217661080).
 
-1. **The companion's hit direction.** At the pin, `operative.from` sends the hidden attacker's position to the metre for 10 ticks after a hit (NET and FPS limitations). The browser client uses only its bearing (`client/operative-view.js:342`). The Rust server sends a point 20 m from the soldier along that bearing instead: the hit indicator is unchanged and the attacker's range stays hidden.
+1. **The companion's hit direction.** Rust retains the exact reference behavior: `operative.from` sends the attacker's position rounded to metres while `tick - hitAt <= 10`, even when the attacker is hidden; otherwise it is null (`server.js:294-306`). The earlier proposal to replace it with a point 20 m along the bearing is not adopted. The browser client uses the bearing (`client/operative-view.js:342`).
 2. **Spectators outside World Conquest.** Owner clarification J on 2026-10-16 selects (c), the reference behavior: the whole map with no delay outside World. The proposed observer delay and seat 0 team view are not adopted. World alone uses seat 0's team view and remains closed on R1. See [ordinary spectator delivery](spectators-v0.md) for prototype-identical fields and tests.
-3. **Owner-only flag bits.** Owner clarification on 2026-10-16 selects the prototype's cached path (`shared/sim.js:5903`): non-owners receive mask `2047|32768|(7<<20)|262144`, clearing gate-open, companion and cargo bits. The uncached path's broader visibility is not adopted. See [ordinary spectator delivery](spectators-v0.md).
+3. **Owner-only flag bits.** Rust uses one nonowner mask, exactly the cached reference expression `2047 | 32768 | (7 << 20) | RIDING_FLAG` (`shared/sim.js:5903`). It clears gate-open, companion and cargo bits for allies and enemies. The uncached reference path's different mask (`shared/sim.js:6044`) is recorded as `differs` by the owner decision. Nonowner cooldown is 0, and target identity is retained only when visible to the recipient (`shared/sim.js:5899-5905`).
 
 ## Error and recovery behavior
 
@@ -70,8 +70,8 @@ The in-process recorder does not exercise WebSocket framing, close codes, subpro
 1. **JSON over WebSocket** works in the Unreal client on Linux. Keep the reference wire shapes for this phase.
 2. **`proto` and `client`:** the Unreal client will send `proto: 0` and a client identifier in its next integration follow-up; the build running on 2026-10-12 does not send them yet.
 
-## Still open (product and security decisions)
+## Product and security decisions (2026-10-16)
 
 1. Spectators (correction 2): resolved to reference behavior by owner clarification J, 2026-10-16.
 2. Flag bits for allies (correction 3): resolved to the cached prototype mask by owner clarification, 2026-10-16.
-3. The companion's hit direction (correction 1): the proposed point 20 m along the bearing.
+3. The companion's hit direction (correction 1): resolved to the exact rounded attacker position through `tick - hitAt <= 10` by owner decision P. The proposed point 20 m along the bearing is not adopted. See the [owner confirmation](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6218552386).

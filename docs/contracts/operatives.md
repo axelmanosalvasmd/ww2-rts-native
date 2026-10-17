@@ -6,6 +6,8 @@ Group G is authorized by the stream brief and Julio's recorded owner decision
 [#5 comment 6217590741](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6217590741).
 Julio confirmed the relayed approval in
 [#5 comment 6217727398](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6217727398).
+Axel confirmed the operative and privacy decisions in
+[#5 comment 6218552386](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6218552386).
 Hermes' exact-head runtime review remains required. This document adds no Unreal
 interface or World admission.
 
@@ -93,3 +95,35 @@ rebroadcasts the lobby (`server.js:634-635`).
 
 This batch enables ordinary native matches. World remains closed. Save/load,
 spectator admission and other mode runners remain separate streams.
+
+## OPERATIVES-2 verification scope
+
+The follow-up batch proves FPS-05, FPS-28, FPS-29, FPS-30 and FPS-40 against
+the same shapes above. It changes tests and documentation, building on PR #367's
+runtime. The server start test checks publication before snapshots, a paused
+reconnect's start-before-pause order, all input and edge resets, and suppression
+without a commander or in World. The latter only exercises the guard; it does
+not admit a running World room (`server.js:307-319,392-413,614`).
+
+The independent delivery test consumes a changed fog mask in the commander
+stream and then in each of two operative streams. Each operative receives the
+same delta once, after the other recipients have acknowledged it
+(`server.js:285-293`). The ordinary-match test collects commander and operative
+snapshots and checks status on every tick through death, respawn, natural
+Conquest victory and eight subsequent ticks. Literal status assertions cover
+every living and dead field, all squad-spawn gates, and attacker ages 0 through
+11, including the age-10 boundary (`server.js:294-306`).
+
+Disconnect coverage keeps the soldier alive and idle for several ticks, then
+runs beyond its respawn deadline while offline with enough MP to respawn.
+Commander snapshots continue without pause or fault. Reconnect reuses the room
+record, resets sequence validation and permits respawn again
+(`server.js:596-603,718-725`; `shared/sim.js:5311-5316`). Resync coverage includes
+play, pause, the ending hold and the returned lobby; only that operative's
+delta record becomes full. Before its first start, resync does nothing because
+the stream does not exist. String names are cleaned and broadcast to all room
+members; non-string names are ignored (`server.js:194,634-635`).
+
+FPS-39 remains unclaimed because its load branch belongs to the save/load
+stream. The remaining assigned NET and IF rows stay for a later batch; this
+batch does not infer their complete coverage from these narrower FPS checks.

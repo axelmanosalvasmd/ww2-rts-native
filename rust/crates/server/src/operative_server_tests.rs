@@ -1,5 +1,7 @@
 use super::*;
 
+#[path = "operative_lifecycle_tests.rs"]
+mod lifecycle;
 #[path = "operative_room_tests.rs"]
 mod room_protocol;
 
