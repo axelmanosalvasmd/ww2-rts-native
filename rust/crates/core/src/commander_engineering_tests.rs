@@ -40,7 +40,7 @@ fn repairs(
     };
     field::field_work(observation, state, &mut result.busy, |command| {
         let accepted = field::can_submit(&terrain, &command, &sees);
-        // Record admitted work and approach orders, excluding the refused Dig attempt.
+        // Record accepted callback attempts and approach orders.
         if accepted {
             result.commands.push(command);
         } else {
