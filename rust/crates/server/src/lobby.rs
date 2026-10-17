@@ -206,11 +206,18 @@ impl Person {
         if self.ai { Some(-1.0) } else { self.rtt }
     }
     fn deny(&mut self, command: &str, reason: &str, now: u64) {
+        self.deny_raw(Some(&json!(command)), reason, now);
+    }
+    fn deny_raw(&mut self, command: Option<&Value>, reason: &str, now: u64) {
         self.denies.retain(|at| now.saturating_sub(*at) < 1_000);
         if self.denies.len() < 4 {
             self.denies.push(now);
             if let Some(c) = &self.connection {
-                c.send(json!({"t":"deny","cmd":command,"reason":reason}));
+                let mut message = json!({"t":"deny","reason":reason});
+                if let Some(command) = command {
+                    message["cmd"] = command.clone();
+                }
+                c.send(message);
             }
         }
     }
@@ -506,9 +513,6 @@ impl Room {
         v
     }
     fn command(&mut self, id: u64, msg: &Value, maps: &Value, now: u64, diagnostics: bool) -> bool {
-        let Some(t) = msg["t"].as_str() else {
-            return false;
-        };
         let seated = self
             .players
             .iter()
@@ -526,6 +530,16 @@ impl Room {
             &mut self.players[i]
         } else {
             &mut self.spectators[watching.unwrap()]
+        };
+        let Some(t) = msg["t"].as_str() else {
+            if seated.is_some()
+                && self.native.as_ref().is_some_and(|native| !native.runtime.paused())
+                && me.connection.as_ref().is_some_and(Connection::ready)
+            {
+                // JSON keeps a supplied tag's value and omits an absent tag.
+                me.deny_raw(msg.get("t"), "blocked", now);
+            }
+            return false;
         };
         if t == "ping" {
             if msg.get("x").is_some() || msg.get("z").is_some() {
@@ -2035,7 +2049,7 @@ impl Hub {
         msg: Value,
         now: u64,
     ) {
-        if self.is_stopped() || !msg.is_object() {
+        if self.is_stopped() || !(msg.is_object() || *joined && msg.is_array()) {
             return;
         }
         if *joined {

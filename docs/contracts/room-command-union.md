@@ -64,3 +64,20 @@ an ordinary queued HQ destruction and canonical elimination, after exercising
 production cancellation. It checks 60 ending frames for every seat, final
 result keys and timeline, and stable post-result status. Public Classic start
 remains guarded.
+
+For already joined commanders in active, unpaused play, malformed command tags
+receive `blocked` with the supplied JSON tag preserved as the `cmd` value:
+`{"t":7}` produces `{"t":"deny","cmd":7,"reason":"blocked"}`, and
+`{"t":null}` produces `{"t":"deny","cmd":null,"reason":"blocked"}`.
+Array and object tag values are preserved as well. An absent tag, including a
+root array, omits the `cmd` property:
+`{"t":"deny","reason":"blocked"}`. These are the prototype's normal dispatch
+and JSON serialization rules (`server.js:584-587,712-714`;
+`shared/sim.js:3408-3410,3812`). No queue identity is reserved.
+
+Raw-tag and string-tag denials share the same four-replies-per-rolling-second
+history (`shared/command-feedback.js:1-8`). Paused, unready, replaced, spectator
+and operative connections retain their existing silence. Before hello and in
+the lobby, malformed tags and root arrays remain ignored, as do top-level JSON
+primitives. The repair adds feedback only for the current ready commander
+connection during active, unpaused play.

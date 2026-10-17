@@ -713,3 +713,142 @@ fn net43_classic_attachment_keeps_mode_map_binding_and_refuses_node_rounding_ove
     state.world.game.mode = Some(ww2_core::game::ModeKind::World);
     assert!(SnapshotCache::new(&state).is_err());
 }
+
+fn malformed_tags() -> [Value; 6] {
+    [json!({"t":7}), json!({"t":[]}), json!({"t":{"command":"attack"}}),
+        json!({"t":null}), json!({}), json!([])]
+}
+
+fn raw_blocked(raw: &Value) -> Value {
+    let mut denial = json!({"t":"deny","reason":"blocked"});
+    if let Some(tag) = raw.get("t") {
+        denial["cmd"] = tag.clone();
+    }
+    denial
+}
+
+#[test]
+fn net43_malformed_tags_preserve_exact_feedback_and_pause_ready_gates() {
+    for raw in malformed_tags() {
+        let mut room = Room::new(scene(Mode::Conquest));
+        room.message(0, json!({"t":"pause"}));
+        room.drain();
+        room.message(1, raw.clone());
+        assert!(room.drain().iter().all(Vec::is_empty));
+        assert!(room.hub.rooms["ABC"].players[1].denies.is_empty());
+        room.message(0, json!({"t":"resume"}));
+        room.drain();
+        room.peers[1].cancel.send_replace(true);
+        room.message(1, raw.clone());
+        assert!(room.drain().iter().all(Vec::is_empty));
+        assert!(room.hub.rooms["ABC"].players[1].denies.is_empty());
+        room.peers[1].cancel.send_replace(false);
+        room.message(1, raw.clone());
+        let messages = room.drain();
+        assert!(messages[0].is_empty());
+        assert_eq!(messages[1], vec![raw_blocked(&raw)]);
+        assert_eq!(room.hub.rooms["ABC"].players[1].denies, vec![room.now]);
+        assert_eq!(room.state().commands.pending_commands(), 0);
+        room.healthy();
+    }
+}
+
+#[test]
+fn net43_malformed_tags_keep_spectator_operative_stale_and_lobby_inputs_silent() {
+    let peer = |id| {
+        let (tx, rx) = mpsc::channel(128);
+        let (cancel, _) = watch::channel(false);
+        (Connection::new(id, tx, cancel), rx)
+    };
+    let mut room = Room::new(scene(Mode::Conquest));
+    let (unknown, mut unknown_rx) = peer(90);
+    for raw in malformed_tags() {
+        let mut joined = false;
+        room.hub.message("ABC", &unknown, &mut joined, raw, room.now);
+        assert!(!joined);
+        assert!(unknown_rx.try_recv().is_err());
+    }
+    let (watcher, mut watcher_rx) = peer(91);
+    let (operative, mut operative_rx) = peer(92);
+    for (connection, hello) in [
+        (&watcher, json!({"t":"hello","token":"watcher","name":"watcher","spectate":true})),
+        (&operative, json!({"t":"hello","token":"operative","name":"operative","role":"operative","commander":1})),
+    ] {
+        let mut joined = false;
+        room.hub.message("ABC", connection, &mut joined, hello, room.now);
+        assert!(joined);
+    }
+    room.drain();
+    while watcher_rx.try_recv().is_ok() {}
+    while operative_rx.try_recv().is_ok() {}
+    let (replacement, replacement_rx) = peer(93);
+    let mut joined = false;
+    room.hub.message("ABC", &replacement, &mut joined,
+        json!({"t":"hello","token":"seat1","name":"seat"}), room.now);
+    assert!(joined);
+    let stale = std::mem::replace(&mut room.peers[1], replacement);
+    let mut stale_rx = std::mem::replace(&mut room.receivers[1], replacement_rx);
+    let mut closed = false;
+    while let Ok(output) = stale_rx.try_recv() {
+        closed |= matches!(output, Output::Close(..));
+    }
+    assert!(closed);
+    room.drain();
+    while watcher_rx.try_recv().is_ok() {}
+    while operative_rx.try_recv().is_ok() {}
+    for raw in malformed_tags() {
+        for connection in [&unknown, &watcher, &operative, &stale] {
+            room.hub.message("ABC", connection, &mut true, raw.clone(), room.now);
+        }
+        assert!(room.drain().iter().all(Vec::is_empty));
+        assert!(unknown_rx.try_recv().is_err());
+        assert!(watcher_rx.try_recv().is_err());
+        assert!(operative_rx.try_recv().is_err());
+        assert!(stale_rx.try_recv().is_err());
+    }
+    for raw in [Value::Null, json!(7), json!(true), json!("attack")] {
+        room.message(1, raw);
+        assert!(room.drain().iter().all(Vec::is_empty));
+    }
+    assert!(room.hub.rooms["ABC"].players[1].denies.is_empty());
+    assert_eq!(room.state().commands.pending_commands(), 0);
+    let current = json!({"t":{"current":true}});
+    room.message(1, current.clone());
+    let messages = room.drain();
+    assert!(messages[0].is_empty());
+    assert_eq!(messages[1], vec![raw_blocked(&current)]);
+    assert!(stale_rx.try_recv().is_err());
+    room.healthy();
+    room.message(0, json!({"t":"end"}));
+    room.drain();
+    assert!(room.hub.rooms["ABC"].native.is_none());
+    for raw in malformed_tags() {
+        room.message(1, raw);
+        assert!(room.drain().iter().all(Vec::is_empty));
+    }
+}
+
+#[test]
+fn net43_raw_and_string_denials_share_the_same_rolling_four_reply_limit() {
+    let mut room = Room::new(scene(Mode::Conquest));
+    for (now, raw, reply) in [
+        (0, json!({"t":7}), true),
+        (100, json!({"t":"unknown"}), true),
+        (200, json!({}), true),
+        (300, json!([]), true),
+        (400, json!({"t":null}), false),
+        (999, json!({"t":[]}), false),
+        (1000, json!({"t":[]}), true),
+        (1000, json!({"t":"unknown"}), false),
+        (1100, json!({"t":"unknown"}), true),
+    ] {
+        room.now = now;
+        room.message(1, raw.clone());
+        let messages = room.drain();
+        assert!(messages[0].is_empty());
+        assert_eq!(messages[1], if reply { vec![raw_blocked(&raw)] } else { vec![] });
+        assert_eq!(room.state().commands.pending_commands(), 0);
+    }
+    assert_eq!(room.hub.rooms["ABC"].players[1].denies, vec![200,300,1000,1100]);
+    room.healthy();
+}
