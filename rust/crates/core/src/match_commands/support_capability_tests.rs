@@ -256,7 +256,7 @@ fn hosted_recorded_support_pays_once_and_delivers_every_seat_through_cleanup_and
                 .capture_selected_with_tick_events(&mut state, &selected, &report.events)
                 .unwrap()
                 .unwrap();
-            for slot in 0..2 {
+            for (slot, arrived_at_seat) in arrived.iter_mut().enumerate() {
                 let row = frame.recipient(slot).unwrap().into_json();
                 assert_eq!(row["t"], "s");
                 assert!(
@@ -266,7 +266,7 @@ fn hosted_recorded_support_pays_once_and_delivers_every_seat_through_cleanup_and
                         .iter()
                         .all(|strike| strike[0] == kind && strike[5] == 0)
                 );
-                arrived[slot] |= row["shots"].as_array().unwrap().contains(&expected_arrival);
+                *arrived_at_seat |= row["shots"].as_array().unwrap().contains(&expected_arrival);
             }
             drop(frame);
             assert!(state.tick_state.fault().is_none());
