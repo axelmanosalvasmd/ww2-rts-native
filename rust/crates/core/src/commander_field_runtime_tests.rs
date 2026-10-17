@@ -193,6 +193,12 @@ fn intent_ai50_gate_order_completes_in_each_real_ordinary_mode_with_supported_se
         Mode::Classic,
     ] {
         let (mut state, builder) = scene(mode);
+        if mode == Mode::Classic {
+            assert_eq!(
+                crate::recipient_snapshot::mode_row(&state).unwrap(),
+                json!({"kind":"classic","timeLeft":1500.0,"suddenDeath":false})
+            );
+        }
         let before = count(&state, "gate");
         let first_gate = state.next_unit_id;
         let spent = state.story[0].mp_spent;

@@ -405,6 +405,12 @@ fn retreat_through_legs(mode: Mode) {
     m.commands.units.get_mut(&id).unwrap().hold_fire = true;
     let home = m.reaction_home(id).unwrap();
     let selected = seats(&m);
+    if mode == Mode::Classic {
+        assert_eq!(
+            crate::recipient_snapshot::mode_row(&m).unwrap(),
+            serde_json::json!({"kind":"classic","timeLeft":1500.0,"suddenDeath":false})
+        );
+    }
     let mut delivery = DeliveryState::new(&m).unwrap();
     assert_eq!(
         m.execute_command(
