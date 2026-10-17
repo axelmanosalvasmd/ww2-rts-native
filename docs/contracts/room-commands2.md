@@ -7,3 +7,5 @@ Prototype-identical shapes at `e4e579a`:
 - Non-World `recover` and unknown orders return `blocked`, as `shared/sim.js:3415,3812` requires. World recovery remains deferred with World room admission.
 
 Commands share the recorded tick queue and the ordinary tick, reserve, convoy and recipient owners. This composition adds no wire field, message kind, save schema or ABI declaration.
+
+Horde sandbox wave-zero bosses use the existing public `mode.boss` bar `[currentHp,maxHp]` once the Horde phase has computed it (`shared/sim.js:945-955,5895-5898`). Initial pre-wave frames still omit uninitialized profile and boss fields; the sandbox spawn does not invent a wave-one profile.
