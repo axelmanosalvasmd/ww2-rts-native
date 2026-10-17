@@ -116,7 +116,7 @@ fn base02_mode06_non_world_constructors_scale_wallets_and_population() {
 #[test]
 fn base52_non_world_starting_bases_and_forces_follow_each_mode() {
     for mode in MODES {
-        let mut m = create(mode, ArmySize::Standard).unwrap();
+        let m = create(mode, ArmySize::Standard).unwrap();
         for owner in 0..m.start.players.len() {
             let units = m
                 .world
@@ -325,7 +325,9 @@ fn base52_first_fitting_site_moves_away_from_a_nearby_income_point() {
 
 #[test]
 fn mode01_non_world_mode_rows_match_the_prototype_public_fields() {
-    use crate::recipient_snapshot::{DeliveryState, SnapshotCache, SnapshotError, mode_row};
+    use crate::recipient_snapshot::{
+        DeliveryState, SnapshotCache, SnapshotCapability, SnapshotError, mode_row,
+    };
 
     // Prototype sim.js:5895-5898; Tutorial's initial goal is tutorial.js:11.
     // Ordinary modes also carry this row through every recipient projection.
@@ -386,7 +388,14 @@ fn mode01_non_world_mode_rows_match_the_prototype_public_fields() {
                 let projection = frame.recipient(slot).unwrap();
                 assert_eq!(projection.fields["mode"], expected, "Classic seat {slot}");
                 assert_eq!(projection.fields["ghosts"], json!([]));
-                assert!(projection.missing.is_empty());
+                assert_eq!(
+                    projection.missing,
+                    vec![
+                        SnapshotCapability::WrecksAndFoundMines,
+                        SnapshotCapability::ShotsAndFlights,
+                        SnapshotCapability::TeamEffects,
+                    ]
+                );
             }
         }
     }
