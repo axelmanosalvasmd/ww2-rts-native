@@ -466,6 +466,7 @@ fn original_result_roster_rows_follow_people_across_removal_and_refill() {
                         disconnected: None,
                         denies: Vec::new(),
                         rtt: None,
+                        map_pings: Vec::new(),
                         diagnostics: crate::diagnostics::PlayerDiagnostics::default(),
                         last_match: Some(
                             json!({"team":name.as_bytes()[0] - b'a',"outcome":"victory"}),
@@ -485,5 +486,68 @@ fn original_result_roster_rows_follow_people_across_removal_and_refill() {
 #[path = "native_mode_predicates.rs"]
 mod mode_predicates;
 
+#[test]
+fn manual_end_restart_old_completion_cannot_consume_current_snapshot_ticket() {
+    let (mut h, a, mut ra, _, mut rb) = room();
+    let old_epoch = h.attach_native("ABC", native_match(), 0).unwrap();
+    initial_start(&mut ra);
+    initial_start(&mut rb);
+    h.poll_native(0, 0);
+    h.poll_native(50, 50_000_000);
+    let old = write(&mut ra);
+    let old_peer = write(&mut rb);
+    let old_bytes = h.accounts[&a.id].pressure.inflight();
+    assert!(old_bytes > 0);
+
+    h.message("ABC", &a, &mut true, json!({"t":"end"}), 51);
+    assert!(h.rooms["ABC"].native.is_none());
+    for receiver in [&mut ra, &mut rb] {
+        while let Ok(output) = receiver.try_recv() {
+            assert!(matches!(output, Output::Json(_)));
+        }
+    }
+    let new_epoch = h.attach_native("ABC", native_match(), 52).unwrap();
+    assert!(new_epoch > old_epoch);
+    initial_start(&mut ra);
+    initial_start(&mut rb);
+    h.poll_native(100, 100_000_000);
+    h.poll_native(150, 150_000_000);
+    let current = write(&mut ra);
+    let current_peer = write(&mut rb);
+    assert_eq!(current.connection_id, old.connection_id);
+    assert_eq!(current.epoch, new_epoch);
+    assert!(current.ticket > old.ticket);
+    let current_bytes = current.json.encode_utf16().count() as u64;
+    assert_eq!(
+        h.accounts[&a.id].pressure.inflight(),
+        old_bytes + current_bytes
+    );
+    let history = h.accounts[&a.id].delivery.clone();
+
+    // The old callback arrives after the new write has already been reserved.
+    h.complete_snapshot(&old, true, 151);
+    assert_eq!(h.accounts[&a.id].pressure.inflight(), current_bytes);
+    assert_eq!(h.accounts[&a.id].delivery, history);
+    assert!(ra.try_recv().is_err());
+    h.complete_snapshot(&current, true, 152);
+    h.complete_snapshot(&old_peer, true, 152);
+    h.complete_snapshot(&current_peer, true, 152);
+    assert_eq!(h.accounts[&a.id].pressure.inflight(), 0);
+    assert!(h.native_status("ABC").unwrap().fault.is_none());
+
+    h.poll_native(200, 200_000_000);
+    h.poll_native(250, 250_000_000);
+    for receiver in [&mut ra, &mut rb] {
+        let next = write(receiver);
+        assert_eq!(next.epoch, new_epoch);
+        h.complete_snapshot(&next, true, 251);
+    }
+    assert!(h.native_status("ABC").unwrap().fault.is_none());
+    assert!(
+        h.accounts
+            .values()
+            .all(|account| account.pressure.inflight() == 0)
+    );
+}
 #[path = "mode_server_lifecycle_tests.rs"]
 mod mode_server_lifecycle;
