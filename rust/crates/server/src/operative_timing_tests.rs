@@ -170,6 +170,9 @@ fn if28_native_input_log_replays_tick_order_away_pause_and_operative_throttle() 
             while let Ok(output) = returned_rx.try_recv() {
                 match output {
                     Output::Json(message) => returned_messages.push(message),
+                    Output::Watcher(_) => {
+                        panic!("returning commander cannot receive watcher frames")
+                    }
                     Output::Snapshot(write) => {
                         returned_messages.push(serde_json::from_str(&write.json).unwrap());
                         hub.complete_snapshot(&write, true, *now);

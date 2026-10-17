@@ -13,3 +13,9 @@ Save files still contain commander seats only. Existing connected people not ass
 Ordinary watcher flight rows use the prototype's full-map overlay and identity predicate (`server.js:204,217-220`; `shared/sim.js:5945-5997`). Their existing `flight`, `kind`, optional `effect`, `seq`, position, velocity, gravity and time fields include unseen or retired shooters. Prediction ends at expiry, 0.15 seconds or canonical visible contact. Seat recipients retain their ground-fog and shooter-visibility rules. Horde retains its ground-projectile validation and aircraft-weapon restriction.
 
 The literal test mapping and merge record are in `docs/testing/room-ai3-20261016.md`. Runtime review and hosted merge gates remain with the orchestrator under the current issue #5 process.
+
+## Combined host pause delivery
+
+Host `pause` and `resume` broadcast the existing pause object to every commander, spectator and operative immediately, matching `server.js:205,470-491` at `e4e579a`. The fields remain exactly `{t:"pause", paused, by, reason, left}`. While host-paused, each one-second boundary sends that object followed by one current frame to each connected role (`server.js:500-519`). Operatives receive the immediate transitions as well as the periodic messages. No new message fields or private state are exposed.
+
+The pause branch precedes simulation and room/Horde AI scheduling (`server.js:782`; `server/room-tick.js:15-22`). Army and operative input remain ignored until the host resumes (`server.js:631,700-703,712`). The composed ordinary/Horde witness is `net79_host_pause_freezes_room_ai_armies_and_operatives_with_one_second_frames`, documented in `docs/testing/gap-net79.md`.

@@ -767,7 +767,12 @@ impl Room {
             };
             match message {
                 Ok(Some(message)) => {
-                    for person in self.players.iter().chain(&self.spectators) {
+                    for person in self
+                        .players
+                        .iter()
+                        .chain(&self.spectators)
+                        .chain(self.operatives.iter().map(|op| &op.person))
+                    {
                         if let Some(connection) = &person.connection {
                             connection.send(message.clone());
                         }

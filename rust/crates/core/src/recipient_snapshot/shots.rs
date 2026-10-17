@@ -40,6 +40,7 @@ impl<'a> TryFrom<&'a TickEvent> for ShotRef<'a> {
             TickEvent::AuthoredScenario(value) => Ok(Self::AuthoredScenario(value)),
             TickEvent::AuthoredMission(_) => Err(SnapshotError::Rules),
             TickEvent::Aviation(value) => Ok(Self::Aviation(value)),
+            TickEvent::AuthoredMission(value) => Ok(Self::AuthoredMission(value)),
         }
     }
 }

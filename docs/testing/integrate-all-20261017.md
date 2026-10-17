@@ -207,3 +207,17 @@ and operative identity validation; all existing full-map flight tests remain.
 
 Final behavioral verification must cover this explicitly requested cross-chain
 change; the earlier standalone Horde chain pass is not proof of equivalence.
+
+## Cross-chain #441
+
+Exact parent `b5c269f3fcc050a66f62830c4808b867646ea1df`. Retains operative pause
+notices, combined pause/checkpoint proofs and canonical Horde gate validation.
+The incoming adversarial foreign-packet privacy assertions are merged into the
+active ordinary view suite. Strict compiled-name counter/reason codecs retain
+all valid-reason roundtrip checks. The populated Horde delivered-intent save
+witness remains rather than reverting to an empty field.
+
+All wider admitted-mode, pending-start, complete logistics and typed authored-v2
+guards remain. Existing duplicate test registrations and obsolete copies of
+legacy mode guards are not reintroduced. The detached comparison implementation
+nested in the incoming view file is test-only; its original tests remain.

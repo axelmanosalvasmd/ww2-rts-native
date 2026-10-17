@@ -305,23 +305,26 @@ fn validate_snapshot(state: &Match) -> Result<(), SnapshotError> {
     projectiles::validate(state)?;
     engineering::validate(state)?;
     aircraft::validate(state)?;
-    state
-        .prepare_companion_tick()
-        .map_err(|_| SnapshotError::Unsupported {
-            unit: g
-                .units
-                .values()
-                .find(|unit| {
-                    state
-                        .commands
-                        .units
-                        .get(&unit.id)
-                        .is_some_and(|control| control.operative)
-                        && !state.companions.soldiers.contains_key(&unit.id)
-                })
-                .map_or(0, |unit| unit.id),
+    if state.options.mode == Mode::Horde {
+        projectiles::validate(state)?;
+    }
+    state.prepare_companion_tick().map_err(|_| {
+        let unit = state
+            .commands
+            .units
+            .iter()
+            .find_map(|(&id, control)| {
+                (control.operative
+                    && g.units.contains_key(&id)
+                    && state.check_companion(id).is_err())
+                .then_some(id)
+            })
+            .unwrap_or(0);
+        SnapshotError::Unsupported {
+            unit,
             capability: SnapshotCapability::Operatives,
-        })?;
+        }
+    })?;
     Ok(())
 }
 
@@ -389,7 +392,13 @@ fn project_recipient(
     fields.extend(owners);
     fields.extend(public);
     fields.insert("falling".into(), falling::project(state, slot)?);
-    fields.insert("flights".into(), flights::project(state, slot)?);
+    if state.options.mode == crate::economy::Mode::Horde {
+        if !state.firing.flights.is_empty() {
+            fields.insert("flights".into(), projectiles::for_seat(state, slot)?);
+        }
+    } else {
+        fields.insert("flights".into(), flights::project(state, slot)?);
+    }
     if let Some(logistics) = logistics::project(state, slot)? {
         fields.insert("logistics".into(), logistics);
     }

@@ -227,6 +227,9 @@ pub enum SituationKind {
     Wait,
     Push,
 }
+// The custom decoder returns compiled names instead of borrowing the save buffer.
+type SavedCounter = &'static str;
+
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Situation {
     pub kind: SituationKind,
@@ -234,8 +237,8 @@ pub struct Situation {
     pub point: Option<usize>,
     pub threat: Option<u32>,
     pub at: Option<Point>,
-    #[serde(deserialize_with = "crate::save_state::optional_static_string")]
-    pub counter: Option<crate::save_state::StaticStr>,
+    #[serde(with = "saved_counter")]
+    pub counter: Option<SavedCounter>,
     pub safe: Option<usize>,
     pub failed_at: u8,
 }
@@ -1721,3 +1724,26 @@ mod field_review_tests;
 #[cfg(test)]
 #[path = "commander_aircraft_tests.rs"]
 mod aircraft_tests;
+
+mod saved_counter {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    pub fn serialize<S: Serializer>(
+        value: &Option<&'static str>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        if value.is_some_and(|v| !matches!(v, "at" | "mg")) {
+            return Err(serde::ser::Error::custom("unknown planner counter"));
+        }
+        value.serialize(serializer)
+    }
+    pub fn deserialize<'de, D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Option<&'static str>, D::Error> {
+        match Option::<String>::deserialize(deserializer)?.as_deref() {
+            None => Ok(None),
+            Some("at") => Ok(Some("at")),
+            Some("mg") => Ok(Some("mg")),
+            _ => Err(serde::de::Error::custom("unknown planner counter")),
+        }
+    }
+}
