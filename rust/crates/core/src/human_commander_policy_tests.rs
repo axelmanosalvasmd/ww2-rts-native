@@ -611,38 +611,27 @@ fn intent_ai36_runtime_policy_retreat_reaches_the_canonical_command_queue() {
 }
 
 #[test]
-fn intent_ai28_delivered_stock_uses_public_two_decimal_precision() {
+fn undelivered_logistics_refuses_before_publishing_human_observation() {
     let mut m = runtime_match();
     m.options.logistics = true;
     m.initialize_logistics().unwrap();
-    let id = *m
-        .world
-        .game
-        .units
-        .iter()
-        .find(|(_, u)| u.owner == 0 && m.rules.kinds[u.kind].name == "rifle")
-        .unwrap()
-        .0;
-    let stock = m.logistics.get_mut(id).unwrap();
-    stock.provisions = 59.6;
-    stock.fuel = Some(36.4);
-    stock.ammo = stock.ammo_max * 0.499;
-    let view = m
-        .human_commander_observation(
-            &mut crate::match_human_observation::HumanObservationMemory::new(0),
-        )
-        .unwrap();
-    let delivered = view.packet.input().runtime.as_ref().unwrap().units[&id]
-        .stock
-        .as_ref()
-        .unwrap();
-    assert_eq!(delivered.provisions, 59.6);
-    assert_eq!(delivered.fuel, Some(36.4));
-    assert_eq!(delivered.ammo, Some(0.5));
-    let commands = HumanPolicy::new(0, 771)
-        .plan(screen(&view), Level::Normal)
-        .unwrap();
-    assert!(!commands.iter().any(|c| c["t"] == "retreat"));
+    let mut memory = crate::match_human_observation::HumanObservationMemory::new(0);
+    let before = memory.clone();
+    let random = m.start.random.snapshot();
+    let queue = m.commands.queue.snapshot();
+    let routing = format!("{:?}", m.recipients);
+    assert_eq!(
+        m.human_commander_observation(&mut memory),
+        Err("human commander requires delivered logistics support".into())
+    );
+    assert_eq!(memory, before);
+    assert_eq!(m.start.random.snapshot(), random);
+    assert_eq!(m.commands.queue.snapshot(), queue);
+    assert_eq!(format!("{:?}", m.recipients), routing);
+    // A stale stock owner cannot bypass the guard by clearing the option alone.
+    m.options.logistics = false;
+    assert!(m.human_commander_observation(&mut memory).is_err());
+    assert_eq!(memory, before);
 }
 
 #[test]
@@ -1124,3 +1113,101 @@ fn intent_ai12_refused_garrison_still_keeps_the_squad_busy_for_that_look() {
 }
 #[path = "commander_field_live_tests.rs"]
 mod field_live_tests;
+
+#[test]
+fn ai63_planner_checkpoint_retains_full_memory_without_random_streams() {
+    use crate::{
+        commander_ai::Aim,
+        commander_tactics::{Decision, Situation, SituationKind},
+    };
+    let mut policy = HumanPolicy::new(2, 77);
+    policy.source.aim = Some(Aim { i: 3, until: -0.0 });
+    policy.source.point_failures = vec![1, 255, 4];
+    policy.tactics.raid = Some(crate::commander_classic_rules::Raid {
+        target: 99,
+        ids: vec![4, 5],
+        at: crate::game::Point { x: 2., z: 3. },
+    });
+    policy.tactics.situation = Some(Situation {
+        kind: SituationKind::Defense,
+        until: 9.,
+        point: Some(1),
+        threat: Some(7),
+        at: Some(crate::game::Point { x: 4., z: 5. }),
+        counter: Some("at"),
+        safe: Some(2),
+        failed_at: 3,
+    });
+    policy.tactics.aim = Some((3, 12.));
+    policy.tactics.supply_waiting.insert(3);
+    policy.tactics.released.insert(4);
+    policy.tactics.decision = Some(Decision {
+        situation: SituationKind::Push,
+        buy: "rifle".into(),
+        aim: Some(3),
+    });
+    policy.tactics.called = Some(27.);
+    policy.tactics.cleared_sightings.insert(8, 19.);
+    policy.tactics.node.insert(9, 2);
+    policy.tactics.fort_steps.insert(10, 4);
+    policy.tactics.assault.cooldown = 8.;
+    policy.tactics.assault.serial = u64::MAX;
+    policy.tactics.assault.released.insert(11, 12.);
+    policy.tactics.assault.operation = Some(crate::commander_assault::Operation {
+        id: 3,
+        phase: crate::commander_assault::Phase::Regroup,
+        started: 2.,
+        state_at: 4.,
+        point: Some(1),
+        at: crate::game::Point { x: 1., z: 2. },
+        stage: crate::game::Point { x: 3., z: 4. },
+        initial: 2,
+        members: vec![crate::commander_assault::Member {
+            id: 5,
+            role: crate::commander_assault::Role::Support,
+            last: crate::game::Point { x: 5., z: 6. },
+            progress_at: 8.,
+            order: Some(crate::game::Point { x: 7., z: 8. }),
+            placement: Some(crate::game::Point { x: 9., z: 10. }),
+            acknowledged: true,
+        }],
+        reason: Some("regroup-blocked"),
+    });
+    let saved = policy.planner_memory_json().unwrap();
+    policy.random.next_fraction(StreamId::Ai(2));
+    assert_eq!(
+        saved,
+        policy.planner_memory_json().unwrap(),
+        "random progress is not saved"
+    );
+    let mut restored = HumanPolicy::new(2, 999);
+    let random = restored.random.clone();
+    restored.restore_planner_memory(&saved).unwrap();
+    assert_eq!(saved, restored.planner_memory_json().unwrap());
+    assert_eq!(restored.random, random);
+    for reason in [
+        "handoff",
+        "timeout",
+        "defense",
+        "regroup-blocked",
+        "withdrawn",
+        "members-unavailable",
+        "armor",
+        "machine-gun",
+        "losses",
+    ] {
+        policy.tactics.assault.operation.as_mut().unwrap().reason = Some(reason);
+        let saved = policy.planner_memory_json().unwrap();
+        restored.restore_planner_memory(&saved).unwrap();
+        assert_eq!(
+            restored.tactics, policy.tactics,
+            "valid assault reason {reason}"
+        );
+    }
+    let before = restored.clone();
+    let foreign = HumanPolicy::new(1, 77).planner_memory_json().unwrap();
+    assert!(restored.restore_planner_memory(&foreign).is_err());
+    assert_eq!(restored, before);
+    assert!(restored.restore_planner_memory(&json!([])).is_err());
+    assert_eq!(restored, before);
+}

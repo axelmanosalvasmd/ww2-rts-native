@@ -215,6 +215,11 @@ fn validate_snapshot(state: &Match) -> Result<(), SnapshotError> {
     {
         return Err(SnapshotError::UnsupportedMode);
     }
+    if state.options.mode == Mode::Classic {
+        state
+            .validate_elimination_state()
+            .map_err(|_| SnapshotError::Rules)?;
+    }
     let g = &state.world.game;
     let cells = g.w.checked_mul(g.h).ok_or(SnapshotError::Rules)?;
     if g.tick < 0 {
@@ -591,10 +596,13 @@ fn economy_fields(state: &Match, slot: usize) -> Result<Map<String, Value>, Snap
     let p = &state.start.economy.players[slot];
     finite(&[p.mp, p.mun, p.fuel, p.inc, p.vp])?;
     let mut fields = Map::new();
-    // Ordinary Conquest does not initialize the source player mun/fuel fields.
-    // Canonical accounting zeros do not make those wire fields present.
+    // Conquest leaves mun/fuel undefined; Classic initializes both wallets.
     for (key, value) in [("mp", p.mp.floor()), ("inc", r(p.inc))] {
         fields.insert(key.into(), json!(value));
+    }
+    if state.options.mode == Mode::Classic {
+        fields.insert("mun".into(), json!(p.mun.floor()));
+        fields.insert("fuel".into(), json!(p.fuel.floor()));
     }
     for (key, value) in [("fuelInc", p.fuel_inc), ("upkeep", p.upkeep)] {
         if let Some(value) = value {

@@ -211,102 +211,207 @@ fn mov91_eight_support_prices_timers_and_mode_currencies_match_pinned_values() {
 
 #[test]
 fn mov91_own_string_keys_all_eight_admissions_denials_and_default_direction() {
-    let mut state = scene(Mode::Conquest);
-    state.start.economy.players[0].mp = 10000.;
-    for kind in [
-        json!({"toString":null,"valueOf":null}),
-        json!(["dive"]),
-        json!(null),
-        json!(1),
-    ] {
+    for mode in [Mode::Conquest, Mode::Classic] {
+        let mut state = scene(mode);
+        state.start.economy.players[0].mp = 10000.;
+        state.start.economy.players[0].mun = 10000.;
+        for kind in [
+            json!({"toString":null,"valueOf":null}),
+            json!(["dive"]),
+            json!(null),
+            json!(1),
+        ] {
+            assert_eq!(
+                Command::from_json(&json!({"t":"support","kind":kind,"x":20,"z":20})),
+                Err(Denial::Blocked)
+            );
+        }
+        for name in [
+            "toString",
+            "valueOf",
+            "hasOwnProperty",
+            "__proto__",
+            "constructor",
+            "nuke",
+            "",
+        ] {
+            let before = state.start.economy.players[0].clone();
+            let cooldowns = state.start.players[0].support.clone();
+            assert_eq!(
+                state
+                    .admit_support(0, name, Point { x: 20., z: 20. }, None)
+                    .unwrap(),
+                Some(SupportDenial::Blocked)
+            );
+            assert_eq!(state.start.economy.players[0].mp, before.mp);
+            assert_eq!(state.start.economy.players[0].mun, before.mun);
+            assert_eq!(state.start.players[0].support, cooldowns);
+            assert_eq!(state.story[0].support_calls, 0.);
+            assert!(state.world.game.strikes.is_empty());
+            assert!(economy::sup_cost(mode, name).is_err());
+        }
+        let spawn = state.start.players[0].spawn;
+        let at = Point {
+            x: spawn.x + 8.,
+            z: spawn.z + 4.,
+        };
+        for name in [
+            "recon",
+            "artillery",
+            "strafe",
+            "smoke",
+            "bombing",
+            "dive",
+            "para",
+            "cover",
+        ] {
+            let price = economy::sup_cost(mode, name).unwrap();
+            let before = state.start.economy.players[0].clone();
+            let cooldowns = state.start.players[0].support.clone();
+            let count = state.world.game.strikes.len();
+            let calls = state.story[0].support_calls;
+            if price.currency == Currency::Manpower {
+                state.start.economy.players[0].mp = price.cost - 1.;
+            } else {
+                state.start.economy.players[0].mun = price.cost - 1.;
+            }
+            assert_eq!(
+                state.admit_support(0, name, at, None).unwrap(),
+                Some(if price.currency == Currency::Manpower {
+                    SupportDenial::Manpower
+                } else {
+                    SupportDenial::Munitions
+                })
+            );
+            assert_eq!(
+                state.start.economy.players[0].mp,
+                if price.currency == Currency::Manpower {
+                    price.cost - 1.
+                } else {
+                    before.mp
+                }
+            );
+            assert_eq!(
+                state.start.economy.players[0].mun,
+                if price.currency == Currency::Munitions {
+                    price.cost - 1.
+                } else {
+                    before.mun
+                }
+            );
+            assert_eq!(state.start.players[0].support, cooldowns);
+            assert_eq!(state.world.game.strikes.len(), count);
+            assert_eq!(state.story[0].support_calls, calls);
+            state.start.economy.players[0].mp = before.mp;
+            state.start.economy.players[0].mun = before.mun;
+            assert_eq!(state.admit_support(0, name, at, None).unwrap(), None);
+            let paid_mp = before.mp
+                - if price.currency == Currency::Manpower {
+                    price.cost
+                } else {
+                    0.
+                };
+            let paid_mun = before.mun
+                - if price.currency == Currency::Munitions {
+                    price.cost
+                } else {
+                    0.
+                };
+            assert_eq!(state.start.economy.players[0].mp, paid_mp);
+            assert_eq!(state.start.economy.players[0].mun, paid_mun);
+            let strike = state.world.game.strikes.last().unwrap();
+            assert_eq!(strike.dir, crate::math::atan2(4., 8.));
+            assert_eq!(strike.runtime.as_ref().unwrap().kind.name(), name);
+            let def = Catalog::compiled().unwrap().support(name).unwrap();
+            assert_eq!(
+                Some(strike.runtime.as_ref().unwrap().delay),
+                def.get("delay").and_then(Value::number)
+            );
+            assert_eq!(
+                Some(state.start.players[0].support[name]),
+                def.get("cd").and_then(Value::number)
+            );
+            let cooldowns = state.start.players[0].support.clone();
+            assert_eq!(
+                state.admit_support(0, name, at, Some(1.25)).unwrap(),
+                Some(SupportDenial::Cooldown)
+            );
+            assert_eq!(state.world.game.strikes.len(), count + 1);
+            assert_eq!(state.start.economy.players[0].mp, paid_mp);
+            assert_eq!(state.start.economy.players[0].mun, paid_mun);
+            assert_eq!(state.start.players[0].support, cooldowns);
+            assert_eq!(state.story[0].support_calls, calls + 1.);
+        }
+        state.start.players[0].support.insert("cover".into(), 0.);
         assert_eq!(
-            Command::from_json(&json!({"t":"support","kind":kind,"x":20,"z":20})),
-            Err(Denial::Blocked)
+            state.admit_support(0, "cover", at, Some(1.25)).unwrap(),
+            None
         );
+        assert_eq!(state.world.game.strikes.last().unwrap().dir, 1.25);
     }
-    for name in ["toString", "__proto__", "constructor", "nuke", ""] {
-        let before = state.start.economy.players[0].mp;
-        assert_eq!(
-            state
-                .admit_support(0, name, Point { x: 20., z: 20. }, None)
-                .unwrap(),
-            Some(SupportDenial::Blocked)
-        );
-        assert_eq!(state.start.economy.players[0].mp, before);
-        assert!(state.world.game.strikes.is_empty());
-        assert!(economy::sup_cost(Mode::Classic, name).is_err());
-    }
-    let at = state.start.players[0].spawn;
-    let at = Point {
-        x: at.x + 8.,
-        z: at.z,
-    };
-    for name in [
-        "recon",
-        "artillery",
-        "strafe",
-        "smoke",
-        "bombing",
-        "dive",
-        "para",
-        "cover",
-    ] {
-        let cost = economy::sup_cost(Mode::Conquest, name).unwrap().cost;
-        let before = state.start.economy.players[0].mp;
-        state.start.economy.players[0].mp = cost - 1.;
-        assert_eq!(
-            state.admit_support(0, name, at, None).unwrap(),
-            Some(SupportDenial::Manpower)
-        );
-        assert_eq!(state.start.economy.players[0].mp, cost - 1.);
-        state.start.economy.players[0].mp = before;
-        assert_eq!(state.admit_support(0, name, at, None).unwrap(), None);
-        assert_eq!(state.start.economy.players[0].mp, before - cost);
-        let strike = state.world.game.strikes.last().unwrap();
-        assert_eq!(strike.dir, 0.);
-        assert_eq!(strike.runtime.as_ref().unwrap().kind.name(), name);
-        let count = state.world.game.strikes.len();
-        assert_eq!(
-            state.admit_support(0, name, at, Some(1.25)).unwrap(),
-            Some(SupportDenial::Cooldown)
-        );
-        assert_eq!(state.world.game.strikes.len(), count);
-        assert_eq!(state.start.economy.players[0].mp, before - cost);
-    }
-    state.start.players[0].support.insert("cover".into(), 0.);
-    assert_eq!(
-        state.admit_support(0, "cover", at, Some(1.25)).unwrap(),
-        None
-    );
-    assert_eq!(state.world.game.strikes.last().unwrap().dir, 1.25);
 }
 
 #[test]
 fn mov91_supported_support_lifetimes_survive_ticks_and_every_seat_delivery() {
-    let mut state = scene(Mode::Conquest);
-    state.start.economy.players[0].mp = 1000.;
-    let at = Point { x: 128., z: 128. };
-    let selected = seats(&state);
-    let mut delivery = DeliveryState::new(&state).unwrap();
-    for name in ["artillery", "smoke", "cover"] {
-        assert_eq!(state.admit_support(0, name, at, None).unwrap(), None);
+    for mode in [Mode::Conquest, Mode::Classic] {
+        let mut state = scene(mode);
+        for control in state.commands.units.values_mut() {
+            control.hold_fire = true;
+            control.auto_cast = false;
+            control.auto_retreat = false;
+        }
+        state.start.economy.players[0].mp = 10000.;
+        state.start.economy.players[0].mun = 10000.;
+        let at = Point { x: 128., z: 128. };
+        publish_rifle(&mut state, at);
+        crate::vision::update_vision(&mut state.world.game, &state.rules, &state.grid);
+        let selected = seats(&state);
+        let mut delivery = DeliveryState::new(&state).unwrap();
+        let names = [
+            "recon",
+            "artillery",
+            "strafe",
+            "smoke",
+            "bombing",
+            "dive",
+            "para",
+            "cover",
+        ];
+        for name in names {
+            assert_eq!(state.admit_support(0, name, at, None).unwrap(), None);
+        }
+        assert_eq!(
+            state
+                .world
+                .game
+                .strikes
+                .iter()
+                .map(|s| s.runtime.as_ref().unwrap().kind.name())
+                .collect::<Vec<_>>(),
+            names
+        );
+        assert_eq!(state.story[0].support_calls, 8.);
+        assert_eq!(
+            state.story[0].mp_spent,
+            if mode == Mode::Classic { 0. } else { 1270. }
+        );
+        let mut cover_active = false;
+        let mut smoke_active = false;
+        for _ in 0..1260 {
+            delivered_tick(&mut state, &mut delivery, &selected);
+            cover_active |= !state.support.covers.is_empty();
+            smoke_active |= !state.world.game.smokes.is_empty();
+        }
+        assert!(cover_active && smoke_active);
+        assert!(state.world.game.strikes.is_empty());
+        assert!(state.world.game.smokes.is_empty());
+        assert!(state.support.covers.is_empty());
+        assert!(state.support.events.is_empty());
+        assert!(state.firing.salvos.is_empty());
+        assert!(state.firing.grenades.is_empty());
+        assert!(state.tick_state.fault().is_none());
+        assert!(state.start.players[0].support[SupportKind::Smoke.name()] <= 0.);
     }
-    assert_eq!(state.story[0].support_calls, 3.);
-    assert_eq!(state.story[0].mp_spent, 320.);
-    let mut cover_active = false;
-    let mut smoke_active = false;
-    for _ in 0..1260 {
-        delivered_tick(&mut state, &mut delivery, &selected);
-        cover_active |= !state.support.covers.is_empty();
-        smoke_active |= !state.world.game.smokes.is_empty();
-    }
-    assert!(cover_active && smoke_active);
-    assert!(state.world.game.strikes.is_empty());
-    assert!(state.world.game.smokes.is_empty());
-    assert!(state.support.covers.is_empty());
-    assert!(state.support.events.is_empty());
-    assert!(state.tick_state.fault().is_none());
-    assert!(state.start.players[0].support[SupportKind::Smoke.name()] <= 0.);
 }
 
 #[test]

@@ -26,6 +26,7 @@ mod mov_runtime_batch;
 mod native_order_intent_tests;
 
 pub mod ai_schedule;
+pub mod ai_seat_view;
 pub mod ai_view;
 pub mod assault_runtime;
 pub mod building_placement;
@@ -34,16 +35,29 @@ pub mod client_view;
 pub mod combat;
 pub mod command_destinations;
 pub mod command_feedback;
+pub mod commander_abilities;
+pub mod commander_ability_policy;
+mod commander_actions;
 pub mod commander_ai;
 pub mod commander_assault;
+mod commander_classic_economy;
 pub mod commander_classic_rules;
 mod commander_construction;
+#[cfg(test)]
+mod commander_engineering_tests;
 mod commander_fortification;
 mod commander_forward_hq;
 pub mod commander_mind;
 mod commander_mirror;
 mod commander_shopping;
 pub mod commander_tactics;
+
+pub mod commander_attack_policy;
+pub mod commander_focus_runtime;
+pub mod commander_look;
+mod commander_received_vision;
+pub mod commander_support_policy;
+pub mod commander_support_runtime;
 pub mod companion_ray;
 pub mod companions;
 pub mod conquest_end;

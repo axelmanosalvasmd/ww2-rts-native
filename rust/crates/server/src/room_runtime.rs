@@ -31,7 +31,7 @@ pub enum PauseReason {
     Drop,
 }
 struct Pause {
-    slot: usize,
+    slot: Option<usize>,
     by: String,
     reason: PauseReason,
     until_ms: Option<u64>,
@@ -56,7 +56,11 @@ pub(crate) fn end_horde_break(state: &mut Match, host: bool, paused: bool) -> Re
 
 /// A caller-owned output batch retains real tick effects until a scheduled send.
 /// It is not another simulation state or producer event authority.
+#[path = "room_ai.rs"]
+mod ai;
+
 pub struct RoomRuntime {
+    ai: ai::RoomAi,
     state: Match,
     delivery: DeliveryState,
     watchers: ww2_core::recipient_snapshot::SpectatorDelivery,
@@ -98,16 +102,16 @@ impl RoomRuntime {
             .capture_selected_with_lists(&mut self.state, &selected, &[])
             .map_err(|e| format!("native startup delivery: {e:?}"))?
             .ok_or("native startup has no seats")?;
-        Ok(slots
-            .iter()
-            .map(|&slot| {
-                let snapshot = frame
-                    .recipient(slot)
-                    .expect("admitted startup seat")
-                    .into_json();
-                (slot, envelope.message(slot, snapshot))
-            })
-            .collect())
+        let mut messages = Vec::new();
+        for &slot in slots {
+            let snapshot = frame
+                .recipient(slot)
+                .map_err(|e| format!("AI start recipient: {e:?}"))?
+                .into_json();
+            self.ai.observe(slot, &snapshot)?;
+            messages.push((slot, envelope.message(slot, snapshot)));
+        }
+        Ok(messages)
     }
     pub(crate) fn collect_watcher_start(
         &self,
@@ -143,6 +147,7 @@ impl RoomRuntime {
         let meter = TickMeter::new(now_ms).map_err(|e| e.to_string())?;
         Ok(Self {
             state,
+            ai: ai::RoomAi::default(),
             delivery,
             watchers: Default::default(),
             lists: RoomListCache::default(),
@@ -159,6 +164,58 @@ impl RoomRuntime {
             #[cfg(test)]
             snapshot_production_calls: 0,
         })
+    }
+    #[cfg(test)]
+    pub(crate) fn ai_delivered_view(
+        &self,
+        slot: usize,
+    ) -> Option<&ww2_core::human_commander::HumanView<ww2_core::commander_ai::Observation>> {
+        self.ai.delivered_view(slot)
+    }
+    pub(crate) fn activate_ai(
+        &mut self,
+        map: &Value,
+        slot: usize,
+        level: &str,
+    ) -> Result<(), String> {
+        self.ai.activate(
+            &self.state,
+            map,
+            slot,
+            ww2_core::commander_ai::Level::from_key(level).unwrap_or_default(),
+        )
+    }
+    pub(crate) fn reset_ai(&mut self, slot: usize) {
+        self.ai.reset(slot);
+    }
+    pub(crate) fn ai_selected(&self) -> Vec<SelectedSeat> {
+        if self.state.finish.is_some() {
+            Vec::new()
+        } else {
+            self.ai.selected(self.state.world.game.tick)
+        }
+    }
+    pub(crate) fn tick_ai(&mut self, sent: bool) -> Result<(), String> {
+        self.running()?;
+        self.ai.tick(&mut self.state, sent)
+    }
+    #[cfg(test)]
+    pub(crate) fn ai_commander(
+        &self,
+        slot: usize,
+    ) -> Option<&ww2_core::seat_commander::SeatCommander> {
+        self.ai.commander(slot)
+    }
+    #[cfg(test)]
+    pub(crate) fn ai_clone_failure(&self) -> Value {
+        self.ai.clone_failure(self.state.start.players.len())
+    }
+    pub(crate) fn save_ai_memories(&self) -> Value {
+        self.ai.save_memories(self.state.start.players.len())
+    }
+    pub(crate) fn restore_ai_memories(&mut self, saved: &Value) -> Result<(), String> {
+        self.ai
+            .restore_memories(saved, self.state.start.players.len())
     }
     pub(crate) fn save_json(&self) -> Result<Value, String> {
         self.running()?;
@@ -311,14 +368,16 @@ impl RoomRuntime {
             .ok_or("selected native frame unexpectedly absent")?;
         let mut captured = Vec::with_capacity(selected.len());
         for seat in selected {
+            let message = frame
+                .recipient(seat.slot)
+                .map_err(|e| format!("native recipient: {e:?}"))?
+                .into_json();
+            self.ai.observe(seat.slot, &message)?;
             captured.push(CapturedSeat {
                 slot: seat.slot,
                 batch,
                 list_versions: versions,
-                message: frame
-                    .recipient(seat.slot)
-                    .map_err(|e| format!("native recipient: {e:?}"))?
-                    .into_json(),
+                message,
             });
         }
         drop(frame);
@@ -396,6 +455,19 @@ impl RoomRuntime {
         if slot >= self.state.world.game.players.len() {
             return Err("invalid native pause seat".into());
         }
+        self.pause_inner(Some(slot), by, reason, now_ms)
+    }
+    pub(crate) fn pause_host(&mut self, by: &str, now_ms: u64) -> Result<Option<Value>, String> {
+        self.pause_inner(None, by, PauseReason::Host, now_ms)
+    }
+    fn pause_inner(
+        &mut self,
+        slot: Option<usize>,
+        by: &str,
+        reason: PauseReason,
+        now_ms: u64,
+    ) -> Result<Option<Value>, String> {
+        self.running()?;
         if self.pause.is_some() {
             return Ok(None);
         }
@@ -445,7 +517,7 @@ impl RoomRuntime {
         let same_drop = self
             .pause
             .as_ref()
-            .is_some_and(|pause| pause.reason == PauseReason::Drop && pause.slot == slot);
+            .is_some_and(|pause| pause.reason == PauseReason::Drop && pause.slot == Some(slot));
         Ok(same_drop.then(|| self.resume(now_ms)))
     }
 
@@ -470,7 +542,8 @@ impl RoomRuntime {
             });
         };
         if pause.reason == PauseReason::Drop
-            && (connected[pause.slot] || pause.until_ms.is_some_and(|until| now_ms >= until))
+            && (pause.slot.is_some_and(|slot| connected[slot])
+                || pause.until_ms.is_some_and(|until| now_ms >= until))
         {
             let message = self.resume(now_ms);
             return Ok(PausePoll {

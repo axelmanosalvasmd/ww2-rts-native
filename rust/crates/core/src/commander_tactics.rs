@@ -24,12 +24,16 @@ pub struct UnitFacts {
     pub hold_fire: bool,
     pub auto_cast: bool,
     pub cooldown: f64,
+    pub attack_target: u32,
     pub queued_orders: usize,
     pub auto_retreat: bool,
     pub convoy: bool,
     pub stock: Option<Stock>,
     pub amove: Option<Point>,
+    pub queued_amove: Option<Point>,
     pub airborne: bool,
+    /// Owner-only readiness from the delivered aircraft base state.
+    pub air_at_base: bool,
     pub wall_work: bool,
 }
 #[derive(Clone, Debug, PartialEq)]
@@ -38,6 +42,13 @@ pub struct KnownBuilding {
     pub kind: String,
     pub owner: usize,
     pub at: Point,
+}
+#[derive(Clone, Debug, PartialEq)]
+pub struct NodeObservation {
+    pub at: Point,
+    pub rate: f64,
+    pub fuel: bool,
+    pub visible: bool,
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct Context {
@@ -59,12 +70,21 @@ pub struct Context {
     pub sight: f64,
     pub support: BTreeMap<String, f64>,
     /// Resource positions and enemy depot memories already delivered to this seat.
-    pub nodes: Vec<Point>,
+    pub nodes: Vec<NodeObservation>,
     pub known_depots: Vec<Point>,
     /// Indices of delivered nodes on owned World ground. Other modes use every node.
     pub owned_nodes: BTreeSet<usize>,
     pub build_reserve: f64,
     pub fort_reserve: f64,
+    pub claimed_nodes: BTreeSet<usize>,
+    /// Public start terrain and recipient-delivered mine knowledge only.
+    pub initial_chars: Option<Vec<u8>>,
+    pub initial_height: Option<Vec<i8>>,
+    pub mines: Vec<Point>,
+    pub found_mines: Vec<Point>,
+    /// Caller capability, never inferred from visible actors. Complete live-flight
+    /// delivery must be integrated before an ordinary human packet enables it.
+    pub ground_flights: bool,
     pub field: Option<crate::commander_field_policy::Facts>,
     pub world: Option<crate::commander_world_policy::Facts>,
 }
@@ -93,6 +113,12 @@ impl Default for Context {
             owned_nodes: BTreeSet::new(),
             build_reserve: 0.0,
             fort_reserve: 0.0,
+            claimed_nodes: BTreeSet::new(),
+            initial_chars: None,
+            initial_height: None,
+            mines: Vec::new(),
+            found_mines: Vec::new(),
+            ground_flights: false,
             field: None,
             world: None,
         }
@@ -203,6 +229,8 @@ pub struct State {
     pub decision: Option<Decision>,
     pub called: Option<f64>,
     pub cleared_sightings: BTreeMap<u32, f64>,
+    #[serde(default)]
+    pub node: BTreeMap<u32, usize>,
     pub(crate) fort_steps: BTreeMap<u32, u8>,
     #[serde(default)]
     pub field: crate::commander_field_policy::State,
@@ -591,50 +619,33 @@ fn plan_inner(
         0.0
     };
     commands.extend(research_commands);
-    let mut budget = input.manpower - reserved;
+    let mut budget = mirrored(observation, &commands)?.input().manpower - tier_savings;
     let mut newly_busy = BTreeSet::new();
     let adaptive = context.mode.is_construction() && skill.adaptive;
-    let rushing: Vec<_> = strategic_recent
+    let rush_at = crate::commander_classic_rules::rush_at(observation, strategic_recent, skill)?;
+    let rush = rush_at.is_some();
+    // Engineers escaping a nearby rush remain available to defense, not construction.
+    let construction_units: Vec<_> = available_units
         .iter()
         .copied()
-        .filter(|e| {
-            adaptive
-                && now < 240.0
-                && now - e.time < 5.0
-                && input.units.iter().any(|u| {
-                    u.owner == input.slot
-                        && boolean(definition(u), "building")
-                        && dist(u.at, e.at) < 35.0
-                })
-        })
-        .collect();
-    let rush = !rushing.is_empty();
-    let rush_at = rush.then(|| Point {
-        x: rushing.iter().map(|s| s.at.x).sum::<f64>() / rushing.len() as f64,
-        z: rushing.iter().map(|s| s.at.z).sum::<f64>() / rushing.len() as f64,
-    });
-    // Reserve endangered engineers for the shared escape order before creating new work.
-    let construction_crew: Vec<_> = available_units
-        .iter()
-        .copied()
-        .filter(|u| {
-            !(world_policy
-                && u.kind == "engineer"
-                && rush_at.is_some_and(|at| dist(u.at, at) < 25.0))
-        })
+        .filter(|u| !rush_at.is_some_and(|at| u.kind == "engineer" && dist(u.at, at) < 25.0))
         .collect();
     let construction_view = mirrored(observation, &commands)?;
     let construction = if world_policy {
         crate::commander_world_policy::construction(
             &construction_view,
-            &mirrored_units(&construction_view, &construction_crew),
+            &mirrored_units(&construction_view, &construction_units),
             budget,
         )?
     } else {
-        crate::commander_construction::plan(
+        crate::commander_construction::plan_with_classic(
             &construction_view,
-            &mirrored_units(&construction_view, &available_units),
+            &mirrored_units(&construction_view, &construction_units),
             budget,
+            strategic_recent,
+            &mut state.node,
+            level,
+            random,
             (adaptive || skill.memory) && strategic_recent.iter().any(|s| armor(&s.kind)),
             &sight_game,
             sees,
@@ -911,6 +922,52 @@ fn plan_inner(
     let strong_enough = !context.mode.is_construction()
         || !skill.adaptive
         || my_value > 1.1 * context.caution * their_value;
+    // Aircraft missions use current delivered contacts, never strategic memories.
+    let army: Vec<_> = mine
+        .iter()
+        .filter(|u| !boolean(definition(u), "air"))
+        .collect();
+    let front = if army.is_empty() {
+        me.spawn
+    } else {
+        Point {
+            x: army.iter().map(|u| u.at.x).sum::<f64>() / army.len() as f64,
+            z: army.iter().map(|u| u.at.z).sum::<f64>() / army.len() as f64,
+        }
+    };
+    for u in mine.iter().filter(|u| {
+        boolean(definition(u), "air") && context.units.get(&u.id).is_some_and(|f| f.air_at_base)
+    }) {
+        let nearest = |ground: bool| {
+            enemies
+                .iter()
+                .copied()
+                .filter(|e| {
+                    let d = definition(e);
+                    if ground {
+                        !boolean(d, "air")
+                            && !boolean(d, "building")
+                            && (!boolean(d, "infantry")
+                                || matches!(e.kind.as_str(), "at" | "flak" | "mortar" | "howitzer"))
+                    } else {
+                        boolean(d, "air")
+                    }
+                })
+                .min_by(|a, b| {
+                    dist(a.at, front)
+                        .total_cmp(&dist(b.at, front))
+                        .then(a.id.cmp(&b.id))
+                })
+        };
+        if u.kind == "attacker" {
+            if let Some(target) = nearest(true).filter(|e| dist(e.at, front) < 120.0) {
+                commands.push(json!({"t":"attack","ids":[u.id],"target":target.id}));
+            }
+        } else {
+            let at = nearest(false).map_or(front, |e| e.at);
+            commands.push(json!({"t":"move","orders":[[u.id,at.x,at.z]]}));
+        }
+    }
     let shopping = crate::commander_shopping::plan(
         &tactics_view,
         &mine,
@@ -967,6 +1024,37 @@ fn plan_inner(
     let mut armed = adaptive.busy.clone();
     let mut busy = adaptive.busy;
     busy.extend(newly_busy);
+    let action_view = mirrored(observation, &commands)?;
+    let action_workers: BTreeSet<_> = available_units.iter().map(|unit| unit.id).collect();
+    let action = crate::commander_actions::plan(
+        &action_view,
+        &enemies
+            .iter()
+            .filter(|enemy| watched(enemy.id))
+            .map(|enemy| enemy.id)
+            .collect(),
+        skill,
+        &busy
+            .iter()
+            .copied()
+            .chain(
+                input
+                    .units
+                    .iter()
+                    .filter(|unit| unit.owner == input.slot && !action_workers.contains(&unit.id))
+                    .map(|unit| unit.id),
+            )
+            .collect(),
+    )?;
+    busy.extend(action.busy);
+    commands.extend(action.commands);
+    let ground_view = mirrored(observation, &commands)?;
+    let mine = mirrored_units(&ground_view, &mine);
+    support.mp = math::min(support.mp, ground_view.input().manpower - tier_savings);
+    support.mun = math::min(
+        support.mun,
+        ground_view.input().runtime.as_ref().unwrap().munitions,
+    );
     if let Some((kind, at)) = adaptive.support
         && let Some(command) = support.call(kind, at, None, &sit, context, skill, now)?
     {
@@ -1510,3 +1598,7 @@ mod field_policy_tests;
 #[cfg(test)]
 #[path = "commander_field_review_tests.rs"]
 mod field_review_tests;
+
+#[cfg(test)]
+#[path = "commander_aircraft_tests.rs"]
+mod aircraft_tests;

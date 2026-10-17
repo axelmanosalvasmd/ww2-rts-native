@@ -1,4 +1,4 @@
-//! Save admission and transactional restoration for ordinary human rooms.
+//! Save admission and transactional restoration for ordinary rooms.
 use super::*;
 
 impl Hub {
@@ -94,7 +94,6 @@ impl Hub {
         if !matches!(state.options.mode, Mode::Default | Mode::Conquest)
             || state.options.sandbox
             || state.world_runtime.is_some()
-            || room.players.iter().any(|p| p.ai)
             || !room.spectators.is_empty()
         {
             return Err("save needs an unavailable room capability".into());
@@ -110,7 +109,7 @@ impl Hub {
             "mapSpawns":native.startup.raw_map()["spawns"],"army":room.army,"weather":room.weather,
             "defenderTeam":room.defender,"logistics":state.options.logistics,"tech":state.options.tech});
         let save = json!({"version":crate::saves::VERSION,"g":native.runtime.save_json()?,"guard":null,
-            "map":native.startup.raw_map(),"seats":seats,"settings":settings,"ai":null});
+            "map":native.startup.raw_map(),"seats":seats,"settings":settings,"ai":native.runtime.save_ai_memories()});
         room.saves.write(
             code,
             "manual",
@@ -136,10 +135,7 @@ impl Hub {
         }
         let saved = room.saves.read(code, id)?;
         // Closed room capabilities remain closed even when a file is valid JSON.
-        if saved["settings"]["mode"] != "conquest"
-            || !saved["guard"].is_null()
-            || !saved["ai"].is_null()
-        {
+        if saved["settings"]["mode"] != "conquest" || !saved["guard"].is_null() {
             return Err("save needs an unavailable room capability".into());
         }
         let state = Match::from_save_json(saved["g"]["state"].clone())?;
@@ -162,8 +158,11 @@ impl Hub {
         let tokens = seats
             .iter()
             .map(|seat| {
-                if seat["ai"] != false {
-                    return Err("AI room loading unavailable".to_owned());
+                if !seat["ai"].is_boolean() {
+                    return Err("invalid saved seat role".to_owned());
+                }
+                if seat["ai"] == true {
+                    return Ok(Vec::new());
                 }
                 if let Some(text) = seat["token"].as_str() {
                     return Ok(text.encode_utf16().collect::<Vec<_>>());
@@ -184,6 +183,9 @@ impl Hub {
         let mut used = std::collections::BTreeSet::new();
         // Finish every token match before assigning any connected fallback.
         for (slot, token) in tokens.iter().enumerate() {
+            if seats[slot]["ai"] == true {
+                continue;
+            }
             if let Some((index, _)) = present
                 .iter()
                 .enumerate()
@@ -193,7 +195,10 @@ impl Hub {
                 used.insert(index);
             }
         }
-        for owner in &mut owners {
+        for (slot, owner) in owners.iter_mut().enumerate() {
+            if seats[slot]["ai"] == true {
+                continue;
+            }
             if owner.is_none()
                 && let Some((index, _)) = present.iter().enumerate().find(|(index, p)| {
                     p.connection.as_ref().is_some_and(Connection::ready) && !used.contains(index)
@@ -227,10 +232,22 @@ impl Hub {
                     token: tokens[slot].clone(),
                     name: seat["name"].as_str().ok_or("invalid saved name")?.into(),
                     connection: None,
-                    ai: false,
+                    ai: seat["ai"] == true,
                     team,
                     faction,
-                    level: "normal",
+                    level: if seat["ai"] == true {
+                        match &seat["level"] {
+                            Value::Null => "normal",
+                            value => match value.as_str() {
+                                Some("normal") => "normal",
+                                Some("easy") => "easy",
+                                Some("hard") => "hard",
+                                _ => return Err("invalid saved AI level".into()),
+                            },
+                        }
+                    } else {
+                        "normal"
+                    },
                     disconnected: None,
                     denies: Vec::new(),
                     rtt: None,
@@ -298,6 +315,22 @@ impl Hub {
         };
         let mut prepared =
             self.prepare_native_room(&staged, state, now, false, Some(&saved["map"]))?;
+        prepared
+            .attached
+            .runtime
+            .restore_ai_memories(&saved["ai"])?;
+        let slots = (0..staged.players.len()).collect::<Vec<_>>();
+        let names = staged
+            .players
+            .iter()
+            .map(|p| p.name.clone())
+            .collect::<Vec<_>>();
+        prepared.starts = prepared.attached.runtime.collect_starts(
+            &slots,
+            &prepared.attached.startup,
+            &names,
+            prepared.attached.epoch,
+        )?;
         prepared
             .attached
             .runtime

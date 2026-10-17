@@ -1,0 +1,3 @@
+- Build the human AI's own plans, research, unit facts and tactical context from recipient rows and the public starting map. Hidden state no longer enters through the strategic adapter. Add Conquest and house-free Conquest privacy checks at every difficulty; Classic, Assault and Horde remain outside this proof until their recipient snapshots are available.
+- Refuse human AI observations with enabled logistics until the recipient producer supplies those facts, instead of reading private stock directly.
+- Exercise the privacy matrix through the production human planner on scripted looks, matching AI-64's scope. Camera and motor delivery timing remain covered separately.

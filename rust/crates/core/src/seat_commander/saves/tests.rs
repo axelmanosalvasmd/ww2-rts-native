@@ -468,6 +468,7 @@ fn if27_field_and_world_policy_memory_round_trip_and_legacy_defaults() {
         panic!("ordinary seat must use the human brain");
     };
     let mut encoded = serde_json::to_value(&**policy).unwrap();
+    encoded["tactics"]["node"] = serde_json::json!({"9": 2});
     encoded["tactics"]["field"] = serde_json::json!({
         "bridges":[12], "bridge_crew":{"4":{"tick":9,"dug":true}},
         "fill_crew":{"5":{"tick":10,"dug":false}},
@@ -492,8 +493,10 @@ fn if27_field_and_world_policy_memory_round_trip_and_legacy_defaults() {
     let tactics = encoded["tactics"].as_object_mut().unwrap();
     tactics.remove("field");
     tactics.remove("world");
+    tactics.remove("node");
     let legacy: HumanPolicy = serde_json::from_value(encoded).unwrap();
     let legacy = serde_json::to_value(legacy).unwrap();
+    assert_eq!(legacy["tactics"]["node"], serde_json::json!({}));
     assert_eq!(
         legacy["tactics"]["field"],
         serde_json::to_value(crate::commander_field_policy::State::default()).unwrap()

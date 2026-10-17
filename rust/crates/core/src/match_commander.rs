@@ -1088,7 +1088,13 @@ impl Match {
             })
             || g.units.values().any(|u| {
                 u.id == 0
-                    || !within(u.at())
+                    || !u.x.is_finite()
+                    || !u.z.is_finite()
+                    || !self
+                        .rules
+                        .kinds
+                        .get(u.kind)
+                        .is_some_and(|kind| kind.air || within(u.at()))
                     || u.hp < 0.0
                     || !u.supp.is_finite()
                     || u.supp < 0.0
@@ -1356,6 +1362,12 @@ impl Match {
                 owned_nodes: BTreeSet::new(),
                 build_reserve: 0.0,
                 fort_reserve: 0.0,
+                claimed_nodes: std::collections::BTreeSet::new(),
+                initial_chars: Some(self.world.initial().chars.clone()),
+                initial_height: self.world.initial().height.clone(),
+                mines: Vec::new(),
+                found_mines: Vec::new(),
+                ground_flights: false,
                 field: None,
                 world: None,
                 support: self.start.players[owner]
@@ -1399,7 +1411,15 @@ impl Match {
                                         .as_ref()
                                         .is_some_and(|c| c.trucks.contains_key(&u.id)),
                                 amove: None,
+                                queued_amove: None,
+                                attack_target: if u.owner == owner {
+                                    self.commands.units[&u.id].attack_id
+                                } else {
+                                    0
+                                },
                                 airborne: u.air.is_some() && vision::airborne(u),
+                                air_at_base: u.owner == owner
+                                    && u.air == Some(crate::game::PlaneState::Base),
                                 wall_work: u.owner == owner
                                     && self.field_works.jobs().get(&u.id).is_some_and(|job| {
                                         job.kind == crate::field_works::FortKind::Wall

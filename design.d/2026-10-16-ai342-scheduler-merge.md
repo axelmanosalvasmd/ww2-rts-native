@@ -1,0 +1,5 @@
+## One caller-fed AI scheduler after the AI seat merge
+
+PR #342 keeps main's `ai_schedule` implementation from #340 unchanged. The caller owns each `DeliveredSeat` and its optional view. `Schedule::tick` refreshes every requested view before any action, skips seats without a delivery, retains delivered views between beats, preserves difficulty staggering and returns before all callbacks after a winner. The older generic `Brain<C>` and `after_step` scheduler are replaced by this one implementation.
+
+The AI-14 tests now supply seat-local `SeatMemory` observations through the caller-fed callbacks. Their original ordering, handover, private-mine, command-admission, victory and final-snapshot assertions remain, with an added assertion that no callback runs after a winner. Main's two scheduler tests are unchanged. All four original seat-delivery tests remain inside the existing test-only scheduler module. Classic construction still passes once through `plan_with_classic`; this merge changes no construction or tactics code from the reviewed #342 head.

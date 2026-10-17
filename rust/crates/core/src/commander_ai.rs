@@ -251,6 +251,14 @@ impl Observation {
             .iter()
             .all(|v| v.is_finite())
                 || context
+                    .nodes
+                    .iter()
+                    .any(|n| !within(n.at) || !n.rate.is_finite() || n.rate < 0.0)
+                || context
+                    .claimed_nodes
+                    .iter()
+                    .any(|i| *i >= context.nodes.len())
+                || context
                     .hidden_spawns
                     .iter()
                     .any(|i| *i >= input.players.len())
@@ -273,11 +281,20 @@ impl Observation {
                     .iter()
                     .any(|i| *i >= context.nodes.len())
                 || context
-                    .nodes
+                    .known_depots
                     .iter()
-                    .chain(&context.known_depots)
+                    .chain(&context.mines)
+                    .chain(&context.found_mines)
                     .any(|p| !finite_point(*p))
                 || context.height.as_ref().is_some_and(|h| h.len() != cells)
+                || context
+                    .initial_chars
+                    .as_ref()
+                    .is_some_and(|v| v.len() != cells)
+                || context
+                    .initial_height
+                    .as_ref()
+                    .is_some_and(|v| v.len() != cells)
                 || context
                     .smokes
                     .iter()
@@ -288,6 +305,7 @@ impl Observation {
                         || !f.built.is_finite()
                         || !f.cooldown.is_finite()
                         || f.amove.is_some_and(|p| !finite_point(p))
+                        || f.queued_amove.is_some_and(|p| !finite_point(p))
                         || f.stock.as_ref().is_some_and(|r| {
                             !r.provisions.is_finite()
                                 || r.ammo.is_some_and(|v| !v.is_finite())
@@ -303,7 +321,15 @@ impl Observation {
             if u.owner >= input.players.len() {
                 return Err(PolicyError::UnitOwner);
             }
-            if !within(u.at) || u.path.len() > 4096 || u.path.iter().any(|p| !within(*p)) {
+            let d = catalog.unit(&u.kind).map_err(|_| PolicyError::UnitKind)?;
+            let is = |name| d.get(name).and_then(Value::boolean).unwrap_or(false);
+            // Aircraft can wait at an off-map base; ground positions and paths stay bounded.
+            if !u.at.x.is_finite()
+                || !u.at.z.is_finite()
+                || (!is("air") && !within(u.at))
+                || u.path.len() > 4096
+                || u.path.iter().any(|p| !within(*p))
+            {
                 return Err(PolicyError::Position);
             }
             if !u.hp.is_finite() || !u.supp.is_finite() || u.hp < 0.0 || u.supp < 0.0 {
@@ -314,8 +340,6 @@ impl Observation {
             {
                 return Err(PolicyError::PrivateUnitFields);
             }
-            let d = catalog.unit(&u.kind).map_err(|_| PolicyError::UnitKind)?;
-            let is = |name| d.get(name).and_then(Value::boolean).unwrap_or(false);
             let health = d
                 .get("models")
                 .and_then(Value::number)
