@@ -217,6 +217,7 @@ pub struct State {
     pub decision: Option<Decision>,
     pub called: Option<f64>,
     pub cleared_sightings: BTreeMap<u32, f64>,
+    #[serde(default)]
     pub node: BTreeMap<u32, usize>,
     pub(crate) fort_steps: BTreeMap<u32, u8>,
     #[serde(default)]

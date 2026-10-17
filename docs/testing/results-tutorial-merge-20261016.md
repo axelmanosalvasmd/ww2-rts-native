@@ -216,3 +216,9 @@ Parents: `aff9cb62b9d39dbbeb3c5a24a2c8aa672d2a4511` and main `3c33cd040b8fcaa71d
 
 
 All parent test bodies and module registrations are retained. Formatting is applied after the merge. The canceled S1 run had not acquired a slot or executed Cargo. The earlier corrected S3 attempt stopped at a test compile error: RecipientProjection exposes fields, not into_json; its mode test now uses that API. The complete Tutorial journey continues to prove delivered frames independently of this component projection check.
+
+## AI checkpoint compatibility after main integration
+
+Main's external v1 HumanPolicy checkpoint has no tactics.node field. The hosted parent adds that required map. `commander_tactics.rs` now defaults only an absent node map to empty, retaining present assignments. The existing `if27_field_and_world_policy_memory_round_trip_and_legacy_defaults` test now proves a nonempty node round trip, removes exactly node from the actual external tagged checkpoint and restores it through restore_ai_memories_json, comparing the complete policy. Its existing field/World omission assertions remain. The incoming Horde memory test's OwnPlan literal also retains the hosted delivered field with None; no queue assertion changes.
+
+Independent source reviews accepted both the core privacy/event resolutions and the AI/startup/event resolutions after these repairs. The inherited spectator adapter still emits an empty flights array (spectator.rs:110); this file is unchanged by the stream and its live-flight preview limitation remains outside the two result rows.

@@ -1,0 +1,2 @@
+- Keep earlier external AI checkpoints loadable when they lack node-planning memory; present node assignments still round trip. Extend the existing external restore test without removing its field and World memory checks, and retain the hosted delivered-plan field in the incoming Horde test.
+- Existing spectator frames still omit live-flight previews. This result stream leaves that unchanged for the flight/spectator owner.
