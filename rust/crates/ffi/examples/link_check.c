@@ -178,7 +178,9 @@ static int check_queries(void) {
   typedef int32_t (*query)(const char *, size_t, char *, size_t, size_t *);
   const query calls[] = {ww2_authoring_validate_map, ww2_authoring_migrate_scenario,
     ww2_authoring_migrate_map, ww2_authoring_spawns_for, ww2_authoring_create_preview,
-    ww2_authoring_find_path, ww2_authoring_house_kinds, ww2_authoring_play_match};
+    ww2_authoring_find_path, ww2_authoring_house_kinds, ww2_authoring_play_match,
+    ww2_movement_profile, ww2_is_ground_vehicle, ww2_body_radius,
+    ww2_flight_at, ww2_velocity_at};
   int failures = ww2_abi_minor_version() != WW2_ABI_MINOR_VERSION;
   for (size_t i = 0; i < sizeof calls / sizeof calls[0]; i++) {
     size_t len = 99;

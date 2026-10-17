@@ -12,8 +12,8 @@ type Query = unsafe extern "C" fn(*const c_char, usize, *mut c_char, usize, *mut
 fn additive_revision_preserves_abi2_layouts_and_signatures() {
     assert_eq!(ww2_abi_version(), 2);
     assert_eq!(WW2_ABI_VERSION, 2);
-    assert_eq!(ww2_abi_minor_version(), 1);
-    assert_eq!(WW2_ABI_MINOR_VERSION, 1);
+    assert_eq!(ww2_abi_minor_version(), 2);
+    assert_eq!(WW2_ABI_MINOR_VERSION, 2);
     assert_eq!(
         (
             size_of::<ww2_formation_item>(),
@@ -109,6 +109,16 @@ fn additive_revision_preserves_abi2_layouts_and_signatures() {
         "ww2_view_unit_count(",
         "ww2_view_units(",
         "ww2_view_needs_resync(",
+        "ww2_view_placement_check(",
+        "ww2_abi_minor_version(",
+        "ww2_authoring_validate_map(",
+        "ww2_authoring_migrate_scenario(",
+        "ww2_authoring_migrate_map(",
+        "ww2_authoring_spawns_for(",
+        "ww2_authoring_create_preview(",
+        "ww2_authoring_find_path(",
+        "ww2_authoring_house_kinds(",
+        "ww2_authoring_play_match(",
     ];
     let positions: Vec<_> = names
         .iter()
@@ -122,7 +132,12 @@ fn additive_revision_preserves_abi2_layouts_and_signatures() {
 
 #[test]
 fn queries_preserve_output_on_errors_and_report_required_capacity() {
-    let calls: [Query; 8] = [
+    let calls: [Query; 13] = [
+        ww2_movement_profile,
+        ww2_is_ground_vehicle,
+        ww2_body_radius,
+        ww2_flight_at,
+        ww2_velocity_at,
         ww2_authoring_validate_map,
         ww2_authoring_migrate_scenario,
         ww2_authoring_migrate_map,

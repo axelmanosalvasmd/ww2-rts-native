@@ -1,10 +1,10 @@
-//! Additive ABI 2.1 queries. JSON outputs always belong to the caller.
+//! Additive ABI 2 queries. JSON outputs always belong to the caller.
 
 use super::*;
 use serde_json::Value;
 
 /// Additive revision of ABI 2. Existing signatures and layouts retain version 2.
-pub const WW2_ABI_MINOR_VERSION: u32 = 1;
+pub const WW2_ABI_MINOR_VERSION: u32 = 2;
 
 /// Additive revision supported by this library. Check ww2_abi_version first.
 #[unsafe(no_mangle)]

@@ -1,12 +1,12 @@
-# Additive C queries, ABI 2.1
+# Additive C queries, ABI 2.2
 
-Status: implementation candidate under the [owner decision on #5](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6224738109), message `julio-373-merged-decisions-20261016`. Exact signatures require runtime review before Unreal adoption. Reference: `ww2-rts` at `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`. This stream stacks on #389 for detached geography validation.
+Status: implementation candidate under the [owner decision on #5](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6224738109), message `julio-373-merged-decisions-20261016`. Exact signatures require runtime review before Unreal adoption. Reference: `ww2-rts` at `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`. ABI 2.1 comes from #418, which stacks on #389 for detached geography validation. IF-11 stacks on #418 and adds ABI 2.2 presentation queries under the user's explicit additive-function authorization.
 
 ## Compatibility and memory
 
-The existing crate had one integer version, `WW2_ABI_VERSION = 2`, with no minor component. That constant and `ww2_abi_version()` remain 2 so an existing ABI 2 consumer's equality check continues to work. This addition introduces `WW2_ABI_MINOR_VERSION = 1` and `ww2_abi_minor_version()`. New consumers first check major 2, then require minor at least 1. An older archive has no minor symbol and cannot satisfy the new link. Existing functions, structs, enums, field order and layouts are unchanged. The formation rules hash is unchanged.
+The existing crate had one integer version, `WW2_ABI_VERSION = 2`, with no minor component. That constant and `ww2_abi_version()` remain 2 so an existing ABI 2 consumer's equality check continues to work. ABI 2.1 introduced `WW2_ABI_MINOR_VERSION` and `ww2_abi_minor_version()`. IF-11 raises the minor constant to 2. New consumers first check major 2, then require minor at least 1 for placement/authoring or at least 2 for motion/flight. An older archive has no minor symbol and cannot satisfy the new link. Existing functions, structs, enums, field order and layouts are unchanged. The formation rules hash is unchanged.
 
-Every new query returns the existing `int32_t` status codes and runs inside the panic boundary. Results use caller-owned buffers, explicit byte lengths and UTF-8 JSON without a terminating zero. Input is limited to 16 MiB before reading or parsing. A null input is allowed only with zero length, which then fails JSON parsing. Input, output, count storage and any view handle must be disjoint. No returned allocation needs freeing.
+Every query in this document returns the existing `int32_t` status codes and runs inside the panic boundary. Results use caller-owned buffers, explicit byte lengths and UTF-8 JSON without a terminating zero. Input is limited to 16 MiB before reading or parsing. A null input is allowed only with zero length, which then fails JSON parsing. Input, output, count storage and any view handle must be disjoint. No returned allocation needs freeing.
 
 A writable `out_len` is required. Buffer validation and parsing set it to zero; a completed query sets it to the required byte count. Capacity zero with null output asks for that count and returns `WW2_ERR_CAPACITY`. An undersized buffer changes no output bytes. A null output with sufficient capacity returns `WW2_ERR_NULL_POINTER`. Other invalid inputs return `WW2_ERR_BAD_ARGUMENT`; invalid UTF-8/JSON returns `WW2_ERR_PARSE`. `ww2_last_error` supplies the diagnostic. Capacity discovery repeats the deterministic query, including bounded simulation for `play_match`.
 
@@ -35,6 +35,39 @@ int32_t ww2_authoring_house_kinds(const char *json, size_t len,
 int32_t ww2_authoring_play_match(const char *json, size_t len,
     char *out, size_t capacity, size_t *out_len);
 ```
+
+## Motion and flight queries added in ABI 2.2
+
+Each of these five additions has the same signature and caller-owned buffer rules as the ABI 2.1 stateless queries:
+
+```c
+int32_t ww2_movement_profile(const char *json, size_t len,
+    char *out, size_t capacity, size_t *out_len);
+int32_t ww2_is_ground_vehicle(const char *json, size_t len,
+    char *out, size_t capacity, size_t *out_len);
+int32_t ww2_body_radius(const char *json, size_t len,
+    char *out, size_t capacity, size_t *out_len);
+int32_t ww2_flight_at(const char *json, size_t len,
+    char *out, size_t capacity, size_t *out_len);
+int32_t ww2_velocity_at(const char *json, size_t len,
+    char *out, size_t capacity, size_t *out_len);
+```
+
+| Function | JSON input | JSON result | Prototype source at `e4e579a` |
+| --- | --- | --- | --- |
+| `ww2_movement_profile` | `{type}` | `{acceleration,reverseAcceleration,braking,reverseSpeed,hullTurn,tracked}` or null | `shared/vehicle-motion.js:1-16`; suspension caller `client/engine-presentation.js:138-141` |
+| `ww2_is_ground_vehicle` | `{type}` | Boolean | `shared/vehicle-motion.js:15`; caller `client/engine-presentation.js:138` |
+| `ww2_body_radius` | `{type}` | Number, hull half-length in metres | `shared/vehicle-motion.js:17`; caller `client/engine-presentation.js:141` |
+| `ww2_flight_at` | `{flight:{x,y,z,vx,vy,vz,gravity,stamp},time}` | `{x,y,z}` position in metres | `shared/projectiles.js:22-25`; client copy `client/projectiles.js:35-36` |
+| `ww2_velocity_at` | Same flight/time input | `{x,y,z}` velocity in metres per second | `shared/projectiles.js:26-28`; client copy `client/projectiles.js:35` |
+
+`type` must name one of the 47 compiled unit definitions. Unknown or missing types return `WW2_ERR_BAD_ARGUMENT`. These are catalog queries, so they do not accept a caller-supplied definition. Non-ground units return a null movement profile; the source fallback is retained for ground units without a named profile (including train, lorry and kaiju). All movement profile fields and radii retain the pinned source values.
+
+All eight flight fields and `time` are required finite JSON numbers. `stamp` and `time` use simulation seconds; elapsed time is `max(0,time-stamp)`. Negative times/stamps and zero or negative gravity are accepted when the calculation remains finite. Missing, null or nonnumeric fields and unrepresentable intermediate/results return `WW2_ERR_BAD_ARGUMENT`. Non-JSON numeric tokens return `WW2_ERR_PARSE`. No output component is silently changed to null. JSON consumers may normalize the sign of zero; the source comparison treats signed zeros as equal. No renderer coordinates are applied; Unreal retains its existing metres-to-centimetres and axis conversion.
+
+The flight calls evaluate caller-supplied presentation data. They have no authoritative match or recipient handle and add no simulation state, message, admission rule, extrapolation window or projectile lifetime policy. The source adapter for received flight rows maps `v[0..2]` to `vx/vy/vz` and `time` to `stamp`. The comparison harness exercises the actual client trail calculation at the same elapsed time; it does not claim the client's expiry or extrapolation behavior.
+
+IF-11 qualification calls the exported functions for all 47 definitions, all 10 existing source-recorded flight/velocity cases and generated flight samples. `harness/if11-source-check.mjs` imports the pinned shared helpers and the actual client projectile view, then compares them with the linked C driver. The new signatures remain candidates for Axel's review before Unreal adoption. Earlier three-platform ABI 2.1 receipts below do not qualify ABI 2.2.
 
 ## Placement input and result
 
