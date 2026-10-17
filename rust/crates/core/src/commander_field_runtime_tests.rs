@@ -97,6 +97,23 @@ fn enqueue(state: &mut Match, sequence: u64, command: Value) {
         )
         .unwrap();
 }
+fn collect_component_projection_or_refusal(state: &Match) {
+    if state.options.mode == Mode::Classic {
+        let cache = SnapshotCache::new(state).unwrap();
+        for slot in 0..state.start.players.len() {
+            let projection = cache.recipient(slot).unwrap();
+            assert_eq!(projection.fields["mode"]["kind"], "classic");
+            assert!(projection.fields["units"].is_array());
+            assert!(projection.fields["works"].is_array());
+        }
+    } else {
+        assert!(matches!(
+            SnapshotCache::new(state),
+            Err(SnapshotError::UnsupportedMode)
+        ));
+    }
+}
+
 fn tick_and_collect(state: &mut Match, delivery: Option<&mut DeliveryState>) {
     let report = state.advance_tick().unwrap();
     assert!(
@@ -110,11 +127,7 @@ fn tick_and_collect(state: &mut Match, delivery: Option<&mut DeliveryState>) {
         state.validate_gate_actor(id).unwrap();
     }
     let Some(delivery) = delivery else {
-        // These existing mode snapshot bounds are independent of Gate admission.
-        assert!(matches!(
-            SnapshotCache::new(state),
-            Err(SnapshotError::UnsupportedMode)
-        ));
+        collect_component_projection_or_refusal(state);
         return;
     };
     let selected: Vec<_> = (0..state.start.players.len())
@@ -168,10 +181,16 @@ fn intent_ai50_gate_order_completes_in_each_real_ordinary_mode_with_supported_se
         let mut delivery = if matches!(mode, Mode::Default | Mode::Conquest) {
             Some(DeliveryState::new(&state).unwrap())
         } else {
-            assert!(matches!(
-                SnapshotCache::new(&state),
-                Err(SnapshotError::UnsupportedMode)
-            ));
+            collect_component_projection_or_refusal(&state);
+            if mode == Mode::Classic {
+                let full = vec![true; state.start.players.len()];
+                let omit = vec![false; state.start.players.len()];
+                let mut guarded = DeliveryState::new(&state).unwrap();
+                assert!(matches!(
+                    guarded.capture_with_lists(&mut state, &full, &omit, &[]),
+                    Err(SnapshotError::UnsupportedMode)
+                ));
+            }
             None
         };
         tick_and_collect(&mut state, delivery.as_mut());

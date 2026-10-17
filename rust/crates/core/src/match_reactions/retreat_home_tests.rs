@@ -348,6 +348,15 @@ fn mov48_manual_retreat_exits_house_moves_home_and_delivers_every_seat() {
     assert!(m.tick_state.fault().is_none());
 }
 
+fn collect_classic_components(m: &Match) {
+    let cache = SnapshotCache::new(m).unwrap();
+    for slot in 0..m.start.players.len() {
+        let projection = cache.recipient(slot).unwrap();
+        assert_eq!(projection.fields["mode"]["kind"], "classic");
+        assert!(projection.fields["units"].is_array());
+    }
+}
+
 fn retreat_through_legs(mode: Mode) {
     let mut m = long_route_scene(mode);
     let at = Point { x: 281., z: 41. };
@@ -357,6 +366,14 @@ fn retreat_through_legs(mode: Mode) {
     let home = m.reaction_home(id).unwrap();
     let selected = seats(&m);
     let mut delivery = if mode == Mode::Classic {
+        collect_classic_components(&m);
+        let full = vec![true; m.start.players.len()];
+        let omit = vec![false; m.start.players.len()];
+        let mut guarded = DeliveryState::new(&m).unwrap();
+        assert!(matches!(
+            guarded.capture_with_lists(&mut m, &full, &omit, &[]),
+            Err(SnapshotError::UnsupportedMode)
+        ));
         None
     } else {
         Some(DeliveryState::new(&m).unwrap())
@@ -382,11 +399,8 @@ fn retreat_through_legs(mode: Mode) {
             delivered_tick(&mut m, delivery, &selected);
         } else {
             m.advance_tick().unwrap();
-            // Classic core ticks are supported; complete recipient delivery remains guarded.
-            assert!(matches!(
-                SnapshotCache::new(&m),
-                Err(SnapshotError::UnsupportedMode)
-            ));
+            // Classic component rows are supported; complete list delivery stays guarded.
+            collect_classic_components(&m);
         }
         let u = &m.world.game.units[&id];
         if let Some(end) = u.path.last() {
@@ -413,10 +427,7 @@ fn retreat_through_legs(mode: Mode) {
             delivered_tick(&mut m, delivery, &selected);
         } else {
             m.advance_tick().unwrap();
-            assert!(matches!(
-                SnapshotCache::new(&m),
-                Err(SnapshotError::UnsupportedMode)
-            ));
+            collect_classic_components(&m);
         }
     }
     assert!(m.tick_state.fault().is_none());
