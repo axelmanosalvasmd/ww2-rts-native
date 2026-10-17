@@ -107,7 +107,7 @@ fn queued_owner_adapters_refuse_unnormalized_or_unrepresented_orders() {
         },
         Command::Ability {
             ids: vec![1],
-            at: Some(at),
+            at: None,
             queue: false,
             automatic: false,
         },
@@ -620,4 +620,52 @@ fn queued_enter_while_moving_survives_every_seat_delivery_through_ordinary_finis
         deliver(&mut state, &mut delivery);
     }
     assert!(state.tick_state.fault().is_none());
+}
+
+#[test]
+fn queued_ability_uses_prototype_kind_six_rounded_anchor_and_owner_privacy() {
+    let mut state = fixture();
+    state
+        .commands
+        .units
+        .get_mut(&1)
+        .unwrap()
+        .orders
+        .push_back(Command::Ability {
+            ids: vec![1],
+            at: Some(Point { x: 41.34, z: 43.36 }),
+            queue: false,
+            automatic: false,
+        });
+    let cache = SnapshotCache::new(&state).unwrap();
+    assert_eq!(
+        cache.recipient(0).unwrap().fields["orders"],
+        json!([[1, 1, 6, 41.3, 43.4]])
+    );
+    for slot in [1, 2] {
+        assert_eq!(cache.recipient(slot).unwrap().fields["orders"], json!([]));
+    }
+    for command in [
+        Command::Ability {
+            ids: vec![1, 2],
+            at: Some(Point { x: 41., z: 43. }),
+            queue: false,
+            automatic: false,
+        },
+        Command::Ability {
+            ids: vec![1],
+            at: Some(Point { x: 41., z: 43. }),
+            queue: true,
+            automatic: false,
+        },
+        Command::Ability {
+            ids: vec![1],
+            at: Some(Point { x: 41., z: 43. }),
+            queue: false,
+            automatic: true,
+        },
+    ] {
+        state.commands.units.get_mut(&1).unwrap().orders = [command].into();
+        assert!(SnapshotCache::new(&state).is_err());
+    }
 }

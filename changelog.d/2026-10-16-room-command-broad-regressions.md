@@ -1,0 +1,2 @@
+- Keep a seated player present in the simulation while its socket still exists, even when its send channel is unready. Away state now follows the prototype's socket-presence rule; frame readiness and online metadata retain their existing checks. Preserve the absence, unready-channel and expiry regression test unchanged.
+- Update the socket takeover test's hidden-target Attack denial from the old public-admission refusal to the canonical `unseen` result. Keep the original ownership, malformed-input, movement, stance and takeover assertions.

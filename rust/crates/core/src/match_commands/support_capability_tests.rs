@@ -611,3 +611,88 @@ fn hosted_recorded_plane_support_pays_once_and_delivers_every_seat_through_retir
         crate::match_support::SupportKind::Recon
     );
 }
+
+#[test]
+fn hosted_unknown_support_and_unsupported_command_reject_without_payment_or_publication() {
+    for command in [
+        Command::Support {
+            kind: "unknown-support".into(),
+            at: Point { x: 128.0, z: 128.0 },
+            direction: Some(0.0),
+        },
+        Command::Unsupported,
+    ] {
+        let mut state = scene();
+        state.restrict_to_ordinary_snapshots().unwrap();
+        state
+            .enqueue_command(
+                OrderKey {
+                    tick: 1,
+                    issuer: 0,
+                    sequence: 1,
+                },
+                command,
+            )
+            .unwrap();
+        let before = (
+            state.start.economy.clone(),
+            state.start.players[0].support.clone(),
+            state.world.game.strikes.clone(),
+            state.support.clone(),
+            state.story.clone(),
+            state.start.random.clone(),
+            state.next_unit_id,
+        );
+        let results = state.apply_commands(1, false).unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].denial, Some(Denial::Unsupported));
+        assert_eq!(
+            (
+                state.start.economy.clone(),
+                state.start.players[0].support.clone(),
+                state.world.game.strikes.clone(),
+                state.support.clone(),
+                state.story.clone(),
+                state.start.random.clone(),
+                state.next_unit_id,
+            ),
+            before,
+            "rejection must leave paid and published state unchanged"
+        );
+        assert_eq!(state.commands.pending_commands(), 0);
+        state.preflight_ordinary_snapshot().unwrap();
+    }
+}
+
+#[test]
+fn unrestricted_recorded_recon_retains_independent_component_admission() {
+    let mut state = scene();
+    let mp = state.start.economy.players[0].mp;
+    let cost = economy::sup_cost(Mode::Conquest, "recon").unwrap().cost;
+    let calls = state.story[0].support_calls;
+    record(&mut state, "recon");
+    assert_eq!(state.apply_commands(1, false).unwrap()[0].denial, None);
+    assert_eq!(state.start.economy.players[0].mp, mp - cost);
+    assert_eq!(state.story[0].support_calls, calls + 1.0);
+    assert_eq!(
+        state.world.game.strikes[0].runtime.as_ref().unwrap().kind,
+        crate::match_support::SupportKind::Recon
+    );
+    assert_eq!(
+        state
+            .execute_command(
+                0,
+                &Command::Support {
+                    kind: "unknown-support".into(),
+                    at: Point { x: 128.0, z: 128.0 },
+                    direction: Some(0.0),
+                },
+                false
+            )
+            .unwrap(),
+        Some(Denial::Blocked)
+    );
+    assert_eq!(state.start.economy.players[0].mp, mp - cost);
+    assert_eq!(state.story[0].support_calls, calls + 1.0);
+    assert_eq!(state.world.game.strikes.len(), 1);
+}

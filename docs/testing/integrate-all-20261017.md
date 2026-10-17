@@ -260,3 +260,7 @@ assertions. Both detached and active delivered adapters are checked against the
 same owner-private control facts. Typed authored-v2 events and every existing
 operative/Sandbox flight witness remain. The selected receiver and common mode
 row remain the single projection path.
+
+## Cross-chain #430
+
+Merged exact `eeca34057f33cd61aef0136e007e59d156f36489`. Canonical queued command-union admission replaces the older Conquest-only ingress slice; core prospective guards remain authoritative. Retained every existing selected-owner, authored-v2, startup, snapshot and privacy guard. Incoming grenade validation is composed with retired-operative identities and current-pose recipient contacts. Added the incoming standalone support witnesses and preserved the six-tick mode delivery assertions across all admitted modes. The deliberately replaced refusal tests and their positive canonical replacements are listed in the integration changelog. Combined compilation and full qualification remain pending.

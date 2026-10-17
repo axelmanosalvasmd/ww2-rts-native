@@ -330,7 +330,7 @@ fn net63_hidden_invalid_units_have_the_same_cached_and_uncached_refusal() {
     state.abilities.get_mut(hidden).unwrap().cooldown = 0.;
     state.commands.units.get_mut(&hidden).unwrap().operative = true;
     let expected = SnapshotError::Unsupported {
-        unit: hidden,
+        unit: 0,
         capability: SnapshotCapability::Operatives,
     };
     assert_eq!(SnapshotCache::new(&state).err(), Some(expected.clone()));

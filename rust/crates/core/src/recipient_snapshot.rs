@@ -102,7 +102,8 @@ pub struct RecipientProjection {
     pub missing: Vec<SnapshotCapability>,
 }
 
-/// The public Horde mode row excludes seat data and hidden purchase state.
+/// Prototype Horde mode fields, shared by all recipients. Internal purchase
+/// state stays private; sandbox bosses can publish their bar during wave zero.
 pub fn horde_mode_row(state: &Match) -> Result<Value, SnapshotError> {
     let mode = state.horde_projection().map_err(|_| SnapshotError::Rules)?;
     let horde = state.horde.as_ref().ok_or(SnapshotError::Rules)?;
@@ -115,6 +116,8 @@ pub fn horde_mode_row(state: &Match) -> Result<Value, SnapshotError> {
     });
     if mode.wave > 0 {
         row["profile"] = json!(mode.profile.as_str());
+    }
+    if mode.wave > 0 || mode.boss.is_some() {
         row["boss"] = json!(mode.boss);
     }
     if let Some(profile) = mode.next_profile {

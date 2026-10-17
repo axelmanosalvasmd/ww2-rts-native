@@ -3,17 +3,21 @@
 Compatibility source: `reference/ww2-rts` at
 `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`. This extends command admission in
 the existing private, two-human Conquest R1 room. It keeps the existing wire
-shapes, canonical meters and recipient view. World, Tutorial, Horde, spectators,
-operatives and World recovery remain outside this batch. Ordinary convoy
-commands and FireAt are admitted by the ROOM-COMMANDS successor.
+shapes, canonical meters and recipient view. World and World recovery remain
+deferred. Ordinary convoy commands, FireAt and
+the remaining canonical command union are admitted by the ROOM-COMMANDS
+successors, alongside the composed sandbox, operative, spectator and hosted
+Horde owners and contracts. Public R1 start remains private Conquest;
+internal Classic attachment supports production cancellation with logistics
+disabled, as described in [room-command-union.md](room-command-union.md).
 
 The owner decisions are `julio-owner-decisions-recorded-20261016`
 (issue #5, comment 6217590741), groups F and M. Julio's later owner instruction
 `julio-owner-merge-now-20261016` (6217727398) confirms the grant and says Axel's
 later written line does not gate implementation. Axel also confirmed these
 decisions on #5 in `axel-owner-confirm-a-to-p-20261016`. This follows the handoff
-and preserves `axel-interface-response-004`. No Hermes ack is claimed here. The stream stops after PR creation; the
-orchestrator owns later CI, review and merge decisions.
+and preserves `axel-interface-response-004`. No Hermes ack is claimed here. The orchestrator owns later CI, review and merge
+decisions.
 
 ## Host controls and resync
 
@@ -59,14 +63,19 @@ in place (`shared/command-feedback.js:2-8`).
 | `tech` | `kind` (`tier`, `inf`, `guns`, `armor`) | `shared/sim.js:3723` |
 | `cancel`, `destroy`, `rally` | Existing `id`,`ids`,`x`,`z` fields for the respective commands | `shared/sim.js:3748,3760,3766` |
 
-`cancelProduction` remains refused before enqueue in R1 Conquest with
-`{"t":"deny","cmd":"cancelProduction","reason":"needs"}`. This is exactly the
-prototype's non-construction-mode result (`shared/sim.js:3737-3738`). Conquest
-training queues remain forbidden by the native tick guard.
+`cancelProduction` now uses the same recorded queue as every ordinary command.
+In R1 Conquest it retains the exact
+`{"t":"deny","cmd":"cancelProduction","reason":"needs"}` result from the
+canonical executor (`shared/sim.js:3737-3738`). Internally attached Classic
+matches can cancel waiting production and receive their original paid refund;
+active jobs retain `notWaiting`. Conquest training queues remain forbidden by
+the native tick guard.
 
 The socket denial matrix verifies a deterministic prototype denial branch per
-command. Existing ground selection restrictions remain in place, and
-client authority fields are ignored. Unknown orders in an active, unpaused seat
+command. Canonical per-family selection rules remain in place, and client
+authority fields are ignored. The old server ground-only filter is removed so
+supported mixed selections and construction replacements reach their owners.
+Unknown orders in an active, unpaused seat
 now receive the prototype's `blocked` denial (`shared/sim.js:3812`).
 
 Garrison and cover retain the prototype semantics (`shared/sim.js:3420,
@@ -81,8 +90,8 @@ both cancellation commands use scalar inputs rather than a selected ID list.
 The public lifecycle test sends commands over actual sockets from start through
 successful garrison, dig, entrench, cover, assist, retreat, rally, tech, cancel
 and destroy, public capture orders, VP victory, final hold, result and a subsequent
-host end. Its initial construction fixture is declared separately from socket
-input because public build remains closed. Every simulation tick builds snapshots
+host end. The test declares its initial construction site before socket input;
+the command-union room tests separately cover successful public Build. Every simulation tick builds snapshots
 for both seats and checks for a fault.
 Normal Conquest results retain `winner`, `teams`, `names`, `reason`, `at`,
 `endTick`, `story`, `timeline`, `winVp`, `mode` and recipient `you`, as in
@@ -118,18 +127,26 @@ on the prototype host controls; ordinary commands have no extra host gate
 select a slot, tick or sequence. Denial delivery and throttle are unchanged.
 Pending convoy inputs survive the existing versioned JSON checkpoint.
 
-## Held dependencies
+## Composed command union and remaining boundaries
 
-Sandbox, attack, ability, autocast, build, board, unload, escort, rail and grouped
-orders retain their public guards on this composition. World recovery stays
-deferred under decision C. NET-43 therefore remains partial, despite the three
-additional command families. The attempted #393 merge was aborted because its
-sandbox-only flight adapter competes with #369's general ordinary adapter; see
-the complete merge record in `docs/testing/room-commands-20261016.md`.
+[room-command-union.md](room-command-union.md) records prototype Attack,
+Ability, Autocast, Build, Board, Unload, Escort, Rail, grouped Orders and
+production-cancellation shapes, selection rules and full room lifecycle tests.
+The existing canonical queue and denial owner serve all of them. Rail retains
+its prototype ordinary-mode `blocked` result, and successful World recovery
+and dispatch stay deferred under decision C.
+
+Sandbox spawn, operative input and shot privacy, and hosted Horde commands use
+their composed owners. [room-commands2.md](room-commands2.md) records sandbox and
+convoy command composition, while [room-commands2-events.md](room-commands2-events.md)
+records the operative and Horde event composition. These owners retain the
+prototype host restriction on the Horde break command.
 
 The #296 base previously limited support to Artillery, Smoke and Cover and
 refused aircraft purchases because snapshots could not carry flights. Integrated
-#369 now supplies all eight support kinds and the flight/event projection.
-This does not open the other guarded public command families. NET-58 is qualified
-only for the ordinary #369 event and flight families; operative small-arms and
-Horde breath events still retain their separate admission guards.
+#369 supplies all eight support kinds and the ordinary flight/event projection;
+the successor NET-58 work composes the operative and Horde event families.
+Canonical guards still refuse states their lifecycle cannot represent, including
+aircraft abilities and depot construction. This note alone does not claim
+execution of the integrated NET-43 or NET-58 checks; the final-head integration
+report records that evidence.

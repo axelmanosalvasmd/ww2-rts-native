@@ -2,6 +2,7 @@
 use super::*;
 
 pub(super) fn validate(state: &Match) -> Result<(), SnapshotError> {
+    operative_flights::validate(state)?;
     if !state.firing.flights.is_empty() {
         state
             .routing_fog

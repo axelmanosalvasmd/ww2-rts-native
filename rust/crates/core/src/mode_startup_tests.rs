@@ -520,3 +520,36 @@ fn mode01_mode_rows_round_timers_and_refuse_invalid_values_or_mode_pairs() {
         assert_eq!(mode_row(&m), Err(SnapshotError::UnsupportedMode));
     }
 }
+
+#[test]
+fn all_admitted_mode_rows_survive_six_tick_selected_delivery() {
+    for mode in MODES {
+        let mut m = create(mode, ArmySize::Standard).unwrap();
+        let selected: Vec<_> = (0..m.start.players.len())
+            .map(|slot| SelectedSeat {
+                slot,
+                full: true,
+                omit: false,
+            })
+            .collect();
+        let mut delivery = DeliveryState::new(&m).unwrap();
+        for _ in 0..6 {
+            let report = m.advance_tick().unwrap();
+            let current = mode_row(&m).unwrap();
+            let frame = delivery
+                .capture_selected_with_tick_events(&mut m, &selected, &report.events)
+                .unwrap()
+                .unwrap();
+            for seat in &selected {
+                let snapshot = frame.recipient(seat.slot).unwrap().into_json();
+                assert_eq!(snapshot["t"], "s");
+                assert!(snapshot["units"].is_array());
+                assert!(snapshot["cells"].is_array());
+                assert!(snapshot["fog"]["v"].is_string());
+                assert!(snapshot["fog"]["e"].is_string());
+                assert_eq!(snapshot["mode"], current, "{mode:?}, seat {}", seat.slot);
+            }
+            assert!(m.tick_state.fault().is_none());
+        }
+    }
+}

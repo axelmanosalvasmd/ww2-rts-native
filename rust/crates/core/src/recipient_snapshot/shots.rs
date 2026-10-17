@@ -610,7 +610,7 @@ pub(super) fn project_shots_perspective(
                 full_map
                     || g.reveal
                     || vision::team_sees(g, &state.rules, &grid, g.players[seat.slot].team, at)
-                    || event["pub"] == true
+                    || (state.options.mode != Mode::World && event["pub"] == true)
                     || allied(state, seat.slot, event, "fo")
                     || allied(state, seat.slot, event, "to")
                     || seen(state, seat.slot, event, "f")
@@ -974,6 +974,59 @@ mod tests {
                 ..
             })
         ));
+    }
+
+    #[test]
+    fn horde_breath_is_public_and_regular_public_status_excludes_world() {
+        let fixture: Value =
+            serde_json::from_str(include_str!("../../tests/fixtures/recipient-delivery.json"))
+                .unwrap();
+        let mut state = super::super::tests::initialize(&fixture["initial"]);
+        state.options.mode = Mode::Horde;
+        state.options.sandbox = false;
+        state.world.game.reveal = false;
+        let at = Point {
+            x: -100.0,
+            z: -100.0,
+        };
+        let breath = LaunchEvent::Breath {
+            shooter: 900001,
+            target: 900002,
+            owner: 0,
+            target_owner: 1,
+            at,
+        };
+        let shell = LaunchEvent::BreathShell { at };
+        let selected: Vec<_> = (0..state.world.game.players.len())
+            .map(|slot| SelectedSeat {
+                slot,
+                full: false,
+                omit: false,
+            })
+            .collect();
+        let shots = [ShotRef::Firing(&breath), ShotRef::Firing(&shell)];
+        for (_, rows) in project_shots(&state, &selected, &shots).unwrap() {
+            assert_eq!(
+                rows,
+                json!([
+                    {"fo":0,"to":1,"x":-100.0,"z":-100.0,"hit":true,"k":"kaiju","pub":true},
+                    {"k":"shell","x":-100.0,"z":-100.0,"pub":true}
+                ])
+            );
+        }
+        // This exercises the public-event policy only. It admits no World room.
+        let public = SupportEvent::Shell(at);
+        state.options.mode = Mode::World;
+        for (_, rows) in project_shots(&state, &selected, &[ShotRef::Support(&public)]).unwrap() {
+            assert_eq!(rows, json!([]));
+        }
+        state.world.game.reveal = true;
+        for (_, rows) in project_shots(&state, &selected, &[ShotRef::Support(&public)]).unwrap() {
+            assert_eq!(
+                rows,
+                json!([{"k":"shell","x":-100.0,"z":-100.0,"pub":true}])
+            );
+        }
     }
 
     #[test]

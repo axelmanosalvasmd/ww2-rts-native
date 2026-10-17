@@ -1,0 +1,5 @@
+- Compose sandbox, operative and hosted Horde commands with ordinary convoy and flight delivery. Keep one recipient flight projector so every path retains the original ballistic stamp, fog bounds and visible contact rules.
+- Prove sandbox spawn with convoy supply, Stop, resume and recipient snapshots. World recovery remains deferred with World room admission.
+- Replace the sandbox start test's old Horde refusal with a host-started Horde sandbox and guest enemy-spawn lifecycle test. Keep the World refusal. Restore the operative test gate and explicit watcher-output rejection in inherited Horde and operative test adapters.
+- Check non-World recovery and unknown-command denials through the room feedback path, while retaining the internal Unsupported command sentinel.
+- Remove the inherited Horde projectile test's obsolete aircraft-delivery restriction setter after composing the canonical aviation owner. Its grenade, barrage, expiration and every-seat assertions remain.

@@ -633,3 +633,35 @@ fn hosted_horde_binary_trusted_start_and_restart_reach_horde_owner() {
     }
     assert!(!server.log().contains("NATIVE_FAULT"));
 }
+
+#[test]
+fn ordinary_binary_horde_and_sandbox_horde_start_and_deliver_to_both_sockets() {
+    for sandbox in [false, true] {
+        let server = BinaryServer::start(true, SEED);
+        let mut host = Client::join(server.address, "a");
+        let mut guest = Client::join(server.address, "b");
+        host.send(json!({"t":"mode","v":"horde"}));
+        host.send(json!({"t":"sandbox","v":sandbox}));
+        host.barrier();
+        host.send(json!({"t":"start"}));
+        for start in [
+            host.until(|m| m["t"] == "start"),
+            guest.until(|m| m["t"] == "start"),
+        ] {
+            assert_eq!(start["sandbox"], sandbox);
+            assert_eq!(start["names"].as_array().unwrap().len(), 3);
+            assert_eq!(start["names"][2], "Horde");
+            assert_eq!(start["teams"], json!([0, 0, 1]));
+        }
+        for _ in 0..3 {
+            for frame in [
+                host.until(|m| m["t"] == "s"),
+                guest.until(|m| m["t"] == "s"),
+            ] {
+                assert_eq!(frame["mode"]["kind"], "horde");
+                assert_eq!(frame["online"].as_array().unwrap().len(), 2);
+                assert!(frame["tick"].as_u64().unwrap() > 0);
+            }
+        }
+    }
+}

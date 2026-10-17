@@ -363,6 +363,17 @@ fn mode56_hosted_horde_runs_boss_combat_to_result_and_complete_hold_with_all_sea
     }];
     horde.profile_wave = 0;
     state.grid.rebuild(&state.world.game.units);
+    let breath_range = ww2_core::catalog::Catalog::compiled()
+        .unwrap()
+        .unit("kaiju")
+        .unwrap()
+        .get("w")
+        .unwrap()
+        .get("range")
+        .unwrap()
+        .number()
+        .unwrap();
+    let shell_count = (breath_range / 8.0) as usize;
     let prepared = hub
         .prepare_native_room(&hub.rooms["ABC"], state, 0, false, Some(map.source()))
         .unwrap();
@@ -372,6 +383,7 @@ fn mode56_hosted_horde_runs_boss_combat_to_result_and_complete_hold_with_all_sea
     let mut saw_boss = false;
     let mut saw_finish = false;
     let mut frames = [0; 2];
+    let mut breath_batches = [0; 2];
     for callback in 0..360_u64 {
         hub.poll_native(callback * 50, callback * 50_000_000);
         let status = hub.native_status("ABC").unwrap();
@@ -384,6 +396,32 @@ fn mode56_hosted_horde_runs_boss_combat_to_result_and_complete_hold_with_all_sea
                     saw_boss |= v["mode"]["boss"].is_array();
                     saw_finish |= v["winner"] == 1;
                     assert_eq!(v["online"].as_array().unwrap().len(), 2);
+                    let shots = v["shots"].as_array().unwrap();
+                    for (index, beam) in shots.iter().enumerate().filter(|(_, s)| s["k"] == "kaiju")
+                    {
+                        breath_batches[slot] += 1;
+                        assert!(beam["x"].as_f64().unwrap().is_finite());
+                        assert!(beam["z"].as_f64().unwrap().is_finite());
+                        let mut public = beam.clone();
+                        let object = public.as_object_mut().unwrap();
+                        object.remove("f");
+                        object.remove("t");
+                        assert_eq!(
+                            public,
+                            json!({"k":"kaiju","fo":2,"to":0,"x":beam["x"],"z":beam["z"],"hit":true,"pub":true})
+                        );
+                        // Actual breath emission puts every shell sample immediately
+                        // after its public endpoint, before later producers' events.
+                        let shells = shots.get(index + 1..index + 1 + shell_count).unwrap();
+                        for shell in shells {
+                            assert!(shell["x"].as_f64().unwrap().is_finite());
+                            assert!(shell["z"].as_f64().unwrap().is_finite());
+                            assert_eq!(
+                                shell,
+                                &json!({"k":"shell","x":shell["x"],"z":shell["z"],"pub":true})
+                            );
+                        }
+                    }
                 }
             }
         }
@@ -409,6 +447,8 @@ fn mode56_hosted_horde_runs_boss_combat_to_result_and_complete_hold_with_all_sea
         }
     }
     assert!(saw_boss && saw_finish);
+    assert!(breath_batches.iter().all(|count| *count > 0));
+    assert_eq!(breath_batches[0], breath_batches[1]);
     assert!(frames.iter().all(|n| *n >= 60));
     assert!(hub.rooms["ABC"].native.is_none());
     let result = &hub.rooms["ABC"].result.as_ref().unwrap().report;

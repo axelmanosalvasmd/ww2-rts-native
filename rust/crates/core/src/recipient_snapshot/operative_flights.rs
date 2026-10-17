@@ -78,7 +78,25 @@ pub(super) fn validate(state: &Match) -> Result<(), SnapshotError> {
             return Err(refused());
         }
     }
-    for ticket in &state.firing.grenades {
+    for ticket in state.firing.grenades.iter().filter(|ticket| {
+        state
+            .firing
+            .flights
+            .get(&ticket.flight)
+            .is_some_and(|flight| {
+                state
+                    .commands
+                    .units
+                    .get(&flight.shooter)
+                    .is_some_and(|c| c.operative)
+                    || state.companions.soldiers.contains_key(&flight.shooter)
+                    || state
+                        .companions
+                        .records
+                        .values()
+                        .any(|op| op.unit_id == flight.shooter)
+            })
+    }) {
         if ![ticket.at.x, ticket.at.z, ticket.remaining]
             .iter()
             .all(|n| n.is_finite())

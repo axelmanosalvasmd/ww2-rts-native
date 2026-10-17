@@ -1,0 +1,1 @@
+- Preserve aircraft projectile delivery when composing the Horde projectile validator. Canonical aviation and firing validation replace its historical air-source exclusion. The existing attacker/bomber and artillery full-match test retains every launch, live-flight, payment, victory and ending assertion.

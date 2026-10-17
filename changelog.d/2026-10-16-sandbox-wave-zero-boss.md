@@ -1,0 +1,1 @@
+- Keep the real sandbox Kaiju boss bar visible during Horde wave zero. The hosted Horde adapter still omits the uninitialized bar and profile before the first wave; a live sandbox boss uses the prototype's existing public boss field.

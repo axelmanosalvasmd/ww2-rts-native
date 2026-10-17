@@ -10,6 +10,8 @@ These files reserve contract topics; no protocol or ABI is approved by their cre
 | [r1-ingress.md](r1-ingress.md) | Julio | Axel | Prototype-identical ordinary R1 ingress candidate under the recorded groups F/M grant; exact-head runtime ack pending |
 | [start-cancellation.md](start-cancellation.md) | Julio | Axel | Identical prototype v0 pending-start cancellation and scenario-denial shapes; exact-head acknowledgement pending |
 | [ordinary-results.md](ordinary-results.md) | Julio | Axel | Identical prototype v0 ordinary mode/result fields; owner groups N/P recorded in #5 comment 6217590741; exact-head acknowledgement pending |
+| [room-command-union.md](room-command-union.md) | Julio | Axel | Prototype-identical remaining room command admission, queued Ability and attached Classic cancellation under decision M; execution pending |
+| [room-commands2-events.md](room-commands2-events.md) | Julio | Axel | Prototype-identical operative, Horde and ordinary flight composition under decisions E/G/K/O; execution pending |
 | terrain.md | Julio | Axel | v0 draft; technical answers recorded (#5) |
 | [save-format.md](save-format.md) | Julio | Axel | Private JSON v1 for ordinary matches and shared authored v2; owner group I recorded in #5 comment 6217590741; implementation exact-head acknowledgement pending |
 | [sandbox.md](sandbox.md) | Julio | Axel | Prototype sandbox start, spawn and recipient rules under owner decisions M/N/P; implementation exact-head acknowledgement pending |
