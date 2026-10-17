@@ -1,5 +1,5 @@
 {
-  "status": "Original failure families and expanded operative lifecycle passed focused diagnostics; full unchanged-tree qualification pending",
+  "status": "Qualified at 4ff2e3daed31d10dfb27276a8c1916525f658af0: all 2448 enabled workspace tests and all nine three-platform CI jobs passed. See integrate-all-final-receipt-20261017.md.",
   "path_note": "Paths name the final union source location; same-path owner files moved during composition. Exact head hashes identify the originating behavior, not a guarantee that every final path existed under that same name at each head.",
   "scope": "Changed expectations and fixture setup repairs after first full union diagnostic. Runtime repairs whose tests retain identical expectations are listed separately in the integration receipt.",
   "entries": [
@@ -19,7 +19,7 @@
         "rust/crates/core/src/match_human_observation/recipient_packet.rs: PublicFacts::packet mode from delivered kind",
         "rust/crates/core/src/recipient_snapshot/modes.rs: ordinary null mode"
       ],
-      "verification": "fresh targeted/full run pending"
+      "verification": "Full unchanged-head workspace run e3e8dfd2-4772-4056-9c6d-067ce83bc7af passed, including direct tests and enclosing witnesses for shared fixture/helper repairs; all three OS CI test jobs passed."
     },
     {
       "test_or_shared_fixture": "base53_mode_constructors_fortify_defenders_all_annihilation_seats_and_shared_horde_base",
@@ -47,7 +47,7 @@
         "rust/crates/core/src/match_tick.rs: Horde validation",
         "rust/crates/core/src/recipient_snapshot.rs: Horde complete admission"
       ],
-      "verification": "fresh targeted/full run pending"
+      "verification": "Full unchanged-head workspace run e3e8dfd2-4772-4056-9c6d-067ce83bc7af passed, including direct tests and enclosing witnesses for shared fixture/helper repairs; all three OS CI test jobs passed."
     },
     {
       "test_or_shared_fixture": "base49_base50_horde_research_uses_shared_defender_labs_and_private_progress",
@@ -75,7 +75,7 @@
         "rust/crates/core/src/match_tick.rs: Horde validation",
         "rust/crates/core/src/recipient_snapshot.rs: Horde complete admission"
       ],
-      "verification": "fresh targeted/full run pending"
+      "verification": "Full unchanged-head workspace run e3e8dfd2-4772-4056-9c6d-067ce83bc7af passed, including direct tests and enclosing witnesses for shared fixture/helper repairs; all three OS CI test jobs passed."
     },
     {
       "test_or_shared_fixture": "mode02_fallback_retains_option_and_mode_guards",
@@ -92,7 +92,7 @@
       "source_paths": [
         "rust/crates/core/src/match_horde.rs: origin fd8d35d69, Endless constructor and income"
       ],
-      "verification": "fresh targeted/full run pending"
+      "verification": "Full unchanged-head workspace run e3e8dfd2-4772-4056-9c6d-067ce83bc7af passed, including direct tests and enclosing witnesses for shared fixture/helper repairs; all three OS CI test jobs passed."
     },
     {
       "test_or_shared_fixture": "commander_union_tests::look (AI-13 union tests)",
@@ -120,7 +120,7 @@
         "rust/crates/core/src/ai_view/commander_view.rs",
         "rust/crates/core/src/commander_field_policy.rs"
       ],
-      "verification": "fresh targeted/full run pending"
+      "verification": "Full unchanged-head workspace run e3e8dfd2-4772-4056-9c6d-067ce83bc7af passed, including direct tests and enclosing witnesses for shared fixture/helper repairs; all three OS CI test jobs passed."
     },
     {
       "test_or_shared_fixture": "intent_ai28_delivered_stock_uses_public_two_decimal_precision",
@@ -148,7 +148,7 @@
         "rust/crates/core/src/match_human_observation.rs: delivered-logistics refusal",
         "rust/crates/core/src/ai_view/commander_view.rs"
       ],
-      "verification": "fresh targeted/full run pending"
+      "verification": "Full unchanged-head workspace run e3e8dfd2-4772-4056-9c6d-067ce83bc7af passed, including direct tests and enclosing witnesses for shared fixture/helper repairs; all three OS CI test jobs passed."
     },
     {
       "test_or_shared_fixture": "reset_restore_tests::warm_human (NET-25 and NET-92)",
@@ -176,7 +176,7 @@
         "rust/crates/core/src/match_human_observation.rs: delivered-logistics refusal",
         "rust/crates/core/src/ai_view/commander_view.rs"
       ],
-      "verification": "fresh targeted/full run pending"
+      "verification": "Full unchanged-head workspace run e3e8dfd2-4772-4056-9c6d-067ce83bc7af passed, including direct tests and enclosing witnesses for shared fixture/helper repairs; all three OS CI test jobs passed."
     },
     {
       "test_or_shared_fixture": "logistics_runtime_full_tick_requires_matching_convoy_state",
@@ -193,7 +193,7 @@
       "source_paths": [
         "rust/crates/core/src/match_logistics.rs: validate_logistics_runtime"
       ],
-      "verification": "fresh targeted/full run pending"
+      "verification": "Full unchanged-head workspace run e3e8dfd2-4772-4056-9c6d-067ce83bc7af passed, including direct tests and enclosing witnesses for shared fixture/helper repairs; all three OS CI test jobs passed."
     },
     {
       "test_or_shared_fixture": "garrison_retreat_ticks_and_unsupported_reaction_actors_reject_before_writes",
@@ -210,7 +210,7 @@
       "source_paths": [
         "rust/crates/core/src/match_logistics.rs: validate_logistics_runtime"
       ],
-      "verification": "fresh targeted/full run pending"
+      "verification": "Full unchanged-head workspace run e3e8dfd2-4772-4056-9c6d-067ce83bc7af passed, including direct tests and enclosing witnesses for shared fixture/helper repairs; all three OS CI test jobs passed."
     },
     {
       "test_or_shared_fixture": "hosted_recorded_support_refuses_unseen_drops_and_unknown_kinds_without_publication",
@@ -228,7 +228,7 @@
         "rust/crates/core/src/match_commands/support_capability_tests.rs",
         "rust/crates/core/src/match_support.rs"
       ],
-      "verification": "fresh targeted/full run pending"
+      "verification": "Full unchanged-head workspace run e3e8dfd2-4772-4056-9c6d-067ce83bc7af passed, including direct tests and enclosing witnesses for shared fixture/helper repairs; all three OS CI test jobs passed."
     },
     {
       "test_or_shared_fixture": "sandbox_horde_enemy_activates_wave_zero_and_attacks_bunker",
@@ -245,7 +245,7 @@
       "source_paths": [
         "rust/crates/core/src/recipient_snapshot.rs: horde_mode_row; origin 4fb21b5a7a1782b0aae33ed3dc7e0fb41314a55f"
       ],
-      "verification": "fresh targeted/full run pending"
+      "verification": "Full unchanged-head workspace run e3e8dfd2-4772-4056-9c6d-067ce83bc7af passed, including direct tests and enclosing witnesses for shared fixture/helper repairs; all three OS CI test jobs passed."
     },
     {
       "test_or_shared_fixture": "net63_hidden_invalid_units_have_the_same_cached_and_uncached_refusal",
@@ -262,7 +262,7 @@
       "source_paths": [
         "rust/crates/core/src/recipient_snapshot.rs: prepare_companion_tick error; origin 98977caa7f4cc312906e284918183e7affce9a52"
       ],
-      "verification": "fresh targeted/full run pending"
+      "verification": "Full unchanged-head workspace run e3e8dfd2-4772-4056-9c6d-067ce83bc7af passed, including direct tests and enclosing witnesses for shared fixture/helper repairs; all three OS CI test jobs passed."
     },
     {
       "test_or_shared_fixture": "classic_complete_snapshots_keep_private_currency_and_public_prototype_nodes",
@@ -279,7 +279,7 @@
       "source_paths": [
         "rust/crates/core/src/recipient_snapshot/composition.rs: complete; origin c0ee6c6cdd2042a6ab52e4f9b869e32a8f4fb1d8"
       ],
-      "verification": "fresh targeted/full run pending"
+      "verification": "Full unchanged-head workspace run e3e8dfd2-4772-4056-9c6d-067ce83bc7af passed, including direct tests and enclosing witnesses for shared fixture/helper repairs; all three OS CI test jobs passed."
     },
     {
       "test_or_shared_fixture": "base59_classic_snapshots_publish_exact_nodes_and_private_research_rallies_through_ticks",
@@ -296,7 +296,7 @@
       "source_paths": [
         "rust/crates/core/src/recipient_snapshot/composition.rs: complete; origin c0ee6c6cdd2042a6ab52e4f9b869e32a8f4fb1d8"
       ],
-      "verification": "fresh targeted/full run pending"
+      "verification": "Full unchanged-head workspace run e3e8dfd2-4772-4056-9c6d-067ce83bc7af passed, including direct tests and enclosing witnesses for shared fixture/helper repairs; all three OS CI test jobs passed."
     },
     {
       "test_or_shared_fixture": "results2_tests::assert_mode (MODE-90 and MODE-96)",
@@ -313,7 +313,7 @@
       "source_paths": [
         "rust/crates/core/src/recipient_snapshot/composition.rs: complete; origin c0ee6c6cdd2042a6ab52e4f9b869e32a8f4fb1d8"
       ],
-      "verification": "fresh targeted/full run pending"
+      "verification": "Full unchanged-head workspace run e3e8dfd2-4772-4056-9c6d-067ce83bc7af passed, including direct tests and enclosing witnesses for shared fixture/helper repairs; all three OS CI test jobs passed."
     },
     {
       "test_or_shared_fixture": "base21_hosted_classic_aircraft_train_fifo_at_exact_times_and_pause_without_losing_jobs",
@@ -330,7 +330,7 @@
       "source_paths": [
         "rust/crates/core/src/recipient_snapshot/composition.rs: complete; origin c0ee6c6cdd2042a6ab52e4f9b869e32a8f4fb1d8"
       ],
-      "verification": "fresh targeted/full run pending"
+      "verification": "Full unchanged-head workspace run e3e8dfd2-4772-4056-9c6d-067ce83bc7af passed, including direct tests and enclosing witnesses for shared fixture/helper repairs; all three OS CI test jobs passed."
     },
     {
       "test_or_shared_fixture": "elimination_snapshot_admission_rejects_missing_state_and_other_modes",
@@ -349,7 +349,7 @@
         "rust/crates/core/src/match_logistics.rs: validate_logistics_runtime",
         "rust/crates/core/src/recipient_snapshot.rs: validate_horde_economy"
       ],
-      "verification": "fresh targeted/full run pending"
+      "verification": "Full unchanged-head workspace run e3e8dfd2-4772-4056-9c6d-067ce83bc7af passed, including direct tests and enclosing witnesses for shared fixture/helper repairs; all three OS CI test jobs passed."
     },
     {
       "test_or_shared_fixture": "invalid_retained_flight_refuses_before_publication_and_aircraft_sources_deliver",
@@ -372,7 +372,7 @@
         "rust/crates/core/src/recipient_snapshot/projectiles.rs: validate",
         "rust/crates/core/src/recipient_snapshot/flights.rs"
       ],
-      "verification": "fresh targeted/full run pending"
+      "verification": "Full unchanged-head workspace run e3e8dfd2-4772-4056-9c6d-067ce83bc7af passed, including direct tests and enclosing witnesses for shared fixture/helper repairs; all three OS CI test jobs passed."
     },
     {
       "test_or_shared_fixture": "commander_ingress::garrison_and_construction_auto_retreat_enqueue_through_canonical_executor",
@@ -389,7 +389,7 @@
       "source_paths": [
         "rust/crates/server/src/commander_ingress.rs"
       ],
-      "verification": "fresh targeted/full run pending"
+      "verification": "Full unchanged-head workspace run e3e8dfd2-4772-4056-9c6d-067ce83bc7af passed, including direct tests and enclosing witnesses for shared fixture/helper repairs; all three OS CI test jobs passed."
     },
     {
       "test_or_shared_fixture": "async_start_tests::finish_ordinary_match",
@@ -412,7 +412,7 @@
         "rust/crates/server/src/lobby.rs",
         "rust/crates/server/src/room_delivered_ai.rs"
       ],
-      "verification": "fresh targeted/full run pending"
+      "verification": "Full unchanged-head workspace run e3e8dfd2-4772-4056-9c6d-067ce83bc7af passed, including direct tests and enclosing witnesses for shared fixture/helper repairs; all three OS CI test jobs passed."
     },
     {
       "test_or_shared_fixture": "mode04_trusted_start_checks_capacity_and_assault_sides_before_r1_policy",
@@ -429,7 +429,7 @@
       "source_paths": [
         "rust/crates/server/src/async_start.rs"
       ],
-      "verification": "fresh targeted/full run pending"
+      "verification": "Full unchanged-head workspace run e3e8dfd2-4772-4056-9c6d-067ce83bc7af passed, including direct tests and enclosing witnesses for shared fixture/helper repairs; all three OS CI test jobs passed."
     },
     {
       "test_or_shared_fixture": "room_ai3_tests::assert_production_queue",
@@ -452,7 +452,7 @@
         "rust/crates/server/src/lobby.rs",
         "rust/crates/server/src/room_runtime.rs"
       ],
-      "verification": "fresh targeted/full run pending"
+      "verification": "Full unchanged-head workspace run e3e8dfd2-4772-4056-9c6d-067ce83bc7af passed, including direct tests and enclosing witnesses for shared fixture/helper repairs; all three OS CI test jobs passed."
     },
     {
       "test_or_shared_fixture": "hosted_horde_save_restores_wave_inputs_and_brain_then_resumes_to_full_ending_hold",
@@ -474,7 +474,7 @@
       "source_paths": [
         "rust/crates/server/src/room_delivered_ai.rs: fresh selected packet ownership"
       ],
-      "verification": "fresh targeted/full run pending"
+      "verification": "Full unchanged-head workspace run e3e8dfd2-4772-4056-9c6d-067ce83bc7af passed, including direct tests and enclosing witnesses for shared fixture/helper repairs; all three OS CI test jobs passed."
     },
     {
       "test_or_shared_fixture": "hosted_horde_save_restores_sandbox_flag_and_resumes_every_seat",
@@ -496,7 +496,7 @@
       "source_paths": [
         "rust/crates/server/src/room_delivered_ai.rs: fresh selected packet ownership"
       ],
-      "verification": "fresh targeted/full run pending"
+      "verification": "Full unchanged-head workspace run e3e8dfd2-4772-4056-9c6d-067ce83bc7af passed, including direct tests and enclosing witnesses for shared fixture/helper repairs; all three OS CI test jobs passed."
     },
     {
       "test_or_shared_fixture": "sandbox_start_flag_host_authority_restart_and_every_seat_snapshots",
@@ -513,7 +513,7 @@
       "source_paths": [
         "rust/crates/core/Cargo.toml: serde_json preserve_order"
       ],
-      "verification": "fresh targeted/full run pending"
+      "verification": "Full unchanged-head workspace run e3e8dfd2-4772-4056-9c6d-067ce83bc7af passed, including direct tests and enclosing witnesses for shared fixture/helper repairs; all three OS CI test jobs passed."
     },
     {
       "test_or_shared_fixture": "intent_net26_spectator_start_precedes_lobby_and_pause_without_changing_seat_memory",
@@ -530,7 +530,7 @@
       "source_paths": [
         "rust/crates/core/Cargo.toml: serde_json preserve_order"
       ],
-      "verification": "fresh targeted/full run pending"
+      "verification": "Full unchanged-head workspace run e3e8dfd2-4772-4056-9c6d-067ce83bc7af passed, including direct tests and enclosing witnesses for shared fixture/helper repairs; all three OS CI test jobs passed."
     },
     {
       "test_or_shared_fixture": "spectator_tests::start_mask (NET-57)",
@@ -547,7 +547,7 @@
       "source_paths": [
         "rust/crates/core/Cargo.toml: serde_json preserve_order"
       ],
-      "verification": "fresh targeted/full run pending"
+      "verification": "Full unchanged-head workspace run e3e8dfd2-4772-4056-9c6d-067ce83bc7af passed, including direct tests and enclosing witnesses for shared fixture/helper repairs; all three OS CI test jobs passed."
     },
     {
       "test_or_shared_fixture": "net18_tutorial_hello_autostarts_once_and_delivers_every_seat",
@@ -564,7 +564,7 @@
       "source_paths": [
         "rust/crates/core/Cargo.toml: serde_json preserve_order"
       ],
-      "verification": "fresh targeted/full run pending"
+      "verification": "Full unchanged-head workspace run e3e8dfd2-4772-4056-9c6d-067ce83bc7af passed, including direct tests and enclosing witnesses for shared fixture/helper repairs; all three OS CI test jobs passed."
     },
     {
       "test_or_shared_fixture": "net36_public_start_checks_host_capacity_and_assault_readiness",
@@ -581,7 +581,7 @@
       "source_paths": [
         "rust/crates/core/Cargo.toml: serde_json preserve_order"
       ],
-      "verification": "fresh targeted/full run pending"
+      "verification": "Full unchanged-head workspace run e3e8dfd2-4772-4056-9c6d-067ce83bc7af passed, including direct tests and enclosing witnesses for shared fixture/helper repairs; all three OS CI test jobs passed."
     },
     {
       "test_or_shared_fixture": "compiled_rules_match_every_recorded_field_and_float_bit",
@@ -599,7 +599,7 @@
         "rust/crates/core/Cargo.toml",
         "rust/crates/simtest/src/load.rs: movement_rules"
       ],
-      "verification": "fresh targeted/full run pending"
+      "verification": "Full unchanged-head workspace run e3e8dfd2-4772-4056-9c6d-067ce83bc7af passed, including direct tests and enclosing witnesses for shared fixture/helper repairs; all three OS CI test jobs passed."
     },
     {
       "test_or_shared_fixture": "net55_classic_mission_recipient_extension_keeps_spawn_and_damage_actuators_refused -> net55_classic_mission_actions_compose_with_recipient_delivery",
@@ -621,7 +621,7 @@
       "source_paths": [
         "rust/crates/core/src/scenario_actuators.rs"
       ],
-      "verification": "fresh targeted/full run pending"
+      "verification": "Full unchanged-head workspace run e3e8dfd2-4772-4056-9c6d-067ce83bc7af passed, including direct tests and enclosing witnesses for shared fixture/helper repairs; all three OS CI test jobs passed."
     },
     {
       "test_or_shared_fixture": "original_paid_construction_replays_full_match_ticks -> original_paid_construction_replays_full_ticks_and_isolates_invalid_reserves",
@@ -640,7 +640,7 @@
         "rust/crates/core/src/match_construction.rs",
         "rust/crates/core/src/environment_lifecycle.rs"
       ],
-      "verification": "fresh targeted/full run pending"
+      "verification": "Full unchanged-head workspace run e3e8dfd2-4772-4056-9c6d-067ce83bc7af passed, including direct tests and enclosing witnesses for shared fixture/helper repairs; all three OS CI test jobs passed."
     },
     {
       "test_or_shared_fixture": "authored_objectives_save_v2_rejects_downgrade_and_restores_mission_and_pending_say",
@@ -674,7 +674,7 @@
         "rust/crates/core/src/authored_scenario/tests.rs",
         "rust/crates/server/src/lobby_saves.rs"
       ],
-      "verification": "fresh targeted/full run pending"
+      "verification": "Full unchanged-head workspace run e3e8dfd2-4772-4056-9c6d-067ce83bc7af passed, including direct tests and enclosing witnesses for shared fixture/helper repairs; all three OS CI test jobs passed."
     },
     {
       "test_or_shared_fixture": "net92_ai_memory_human_reset_and_surplus_watchers_restore_transactionally_through_victory",
@@ -698,7 +698,7 @@
         "rust/crates/server/src/room_delivered_ai_tests.rs: ai63_hosted_save_restores_planners_resets_humans_and_restarts_commanders",
         "rust/crates/core/src/human_commander_policy.rs: PlannerMemory excludes random"
       ],
-      "verification": "fresh targeted/full run pending"
+      "verification": "Full unchanged-head workspace run e3e8dfd2-4772-4056-9c6d-067ce83bc7af passed, including direct tests and enclosing witnesses for shared fixture/helper repairs; all three OS CI test jobs passed."
     },
     {
       "test_or_shared_fixture": "if28_native_input_log_replays_tick_order_away_pause_and_operative_throttle",
@@ -715,7 +715,7 @@
       "source_paths": [
         "rust/crates/server/src/operative_timing_tests.rs"
       ],
-      "verification": "fresh targeted/full run pending"
+      "verification": "Full unchanged-head workspace run e3e8dfd2-4772-4056-9c6d-067ce83bc7af passed, including direct tests and enclosing witnesses for shared fixture/helper repairs; all three OS CI test jobs passed."
     }
   ],
   "sigkill_tests_retained": [
