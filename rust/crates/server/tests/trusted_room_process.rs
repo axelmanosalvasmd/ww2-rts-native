@@ -94,6 +94,25 @@ fn ordinary_binary_opt_in_admits_spectators_and_retains_other_refusals() {
     host.send(json!({"t":"start"}));
     host.deny("start");
     assert!(server.receipts().is_empty());
+    // One human may add an AI inside the trusted two-commander boundary.
+    host.send(json!({"t":"addAi"}));
+    let with_ai = host.until(|m| {
+        m["t"] == "lobby"
+            && m["players"]
+                .as_array()
+                .is_some_and(|players| players.len() == 2)
+            && m["players"][1]["ai"] == true
+    });
+    assert_eq!(with_ai["players"][1]["connected"], true);
+    host.send(json!({"t":"kick","slot":1}));
+    let without_ai = host.until(|m| {
+        m["t"] == "lobby"
+            && m["players"]
+                .as_array()
+                .is_some_and(|players| players.len() == 1)
+    });
+    assert_eq!(without_ai["players"][0]["name"], "a");
+    assert!(server.receipts().is_empty());
     let _guest = Client::join(server.address, "b");
     let mut third = Client::open(
         server.address,
@@ -110,7 +129,7 @@ fn ordinary_binary_opt_in_admits_spectators_and_retains_other_refusals() {
     assert_eq!(watching["spectator"], true);
     assert_eq!(watching["you"], -1);
     host.send(json!({"t":"addAi"}));
-    host.deny("addAi");
+    assert_eq!(host.deny("addAi")["reason"], "blocked");
     host.send(json!({"t":"spectate"}));
     let released = host.until(|m| m["t"] == "lobby" && m["spectator"] == true);
     assert_eq!(released["players"].as_array().unwrap().len(), 1);

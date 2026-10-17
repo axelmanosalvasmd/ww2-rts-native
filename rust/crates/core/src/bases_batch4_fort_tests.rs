@@ -282,35 +282,55 @@ fn base54_elimination_construction_plan_refusal_keeps_fort_capture_atomic() {
     let units = m.world.game.units.clone();
     let regions = m.world_runtime.as_ref().unwrap().regions.clone();
     let wallets = m.start.economy.clone();
+    let footprints = m.building_cells.clone();
     let order = m.world.game.units.keys().copied().collect::<Vec<_>>();
+    let assert_unchanged = |state: &Match| {
+        assert_eq!(
+            state.world.game.units.keys().collect::<Vec<_>>(),
+            units.keys().collect::<Vec<_>>()
+        );
+        // Canonical units contain NaN pace values, so structural PartialEq is unsuitable.
+        for (unit_id, before) in &units {
+            let after = &state.world.game.units[unit_id];
+            assert_eq!(
+                format!("{after:?}"),
+                format!("{before:?}"),
+                "unit {unit_id}"
+            );
+            assert_eq!(
+                after.pace.to_bits(),
+                before.pace.to_bits(),
+                "unit {unit_id} pace"
+            );
+        }
+        assert_eq!(state.world_runtime.as_ref().unwrap().regions, regions);
+        assert_eq!(state.start.economy, wallets);
+        assert_eq!(state.building_cells, footprints);
+        for &cell in state.world.game.units[&id].cells.as_ref().unwrap() {
+            assert_eq!(
+                state.building_cells[&(cell as usize)].owner,
+                LOCAL_DEFENDER_OWNER
+            );
+        }
+        assert_eq!(
+            state.world_runtime.as_ref().unwrap().regions[region].team,
+            -1
+        );
+    };
+    // Ordinary World phases still refuse fort transfers before any income or capture commits.
     assert_eq!(
         m.apply_world_capture_income_and_elimination(&order, &order, 0.05)
             .unwrap_err(),
+        "unsupported World phase: fort transfer requires the detached component"
+    );
+    assert_unchanged(&m);
+    // The explicit detached component reaches the independent construction-plan guard.
+    assert_eq!(
+        m.apply_world_regions_with_fort_capture(&order, 0.05)
+            .unwrap_err(),
         "unsupported World elimination: mass-work and construction plans"
     );
-    assert_eq!(
-        m.world.game.units.keys().collect::<Vec<_>>(),
-        units.keys().collect::<Vec<_>>()
-    );
-    // Canonical units contain NaN pace values, so structural PartialEq is unsuitable.
-    for (id, before) in units {
-        let after = &m.world.game.units[&id];
-        assert_eq!(format!("{after:?}"), format!("{before:?}"), "unit {id}");
-        assert_eq!(
-            after.pace.to_bits(),
-            before.pace.to_bits(),
-            "unit {id} pace"
-        );
-    }
-    assert_eq!(m.world_runtime.as_ref().unwrap().regions, regions);
-    assert_eq!(m.start.economy, wallets);
-    for &cell in m.world.game.units[&id].cells.as_ref().unwrap() {
-        assert_eq!(
-            m.building_cells[&(cell as usize)].owner,
-            LOCAL_DEFENDER_OWNER
-        );
-    }
-    assert_eq!(m.world_runtime.as_ref().unwrap().regions[region].team, -1);
+    assert_unchanged(&m);
 }
 
 fn detached_capture(

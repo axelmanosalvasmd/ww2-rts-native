@@ -2009,10 +2009,9 @@ impl Hub {
                 return true;
             }
             "addAi"
-                if self
-                    .rooms
-                    .get(code)
-                    .is_some_and(|room| room.native.is_none() && room.has_seat(&self.maps)) =>
+                if self.rooms.get(code).is_some_and(|room| {
+                    room.native.is_none() && room.players.len() < 2 && room.has_seat(&self.maps)
+                }) =>
             {
                 return false;
             }
