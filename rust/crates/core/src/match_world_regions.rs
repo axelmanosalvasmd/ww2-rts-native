@@ -61,7 +61,7 @@ impl Match {
         dt: f64,
     ) -> Result<Vec<WorldCapture>, String> {
         Ok(self
-            .world_region_phase(Some(unit_order), None, dt)?
+            .world_region_phase(Some(unit_order), None, dt, false)?
             .captures)
     }
     /// Run the bounded phase with actual administrative removals and building wrecks.
@@ -73,7 +73,7 @@ impl Match {
         live_order: &[u32],
         dt: f64,
     ) -> Result<WorldRegionEffects, String> {
-        self.world_region_phase(Some(tick_order), Some(live_order), dt)
+        self.world_region_phase(Some(tick_order), Some(live_order), dt, false)
     }
     /// Run the current region, home, elimination and finish phase without charging income.
     /// Invoke this after the real intervening convoy phase. This bounded API still
@@ -83,13 +83,23 @@ impl Match {
         live_order: &[u32],
         dt: f64,
     ) -> Result<WorldRegionEffects, String> {
-        self.world_region_phase(None, Some(live_order), dt)
+        self.world_region_phase(None, Some(live_order), dt, false)
+    }
+    /// Run detached region capture with damaged fort ownership and Gate reset enabled.
+    /// This component does not admit World ticks, snapshots or hosted rooms.
+    pub fn apply_world_regions_with_fort_capture(
+        &mut self,
+        live_order: &[u32],
+        dt: f64,
+    ) -> Result<WorldRegionEffects, String> {
+        self.world_region_phase(None, Some(live_order), dt, true)
     }
     fn world_region_phase(
         &mut self,
         income_order: Option<&[u32]>,
         live_order: Option<&[u32]>,
         dt: f64,
+        capture_forts: bool,
     ) -> Result<WorldRegionEffects, String> {
         if let Some(order) = live_order {
             self.validate_world_live_order(order)?;
@@ -205,6 +215,22 @@ impl Match {
                         owner,
                     });
                 }
+            }
+        }
+        if !capture_forts && !transfers.is_empty() {
+            return Err(
+                "unsupported World phase: fort transfer requires the detached component".into(),
+            );
+        }
+        for transfer in &transfers {
+            let unit = &game.units[&transfer.id];
+            let control = self
+                .commands
+                .units
+                .get(&transfer.id)
+                .ok_or("missing captured fort control")?;
+            if (self.rules.kinds[unit.kind].name == "gate") != control.gate.is_some() {
+                return Err("captured fort Gate control does not match its actor".into());
             }
         }
         let mut spawns: Vec<_> = self.start.players.iter().map(|p| p.spawn).collect();
@@ -345,9 +371,17 @@ impl Match {
             story.commit();
         }
         // Transfer only footprint rows that still identify the captured building.
-        // No gate timer exists in this core slice; gate ticking stays refused.
+        // Captured Gates decide afresh when their separately guarded actuator runs.
         for transfer in transfers {
             if let Some(unit) = self.world.game.units.get(&transfer.id) {
+                if let Some(gate) = self
+                    .commands
+                    .units
+                    .get_mut(&transfer.id)
+                    .and_then(|c| c.gate.as_mut())
+                {
+                    *gate = crate::match_gates::GateControl::default();
+                }
                 for &cell in unit.cells.as_deref().unwrap_or(&[]) {
                     if let Some(row) = self.building_cells.get_mut(&(cell as usize))
                         && row.unit == transfer.id

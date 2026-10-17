@@ -59,3 +59,43 @@ fn if25_ai_observation_rejects_nan_score_inputs_and_positions() {
         ));
     }
 }
+
+#[test]
+fn if25_ai_guard_dispatch_keeps_equal_distance_observation_order() {
+    let mut foe = unit(9, "rifle", 90.0);
+    foe.owner = 1;
+    let mut input = fixture(vec![
+        unit(1, "rifle", 39.0),
+        unit(2, "rifle", 40.0),
+        unit(3, "rifle", 40.0),
+        foe,
+    ]);
+    input.points[0].at = Point { x: 90.0, z: 20.0 };
+    input.points[0].owner = Some(0);
+    let commands = run(input.clone(), &mut State::default(), Level::Hard);
+    let orders: Vec<_> = commands
+        .iter()
+        .filter(|c| c["t"] == "amove")
+        .flat_map(|c| c["orders"].as_array().unwrap())
+        .map(|row| row[0].as_u64().unwrap())
+        .collect();
+    assert_eq!(orders, [2, 3]);
+    // Suppressing an already-issued order must not change the tied responder
+    // budget or cause the farther squad to replace it.
+    input
+        .runtime
+        .as_mut()
+        .unwrap()
+        .units
+        .get_mut(&2)
+        .unwrap()
+        .amove = Some(Point { x: 90.0, z: 20.0 });
+    let commands = run(input, &mut State::default(), Level::Hard);
+    let orders: Vec<_> = commands
+        .iter()
+        .filter(|c| c["t"] == "amove")
+        .flat_map(|c| c["orders"].as_array().unwrap())
+        .map(|row| row[0].as_u64().unwrap())
+        .collect();
+    assert_eq!(orders, [3]);
+}

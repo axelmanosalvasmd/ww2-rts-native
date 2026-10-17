@@ -310,6 +310,39 @@ fn intent_eng38_building_loss_reaches_nearest_sections_without_second_debit() {
 }
 
 #[test]
+fn if25_building_loss_equal_distance_keeps_authored_section_order() {
+    for reverse in [false, true] {
+        let mut m = empty_scene();
+        let mut cells = building(&mut m, 901, "hq");
+        if reverse {
+            let structure = m
+                .world
+                .structures
+                .iter_mut()
+                .find(|s| s.entity_id == Some(901))
+                .unwrap();
+            structure.cells.reverse();
+            structure.section_ids.reverse();
+            cells.reverse();
+        }
+        // All four section centers are equally far from the building center.
+        let unit = m.world.game.units.get_mut(&901).unwrap();
+        unit.hp -= 100.0;
+        unit.hit_from = Some(Point { x: 32.0, z: 32.0 });
+        environment(&mut m, |runtime, world, ctx| {
+            runtime
+                .sync_building_sections(world, 901, Some(1), ctx)
+                .unwrap();
+        });
+        close(m.world.game.sections[&(cells[0] as u32)].hp, 650.0);
+        for &cell in &cells[1..] {
+            close(m.world.game.sections[&(cell as u32)].hp, 750.0);
+        }
+        close(m.world.game.units[&901].hp, 2900.0);
+    }
+}
+
+#[test]
 fn intent_eng38_each_match_tick_syncs_new_building_loss_from_its_hit_origin() {
     let mut m = scene(false);
     let id = m.next_unit_id;

@@ -458,41 +458,64 @@ fn original_cut_reconnection_check_and_human_inputs_match() {
 }
 
 fn runtime_match() -> crate::match_runtime::Match {
+    runtime_match_with_mode(crate::economy::Mode::Conquest)
+}
+
+fn runtime_match_with_mode(mode: crate::economy::Mode) -> crate::match_runtime::Match {
+    runtime_match_scene(mode, false)
+}
+
+fn runtime_match_scene(mode: crate::economy::Mode, quiet: bool) -> crate::match_runtime::Match {
     use crate::{
-        economy::{Faction, Mode},
+        economy::Faction,
         economy_state::ArmySize,
         map::AuthoritativeMap,
         match_runtime::{Match, MatchOptions, PlayerConfig},
         weather::WeatherChoice,
     };
-    let map=AuthoritativeMap::from_json(&serde_json::to_vec(&json!({"name":"AI runtime intent","w":64,"h":64,
-        "rows":vec![".".repeat(64);64],"spawns":[{"x":4,"y":4},{"x":59,"y":59}],"points":[{"x":32,"y":32}]})).unwrap()).unwrap();
-    Match::new(
-        &map,
-        MatchOptions {
-            seed: 771,
-            mode: Mode::Conquest,
-            players: [0, 1]
-                .into_iter()
-                .map(|team| PlayerConfig {
-                    name: format!("Seat {team}"),
-                    team,
-                    faction: Faction::Germany,
-                })
-                .collect(),
-            shuffle: false,
-            army: ArmySize::Standard,
-            weather: WeatherChoice::Map,
-            weather_seed: None,
-            living_weather: false,
-            map_key: None,
-            tech: false,
-            supply: false,
-            logistics: false,
-            sandbox: false,
-        },
+    let rows: Vec<_> = (0..64)
+        .map(|y| {
+            if quiet && (16..48).contains(&y) {
+                "W".repeat(64)
+            } else {
+                ".".repeat(64)
+            }
+        })
+        .collect();
+    let point = if quiet { 11 } else { 32 };
+    let map = AuthoritativeMap::from_json(
+        &serde_json::to_vec(&json!({"name":"AI runtime intent","w":64,"h":64,
+        "rows":rows,"spawns":[{"x":4,"y":4},{"x":59,"y":59}],"points":[{"x":point,"y":point}]}))
+        .unwrap(),
     )
-    .unwrap()
+    .unwrap();
+    let options = MatchOptions {
+        seed: 771,
+        mode,
+        players: [0, 1]
+            .into_iter()
+            .map(|team| PlayerConfig {
+                name: format!("Seat {team}"),
+                team,
+                faction: Faction::Germany,
+            })
+            .collect(),
+        shuffle: false,
+        army: ArmySize::Standard,
+        weather: WeatherChoice::Map,
+        weather_seed: None,
+        living_weather: false,
+        map_key: None,
+        tech: false,
+        supply: false,
+        logistics: false,
+        sandbox: false,
+    };
+    if mode == crate::economy::Mode::Classic {
+        Match::new_classic(&map, options).unwrap()
+    } else {
+        Match::new(&map, options).unwrap()
+    }
 }
 fn screen(view: &HumanView<Observation>) -> ScreenView<'_, Observation> {
     ScreenView {
@@ -1125,3 +1148,188 @@ fn intent_ai12_refused_garrison_still_keeps_the_squad_busy_for_that_look() {
 }
 #[path = "commander_field_live_tests.rs"]
 mod field_live_tests;
+
+#[test]
+fn intent_ai66_private_streams_drive_ordinary_ai_ticks_and_every_seat_snapshot() {
+    use crate::{
+        economy::Mode,
+        human_commander_timing::{Skill, Timing},
+        match_human_observation::HumanObservationMemory,
+        orders::OrderKey,
+        recipient_snapshot::{DeliveryState, SelectedSeat},
+        seat_commander::{Advance, Brain, Delivered},
+    };
+    for mode in [Mode::Conquest, Mode::Classic] {
+        // Authored water separates opposing ground armies. This row exercises
+        // planner/motor randomness and buildings, without depending on combat effects.
+        let mut game = runtime_match_scene(mode, true);
+        for player in &mut game.start.players {
+            for cooldown in player.support.values_mut() {
+                *cooldown = 10_000.0;
+            }
+        }
+        if mode == Mode::Conquest {
+            game.start.win_vp = 20.0;
+        } else {
+            // Start after two existing depots, so the ordinary non-depot branch
+            // is reached without depending on the separate node-economy planner.
+            for (slot, cells) in [
+                (0, [11 * 64 + 6, 6 * 64 + 11]),
+                (1, [52 * 64 + 57, 57 * 64 + 52]),
+            ] {
+                for cell in cells {
+                    game.place_starting_building(slot, "depot", cell).unwrap();
+                }
+            }
+        }
+        let mut seats: Vec<_> = (0..2)
+            .map(|slot| game.create_seat_commander(slot, Level::Hard).unwrap())
+            .collect();
+        let mut memories: Vec<_> = (0..2).map(HumanObservationMemory::new).collect();
+        let mut delivery = DeliveryState::new(&game).unwrap();
+        let mut sequence = [0; 2];
+        let mut emitted = [0; 2];
+        let mut maximum_draws = [0; 2];
+        let mut snapshots = 0;
+        let mut built = false;
+        let mut ended = None;
+        let limit = if mode == Mode::Classic { 600 } else { 1800 };
+        for _ in 0..limit {
+            let tick = game.world.game.tick;
+            for slot in 0..2 {
+                let before_other = seats[1 - slot].clone();
+                let terminal = game.finish.is_some();
+                let before_self = terminal.then(|| seats[slot].clone());
+                let before_match_rng = game.start.random.clone();
+                let before_environment = game.start.environment_seed;
+                let first = matches!(seats[slot].brain(), Brain::Human { state, .. } if state.snapshot().is_none());
+                let view = seats[slot].wants_view(tick, tick % 2 == 0).then(|| {
+                    Delivered::Human(Box::new(
+                        game.human_commander_observation(&mut memories[slot])
+                            .unwrap(),
+                    ))
+                });
+                let Advance::Human(advance) = game
+                    .advance_seat_commander(&mut seats[slot], view, tick as u64, &[])
+                    .unwrap()
+                else {
+                    panic!("ordinary seat must use human timing")
+                };
+                assert_eq!(seats[1 - slot], before_other);
+                if let Some(before) = before_self {
+                    assert_eq!(seats[slot], before);
+                    assert_eq!(
+                        advance,
+                        crate::human_commander_state::HumanAdvance::default()
+                    );
+                }
+                assert_eq!(game.start.random, before_match_rng);
+                assert_eq!(game.start.environment_seed, before_environment);
+                let Brain::Human { state, .. } = seats[slot].brain() else {
+                    panic!()
+                };
+                let runtime = state.snapshot().unwrap();
+                assert_eq!(runtime.timing.draws() % 2, 0);
+                maximum_draws[slot] = maximum_draws[slot].max(runtime.timing.draws());
+                if first {
+                    let mut expected = Timing::new(game.options.seed as u32, slot as u32);
+                    let delay = expected.opening_delay(Skill::for_level("hard")).unwrap();
+                    assert_eq!(runtime.timing, expected);
+                    assert_eq!(runtime.look.as_ref().unwrap().at, tick as u64 + delay);
+                }
+                if let Some(raw) = advance.input.and_then(|input| input.command) {
+                    emitted[slot] += 1;
+                    let command = Command::from_json(&raw).unwrap();
+                    built |= raw["t"] == "build";
+                    game.enqueue_command(
+                        OrderKey {
+                            tick: tick as u64 + 1,
+                            issuer: slot as u32,
+                            sequence: sequence[slot],
+                        },
+                        command,
+                    )
+                    .unwrap();
+                    sequence[slot] += 1;
+                }
+            }
+            let report = game.advance_tick().unwrap();
+            assert_eq!(game.tick_state.fault(), None);
+            let selected = [0, 1].map(|slot| SelectedSeat {
+                slot,
+                full: false,
+                omit: false,
+            });
+            let frame = delivery
+                .capture_selected_with_tick_events(&mut game, &selected, &report.events)
+                .unwrap_or_else(|error| {
+                    panic!(
+                        "{mode:?} tick {}: {error:?}; events={:?}",
+                        report.tick, report.events
+                    )
+                })
+                .unwrap();
+            for slot in 0..2 {
+                let packet = frame.recipient(slot).unwrap().into_json();
+                assert_eq!(packet["tick"], report.tick);
+                snapshots += 1;
+            }
+            if game.finish.is_some() {
+                let finish_tick = *ended.get_or_insert(game.world.game.tick);
+                if game.world.game.tick >= finish_tick + 8 {
+                    break;
+                }
+            }
+        }
+        assert!(
+            emitted.iter().all(|count| *count > 0),
+            "{mode:?}: {emitted:?}"
+        );
+        assert!(maximum_draws.iter().all(|count| *count > 2));
+        assert_eq!(snapshots, game.world.game.tick as usize * 2);
+        if mode == Mode::Classic {
+            assert!(
+                built,
+                "Classic planner must deliver an actual build attempt"
+            );
+            assert!(
+                game.world
+                    .game
+                    .units
+                    .values()
+                    .any(|u| game.rules.kinds[u.kind].name == "barracks")
+            );
+        } else {
+            assert!(
+                ended.is_some(),
+                "point income must finish the ordinary match"
+            );
+        }
+    }
+}
+
+#[test]
+fn intent_ai66_classic_human_view_requires_matching_mode_and_keeps_quiet_policy_narrow() {
+    use crate::{economy::Mode, game::ModeKind, match_human_observation::HumanObservationMemory};
+    let mut game = runtime_match_scene(Mode::Classic, true);
+    let mut memory = HumanObservationMemory::new(0);
+    let view = game.human_commander_observation(&mut memory).unwrap();
+    assert_eq!(
+        view.packet.input().runtime.as_ref().unwrap().mode,
+        Mode::Classic
+    );
+    assert!(view.packet.input().units.iter().all(|u| u.owner == 0));
+    assert!(game.opening_commander_observation(0).is_err());
+    let before = (memory.clone(), game.start.random.clone());
+    game.world.game.mode = None;
+    assert!(game.human_commander_observation(&mut memory).is_err());
+    assert_eq!((memory.clone(), game.start.random.clone()), before);
+    game.world.game.mode = Some(ModeKind::Classic);
+    let elimination = game.elimination.take();
+    assert!(game.human_commander_observation(&mut memory).is_err());
+    assert_eq!((memory.clone(), game.start.random.clone()), before);
+    game.elimination = elimination;
+    game.options.mode = Mode::World;
+    assert!(game.human_commander_observation(&mut memory).is_err());
+    assert_eq!((memory, game.start.random.clone()), before);
+}

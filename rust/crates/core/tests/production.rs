@@ -387,6 +387,50 @@ fn invalid_inputs_do_not_change_canonical_jobs_or_wallets() {
 }
 
 #[test]
+fn if25_production_shortest_queue_keeps_producer_input_order_on_ties() {
+    for ids in [[9, 2], [2, 9]] {
+        let mut state = ProductionState::new(vec![TechState::new(1, 0, 0, 0).unwrap()]).unwrap();
+        let mut wallets = EconomyState {
+            players: vec![PlayerEconomy {
+                mp: 10_000.0,
+                ..Default::default()
+            }],
+        };
+        // Classic rifles train at HQs. The Barracks rifle override belongs
+        // only to the separate skirmish recruitment path.
+        let units = ids.map(|id| UnitView {
+            id,
+            owner: Some(0),
+            kind: "hq",
+            hp: 100.0,
+            built: 1.0,
+        });
+        let c = Context {
+            mode: ModeContext {
+                kind: Mode::Classic,
+                ..Default::default()
+            },
+            army: ArmySize::Standard,
+            tech_enabled: false,
+            naval: false,
+            sudden_death: false,
+            units: &units,
+            drops: &[],
+            world: None,
+        };
+        for expected in [ids[0], ids[1], ids[0]] {
+            let prepared = state
+                .prepare_queue_unit(&c, &mut wallets, 0, Faction::Usa, "rifle", None)
+                .unwrap();
+            assert_eq!(prepared.building(), expected);
+            prepared.commit();
+        }
+        assert_eq!(state.building(ids[0]).unwrap().jobs().len(), 2);
+        assert_eq!(state.building(ids[1]).unwrap().jobs().len(), 1);
+    }
+}
+
+#[test]
 fn aborted_research_and_training_guards_preserve_canonical_state() {
     let fixture: Value = serde_json::from_str(include_str!("fixtures/production.json")).unwrap();
     let config = &fixture["scenarios"][0]["input"];

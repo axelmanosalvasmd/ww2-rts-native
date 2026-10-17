@@ -455,6 +455,40 @@ fn intent_mov73_nearest_pairs_reserve_seats_and_exclude_retreating_squads() {
     assert_eq!(retreat.world.game.units[&2].board, 0);
     assert_ne!(retreat.world.game.units[&1].board, 0);
 }
+
+#[test]
+fn if25_boarding_equal_distance_uses_selected_squad_and_carrier_order() {
+    let fixture = fixture();
+    let case = fixture["traces"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|case| case["name"] == "nearest-pairs-recorded-ties")
+        .unwrap();
+    for (ids, assignments) in [
+        ([2, 1, 4, 3], [(2, 4), (1, 3)]),
+        ([1, 2, 4, 3], [(1, 4), (2, 3)]),
+        ([2, 1, 3, 4], [(2, 3), (1, 4)]),
+        ([1, 2, 3, 4], [(1, 3), (2, 4)]),
+    ] {
+        let mut m = make(case);
+        assert_eq!(m.carrier_board_command(0, &ids, None, false).unwrap(), None);
+        for (squad, carrier) in assignments {
+            assert_eq!(m.world.game.units[&squad].board, carrier);
+        }
+        crate::unit_placement::tests::assert_current(&m.world.game, &m.grid);
+    }
+    let mut invalid = make(case);
+    invalid.world.game.units.get_mut(&1).unwrap().x = f64::NAN;
+    let commands = serde_json::to_value(&invalid.commands).unwrap();
+    assert!(
+        invalid
+            .carrier_board_command(0, &[2, 1, 4, 3], None, false)
+            .is_err()
+    );
+    assert_eq!(serde_json::to_value(&invalid.commands).unwrap(), commands);
+    assert!(invalid.world.game.units.values().all(|u| u.board == 0));
+}
 fn snapshot(m: &Match) -> Value {
     crate::unit_placement::tests::assert_current(&m.world.game, &m.grid);
     let units=m.world.game.units.values().map(|u| {

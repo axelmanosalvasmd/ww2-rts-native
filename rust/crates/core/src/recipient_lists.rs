@@ -303,11 +303,15 @@ impl crate::match_runtime::Match {
     pub fn ordinary_snapshot_raw_lists(&self) -> Result<OrdinaryRawLists, String> {
         let game = &self.world.game;
         if !matches!(
-            self.options.mode,
-            crate::economy::Mode::Default | crate::economy::Mode::Conquest
-        ) || game.mode.is_some()
+            (self.options.mode, game.mode),
+            (
+                crate::economy::Mode::Default | crate::economy::Mode::Conquest,
+                None
+            ) | (crate::economy::Mode::Classic, Some(ModeKind::Classic))
+        ) || self.world_runtime.is_some()
+            || self.world.geography().is_some()
         {
-            return Err("global ordinary lists require absent Game mode".into());
+            return Err("global ordinary lists require an admitted ordinary mode".into());
         }
         let mut ids = std::collections::BTreeSet::new();
         let mut rows = Vec::with_capacity(game.wrecks.len());

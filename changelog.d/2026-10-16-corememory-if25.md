@@ -1,0 +1,1 @@
+- Add direct IF-25 ordering tests for all nine supply sort sites, boarding selection, building section loss, producer queue ties and AI guard dispatch. Inventory all 23 simulation, 28 AI and 9 supply sorts, keeping missing ordinary planners and untested consumers explicit. IF-25 remains incomplete.

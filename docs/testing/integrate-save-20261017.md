@@ -33,3 +33,4 @@ The repaired four-merge checkpoint at `3a12e1ad` passed all 1,883 tests, with 10
 
 - #409 merges automatically.
 - #415: retain the complete authored v2 field table and AI-memory defaults, update the contract to reflect hosted AI restoration, and combine AI payloads with `version_for(state)`. Retain surplus spectators and main's transactional operative membership/remapping. Keep the existing precise odd-tick observation assertion rather than replacing it with an unwrap.
+- #416: keep one complete save/AI contract section with the required authored clock. Preserve main's World construction/escape path and mirrored construction input, while passing the incoming seat RNG to ordinary construction. Combine Classic observation admission with main's adaptive odd-tick observation support. Retain both garrison-reservation and AI-66 tests, the field-live module, and both spectator-mission/core-memory room-runtime modules.

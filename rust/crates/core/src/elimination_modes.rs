@@ -164,7 +164,7 @@ impl Match {
         map: &crate::map::AuthoritativeMap,
         mut options: MatchOptions,
     ) -> Result<Self, String> {
-        if map.source().get("scenario").is_some() {
+        if map.source().get("scenario").is_some() && options.mode != Mode::Classic {
             return Err("elimination startup does not apply authored scenarios".into());
         }
         // These bounded modes have no reserves/convoy publication adapter yet.

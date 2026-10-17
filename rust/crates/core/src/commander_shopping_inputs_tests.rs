@@ -352,6 +352,7 @@ fn intent_ai33_world_engineers_count_unclaimed_nodes_while_build_reserves_use_ow
             false,
             &ground,
             |_| false,
+            &mut MatchRandom::new(77),
         )
         .unwrap();
         assert_eq!(r.reserve, reserve);
@@ -425,9 +426,16 @@ fn intent_ai33_mounted_squads_cannot_spend_or_advance_construction() {
     let context = observation.input().runtime.as_ref().unwrap();
     let ground = sight_game(&observation, context);
     let crew = observation.input().units[..2].iter().collect::<Vec<_>>();
-    let base =
-        crate::commander_construction::plan(&observation, &crew, 1000.0, false, &ground, |_| true)
-            .unwrap();
+    let base = crate::commander_construction::plan(
+        &observation,
+        &crew,
+        1000.0,
+        false,
+        &ground,
+        |_| true,
+        &mut MatchRandom::new(77),
+    )
+    .unwrap();
     assert_eq!(base.builders, vec![2]);
     let fort = crate::commander_fortification::plan(
         &observation,
@@ -444,9 +452,16 @@ fn intent_ai33_mounted_squads_cannot_spend_or_advance_construction() {
     input.units[1].riding = true;
     let observation = Observation::new(input).unwrap();
     let crew = observation.input().units[..2].iter().collect::<Vec<_>>();
-    let base =
-        crate::commander_construction::plan(&observation, &crew, 1000.0, false, &ground, |_| true)
-            .unwrap();
+    let base = crate::commander_construction::plan(
+        &observation,
+        &crew,
+        1000.0,
+        false,
+        &ground,
+        |_| true,
+        &mut MatchRandom::new(77),
+    )
+    .unwrap();
     assert!(base.commands.is_empty());
     assert_eq!(base.remaining_mp, 1000.0);
     let mut steps = BTreeMap::new();

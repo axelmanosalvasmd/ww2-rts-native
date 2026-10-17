@@ -638,12 +638,16 @@ fn plan_inner(
             (adaptive || skill.memory) && strategic_recent.iter().any(|s| armor(&s.kind)),
             &sight_game,
             sees,
+            random,
         )?
     };
     budget = construction.remaining_mp;
     let build_reserve = if rush { 0.0 } else { construction.reserve };
     mine.retain(|u| !construction.builders.contains(&u.id));
-    available_units.retain(|u| !construction.builders.contains(&u.id));
+    // Source's rush response still sees every available engineer after construction
+    // proposals, so a threatened builder can receive the later escape order.
+    available_units
+        .retain(|u| !construction.builders.contains(&u.id) || rush && u.kind == "engineer");
     newly_busy.extend(construction.builders);
     commands.extend(construction.commands);
     let mut fort_reserve = 0.0;
