@@ -8,6 +8,12 @@ mod room_protocol;
 #[path = "operative_room_tests.rs"]
 mod room_protocol;
 
+#[path = "operative_supplemental_tests.rs"]
+mod supplemental;
+
+#[path = "operative_timing_tests.rs"]
+mod timing;
+
 fn client(id: u64) -> (Connection, mpsc::Receiver<Output>) {
     let (tx, rx) = mpsc::channel(256);
     let (cancel, _) = watch::channel(false);
