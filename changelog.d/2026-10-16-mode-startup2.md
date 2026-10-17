@@ -1,0 +1,4 @@
+- Fall back to Conquest when Horde has no defender spawns or Horde and Tutorial have six players, preserving the ordinary roster and the original mode's logistics and tech gates.
+- Project the six non-World public mode rows with the prototype's field presence rules, and apply map seat counts and Assault team readiness before trusted startup.
+- Add intent checks for ordinary map validation, lobby-to-match spawn selection, mode startup rows and fallback matches with snapshots for every seat. World startup and complete non-Conquest room delivery remain guarded.
+- Match the prototype's validation message when an ordinary map has fewer than two universal spawns, and check that Assault uses its reserved spawn.
