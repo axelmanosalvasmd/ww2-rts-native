@@ -240,3 +240,9 @@ Merged main after the final fetch brought in building placement (#336), R1 comma
 No additional manual source edits were made outside these conflict resolutions. The automatic core construction merge and all incoming test registrations are retained. Focused qualification also includes placement, fort, construction and garrison tests for the newly inherited runtime.
 
 The independent source review identified guest End being denied before pause suppression in the first resolution. The condition now admits only host End there. The existing `r1_host_pause_freezes_commands_and_ticks_and_only_host_resumes_or_ends` test also sends guest End during each paused iteration and keeps its exact no-deny/no-pause-message assertion. Qualification was still queued and was canceled before this correction; no Cargo ran.
+
+## Async load-failure fixture qualification
+
+The fresh S3 run at `63cb45a156225aacd842dfabd6c99c057a23f165` built successfully and ran 663 tests: 662 passed, including both Tutorial result tests, the delivered-adapter privacy test, legacy node compatibility and R1 host pause. The single failure was `net37_real_load_and_creation_failures_restore_lobby_or_previous_match_and_finish`: missing-map catalog capacity was zero, so the preserved readiness guard refused its claim before the intended worker load failure.
+
+The fixture now supplies normal catalog metadata under the missing map name before each claim. The authoritative loader remains independent and still rejects that name. All original worker-error, rollback, identity/seed, previous-match and full-match assertions remain. No runtime guard changes. Independent source review confirmed this test-only repair.
