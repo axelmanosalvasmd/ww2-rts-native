@@ -438,6 +438,9 @@ impl CommanderViewMemory {
                             number(&u["built"])?
                         },
                         hold_position: own && truth(&u["holdPos"]),
+                        hold_fire: own && truth(&u["holdFire"]),
+                        auto_cast: own && truth(&u["auto"]),
+                        cooldown: if own { number(&u["cd"])? } else { 0.0 },
                         auto_retreat: own && truth(&u["autoRetreat"]),
                         queued_orders: if own {
                             optional_rows(&u["orders"])?.len()
@@ -585,6 +588,10 @@ mod tests {
         let mut snap = snapshot();
         snap["mun"] = json!(45);
         snap["fuel"] = json!(12);
+        for row in snap["units"].as_array_mut().unwrap() {
+            row[11] = json!(0.75);
+            row[12] = json!(2048 | 4096 | 16384);
+        }
         let view = SeatMemory::new(0, map()).unwrap().decode(&snap).unwrap();
         let human = memory().observe(&view, &snap).unwrap();
         let input = human.packet.input();
@@ -599,6 +606,22 @@ mod tests {
         assert_eq!(runtime.sight, 0.7);
         assert_eq!(runtime.units[&9].queued_orders, 1);
         assert!(runtime.units[&9].hold_position);
+        assert_eq!(
+            (
+                runtime.units[&9].hold_fire,
+                runtime.units[&9].auto_cast,
+                runtime.units[&9].cooldown
+            ),
+            (true, true, 0.75)
+        );
+        assert_eq!(
+            (
+                runtime.units[&4].hold_fire,
+                runtime.units[&4].auto_cast,
+                runtime.units[&4].cooldown
+            ),
+            (false, false, 0.0)
+        );
         assert_eq!(runtime.units[&9].amove, Some(Point { x: 40.0, z: 40.0 }));
         assert!(!runtime.units.contains_key(&2));
         assert_eq!(runtime.units[&4].queued_orders, 0);
@@ -621,6 +644,12 @@ mod tests {
             packet: &human.packet,
         };
         assert!(crate::match_human_observation::human_screen_observation(&screen).is_ok());
+        snap["units"][0][11] = json!("invalid");
+        let invalid = SeatMemory::new(0, map()).unwrap().decode(&snap).unwrap();
+        let mut memory = memory();
+        let saved = memory.clone();
+        assert!(memory.observe(&invalid, &snap).is_err());
+        assert_eq!(memory, saved, "invalid own cooldown cannot publish memory");
     }
 
     #[test]
@@ -1032,6 +1061,9 @@ mod detached {
                         UnitFacts {
                             built: optional_number(&u["built"])?.unwrap_or(1.0),
                             hold_position: own && truth(&u["holdPos"]),
+                            hold_fire: own && truth(&u["holdFire"]),
+                            auto_cast: own && truth(&u["auto"]),
+                            cooldown: if own { number(&u["cd"])? } else { 0.0 },
                             queued_orders: if own { array(&u["orders"])?.len() } else { 0 },
                             auto_retreat: own && truth(&u["autoRetreat"]),
                             convoy: own && trucks.contains(&id),
@@ -1277,6 +1309,10 @@ mod detached {
         #[test]
         fn delivered_defender_packet_keeps_own_intent_economy_and_received_terrain() {
             let (mut delivery, mut snap) = delivery();
+            for row in snap["units"].as_array_mut().unwrap() {
+                row[11] = json!(0.75);
+                row[12] = json!(2048 | 16384);
+            }
             snap["cells"] = json!([[5,"N",2,0,{"ground":"D","object":".","mineOwned":true}]]);
             let view = delivery.decode(&snap).unwrap();
             let result = CommanderMemory::new(0, 40, 40)
@@ -1287,6 +1323,23 @@ mod detached {
             let context = input.runtime.as_ref().unwrap();
             assert_eq!(context.mode, Mode::Horde);
             assert!(context.defender);
+            assert_eq!(
+                (
+                    context.units[&1].hold_fire,
+                    context.units[&1].auto_cast,
+                    context.units[&1].cooldown
+                ),
+                (true, true, 0.75)
+            );
+            assert_eq!(
+                (
+                    context.units[&3].hold_fire,
+                    context.units[&3].auto_cast,
+                    context.units[&3].cooldown
+                ),
+                (false, false, 0.0)
+            );
+            assert!(!context.units.contains_key(&2));
             assert!(!context.horde);
             assert_eq!(input.manpower, 420.0);
             assert_eq!(context.munitions, 160.0);
@@ -1323,6 +1376,12 @@ mod detached {
                 view.chars[5], b'N',
                 "a new delivery cannot mutate an old packet"
             );
+            snap["units"][0][11] = json!("invalid");
+            let invalid = delivery.decode(&snap).unwrap();
+            let mut memory = CommanderMemory::new(0, 40, 40).unwrap();
+            let saved = memory.clone();
+            assert!(memory.observe(&invalid).is_err());
+            assert_eq!(memory, saved, "invalid own cooldown cannot publish memory");
         }
 
         #[test]
