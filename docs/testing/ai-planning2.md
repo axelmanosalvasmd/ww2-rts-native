@@ -19,13 +19,13 @@ AI-13 ground outputs:
 | Focus attack and queued onward attack-move | `commander_actions::tests::ai13_ground_focus_emits_attack_and_queued_resume_with_visibility_range_los_controls` |
 | Focus release and weapon suitability | `commander_actions::tests::ai13_ground_focus_releases_visible_retreating_ranged_or_occluded_target`; `ai13_ground_focus_assigns_weapons_to_suitable_visible_targets` |
 | House shelling output only | `commander_actions::tests::ai13_ground_fireat_shells_watched_occupied_house_and_reserves_shooter` |
-| Bridge, fill and detected-mine repair | `commander_engineering::tests::ai13_repairs_emit_bridge_fill_demine_and_wait_for_observed_completion` |
-| Repair approach, full stamp visibility, eligible workers and research priority | The `commander_engineering::tests::ai13_unseen_*`, `ai13_repair_stamp_*`, `ai13_engineering_*` and `ai13_research_*` controls |
-| Point mines, arc, strongpoint, wire, traps and house entry | `commander_engineering::tests::ai13_point_holder_emits_mines_arc_strongpoint_wire_traps_and_garrison` |
-| Persistent vehicle lesson for traps | `commander_engineering::tests::ai13_traps_keep_the_first_visible_vehicle_lesson_after_contacts_expire` |
-| Headquarters wall and gate outputs | `commander_tactics::shopping_inputs_tests::intent_ai33_wall_plans_defer_payment_and_gate_reserves_its_price` |
+| Bridge, fill and detected-mine repair | `commander_engineering_tests::ai13_repairs_emit_bridge_fill_demine_and_wait_for_observed_completion` |
+| Repair approach, full stamp visibility, eligible workers and research priority | The `commander_engineering_tests::ai13_unseen_*`, `ai13_repair_stamp_*`, `ai13_engineering_*` and `ai13_research_*` controls |
+| Point mines, arc, strongpoint, wire, traps and house entry | `commander_engineering_tests::ai13_point_holder_emits_mines_arc_strongpoint_wire_traps_and_garrison` |
+| Persistent vehicle lesson for traps | `commander_engineering_tests::ai13_traps_keep_the_first_visible_vehicle_lesson_after_contacts_expire` |
+| Headquarters wall and gate outputs | `commander_tactics::shopping_inputs_tests::intent_ai33_fort_jobs_charge_gate_and_leave_deferred_wall_segments_for_ticks` |
 | Ability/focus execution and complete ordinary delivery through victory | `commander_actions::tests::ai13_ground_emitted_ability_and_focus_orders_survive_ordinary_match_delivery_and_finish` |
-| Entrench execution and complete ordinary delivery through victory | `commander_engineering::tests::ai13_emitted_holder_project_survives_canonical_queue_every_seat_delivery_and_finish` |
+| Entrench execution and complete ordinary delivery through victory | `commander_engineering_tests::ai13_emitted_holder_project_survives_canonical_queue_every_seat_delivery_and_finish` |
 
 The focus lifecycle retains weapon cooldowns to isolate order state. It does
 not establish live-flight delivery or unrestricted firing.
@@ -71,3 +71,5 @@ The PR body records the producing head and actual results. Required checks
 are formatting, the focused core selection and strict workspace Clippy, under
 the prescribed shared slot and matching target, Rust 1.99.0, 6 GiB memory and
 zero swap. No Source recorder is used.
+
+The main merge uses the existing field-work and point-holder providers rather than a second engineering policy. Engineering witnesses now call those providers. Their callback records accepted work separately from refused Dig attempts, and the visibility controls require an actual refused Dig plus an approach without a crew job. The bridge retry check observes Dig before requiring suppression, matching main. The persistent armor lesson uses a tank, matching main's armor classification. All original command-shape, worker-selection and canonical lifecycle assertions remain.

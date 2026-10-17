@@ -43,6 +43,7 @@ fn floating_bits(rules: &Rules) -> Vec<u64> {
             braking,
             reverse_speed,
             hull_turn,
+            tracked: _,
         }) = vehicle
         {
             bits.extend(

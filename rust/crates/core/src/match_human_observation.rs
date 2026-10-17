@@ -23,7 +23,7 @@ mod recipient_packet;
 
 const SAFE_TICK: i64 = 9_007_199_254_740_991;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 struct Sighting {
     id: u32,
     kind: String,
@@ -33,7 +33,7 @@ struct Sighting {
     worth: f64,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 struct Stationary {
     id: u32,
     at: Point,
@@ -42,9 +42,10 @@ struct Stationary {
 
 /// The source AI view memory, not human camera attention or policy intent.
 /// Reset by replacing this value when a person resumes the seat or the match changes.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct HumanObservationMemory {
     owner: usize,
+    #[serde(skip)]
     binding: Option<(usize, usize, usize, u64)>,
     tick: Option<i64>,
     sightings: Vec<Sighting>,
@@ -62,6 +63,34 @@ impl HumanObservationMemory {
     }
     pub fn owner(&self) -> usize {
         self.owner
+    }
+    pub(crate) fn validate_save_binding(&self, state: &Match) -> Result<(), String> {
+        let game = &state.world.game;
+        let binding = (
+            state.world.initial().chars.as_ptr() as usize,
+            game.w,
+            game.h,
+            state.options.seed,
+        );
+        if self.owner >= game.players.len()
+            || self.binding.is_some_and(|old| old != binding)
+            || self.tick.is_some_and(|tick| tick < 0 || tick > game.tick)
+            || self.sightings.len() > 65_536
+            || self.still.len() > 65_536
+            || self.sightings.iter().any(|s| {
+                s.owner >= game.players.len()
+                    || !finite(s.at)
+                    || !s.time.is_finite()
+                    || !s.worth.is_finite()
+            })
+            || self
+                .still
+                .iter()
+                .any(|s| !finite(s.at) || !s.since.is_finite())
+        {
+            return Err("AI observation memory binding or clock mismatch".into());
+        }
+        Ok(())
     }
 }
 
@@ -412,6 +441,46 @@ impl Match {
         }
         let sightings = staged.sightings.iter().map(|s| HumanSighting { id: s.id,
             payload: json!({"id":s.id,"type":s.kind,"owner":s.owner,"x":s.at.x,"z":s.at.z,"t":s.time,"val":s.worth}) }).collect();
+        let found = self.prepare_ordinary_recipient_lists(&[owner])?.results()[0]
+            .1
+            .found_mines
+            .clone();
+        let initial = self.world.initial();
+        let width = input.width;
+        let field = crate::commander_field_policy::Facts {
+            initial_chars: initial
+                .chars
+                .iter()
+                .enumerate()
+                .map(|(cell, &ch)| {
+                    if initial.mines[cell] == 0 {
+                        ch
+                    } else if initial.objects[cell] != b'.' {
+                        initial.objects[cell]
+                    } else {
+                        initial.ground[cell]
+                    }
+                })
+                .collect(),
+            initial_height: initial.height.clone(),
+            ground: initial.ground.clone(),
+            bridges: initial
+                .chars
+                .iter()
+                .enumerate()
+                .filter_map(|(c, &ch)| (ch == b'=').then_some(c))
+                .collect(),
+            mines: vec![],
+            found_mines: found
+                .into_iter()
+                .map(|c| Point {
+                    x: (c % width) as f64 * crate::game::CELL + 1.0,
+                    z: (c / width) as f64 * crate::game::CELL + 1.0,
+                })
+                .collect(),
+            free_nodes: vec![],
+        };
+        input.runtime.as_mut().unwrap().field = Some(field);
         let spawn = Some(self.start.players[owner].spawn);
         let preview = prepare_recipient_routing(
             RecipientContext {
@@ -438,8 +507,8 @@ impl Match {
                 })
                 .collect::<Vec<_>>()
         );
-        public.populate_mines(&mut input, &snapshot)?;
         apply_view_rows(&mut input, preview.remembered(), terrain)?;
+        public.populate_mines(&mut input, &snapshot)?;
         let packet =
             Observation::new(input).map_err(|e| format!("human strategic observation: {e:?}"))?;
         let view = HumanView {
@@ -483,6 +552,18 @@ fn apply_view_rows(
         // ai-view retains the received N character while decoding its delivered surface mask.
         input.chars[row.cell] = row.ch;
         input.flags[row.cell] = flag as u16;
+        if let Some(field) = input.runtime.as_mut().and_then(|r| r.field.as_mut()) {
+            field.ground[row.cell] = row.data.ground;
+            if row.ch == b'=' {
+                field.bridges.insert(row.cell);
+            }
+            if row.ch == b'N' && observed.mine_owned == Some(true) {
+                field.mines.push(Point {
+                    x: (row.cell % input.width) as f64 * crate::game::CELL + 1.0,
+                    z: (row.cell / input.width) as f64 * crate::game::CELL + 1.0,
+                });
+            }
+        }
         if let Some(runtime) = &mut input.runtime
             && let Some(height) = &mut runtime.height
         {

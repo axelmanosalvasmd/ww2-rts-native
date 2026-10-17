@@ -1,4 +1,75 @@
-use super::*;
+use crate::{
+    catalog::{Catalog, Value as Rule},
+    commander_ai::{Observation, Point, UnitObservation},
+    commander_field_policy::{self as field, State},
+    game::{CELL, TRENCH},
+    math,
+};
+use serde_json::{Value, json};
+use std::collections::{BTreeMap, BTreeSet};
+
+fn number(rule: &Rule, key: &str) -> f64 {
+    rule.get(key).and_then(Rule::number).unwrap_or(0.0)
+}
+fn distance(a: Point, b: Point) -> f64 {
+    math::hypot(a.x - b.x, a.z - b.z)
+}
+fn at(cell: usize, width: usize) -> Point {
+    Point {
+        x: (cell % width) as f64 * CELL + CELL / 2.0,
+        z: (cell / width) as f64 * CELL + CELL / 2.0,
+    }
+}
+#[derive(Default)]
+struct Plan {
+    commands: Vec<Value>,
+    refused: Vec<Value>,
+    busy: BTreeSet<u32>,
+}
+fn repairs(
+    observation: &Observation,
+    state: &mut State,
+    busy: &BTreeSet<u32>,
+    sees: impl Fn(Point) -> bool,
+) -> Result<Plan, String> {
+    let context = observation.input().runtime.as_ref().unwrap();
+    let terrain = crate::commander_tactics::sight_game(observation, context);
+    let mut result = Plan {
+        busy: busy.clone(),
+        ..Plan::default()
+    };
+    field::field_work(observation, state, &mut result.busy, |command| {
+        let accepted = field::can_submit(&terrain, &command, &sees);
+        // Record admitted work and approach orders, excluding the refused Dig attempt.
+        if accepted {
+            result.commands.push(command);
+        } else {
+            result.refused.push(command);
+        }
+        accepted
+    })?;
+    Ok(result)
+}
+fn holder(
+    observation: &Observation,
+    unit: &UnitObservation,
+    point: usize,
+    armor_seen: bool,
+) -> Result<Option<Value>, String> {
+    let mut commands = Vec::new();
+    field::holder(observation, unit, point, armor_seen, |command| {
+        commands.push(command);
+        true
+    })?;
+    assert!(commands.len() <= 1, "{commands:?}");
+    Ok(commands.pop())
+}
+fn crews_empty(state: &State) -> bool {
+    let encoded = serde_json::to_value(state).unwrap();
+    ["bridge_crew", "fill_crew", "demine_crew"]
+        .iter()
+        .all(|key| encoded[*key].as_object().unwrap().is_empty())
+}
 use crate::{
     commander_ai::{Input, Level, PlayerObservation, PointObservation},
     commander_tactics::{Context, UnitFacts},
@@ -59,9 +130,13 @@ fn fixture() -> Input {
         manpower: 0.0,
         research: None,
         runtime: Some(Context {
-            initial_chars: Some(vec![b'.'; 6400]),
+            field: Some(field::Facts {
+                initial_chars: vec![b'.'; 6400],
+                initial_height: Some(vec![0; 6400]),
+                ground: vec![b'.'; 6400],
+                ..field::Facts::default()
+            }),
             height: Some(vec![0; 6400]),
-            initial_height: Some(vec![0; 6400]),
             units: BTreeMap::from([(
                 1,
                 UnitFacts {
@@ -104,7 +179,7 @@ fn ai13_point_holder_emits_mines_arc_strongpoint_wire_traps_and_garrison() {
     for (pattern, armor) in [("strongpoint", false), ("wire", false), ("traps", true)] {
         let mut i = fixture();
         i.manpower = 600.0;
-        i.runtime.as_mut().unwrap().mines =
+        i.runtime.as_mut().unwrap().field.as_mut().unwrap().mines =
             vec![Point { x: 31.0, z: 31.0 }, Point { x: 33.0, z: 31.0 }];
         if pattern != "strongpoint" {
             for cell in [
@@ -143,14 +218,24 @@ fn ai13_repairs_emit_bridge_fill_demine_and_wait_for_observed_completion() {
         let cell = 20 * 80 + 23;
         match name {
             "bridge" => {
-                i.runtime.as_mut().unwrap().initial_chars.as_mut().unwrap()[cell] = b'=';
+                let facts = i.runtime.as_mut().unwrap().field.as_mut().unwrap();
+                facts.initial_chars[cell] = b'=';
+                facts.bridges.insert(cell);
                 i.chars[cell] = b'W';
             }
             "fill" => {
                 i.chars[cell] = b'F';
                 i.runtime.as_mut().unwrap().height.as_mut().unwrap()[cell] = -1;
             }
-            _ => i.runtime.as_mut().unwrap().found_mines = vec![at(cell, 80)],
+            _ => {
+                i.runtime
+                    .as_mut()
+                    .unwrap()
+                    .field
+                    .as_mut()
+                    .unwrap()
+                    .found_mines = vec![at(cell, 80)]
+            }
         }
         let mut state = State::default();
         let first = repairs(
@@ -167,6 +252,8 @@ fn ai13_repairs_emit_bridge_fill_demine_and_wait_for_observed_completion() {
             .unwrap_or_else(|| panic!("{name}: {:?}", first.commands));
         crate::match_commands::Command::from_json(command).unwrap();
         assert_eq!(first.busy, BTreeSet::from([1]));
+        // Main suppresses bridge retries once the delivered packet observes the Dig.
+        i.units[0].dig = true;
         assert!(
             repairs(
                 &Observation::new(i.clone()).unwrap(),
@@ -220,7 +307,13 @@ fn ai13_engineering_uses_only_delivered_damage_mines_and_safe_available_builders
     for guard in ["enemy", "busy", "far", "wallet", "dig"] {
         let mut i = base.clone();
         i.manpower = 1000.0;
-        i.runtime.as_mut().unwrap().found_mines = vec![Point { x: 45.0, z: 40.0 }];
+        i.runtime
+            .as_mut()
+            .unwrap()
+            .field
+            .as_mut()
+            .unwrap()
+            .found_mines = vec![Point { x: 45.0, z: 40.0 }];
         let mut busy = BTreeSet::new();
         match guard {
             "enemy" => {
@@ -231,7 +324,16 @@ fn ai13_engineering_uses_only_delivered_damage_mines_and_safe_available_builders
             "busy" => {
                 busy.insert(1);
             }
-            "far" => i.runtime.as_mut().unwrap().found_mines[0].x = 100.0,
+            "far" => {
+                i.runtime
+                    .as_mut()
+                    .unwrap()
+                    .field
+                    .as_mut()
+                    .unwrap()
+                    .found_mines[0]
+                    .x = 100.0
+            }
             "wallet" => i.manpower = -1.0,
             _ => i.units[0].dig = true,
         }
@@ -352,21 +454,37 @@ fn ai13_unseen_repair_ground_gets_an_approach_without_a_phantom_job() {
         let cell = 20 * 80 + 28;
         match name {
             "bridge" => {
-                i.runtime.as_mut().unwrap().initial_chars.as_mut().unwrap()[cell] = b'=';
+                let facts = i.runtime.as_mut().unwrap().field.as_mut().unwrap();
+                facts.initial_chars[cell] = b'=';
+                facts.bridges.insert(cell);
                 i.chars[cell] = b'W';
             }
             "fill" => {
                 i.chars[cell] = b'F';
                 i.runtime.as_mut().unwrap().height.as_mut().unwrap()[cell] = -1;
             }
-            _ => i.runtime.as_mut().unwrap().found_mines = vec![at(cell, 80)],
+            _ => {
+                i.runtime
+                    .as_mut()
+                    .unwrap()
+                    .field
+                    .as_mut()
+                    .unwrap()
+                    .found_mines = vec![at(cell, 80)]
+            }
         }
         let observation = Observation::new(i).unwrap();
         let mut state = State::default();
         let approach = repairs(&observation, &mut state, &BTreeSet::new(), |_| false).unwrap();
         assert_eq!(approach.commands.len(), 1, "{name}");
         assert_eq!(approach.commands[0]["t"], "move");
-        assert!(state.crew.is_empty());
+        assert!(
+            approach
+                .refused
+                .iter()
+                .any(|command| command["t"] == "dig" && command["kind"] == name)
+        );
+        assert!(crews_empty(&state));
         let visible = repairs(&observation, &mut state, &BTreeSet::new(), |_| true).unwrap();
         assert!(visible.commands.iter().any(|c| c["kind"] == name));
     }
@@ -382,7 +500,9 @@ fn ai13_research_and_supply_exclusions_precede_repair_and_combat_attempts() {
     i.tick = 2400;
     i.manpower = 250.0;
     i.chars[20 * 80 + 23] = b'W';
-    i.runtime.as_mut().unwrap().initial_chars.as_mut().unwrap()[20 * 80 + 23] = b'=';
+    let facts = i.runtime.as_mut().unwrap().field.as_mut().unwrap();
+    facts.initial_chars[20 * 80 + 23] = b'=';
+    facts.bridges.insert(20 * 80 + 23);
     i.research = Some(ResearchObservation {
         faction: Faction::Usa,
         tech: TechState::new(1, 0, 0, 0).unwrap(),
@@ -406,7 +526,13 @@ fn ai13_research_and_supply_exclusions_precede_repair_and_combat_attempts() {
         let mut enemy = unit(2, "mg", 45.0);
         enemy.owner = 1;
         i.units.push(enemy);
-        i.runtime.as_mut().unwrap().found_mines = vec![Point { x: 45.0, z: 40.0 }];
+        i.runtime
+            .as_mut()
+            .unwrap()
+            .field
+            .as_mut()
+            .unwrap()
+            .found_mines = vec![Point { x: 45.0, z: 40.0 }];
         i.runtime.as_mut().unwrap().units.get_mut(&1).unwrap().stock =
             Some(crate::commander_tactics::Stock {
                 ammo: Some(0.0),
@@ -430,16 +556,16 @@ fn ai13_research_and_supply_exclusions_precede_repair_and_combat_attempts() {
 #[test]
 fn ai13_traps_keep_the_first_visible_vehicle_lesson_after_contacts_expire() {
     let mut i = fixture();
-    let mut enemy = unit(2, "halftrack", 100.0);
+    let mut enemy = unit(2, "tank", 100.0);
     enemy.owner = 1;
     i.units.push(enemy);
     let mut state = Default::default();
     run(i.clone(), &mut state);
-    assert!(state.armor_ever_seen);
+    assert!(state.field.armor_seen);
     i.units.pop();
     i.tick += 2000;
     run(i, &mut state);
-    assert!(state.armor_ever_seen);
+    assert!(state.field.armor_seen);
 }
 
 #[test]
@@ -450,14 +576,24 @@ fn ai13_repair_stamp_requires_visible_neighbors_as_well_as_its_center() {
         let cell = 20 * 80 + 28;
         match name {
             "bridge" => {
-                i.runtime.as_mut().unwrap().initial_chars.as_mut().unwrap()[cell] = b'=';
+                let facts = i.runtime.as_mut().unwrap().field.as_mut().unwrap();
+                facts.initial_chars[cell] = b'=';
+                facts.bridges.insert(cell);
                 i.chars[cell] = b'W';
             }
             "fill" => {
                 i.chars[cell] = b'F';
                 i.runtime.as_mut().unwrap().height.as_mut().unwrap()[cell] = -1;
             }
-            _ => i.runtime.as_mut().unwrap().found_mines = vec![at(cell, 80)],
+            _ => {
+                i.runtime
+                    .as_mut()
+                    .unwrap()
+                    .field
+                    .as_mut()
+                    .unwrap()
+                    .found_mines = vec![at(cell, 80)]
+            }
         }
         let observation = Observation::new(i).unwrap();
         let mut state = State::default();
@@ -467,7 +603,12 @@ fn ai13_repair_stamp_requires_visible_neighbors_as_well_as_its_center() {
         })
         .unwrap();
         assert_eq!(plan.commands[0]["t"], "move", "{name}: {:?}", plan.commands);
-        assert!(state.crew.is_empty());
+        assert!(
+            plan.refused
+                .iter()
+                .any(|command| command["t"] == "dig" && command["kind"] == name)
+        );
+        assert!(crews_empty(&state));
     }
 }
 
@@ -476,7 +617,9 @@ fn ai13_bridge_worker_is_nearest_the_complete_repair_center() {
     let mut i = fixture();
     i.manpower = 1000.0;
     let gap = 20 * 80 + 28;
-    i.runtime.as_mut().unwrap().initial_chars.as_mut().unwrap()[gap] = b'=';
+    let facts = i.runtime.as_mut().unwrap().field.as_mut().unwrap();
+    facts.initial_chars[gap] = b'=';
+    facts.bridges.insert(gap);
     for x in 28..=32 {
         i.chars[20 * 80 + x] = b'W';
     }

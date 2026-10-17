@@ -387,6 +387,25 @@ impl PublicFacts {
         if let Some(context) = &mut input.runtime {
             context.mines = view.mines.iter().map(at).collect::<Result<_, _>>()?;
             context.found_mines = view.found_mines.iter().map(at).collect::<Result<_, _>>()?;
+            if let Some(field) = &mut context.field {
+                field.mines = context.mines.clone();
+                field.found_mines = context.found_mines.clone();
+                field.free_nodes = context
+                    .site_nodes
+                    .iter()
+                    .copied()
+                    .filter(|node| {
+                        !context
+                            .known_depots
+                            .iter()
+                            .any(|at| crate::math::hypot(node.x - at.x, node.z - at.z) <= 4.0)
+                            && !input.units.iter().any(|u| {
+                                u.kind == "depot"
+                                    && crate::math::hypot(node.x - u.at.x, node.z - u.at.z) <= 4.0
+                            })
+                    })
+                    .collect();
+            }
         }
         Ok(())
     }

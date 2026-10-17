@@ -76,11 +76,11 @@ impl DeliveryState {
         if selected.is_empty() {
             return Ok(None);
         }
-        self.preflight_selected(state, selected)?;
+        let rows = self.preflight_selected(state, selected)?;
         composition::admit_actors(state, &[])?;
         let projected = project_shots(state, selected, shots)?;
         let frame = self
-            .capture_selected_with_lists(state, selected, &[])?
+            .capture_selected_with_lists_admitted(state, selected, &[], rows)?
             .ok_or(SnapshotError::InvalidRecipient)?;
         Ok(Some(SelectedGroundShotFrame {
             frame,
@@ -398,6 +398,15 @@ fn project_shots(
     selected: &[SelectedSeat],
     shots: &[ShotRef<'_>],
 ) -> Result<Vec<(usize, Value)>, SnapshotError> {
+    project_shots_perspective(state, selected, shots, false)
+}
+
+pub(super) fn project_shots_perspective(
+    state: &Match,
+    selected: &[SelectedSeat],
+    shots: &[ShotRef<'_>],
+    full_map: bool,
+) -> Result<Vec<(usize, Value)>, SnapshotError> {
     let events = shots
         .iter()
         .copied()
@@ -429,9 +438,10 @@ fn project_shots(
             };
             let local = event["local"] == true;
             let admitted = if local {
-                flight_visible(state, visible, at)
+                full_map || flight_visible(state, visible, at)
             } else {
-                g.reveal
+                full_map
+                    || g.reveal
                     || vision::team_sees(g, &state.rules, &grid, g.players[seat.slot].team, at)
                     || event["pub"] == true
                     || allied(state, seat.slot, event, "fo")
@@ -445,7 +455,9 @@ fn project_shots(
             let mut row = event.clone();
             let object = row.as_object_mut().ok_or(SnapshotError::Rules)?;
             for (id, owner) in [("f", "fo"), ("t", "to")] {
-                if !seen(state, seat.slot, event, id) {
+                // watchGame supplies EVERYTHING.has, including IDs whose units died.
+                let visible_identity = full_map || seen(state, seat.slot, event, id);
+                if !visible_identity {
                     object.remove(id);
                     if local {
                         object.remove(owner);
@@ -453,7 +465,15 @@ fn project_shots(
                 }
             }
             if local && event["k"] == "flight" {
-                object.insert("until".into(), json!(until(state, visible, event)?));
+                let until = if full_map {
+                    math::min(
+                        event["expires"].as_f64().ok_or(SnapshotError::Rules)?,
+                        event["time"].as_f64().ok_or(SnapshotError::Rules)? + 0.15,
+                    )
+                } else {
+                    until(state, visible, event)?
+                };
+                object.insert("until".into(), json!(until));
             }
             rows.push(row);
         }

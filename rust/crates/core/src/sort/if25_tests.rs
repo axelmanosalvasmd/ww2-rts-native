@@ -95,3 +95,20 @@ fn if25_finite_consumer_keys_compare_without_nan_and_keep_ties() {
     assert!(comparisons > 0);
     assert_eq!(rows.map(|v| v.0), [3, 2, 8, 9, 1]);
 }
+
+#[test]
+fn if25_sorted_first_and_chained_comparators_follow_v8_nan_and_stable_ties() {
+    let rows = [(9, 3.0), (2, f64::NAN), (8, 1.0)];
+    assert_eq!(super::first_by(rows, |a, b| a.1 - b.1).unwrap().0, 9);
+    let rows = [(9, -0.0), (2, 0.0)];
+    assert_eq!(super::first_by(rows, |a, b| a.1 - b.1).unwrap().0, 9);
+    for first in [0.0, -0.0, f64::NAN] {
+        assert_eq!(super::then(first, -7.0), -7.0);
+    }
+    assert_eq!(super::then(f64::INFINITY, -7.0), f64::INFINITY);
+    let mut rows = [(9_u32, f64::NAN), (2, 0.0)];
+    sort_by(&mut rows, |a, b| {
+        super::then(a.1 - b.1, f64::from(a.0) - f64::from(b.0))
+    });
+    assert_eq!(rows.map(|r| r.0), [2, 9]);
+}

@@ -40,7 +40,7 @@ fn drain(
             Output::Json(message) if message["t"] == "start" => {
                 view.apply(&message.to_string()).unwrap();
             }
-            Output::Json(_) => {}
+            Output::Json(_) | Output::Watcher(_) => {}
             Output::Close(code, reason) => panic!("unexpected close {code}: {reason}"),
         }
     }
@@ -144,7 +144,7 @@ fn net97_writer_records_scheduler_delay_and_confines_paths_without_faulting_on_i
 }
 
 #[test]
-fn net97_optional_socket_gauge_counts_utf8_for_all_outputs_and_rolls_back_failed_enqueues() {
+fn net97_socket_gauge_counts_utf8_without_diagnostics_and_rolls_back_failed_enqueues() {
     let (tx, mut rx) = mpsc::channel(3);
     let (cancel, _) = watch::channel(false);
     let mut connection = Connection::new(1, tx, cancel);
@@ -186,8 +186,14 @@ fn net97_optional_socket_gauge_counts_utf8_for_all_outputs_and_rolls_back_failed
     assert_eq!(connection.buffered_bytes(), 0);
     let (tx, mut rx) = mpsc::channel(1);
     let (cancel, _) = watch::channel(false);
-    let disabled = Connection::new(2, tx, cancel);
-    disabled.send(json!({"t":"pong"}));
-    assert_eq!(disabled.buffered_bytes(), 0);
-    assert!(matches!(rx.try_recv(), Ok(Output::Json(_))));
+    let without_diagnostics = Connection::new(2, tx, cancel);
+    without_diagnostics.send(json!({"t":"pong"}));
+    let output = rx.try_recv().unwrap();
+    assert!(matches!(output, Output::Json(_)));
+    assert_eq!(
+        without_diagnostics.buffered_bytes(),
+        output.diagnostic_bytes()
+    );
+    without_diagnostics.complete_bytes(output.diagnostic_bytes());
+    assert_eq!(without_diagnostics.buffered_bytes(), 0);
 }

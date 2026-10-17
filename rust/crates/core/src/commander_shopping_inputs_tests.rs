@@ -297,15 +297,15 @@ fn intent_ai33_classic_reserves_only_non_depot_builds_and_rush_releases_them() {
 }
 
 #[test]
-fn intent_ai33_wall_plans_defer_payment_and_gate_reserves_its_price() {
+fn intent_ai33_fort_jobs_charge_gate_and_leave_deferred_wall_segments_for_ticks() {
     let mut input = fixture(vec![
         unit(1, "rifle", 30.0),
         unit(2, "mg", 32.0),
         unit(3, "mg", 34.0),
         unit(4, "hq", 20.0),
     ]);
-    input.players[1].spawn = Point { x: 140.0, z: 20.0 };
     input.tick = 3000;
+    input.players[1].spawn = Point { x: 140.0, z: 20.0 };
     let observation = Observation::new(input).unwrap();
     let context = observation.input().runtime.as_ref().unwrap();
     let ground = sight_game(&observation, context);
@@ -342,6 +342,9 @@ fn intent_ai33_wall_plans_defer_payment_and_gate_reserves_its_price() {
         for command in &r.commands {
             crate::match_commands::Command::from_json(command).unwrap();
         }
+        assert_eq!(r.remaining_mp, if step == 3 { 150.0 } else { 300.0 });
+        assert_eq!(r.reserve, 0.0);
+        assert!(!r.commands.is_empty());
     }
 }
 
