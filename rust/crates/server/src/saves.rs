@@ -174,7 +174,7 @@ impl SaveStore {
             return Err("unsupported save version".into());
         }
         if !value.is_object()
-            || !["g", "guard", "map", "seats", "settings", "ai"]
+            || !["g", "guard", "map", "seats", "settings"]
                 .iter()
                 .all(|key| value.get(key).is_some())
         {

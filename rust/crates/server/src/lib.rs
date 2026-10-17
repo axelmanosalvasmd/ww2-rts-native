@@ -10,6 +10,7 @@ pub use map_editor::MapEditor;
 mod horde_records;
 pub use horde_records::RecordStore as HordeRecords;
 mod native_startup;
+mod room_ai;
 mod saves;
 mod static_files;
 mod trusted_room;

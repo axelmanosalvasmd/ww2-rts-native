@@ -219,6 +219,7 @@ impl Person {
 struct AttachedRuntime {
     epoch: u64,
     ingress: CommanderIngress,
+    ai: crate::room_ai::RoomAi,
     runtime: RoomRuntime,
     startup: crate::native_startup::NativeStartup,
     watch_delivery: SnapshotDelivery,
@@ -233,6 +234,7 @@ struct PreparedNative {
     now: u64,
     attached: AttachedRuntime,
     starts: Vec<(usize, Value)>,
+    watcher_start: Option<Value>,
     resume: Value,
     pause: Option<Value>,
 }
@@ -1107,8 +1109,8 @@ impl Hub {
         if room.native.is_some() && !replace {
             return Err("room already has a native runtime".into());
         }
-        if room.players.is_empty() || room.players.iter().any(|p| p.ai) {
-            return Err("native attachment needs human commander seats".into());
+        if room.players.is_empty() {
+            return Err("native attachment needs commander seats".into());
         }
         if state.start.players.len() != room.players.len()
             || state.options.players.len() != room.players.len()
@@ -1145,13 +1147,28 @@ impl Hub {
             crate::native_startup::NativeStartup::prepare(&state, settings)?
         };
         // Canonical runtime admission completes before changing the room or accounts.
+        let levels = room
+            .players
+            .iter()
+            .map(|person| {
+                if person.ai {
+                    ww2_core::commander_ai::Level::from_key(person.level)
+                        .map(Some)
+                        .ok_or("invalid AI difficulty".to_owned())
+                } else {
+                    Ok(None)
+                }
+            })
+            .collect::<Result<Vec<_>, String>>()?;
+        let ai = crate::room_ai::RoomAi::new(&state, &levels)?;
         let mut runtime = RoomRuntime::new(state, now)?;
         let resume = runtime.resume(now);
         for (slot, person) in room.players.iter().enumerate() {
-            if person
-                .connection
-                .as_ref()
-                .is_none_or(|connection| !connection.ready())
+            if !person.ai
+                && person
+                    .connection
+                    .as_ref()
+                    .is_none_or(|connection| !connection.ready())
             {
                 runtime.auto_pause(slot, &person.name, now)?;
             }
@@ -1163,12 +1180,18 @@ impl Hub {
             .map(|p| p.name.clone())
             .collect::<Vec<_>>();
         let starts = runtime.collect_starts(&slots, &startup, &names, epoch)?;
+        let watcher_start = if room.spectators.is_empty() {
+            None
+        } else {
+            Some(runtime.collect_watcher_start(&startup, &names, epoch)?)
+        };
         let pause = runtime.paused().then(|| runtime.pause_message(now));
         Ok(PreparedNative {
             now,
             attached: AttachedRuntime {
                 epoch,
                 ingress: CommanderIngress::default(),
+                ai,
                 runtime,
                 startup,
                 watch_delivery: SnapshotDelivery::default(),
@@ -1178,6 +1201,7 @@ impl Hub {
                 diagnostics: crate::diagnostics::RoomDiagnostics::default(),
             },
             starts,
+            watcher_start,
             resume,
             pause,
         })
@@ -1188,6 +1212,7 @@ impl Hub {
             now,
             attached,
             starts,
+            watcher_start,
             resume,
             pause,
         } = prepared;
@@ -1217,31 +1242,14 @@ impl Hub {
                 self.accounts.get_mut(&connection.id).unwrap().full_terrain = false;
             }
         }
-        if !room.spectators.is_empty() {
-            let native = room.native.as_mut().unwrap();
-            let names = room
-                .players
-                .iter()
-                .map(|p| p.name.clone())
-                .collect::<Vec<_>>();
-            match native
-                .runtime
-                .collect_watcher_start(&native.startup, &names, epoch)
-            {
-                Ok(start) => {
-                    if native.watch_started {
-                        native.watch_delivery.request_full();
-                    }
-                    for person in &room.spectators {
-                        if let Some(connection) = &person.connection {
-                            connection.send(start.clone());
-                            if let Some(pause) = &pause {
-                                connection.send(pause.clone());
-                            }
-                        }
+        if let Some(start) = watcher_start {
+            for person in &room.spectators {
+                if let Some(connection) = &person.connection {
+                    connection.send(start.clone());
+                    if let Some(pause) = &pause {
+                        connection.send(pause.clone());
                     }
                 }
-                Err(error) => native.runtime.fault_stop(error),
             }
         }
         for index in 0..room.operatives.len() {
@@ -1644,11 +1652,7 @@ impl Hub {
                     native.ingress.discard_feedback();
                     continue;
                 }
-                let connected = room
-                    .players
-                    .iter()
-                    .map(|p| p.connection.as_ref().is_some_and(Connection::ready))
-                    .collect::<Vec<_>>();
+                let connected = room.players.iter().map(Person::online).collect::<Vec<_>>();
                 let pause = match native.runtime.poll_pause(&connected, now_ms) {
                     Ok(pause) => pause,
                     Err(error) => {
@@ -1683,7 +1687,7 @@ impl Hub {
                 let away = room
                     .players
                     .iter()
-                    .map(|person| person.connection.is_none())
+                    .map(|person| !person.ai && person.connection.is_none())
                     .collect::<Vec<_>>();
                 let native = room.native.as_mut().unwrap();
                 if let Err(error) = native.runtime.set_away(&away) {
@@ -1755,6 +1759,14 @@ impl Hub {
                     }
                 }
                 let sent = native.runtime.should_snapshot(report.tick);
+                if let Err(error) =
+                    native
+                        .ai
+                        .advance(native.runtime.state_mut(), sent, &report.events)
+                {
+                    native.runtime.fault_stop(format!("room AI: {error}"));
+                    continue;
+                }
                 let snapshot_at = Instant::now();
                 let mut costs = (0.0, 0.0);
                 if sent {
@@ -1867,13 +1879,13 @@ impl Hub {
         }
         let room = self.rooms.get(code).ok_or("trusted room absent")?;
         if !room.is_host(connection_id)
-            || !room.players.iter().any(|p| {
+            || !room.people().any(|p| {
                 p.connection
                     .as_ref()
                     .is_some_and(|c| c.id == connection_id && c.ready())
             })
         {
-            return Err("only the current commander host may start or restart".into());
+            return Err("only the current host may start or restart".into());
         }
         if restart {
             let native = room
@@ -1913,11 +1925,16 @@ impl Hub {
             return Err("R1 requires private Conquest and sandbox off".into());
         }
         if room.players.len() != 2
-            || room.players.iter().any(|p| p.ai || p.token.is_empty())
+            || room.players.iter().any(|p| !p.ai && p.token.is_empty())
             || room.players[0].team == room.players[1].team
-            || room.players[0].token == room.players[1].token
+            || (!room.players[0].ai
+                && !room.players[1].ai
+                && room.players[0].token == room.players[1].token)
         {
-            return Err("R1 requires exactly two human commander tokens on opposing teams".into());
+            return Err(
+                "R1 requires exactly two commanders on opposing teams and distinct human tokens"
+                    .into(),
+            );
         }
         if !matches!(
             room.army.as_str(),
@@ -1991,7 +2008,22 @@ impl Hub {
             {
                 return true;
             }
-            "addAi" | "level" => Err("R1 admits human commanders only".into()),
+            "addAi"
+                if self
+                    .rooms
+                    .get(code)
+                    .is_some_and(|room| room.native.is_none() && room.has_seat(&self.maps)) =>
+            {
+                return false;
+            }
+            "level"
+                if self.rooms.get(code).is_some_and(|room| {
+                    room.native.is_none() && room.players.iter().any(|p| p.ai)
+                }) =>
+            {
+                return false;
+            }
+            "addAi" | "level" => Err("AI setup needs an available lobby seat".into()),
             _ => return false,
         };
         if let Err(error) = result {
@@ -2229,6 +2261,16 @@ impl Hub {
                     return;
                 }
             }
+        }
+        if let Some(slot) = returning
+            && !room.players[slot].ai
+            && let Some(native) = &mut room.native
+            && let Err(error) = native.ai.reset_human(native.runtime.state(), slot)
+        {
+            native.runtime.fault_stop(error);
+            connection.send(json!({"t":"deny","cmd":"join","reason":"blocked"}));
+            connection.close(1008, "native helper reset unavailable");
+            return;
         }
         if let Some(p) = room
             .players

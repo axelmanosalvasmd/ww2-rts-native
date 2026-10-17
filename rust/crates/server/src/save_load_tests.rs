@@ -911,3 +911,6 @@ fn mode55_lobby_record_uses_current_map_defender_count_and_army_after_reload() {
     );
     assert!(hub.rooms["ABC"].native.is_none());
 }
+
+#[path = "reset_restore_tests.rs"]
+mod reset_restore;

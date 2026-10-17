@@ -1,4 +1,4 @@
-//! Save admission and transactional restoration for ordinary human rooms.
+//! Save admission and transactional restoration for ordinary commander rooms.
 use super::*;
 
 impl Hub {
@@ -94,8 +94,6 @@ impl Hub {
         if !matches!(state.options.mode, Mode::Default | Mode::Conquest)
             || state.options.sandbox
             || state.world_runtime.is_some()
-            || room.players.iter().any(|p| p.ai)
-            || !room.spectators.is_empty()
         {
             return Err("save needs an unavailable room capability".into());
         }
@@ -109,8 +107,9 @@ impl Hub {
         let settings = json!({"mode":room.mode,"worldSize":room.world_size,"mapName":room.map,
             "mapSpawns":native.startup.raw_map()["spawns"],"army":room.army,"weather":room.weather,
             "defenderTeam":room.defender,"logistics":state.options.logistics,"tech":state.options.tech});
+        let ai = native.ai.save(state)?;
         let save = json!({"version":crate::saves::version_for(state),"g":native.runtime.save_json()?,"guard":null,
-            "map":native.startup.raw_map(),"seats":seats,"settings":settings,"ai":null});
+            "map":native.startup.raw_map(),"seats":seats,"settings":settings,"ai":ai});
         room.saves.write(
             code,
             "manual",
@@ -136,10 +135,7 @@ impl Hub {
         }
         let saved = room.saves.read(code, id)?;
         // Closed room capabilities remain closed even when a file is valid JSON.
-        if saved["settings"]["mode"] != "conquest"
-            || !saved["guard"].is_null()
-            || !saved["ai"].is_null()
-        {
+        if saved["settings"]["mode"] != "conquest" || !saved["guard"].is_null() {
             return Err("save needs an unavailable room capability".into());
         }
         let state = Match::from_save_json(saved["g"]["state"].clone())?;
@@ -165,8 +161,11 @@ impl Hub {
         let tokens = seats
             .iter()
             .map(|seat| {
-                if seat["ai"] != false {
-                    return Err("AI room loading unavailable".to_owned());
+                if !seat["ai"].is_boolean() {
+                    return Err("invalid saved AI flag".to_owned());
+                }
+                if seat["ai"] == true {
+                    return Ok(Vec::new());
                 }
                 if let Some(text) = seat["token"].as_str() {
                     return Ok(text.encode_utf16().collect::<Vec<_>>());
@@ -187,6 +186,9 @@ impl Hub {
         let mut used = std::collections::BTreeSet::new();
         // Finish every token match before assigning any connected fallback.
         for (slot, token) in tokens.iter().enumerate() {
+            if seats[slot]["ai"] == true {
+                continue;
+            }
             if let Some((index, _)) = present
                 .iter()
                 .enumerate()
@@ -196,7 +198,10 @@ impl Hub {
                 used.insert(index);
             }
         }
-        for owner in &mut owners {
+        for (slot, owner) in owners.iter_mut().enumerate() {
+            if seats[slot]["ai"] == true {
+                continue;
+            }
             if owner.is_none()
                 && let Some((index, _)) = present.iter().enumerate().find(|(index, p)| {
                     p.connection.as_ref().is_some_and(Connection::ready) && !used.contains(index)
@@ -206,10 +211,17 @@ impl Hub {
                 used.insert(index);
             }
         }
-        if present.iter().enumerate().any(|(index, p)| {
-            !used.contains(&index) && p.connection.as_ref().is_some_and(Connection::ready)
-        }) {
-            return Err("spectator runtime admission unavailable".into());
+        let mut spectators = present
+            .iter()
+            .enumerate()
+            .filter(|(index, p)| {
+                !used.contains(index) && p.connection.as_ref().is_some_and(Connection::ready)
+            })
+            .map(|(_, p)| (*p).clone())
+            .collect::<Vec<_>>();
+        for person in &mut spectators {
+            person.disconnected = None;
+            person.last_match = None;
         }
         let mut players = Vec::new();
         for (slot, seat) in seats.iter().enumerate() {
@@ -230,10 +242,16 @@ impl Hub {
                     token: tokens[slot].clone(),
                     name: seat["name"].as_str().ok_or("invalid saved name")?.into(),
                     connection: None,
-                    ai: false,
+                    ai: seat["ai"] == true,
                     team,
                     faction,
-                    level: "normal",
+                    level: match seat["level"].as_str() {
+                        None if seat["level"].is_null() => "normal",
+                        Some("easy") => "easy",
+                        Some("normal") => "normal",
+                        Some("hard") => "hard",
+                        _ => return Err("invalid saved AI difficulty".into()),
+                    },
                     disconnected: None,
                     denies: Vec::new(),
                     rtt: None,
@@ -282,7 +300,7 @@ impl Hub {
             listed: room.listed,
             title: room.title.clone(),
             players,
-            spectators: Vec::new(),
+            spectators,
             operatives: Vec::new(),
             mode: text("mode")?,
             map: text("mapName")?,
@@ -310,16 +328,28 @@ impl Hub {
             .attached
             .runtime
             .restore_saved_events(saved["g"]["pendingEvents"].clone())?;
+        prepared
+            .attached
+            .ai
+            .restore(prepared.attached.runtime.state(), &saved["ai"])?;
+        // Host pauses use the person name, including a surplus spectator host.
+        // The slot is consulted only by drop pauses.
         let host = staged
             .players
             .iter()
             .position(|p| p.connection.as_ref().is_some_and(|c| c.id == connection_id))
-            .ok_or("host did not receive a saved seat")?;
+            .unwrap_or(0);
+        let host_name = staged
+            .people()
+            .find(|p| p.connection.as_ref().is_some_and(|c| c.id == connection_id))
+            .ok_or("loading host disappeared")?
+            .name
+            .clone();
         // Replace a missing-seat drop pause with the prototype's indefinite host pause.
         prepared
             .attached
             .runtime
-            .open_loaded_pause(host, &staged.players[host].name, now)?;
+            .open_loaded_pause(host, &host_name, now)?;
         prepared.pause = Some(prepared.attached.runtime.pause_message(now));
         prepared.attached.loaded_save = true;
         // Move membership only after every fallible restoration step succeeds.

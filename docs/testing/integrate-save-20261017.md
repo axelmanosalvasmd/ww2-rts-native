@@ -28,3 +28,8 @@ The first checkpoint at `9fd2f291` compiled and ran 28 tests: 26 passed and two 
 The next checkpoint at `6110d917` ran 1,522 tests: 1,521 passed and one room-preparation test failed on the separate timed-only map-binding validator. The repair compares the full saved definition directly with the raw map and preserves null-scenario legacy triggers.
 
 At `c6f4f680`, both repaired scenario startup and spectator action tests passed. The run reached 1,641 passes, one catalog-refusal assertion and four signal-aborted tests before the 6 GiB scope reported OOM. Map lookup now precedes readiness so a missing map retains its specific refusal; subsequent three-package runs use the authorized `-j2` setting.
+
+The repaired four-merge checkpoint at `3a12e1ad` passed all 1,883 tests, with 10 skipped, using two test processes under the 6 GiB cap.
+
+- #409 merges automatically.
+- #415: retain the complete authored v2 field table and AI-memory defaults, update the contract to reflect hosted AI restoration, and combine AI payloads with `version_for(state)`. Retain surplus spectators and main's transactional operative membership/remapping. Keep the existing precise odd-tick observation assertion rather than replacing it with an unwrap.

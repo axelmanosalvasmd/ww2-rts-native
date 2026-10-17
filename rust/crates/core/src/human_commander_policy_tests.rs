@@ -864,6 +864,7 @@ fn intent_ai33_construction_spending_survives_ordinary_ticks_and_recipient_snaps
     }
     assert_eq!(m.tick_state.fault(), None);
     assert_eq!(m.world.game.units[&id].built, Some(1.0));
+    // Adaptive host snapshot cadence can deliver observations on either tick parity.
     let view = m.human_commander_observation(
         &mut crate::match_human_observation::HumanObservationMemory::new(0),
     );

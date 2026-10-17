@@ -4,3 +4,4 @@
 - Replace the stale timed-only startup gate with the full ordinary scenario validator. Keep English fallback required for localized objective and announcement text; update localization_side_key_is_text_and_not_an_authored_side_reference to include that fallback.
 - Bind room startup directly to the complete authored definition and retain null-scenario legacy triggers. Rewrite authored_mission_admission_refuses_unimplemented_actions_and_changed_map_bindings as authored_mission_admission_runs_engine_actions_and_refuses_changed_map_bindings: verify canonical destruction and retained World/map-binding refusal.
 - Resolve the selected authoring map before trusted startup readiness, preserving both missing-map scenario refusal and the existing player-capacity checks. No assertion is relaxed.
+- Compose AI save restoration with authored-v2 selection, surplus spectators and transactional operative remapping. Preserve the exact adaptive observation tick assertion.
