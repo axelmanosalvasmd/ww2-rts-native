@@ -1,2 +1,3 @@
 - Integrate editor persistence with static-file serving and logistics-aware map startup. Preserve main's Classic partial-delivery assertions while adding editor routes and shared worker state.
 - Save envelopes remain version 1 for ordinary games and version 2 for authored missions. World admission remains refused.
+- Rewrite authored_scenarios_validate_ordinary_sides_and_localization_before_startup and map15_map_loading_uses_the_existing_complete_scenario_validator for the full scenario engine: groups, areas and reinforcement now execute through ordinary ticks. Preserve the stricter checkpoint schema and legacy-state refusal from the timed executor.

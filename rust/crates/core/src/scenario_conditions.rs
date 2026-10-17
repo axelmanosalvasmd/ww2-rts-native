@@ -1,5 +1,5 @@
 //! Typed authored-scenario conditions over canonical match facts.
-//! This component does not admit maps, schedule triggers or project recipient state.
+//! The authored runtime supplies durable facts, contexts and the shared tick budget.
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{game::CELL, grid::UnitId, match_runtime::Match};
@@ -67,7 +67,7 @@ pub enum Kind {
     All(Vec<Condition>),
     Any(Vec<Condition>),
 }
-/// Durable facts owned by the future scenario runtime. Unit and owner facts stay in Match.
+/// Durable scenario facts. Unit and owner facts stay in Match.
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ConditionState {
     pub groups: BTreeMap<String, Vec<UnitId>>,
@@ -293,6 +293,59 @@ impl Match {
                     > 0
             }
         })
+    }
+}
+
+/// Decode a schema-validated authored condition without changing its side fallback.
+pub(crate) fn from_definition(q: &serde_json::Value) -> Condition {
+    let text = |key: &str| {
+        q[key]
+            .as_str()
+            .expect("validated condition reference")
+            .to_owned()
+    };
+    let kind = match q["kind"].as_str().expect("validated condition kind") {
+        "time" => Kind::Time(q["seconds"].as_f64().unwrap()),
+        "ownership" => Kind::Ownership(Target::Point(text("target"))),
+        "capture" => Kind::Capture(Target::Point(text("target"))),
+        "unitLost" => Kind::UnitLost(text("unit")),
+        "groupLost" => Kind::GroupLost(text("group")),
+        "groupCount" => Kind::GroupCount {
+            group: text("group"),
+            count: q["count"].as_f64().unwrap() as usize,
+            comparison: match q["op"].as_str().unwrap() {
+                "atMost" => Comparison::AtMost,
+                "atLeast" => Comparison::AtLeast,
+                _ => Comparison::Equal,
+            },
+        },
+        "areaEntry" => Kind::AreaEntry {
+            area: text("area"),
+            group: q["group"].as_str().map(str::to_owned),
+        },
+        "objectiveComplete" => Kind::ObjectiveComplete(text("objective")),
+        "triggerComplete" => Kind::TriggerComplete(text("trigger")),
+        "all" => Kind::All(
+            q["conditions"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(from_definition)
+                .collect(),
+        ),
+        "any" => Kind::Any(
+            q["conditions"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(from_definition)
+                .collect(),
+        ),
+        _ => unreachable!("schema-validated condition"),
+    };
+    Condition {
+        side: q["side"].as_f64().map(|n| n as usize),
+        kind,
     }
 }
 

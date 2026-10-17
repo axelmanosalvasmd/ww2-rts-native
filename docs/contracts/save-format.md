@@ -97,7 +97,7 @@ The `state` struct field keys are listed below. These are native component bound
 | `capture_ticks`, `tick_state`, `ordinary_snapshot_only` | Capture clocks, tick phase state and the existing delivery capability restriction. |
 | `story`, `fallen`, `finish`, `timeline`, `next_unit_id` | Match statistics, fall locations, terminal decision, result samples and the canonical actor allocator. |
 | `assault`, `horde`, `tutorial`, `scenario`, `companions`, `rail_runs` | Existing mode and operative owners. Inactive records are retained; their presence does not grant room admission. |
-| `authored_scenario` | Optional bounded ordinary mission owner with the complete v2 schema below, including its execution clock. Non-authored checkpoints default to absent; present state is validated against canonical execution. See [scenario objectives](scenario-objectives.md). |
+| `authored_scenario` | Optional bounded ordinary mission owner with the complete v2 schema below, including its execution clock. Non-authored checkpoints default to absent; present timed state is validated against canonical execution and full engine state against its contextual records and facts. See [scenario objectives](scenario-objectives.md). |
 | `authored_mission` | Decode-only legacy timed owner. A present legacy owner is refused instead of silently discarded; newly written matches use `authored_scenario` alone. |
 | `elimination` | Optional Annihilation/Classic owner: `teams`, `bunkers`, `time_left`, `sudden_death`, `nodes`. Each resource node retains `cell`, `at` (`x`, `z`), `depot`, `rate`, `fuel`. |
 | `rules` | Omitted and reconstructed from compiled rules. Saving modified rules is refused. |

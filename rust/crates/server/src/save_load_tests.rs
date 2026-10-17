@@ -584,7 +584,7 @@ fn net80_loaded_save_stays_host_paused_until_host_resume_and_refuses_versions_at
     let id = hub.save_room("ABC", host.id).unwrap();
     hub.rooms.get_mut("ABC").unwrap().native = None;
     let mut invalid = hub.saves.read("ABC", &id).unwrap();
-    invalid["version"] = json!(3);
+    invalid["version"] = json!(4);
     let mut zipper = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
     zipper
         .write_all(&serde_json::to_vec(&invalid).unwrap())
@@ -802,6 +802,22 @@ fn authored_objectives_save_v2_rejects_downgrade_and_restores_mission_and_pendin
     let mut saved = hub.saves.read("ABC", &id).unwrap();
     assert_eq!(saved["version"], 2);
     hub.rooms.get_mut("ABC").unwrap().native = None;
+    // The superseded version 3 is refused before restoration, preserving the lobby and epoch.
+    let mut legacy = saved.clone();
+    legacy["version"] = json!(3);
+    let bad = "ABC-1800000000002-manual";
+    let mut zipper = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+    zipper
+        .write_all(&serde_json::to_vec(&legacy).unwrap())
+        .unwrap();
+    std::fs::write(dir.0.join(format!("{bad}.save")), zipper.finish().unwrap()).unwrap();
+    let epoch = hub.next_epoch;
+    assert_eq!(
+        hub.load_room("ABC", host.id, bad, 2).unwrap_err(),
+        "unsupported save version"
+    );
+    assert_eq!(hub.next_epoch, epoch);
+    assert!(hub.rooms["ABC"].native.is_none());
     saved["version"] = json!(1);
     let downgraded = hub
         .saves
