@@ -1,0 +1,1 @@
+- Integrate the rooms PR chain while retaining frozen-main spectator and command-ingress test registrations, room latency telemetry, and both operative lifecycle test sets. No assertions or tests were rewritten for PR #374.
