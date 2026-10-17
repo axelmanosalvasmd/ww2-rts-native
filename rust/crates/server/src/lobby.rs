@@ -27,6 +27,10 @@ use ww2_core::{
 const MAX_PLAYERS: usize = 6;
 const MAX_SPECTATORS: usize = 8;
 
+#[path = "operative.rs"]
+mod operative;
+use operative::Operative;
+
 #[derive(Clone)]
 pub(crate) struct Connection {
     pub id: u64,
@@ -226,6 +230,7 @@ struct AttachedRuntime {
 }
 
 struct PreparedNative {
+    now: u64,
     attached: AttachedRuntime,
     starts: Vec<(usize, Value)>,
     resume: Value,
@@ -245,6 +250,7 @@ struct Room {
     title: String,
     players: Vec<Person>,
     spectators: Vec<Person>,
+    operatives: Vec<Operative>,
     mode: String,
     map: String,
     loaded_spawns: Option<Value>,
@@ -260,7 +266,10 @@ struct Room {
 
 impl Room {
     fn people(&self) -> impl Iterator<Item = &Person> {
-        self.players.iter().chain(self.spectators.iter())
+        self.players
+            .iter()
+            .chain(self.spectators.iter())
+            .chain(self.operatives.iter().map(|op| &op.person))
     }
     fn host(&self) -> Option<usize> {
         self.players
@@ -360,6 +369,15 @@ impl Room {
                     *list = rows;
                 }
             }
+        }
+        for operative in &mut self.operatives {
+            operative.commander = operative.commander.and_then(|slot| {
+                retained
+                    .get(slot)
+                    .copied()
+                    .filter(|keep| *keep)
+                    .map(|_| retained[..slot].iter().filter(|keep| **keep).count())
+            });
         }
         let mut removed = Vec::new();
         for (person, keep) in std::mem::take(&mut self.players).into_iter().zip(retained) {
@@ -475,6 +493,7 @@ impl Room {
                 "team":p.team,"faction":p.faction,"level":if p.ai { json!(p.level) } else { Value::Null }
             })).collect::<Vec<_>>()
         });
+        self.operative_lobby(id, &mut result);
         if let Some(last) = &self.result {
             let mut report = last.report.clone();
             report["you"] = you
@@ -1146,6 +1165,7 @@ impl Hub {
         let starts = runtime.collect_starts(&slots, &startup, &names, epoch)?;
         let pause = runtime.paused().then(|| runtime.pause_message(now));
         Ok(PreparedNative {
+            now,
             attached: AttachedRuntime {
                 epoch,
                 ingress: CommanderIngress::default(),
@@ -1165,6 +1185,7 @@ impl Hub {
 
     fn publish_native(&mut self, code: &str, prepared: PreparedNative) -> u64 {
         let PreparedNative {
+            now,
             attached,
             starts,
             resume,
@@ -1221,6 +1242,12 @@ impl Hub {
                     }
                 }
                 Err(error) => native.runtime.fault_stop(error),
+            }
+        }
+        for index in 0..room.operatives.len() {
+            if let Err(error) = room.start_operative(index, now) {
+                room.native.as_mut().unwrap().runtime.fault_stop(error);
+                break;
             }
         }
         if let Some(receipt) = &room.native.as_ref().unwrap().receipt {
@@ -1412,6 +1439,7 @@ impl Hub {
         let online = room.players.iter().map(Person::online).collect::<Vec<_>>();
         let ping = room.players.iter().map(Person::ping).collect::<Vec<_>>();
         let native = room.native.as_mut()?;
+        let operative_events = native.runtime.frame_events(kind).to_vec();
         let began = Instant::now();
         if kind == FrameKind::Scheduled {
             let mut watching = Vec::new();
@@ -1568,6 +1596,12 @@ impl Hub {
                     }
                 }
             }
+        }
+        if kind == FrameKind::Scheduled
+            && let Err(error) = room.send_operatives(&operative_events, &online, &ping)
+        {
+            room.native.as_mut().unwrap().runtime.fault_stop(error);
+            return None;
         }
         Some((build, stringify))
     }
@@ -2001,6 +2035,15 @@ impl Hub {
             .encode_utf16()
             .take(40)
             .collect::<Vec<_>>();
+        if msg["role"] == "operative"
+            || self.rooms.get(code).is_some_and(|room| {
+                room.operatives
+                    .iter()
+                    .any(|op| !token.is_empty() && op.person.token == token)
+            })
+        {
+            return Ok(());
+        }
         if token.is_empty() || msg.get("role").is_some_and(|role| role != "commander") {
             return Err("trusted room requires a nonempty token");
         }
@@ -2028,6 +2071,16 @@ impl Hub {
             return;
         }
         if *joined {
+            if let Some(changed) = self
+                .rooms
+                .get_mut(code)
+                .and_then(|room| room.operative_message(connection.id, &msg, now))
+            {
+                if changed {
+                    self.rooms[code].broadcast(&self.maps, &self.public_url);
+                }
+                return;
+            }
             if self.save_command(code, connection.id, &msg, now) {
                 return;
             }
@@ -2083,11 +2136,6 @@ impl Hub {
             connection.close(1008, "unsupported protocol");
             return;
         }
-        if msg["role"] == "operative" {
-            connection.send(json!({"t":"deny","cmd":"join","reason":"commander"}));
-            connection.close(1008, "operative unavailable");
-            return;
-        }
         if let Err(reason) = self.admit_trusted_hello(code, &msg) {
             connection.send(json!({"t":"deny","cmd":"join","reason":"blocked"}));
             connection.close(1008, reason);
@@ -2118,6 +2166,7 @@ impl Hub {
                 ),
                 players: Vec::new(),
                 spectators: Vec::new(),
+                operatives: Vec::new(),
                 mode: if tutorial { "tutorial" } else { "conquest" }.into(),
                 map: if tutorial { "tutorial" } else { "default" }.into(),
                 loaded_spawns: None,
@@ -2138,6 +2187,12 @@ impl Hub {
             .take(40)
             .collect();
         let name = clean(msg["name"].as_str().unwrap(), 16, "Soldier", false);
+        if room.operative_hello(connection, &msg, &token, &name, joined, now) {
+            if *joined {
+                room.broadcast(&self.maps, &self.public_url);
+            }
+            return;
+        }
         // Prepare the returning seat before replacing its socket or transport ledgers.
         let returning = room
             .players
@@ -2313,6 +2368,7 @@ impl Hub {
                 }
             }
         }
+        changed |= room.disconnect_operative(id);
         let size = room.spectators.len();
         room.spectators
             .retain(|p| !p.connection.as_ref().is_some_and(|c| c.id == id));
@@ -2792,6 +2848,10 @@ mod net_runtime2;
 #[cfg(test)]
 #[path = "seat_lifecycle_tests.rs"]
 mod seat_lifecycle_tests;
+
+#[cfg(test)]
+#[path = "operative_server_tests.rs"]
+mod operative_tests;
 
 #[cfg(test)]
 #[path = "spectator_tests.rs"]

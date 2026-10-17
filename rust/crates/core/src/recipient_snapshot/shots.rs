@@ -350,12 +350,31 @@ fn raw_event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
                 } => {
                     identity(u64::from(*shooter))?;
                     owner(state, *seat)?;
+                    if state
+                        .commands
+                        .units
+                        .get(shooter)
+                        .is_some_and(|c| c.operative)
+                    {
+                        operative_flights::shooter(state, *shooter, *seat)?;
+                    }
                     numbers(&[at.x, at.z])?;
                 }
-                // Operative shots and Horde breath effects retain their separate admission.
-                LaunchEvent::SmallArms(_)
-                | LaunchEvent::Breath { .. }
-                | LaunchEvent::BreathShell { .. } => return Err(refused()),
+                LaunchEvent::SmallArms(value) => {
+                    operative_flights::shooter(state, value.shooter, value.owner)?;
+                    point(value.at)?;
+                    if !matches!(value.effect, "sniper" | "commando") {
+                        return Err(refused());
+                    }
+                    if let Some(hit) = value.hit {
+                        identity(u64::from(hit.target))?;
+                        owner(state, hit.owner)?;
+                    }
+                }
+                // Horde breath effects retain their separate mode admission.
+                LaunchEvent::Breath { .. } | LaunchEvent::BreathShell { .. } => {
+                    return Err(refused());
+                }
                 LaunchEvent::Contact(value) => {
                     kind(state, value.kind)?;
                     identity(value.flight)?;

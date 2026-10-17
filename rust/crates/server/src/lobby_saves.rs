@@ -261,7 +261,21 @@ impl Hub {
         {
             return Err("saved settings disagree with the match".into());
         }
-        let staged = Room {
+        // The prototype retains each operative's commander object across load.
+        // Resolve that identity through the same present-person assignment used
+        // for saved seats; a departed commander must stay unassigned.
+        let operative_commanders = room
+            .operatives
+            .iter()
+            .map(|op| {
+                let commander = room.players.get(op.commander?)?;
+                let present_index = present.iter().position(|p| std::ptr::eq(*p, commander))?;
+                owners
+                    .iter()
+                    .position(|owner| *owner == Some(present_index))
+            })
+            .collect::<Vec<_>>();
+        let mut staged = Room {
             code: room.code.clone(),
             saves: room.saves.clone(),
             records: room.records.clone(),
@@ -269,6 +283,7 @@ impl Hub {
             title: room.title.clone(),
             players,
             spectators: Vec::new(),
+            operatives: Vec::new(),
             mode: text("mode")?,
             map: text("mapName")?,
             loaded_spawns: Some(settings["mapSpawns"].clone()),
@@ -307,6 +322,11 @@ impl Hub {
             .open_loaded_pause(host, &staged.players[host].name, now)?;
         prepared.pause = Some(prepared.attached.runtime.pause_message(now));
         prepared.attached.loaded_save = true;
+        // Move membership only after every fallible restoration step succeeds.
+        staged.operatives = std::mem::take(&mut self.rooms.get_mut(code).unwrap().operatives);
+        for (operative, commander) in staged.operatives.iter_mut().zip(operative_commanders) {
+            operative.commander = commander;
+        }
         *self.rooms.get_mut(code).unwrap() = staged;
         Ok(self.publish_native(code, prepared))
     }
