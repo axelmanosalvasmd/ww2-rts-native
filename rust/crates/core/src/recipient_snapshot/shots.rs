@@ -397,6 +397,9 @@ fn raw_event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
                     target_owner,
                     at,
                 } => {
+                    if state.options.mode != Mode::Horde {
+                        return Err(refused());
+                    }
                     identity(u64::from(*shooter))?;
                     identity(u64::from(*target))?;
                     owner(state, *seat)?;
@@ -404,6 +407,9 @@ fn raw_event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
                     numbers(&[at.x, at.z])?;
                 }
                 LaunchEvent::BreathShell { at } => {
+                    if state.options.mode != Mode::Horde {
+                        return Err(refused());
+                    }
                     numbers(&[at.x, at.z])?;
                 }
                 LaunchEvent::Contact(value) => {

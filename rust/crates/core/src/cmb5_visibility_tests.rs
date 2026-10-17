@@ -346,10 +346,19 @@ fn cmb127_horde_reveals_only_active_final_ground_enemies_and_bosses_to_defenders
     }
     // This visibility fixture creates the physical aircraft without the sortie
     // owner. Complete ticking and snapshots must still reject that missing state.
+    let tick = m.world.game.tick;
+    let units = crate::save_codec::to_value(&m.world.game.units).unwrap();
+    let horde = m.horde.clone();
     assert_eq!(
         m.advance_tick().unwrap_err().reason,
         "aircraft admission: query aircraft has no sortie runtime metadata"
     );
+    assert_eq!(m.world.game.tick, tick);
+    assert_eq!(
+        crate::save_codec::to_value(&m.world.game.units).unwrap(),
+        units
+    );
+    assert_eq!(m.horde, horde);
     assert!(m.tick_state.fault().is_none());
     assert!(matches!(SnapshotCache::new(&m), Err(SnapshotError::Rules)));
     assert_eq!(

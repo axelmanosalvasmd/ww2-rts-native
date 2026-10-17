@@ -820,3 +820,11 @@ mod tests;
 #[cfg(test)]
 #[path = "match_horde_ground_tests.rs"]
 mod ground_tests;
+
+#[cfg(test)]
+#[path = "match_horde_lifecycle_tests.rs"]
+mod lifecycle_tests;
+
+#[cfg(test)]
+#[path = "match_horde_runner_tests.rs"]
+mod runner_tests;

@@ -33,3 +33,7 @@ The focused post-fix run at `868355ed` passed all 76 selected core/simtest tests
 ## Merge five: #414
 
 Preserve every module registration and the existing canonical Horde/Classic/Annihilation snapshot checks while adding Assault and its exact owner/timer validation. Ordinary lists reuse the existing node helper with Assault added to the whitelist. Retain per-team remembered ghosts rather than overwriting them. Lobby hosting keeps the shared option/constructor helpers and loaded false overrides, and save/load accepts the expanded ordinary-mode set without reinstating an obsolete logistics refusal. World, sandbox and roster guards remain. Test conflicts retain stronger complete delivery and actor checks while adding Assault.
+
+## Merge six: #399
+
+Retain the existing canonical actor predicate, logistics runner, complete mode delivery, production context, construction assignment guards and stronger every-seat tests. Register the incoming Horde lifecycle and runner test modules alongside ground production tests. Merge incoming visibility atomicity and manual-clock assertions with the exact metadata refusals. Keep the existing aircraft/operative/authored mission adapters and add explicit Horde-mode guards to breath effects. Remove duplicate Horde enum variants, event match arms and late tick phase introduced by the automatic merge. Room attachment keeps frozen main's supported aircraft implementation rather than restoring an obsolete weapon-restriction method. The core hosted-Horde guard remains until #413.

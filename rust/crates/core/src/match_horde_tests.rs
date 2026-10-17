@@ -1042,7 +1042,10 @@ fn mode54_bunker_death_finishes_once_at_the_fallen_bunker_with_wave_and_defeats(
         assert_eq!(m.story, story);
         // This explicit phase fixture advances its own clock, so the recorded
         // queue boundary does not qualify it for the ordinary tick runner.
-        assert!(m.validate_tick_state().is_err());
+        assert!(
+            m.validate_tick_state().is_err(),
+            "manual component clock leaves the recorded command boundary behind"
+        );
         crate::recipient_snapshot::SnapshotCache::new(&m).unwrap();
         assert!(m.restrict_to_ordinary_snapshots().is_err());
     }
@@ -1194,6 +1197,10 @@ fn mode52_real_boss_wave_allows_breath_and_retirement_beside_guarded_aircraft() 
     }
     assert!(m.horde_projection().unwrap().boss.is_none());
     m.validate_aviation().unwrap();
+    assert!(
+        m.validate_tick_state().is_err(),
+        "manual component clock leaves the recorded command boundary behind"
+    );
     assert!(m.restrict_to_ordinary_snapshots().is_err());
 }
 
@@ -1274,8 +1281,15 @@ fn mode53_core_reveal_requires_active_spent_budget_and_at_most_three_left() {
     assert!(m.combat.get(ids[0]).is_none());
     assert!(!m.commands.units.contains_key(&ids[0]));
     assert!(m.advance_tick().is_err());
-    assert!(matches!(
-        crate::recipient_snapshot::SnapshotCache::new(&m),
-        Err(crate::recipient_snapshot::SnapshotError::Rules)
-    ));
+    assert_eq!(
+        m.validate_aviation().unwrap_err().to_string(),
+        "missing combat metadata"
+    );
+    assert!(
+        matches!(
+            crate::recipient_snapshot::SnapshotCache::new(&m),
+            Err(crate::recipient_snapshot::SnapshotError::Rules)
+        ),
+        "vision-only actors have no complete recipient metadata"
+    );
 }

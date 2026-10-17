@@ -230,7 +230,14 @@ fn horde_breath_hits_whole_line_once_and_overlapping_trench_cells_once() {
     assert_eq!(m.world.game.units[&boss].shot_at, Some(0.0));
     assert!(m.firing.flights.is_empty());
     // This component scene replaced the world and lacks full runtime owners.
-    assert!(m.advance_tick().is_err());
+    assert!(
+        m.advance_tick().is_err(),
+        "detached combat scene lacks tick metadata"
+    );
+    assert!(
+        matches!(SnapshotCache::new(&m), Err(SnapshotError::Rules)),
+        "detached combat world lacks full Match metadata"
+    );
     assert_eq!(
         m.restrict_to_ordinary_snapshots(),
         Err(SnapshotError::Unsupported {
