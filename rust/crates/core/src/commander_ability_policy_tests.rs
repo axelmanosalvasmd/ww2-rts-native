@@ -55,7 +55,7 @@ fn ability_projection_reads_only_owned_cooldowns_and_completed_own_bases() {
             .iter()
             .all(|id| m.world.game.units[id].owner == 0)
     );
-    m.abilities.get_mut(enemy).unwrap().cooldown = f64::NAN;
+    m.abilities.get_mut(enemy).unwrap().cooldown = 12345.0;
     let other = m
         .human_ability_observation(&mut HumanObservationMemory::new(0))
         .unwrap();
@@ -63,6 +63,13 @@ fn ability_projection_reads_only_owned_cooldowns_and_completed_own_bases() {
         other, view,
         "enemy private ability state cannot change the packet"
     );
+    // Recipient rows reject invalid canonical numbers before owner masking.
+    m.abilities.get_mut(enemy).unwrap().cooldown = f64::NAN;
+    let mut invalid_memory = HumanObservationMemory::new(0);
+    let invalid_before = invalid_memory.clone();
+    assert!(m.human_ability_observation(&mut invalid_memory).is_err());
+    assert_eq!(invalid_memory, invalid_before);
+    m.abilities.get_mut(enemy).unwrap().cooldown = 12345.0;
     m.abilities.get_mut(own).unwrap().cooldown = f64::NAN;
     let mut memory = HumanObservationMemory::new(0);
     let before = memory.clone();
