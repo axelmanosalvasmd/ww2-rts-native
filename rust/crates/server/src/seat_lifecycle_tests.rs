@@ -205,3 +205,62 @@ fn only_host_pause_and_resume_change_pause_without_advancing_state() {
 }
 
 #[test]
+fn net80_human_drop_expiry_reconnect_host_release_and_fresh_match_allowance() {
+    let (mut hub, _host, mut host_rx, guest, mut guest_rx) = setup();
+    hub.disconnected("ABC", guest.id, 10);
+    assert!(hub.native_status("ABC").unwrap().paused);
+    hub.poll_native(30_009, 0);
+    assert!(hub.native_status("ABC").unwrap().paused);
+    assert_eq!(hub.native_status("ABC").unwrap().tick, 0);
+    drain(&mut hub, &mut host_rx, 30_009);
+    hub.poll_native(30_010, 50_000_000);
+    assert!(!hub.native_status("ABC").unwrap().paused);
+    assert_eq!(hub.native_status("ABC").unwrap().tick, 1);
+    drain(&mut hub, &mut host_rx, 30_010);
+    let (returned, mut returned_rx) = peer(3);
+    join(&mut hub, &returned, "guest", 30_011);
+    drain(&mut hub, &mut returned_rx, 30_011);
+    hub.disconnected("ABC", returned.id, 30_012);
+    assert!(!hub.native_status("ABC").unwrap().paused);
+
+    // A new match restores the allowance; neither reconnect nor host release
+    // restores a used allowance within that match.
+    let prepared = hub
+        .prepare_native("ABC", native_tests::native_match(), 30_013, true)
+        .unwrap();
+    hub.publish_native("ABC", prepared);
+    drain(&mut hub, &mut host_rx, 30_013);
+    assert!(hub.native_status("ABC").unwrap().paused);
+    // Exercise the existing host API without admitting a client resume message.
+    hub.rooms
+        .get_mut("ABC")
+        .unwrap()
+        .native
+        .as_mut()
+        .unwrap()
+        .runtime
+        .resume(30_014);
+    assert!(!hub.native_status("ABC").unwrap().paused);
+    let (returned, mut rx) = peer(4);
+    join(&mut hub, &returned, "guest", 30_015);
+    drain(&mut hub, &mut rx, 30_015);
+    hub.disconnected("ABC", returned.id, 30_016);
+    assert!(!hub.native_status("ABC").unwrap().paused);
+    let prepared = hub
+        .prepare_native("ABC", native_tests::native_match(), 30_017, true)
+        .unwrap();
+    hub.publish_native("ABC", prepared);
+    assert!(hub.native_status("ABC").unwrap().paused);
+    let (returned, mut rx) = peer(5);
+    join(&mut hub, &returned, "guest", 30_018);
+    drain(&mut hub, &mut rx, 30_018);
+    assert!(!hub.native_status("ABC").unwrap().paused);
+    hub.disconnected("ABC", returned.id, 30_019);
+    assert!(!hub.native_status("ABC").unwrap().paused);
+    for beat in 2..7 {
+        hub.poll_native(30_019 + beat * 50, beat * 50_000_000);
+        drain(&mut hub, &mut host_rx, 30_400);
+    }
+    assert!(hub.native_status("ABC").unwrap().fault.is_none());
+    drain(&mut hub, &mut guest_rx, 30_400);
+}
