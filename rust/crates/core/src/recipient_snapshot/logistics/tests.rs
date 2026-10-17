@@ -166,6 +166,13 @@ fn intent_log44_exact_fields_rounding_and_private_allied_stock_in_complete_frame
     for p in &mut state.world.game.players {
         p.visible = state.world.game.units.keys().copied().collect();
     }
+    let cache = SnapshotCache::new(&state).unwrap();
+    for slot in 0..3 {
+        let cached = cache.recipient(slot).unwrap();
+        let uncached = crate::recipient_snapshot::recipient_uncached(&state, slot).unwrap();
+        assert_eq!(cached.fields, uncached.fields, "seat {slot}");
+        assert_eq!(cached.missing, uncached.missing, "seat {slot}");
+    }
     let mut delivery = DeliveryState::new(&state).unwrap();
     let frame = delivery
         .capture_with_lists(&mut state, &[true; 3], &[false; 3], &[])

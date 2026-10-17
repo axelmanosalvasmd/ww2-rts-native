@@ -358,7 +358,11 @@ fn mode01_non_world_mode_rows_match_the_prototype_public_fields() {
         };
         assert_eq!(mode_row(&m).unwrap(), expected, "{mode:?}");
         if mode == Mode::Conquest {
-            assert!(SnapshotCache::new(&m).is_ok());
+            let cache = SnapshotCache::new(&m).unwrap();
+            for slot in 0..m.start.players.len() {
+                let fields = cache.recipient(slot).unwrap().fields;
+                assert!(!fields.contains_key("mode"));
+            }
         } else if mode == Mode::Classic {
             let count = m.start.players.len();
             let mut delivery = DeliveryState::new(&m).unwrap();
