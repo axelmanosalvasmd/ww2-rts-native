@@ -371,6 +371,14 @@ fn raw_event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
                 } => {
                     identity(u64::from(*shooter))?;
                     owner(state, *seat)?;
+                    if state
+                        .commands
+                        .units
+                        .get(shooter)
+                        .is_some_and(|c| c.operative)
+                    {
+                        operative_flights::shooter(state, *shooter, *seat)?;
+                    }
                     numbers(&[at.x, at.z])?;
                 }
                 LaunchEvent::SmallArms(value) => {

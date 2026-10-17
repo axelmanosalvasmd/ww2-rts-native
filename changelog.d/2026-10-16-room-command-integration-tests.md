@@ -1,0 +1,2 @@
+- Rewrite the inherited support restriction tests for the integrated flight adapter: all eight support kinds now reserve and create strike/cooldown state, while recon preserves sequence and snapshot flow. The tests retain trusted and attached-room coverage.
+- Correct the convoy denial fixture to test an unassignable job without a collection source. The prior water fixture correctly accepted a reachable one-metre approach and did not prove a routing refusal.

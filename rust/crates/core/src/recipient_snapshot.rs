@@ -1,4 +1,5 @@
 //! Recipient projections for admitted ordinary, Classic and Horde matches.
+//! Unsupported canonical actors remain explicit. No transport contract is added.
 //! Projectile and aviation fields follow the pinned prototype recipient rules.
 use crate::{
     catalog::Catalog,
@@ -22,6 +23,8 @@ mod engineering;
 mod falling;
 #[path = "recipient_snapshot/flights.rs"]
 mod flights;
+#[path = "recipient_snapshot/logistics.rs"]
+mod logistics;
 #[path = "recipient_snapshot/modes.rs"]
 mod modes;
 #[path = "recipient_snapshot/operative.rs"]
@@ -347,20 +350,10 @@ fn project_recipient(
             fields.insert("flights".into(), projectiles::for_seat(state, slot)?);
         }
     } else {
-        if !state.firing.flights.is_empty()
-            && state.firing.flights.values().all(|flight| {
-                state
-                    .commands
-                    .units
-                    .get(&flight.shooter)
-                    .is_some_and(|c| c.operative)
-            })
-            && operative_flights::validate(state).is_ok()
-        {
-            fields.insert("flights".into(), operative_flights::project(state, slot)?);
-        } else {
-            fields.insert("flights".into(), flights::project(state, slot)?);
-        }
+        fields.insert("flights".into(), flights::project(state, slot)?);
+    }
+    if let Some(logistics) = logistics::project(state, slot)? {
+        fields.insert("logistics".into(), logistics);
     }
     Ok(RecipientProjection {
         fields,
@@ -370,7 +363,6 @@ fn project_recipient(
             SnapshotCapability::Fog,
             SnapshotCapability::ShotsAndFlights,
             SnapshotCapability::TeamEffects,
-            SnapshotCapability::Logistics,
         ],
     })
 }

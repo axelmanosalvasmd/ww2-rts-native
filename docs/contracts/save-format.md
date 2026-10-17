@@ -57,7 +57,7 @@ The setting keys and values are:
 | `logistics` | Match logistics switch. |
 | `tech` | Match technology switch. |
 
-The list is identical to `server.js:419`. In particular, `sandbox` is not a setting key. Native sandbox and logistics room restoration remain refused by this batch's existing room capability boundary.
+The list is identical to `server.js:419`. In particular, `sandbox` is not a setting key. Sandbox restoration remains refused. Ordinary logistics checkpoints preserve reserves, convoy stores, cargo, routes and supply state through the existing versioned match checkpoint.
 
 ## Game checkpoint encoding
 
@@ -79,7 +79,7 @@ Each node is `[tag, payload]`, except `["unit"]` and `["none"]`. A unit enum var
 
 All fields in `Match` and its nested mutable owners participate in the checkpoint. This includes `world`, `start` (economy, points, weather and RNG streams), `options`, commands and pending orders, production, rallies, field work, combat, firing, abilities, recovery, environment, logistics, supply, unit allocation, story, fallen locations, finish state and timeline. Recipient routing knowledge, fog, remembered buildings, path requests, retries and route caches also survive. Immutable compiled rules are reconstructed from the binary. World runtime and geography are excluded behind an explicit save/load refusal.
 
-Native cache identities that refer to vector allocations must be rebound to restored storage. They are not dereferenced from saved addresses. This is an internal native persistence choice under IF-27, recorded in `design.d/2026-10-16-save-load.md`: the prototype loses WeakMap path/cache state (`shared/sim.js:2865,3035`), while native checkpoints retain state required for deterministic continuation. It does not claim JavaScript tick equality or import compatibility.
+Native cache identities that refer to vector allocations must be rebound to restored storage, including convoy handoff paths, per-owner ordinary and danger paths, and their owned danger and vehicle buffers. They are not dereferenced from saved addresses. This is an internal native persistence choice under IF-27, recorded in `design.d/2026-10-16-save-load.md`: the prototype loses WeakMap path/cache state (`shared/sim.js:2865,3035`), while native checkpoints retain state required for deterministic continuation. It does not claim JavaScript tick equality or import compatibility.
 
 The `state` struct field keys are listed below. These are native component boundaries for the prototype's whole-game payload (`shared/sim.js:709-728`, terrain and optional arrays at `:735-766`), rather than additional socket keys. Nested records use the same tagged struct/map/sequence rules and the typed fields of the named canonical owner.
 

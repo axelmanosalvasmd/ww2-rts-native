@@ -98,6 +98,7 @@ impl Match {
             pointers.extend(recipient.save_storage_pointers());
         }
         pointers.extend(self.commands.paths.storage_pointers());
+        pointers.extend(self.supply_routes.save_storage_pointers());
         pointers
     }
 
@@ -116,6 +117,7 @@ impl Match {
             }
         }
         self.commands.paths.relocate_save_storage(&bindings);
+        self.supply_routes.relocate_save_storage(&bindings);
         for recipient in &mut self.recipients {
             recipient.relocate_save_storage(&bindings);
         }

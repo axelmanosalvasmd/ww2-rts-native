@@ -92,7 +92,6 @@ impl Hub {
         }
         let state = native.runtime.state();
         if !matches!(state.options.mode, Mode::Default | Mode::Conquest)
-            || state.options.logistics
             || state.options.sandbox
             || state.world_runtime.is_some()
         {
@@ -140,7 +139,6 @@ impl Hub {
         }
         let state = Match::from_save_json(saved["g"]["state"].clone())?;
         if !matches!(state.options.mode, Mode::Default | Mode::Conquest)
-            || state.options.logistics
             || state.options.sandbox
             || state.world_runtime.is_some()
         {
@@ -258,6 +256,7 @@ impl Hub {
                     disconnected: None,
                     denies: Vec::new(),
                     rtt: None,
+                    map_pings: Vec::new(),
                     diagnostics: Default::default(),
                     last_match: None,
                 }

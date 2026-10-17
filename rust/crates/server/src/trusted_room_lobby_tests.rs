@@ -260,9 +260,9 @@ fn trusted_canonical_map_weather_matrix_records_options_before_publication() {
             let native = hub.rooms["ABC"].native.as_ref().unwrap();
             let state = native.runtime.state();
             assert!(
-                !state.options.logistics
-                    && state.convoys.is_none()
-                    && state.logistics.iter().next().is_none()
+                state.options.logistics
+                    && state.convoys.is_some()
+                    && state.logistics.iter().next().is_some()
             );
             assert!(
                 state.options.shuffle
@@ -285,6 +285,102 @@ fn trusted_canonical_map_weather_matrix_records_options_before_publication() {
     assert_eq!(admitted + refused.len(), 231);
     assert_eq!(admitted, 231);
     assert!(refused.is_empty());
+}
+
+#[test]
+fn logistics_enablement_matches_prototype_mode_table_and_strict_scenario_opt_in() {
+    for (mode, enabled) in [
+        ("conquest", true),
+        ("classic", true),
+        ("annihilation", true),
+        ("world", true),
+        ("assault", false),
+        ("horde", false),
+        ("tutorial", false),
+        ("default", false),
+        ("", false),
+        ("unknown", false),
+    ] {
+        assert_eq!(logistics_enabled_for(mode, &json!({})), enabled, "{mode}");
+        for flag in [
+            Value::Null,
+            json!(false),
+            json!(0),
+            json!(1),
+            json!("true"),
+            json!([]),
+            json!({}),
+        ] {
+            assert!(
+                !logistics_enabled_for(mode, &json!({"scenario":{"logistics":flag}})),
+                "{mode}/{flag}"
+            );
+        }
+        assert!(
+            !logistics_enabled_for(mode, &json!({"scenario":{}})),
+            "{mode}"
+        );
+        assert!(
+            logistics_enabled_for(mode, &json!({"scenario":{"logistics":true}})),
+            "{mode}"
+        );
+        for scenario in [Value::Null, json!(false), json!(0), json!("")] {
+            assert_eq!(
+                logistics_enabled_for(mode, &json!({"scenario":scenario})),
+                enabled,
+                "{mode}/{scenario}"
+            );
+        }
+    }
+}
+
+#[test]
+fn trusted_conquest_logistics_survives_room_ticks_and_both_recipient_snapshots() {
+    let (mut hub, a, mut ra, _, mut rb) = room();
+    hub.start_trusted("ABC", a.id, false, 0).unwrap();
+    assert_eq!(
+        hub.rooms["ABC"]
+            .native
+            .as_ref()
+            .unwrap()
+            .receipt
+            .as_ref()
+            .unwrap()["options"]["logistics"],
+        true
+    );
+    let mut frames = [0; 2];
+    for step in 0..=20_u64 {
+        let now = step * 50;
+        hub.poll_native(now, now * 1_000_000);
+        for (slot, receiver) in [&mut ra, &mut rb].into_iter().enumerate() {
+            while let Ok(output) = receiver.try_recv() {
+                let message = match output {
+                    Output::Snapshot(write) => {
+                        let message: Value = serde_json::from_str(&write.json).unwrap();
+                        hub.complete_snapshot(&write, true, now);
+                        frames[slot] += 1;
+                        message
+                    }
+                    Output::Json(_) => continue,
+                    Output::Watcher(_) => {
+                        panic!("watcher output reached a seated commander")
+                    }
+                    Output::Close(code, reason) => panic!("unexpected close {code}: {reason}"),
+                };
+                assert_eq!(message["logistics"]["enabled"], true);
+                let rows = message["logistics"]["units"].as_array().unwrap();
+                assert!(!rows.is_empty());
+                let state = hub.rooms["ABC"].native.as_ref().unwrap().runtime.state();
+                for row in rows {
+                    let id = row["id"].as_u64().unwrap() as u32;
+                    assert_eq!(state.world.game.units[&id].owner, slot);
+                }
+            }
+        }
+        assert!(hub.native_status("ABC").unwrap().fault.is_none());
+    }
+    assert!(hub.native_status("ABC").unwrap().tick >= 20);
+    assert!(frames.iter().all(|count| *count > 1));
 }
 
 #[test]

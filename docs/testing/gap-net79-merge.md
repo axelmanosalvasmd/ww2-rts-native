@@ -70,3 +70,117 @@ The resumed clean rebuild found main's `if27_horde_pending_memory_round_trips_or
 The next compiler pass required checked conversion from the simulation's signed tick to the command queue's unsigned key in NET-79. It also found the inherited operative replay test missing `Output::Watcher`; that returning commander now explicitly rejects watcher frames, matching the sibling commander drains. No existing replay assertion is removed.
 
 The rebuilt recipient tests found `net63_hidden_invalid_units_have_the_same_cached_and_uncached_refusal` returning unit zero after the shared companion guard replaced main's unit-row refusal. On validation failure, the shared guard now identifies the first invalid live operative in deterministic control order, preserving the offending unit diagnostic. Failures without an identifiable live operative retain unit zero, and both snapshot paths still reject the state before projection. The existing test remains unchanged.
+
+## Resume merge of current main c391c2e8
+
+# NET-79 current-main core conflict resolution
+
+Scope: the seven assigned core paths only. This is source reconciliation. The parent task owns staging, committing, formatting, compilation, native tests and publication.
+
+- First parent: `61766704b40ddbaeeffa1b558d7c87afc202d382`.
+- Incoming main: `c391c2e8d63fb9d4c2d66593329dfa404fad267f`.
+- Merge base: `f02e09e0549ae5e49b40b086d7f301706582ef51`.
+- Git automatic conflict tree (`AUTO_MERGE`): `df7f9d295986ac57d20930f23ead17b54d18c871`.
+- Fifteen conflict hunks across seven core paths. Hunk numbers follow source order within each file. The original marked hunks and pre-resolution line numbers are also saved in `/tmp/net79-core-conflict-hunks.json`.
+
+## Every manual conflict hunk
+
+| Path under `rust/crates/core/src/` | Hunk | Resolution and reason |
+| --- | --- | --- |
+| `commander_tactics.rs` | 1 | Retain the first parent's blank line after medic rule lookup. This conflict changes whitespace only; the surrounding merged planner retains both parents' behavior. |
+| `match_firing.rs` | 1 | Retain the first parent's `flight_contact_filtered` simulation call with explicit fractions and an all-visible predicate. It has main's ordinary simulation contact semantics. |
+| `match_firing.rs` | 2 | Retain the first parent's crate-private `recipient_flight_contact` closure API and shared `flight_contact_filtered` helper. Main's seat-specific `visible_flight_contact` remains the wrapper above it. The operative-stack spectator still calls the closure API with all bodies visible, so replacing it with main's private seat-only helper would break that caller. |
+| `match_firing.rs` | 3 | Retain optional fractions plus the visibility predicate. Recipient queries use current poses with `(1, 1)`; simulation queries interpolate from the prior map. This preserves main's separation of recipient and simulation poses while retaining spectator composition. |
+| `match_firing.rs` | 4 | Retain the caller-supplied visibility filter. The seat wrapper supplies `seen_by`, which matches main; the spectator supplies all-visible. |
+| `match_firing.rs` | 5 | Retain prior-pose lookup only when explicit simulation fractions are present. Recipient and spectator queries use current poses, matching main's recipient branch. |
+| `match_tick.rs` | 1 | Keep the first parent's Horde economy validation, then main's World logistics refusal, ordinary options/convoy consistency check and supply validation. Main's automatically merged reserve, network, convoy and retirement phases remain intact. |
+| `recipient_snapshot.rs` | 1 | Keep the first parent's ordinary/Classic/Horde scope and main's statement that unsupported actors remain explicit and no transport contract is added. |
+| `recipient_snapshot.rs` | 2 | Keep main's logistics module registration. |
+| `recipient_snapshot.rs` | 3 | Keep the first parent's Horde projectile validation and shared companion validation. On companion failure, retain the first invalid live operative identified in deterministic control order through `check_companion`. This includes main's missing-soldier case and preserves the existing NET-63 offending-unit diagnostic for broader invalid operative states. Failures with no identifiable live operative retain unit zero. |
+| `recipient_snapshot.rs` | 4 | Keep Horde's dedicated projectile projection, including its empty-flight behavior. For non-Horde contexts, use main's shared `flights::project`, which now covers ordinary and operative flights together. Then append main's seat-private logistics projection. This removes the obsolete branch calling the operative-only projector that main already deleted. |
+| `recipient_snapshot/composition.rs` | 1 | Retain the first parent's empty-flight fallback. Horde's shared projection intentionally omits `flights` when none exist; complete frames must still contain the existing empty list. The fallback leaves actual flight rows intact. |
+| `recipient_snapshot/operative_flights.rs` | 1 | Use main's generic flight validation and conditional operative restrictions, adding the first parent's record-to-shooter recognition to the operative predicate. A shooter mentioned by a companion record still requires valid operative control, owner and combat backing. Ordinary flights receive generic validation without being forced into operative grenade shape. |
+| `recipient_snapshot/shots.rs` | 1 | Retain conversions for Horde, Aviation and AuthoredMission. All three event producers remain represented. |
+| `recipient_snapshot/shots.rs` | 2 | Add main's operative shooter validation for `Throw` events, preserving the existing owner, identity and coordinate validation. |
+
+## Automatic merge adaptations retained and source audit
+
+No source edits were made outside those fifteen conflict spans. The following incoming automatic changes are intentionally retained and explain differences from the first parent:
+
+- `operative_flights.rs` no longer contains the separate `project` function or its geometry imports. Main's `flights::project` now validates and projects mixed ordinary and operative flights. The resolved common projection calls that owner directly for non-Horde matches.
+- `composition.rs` no longer blanket-refuses logistics. The new logistics module projects the existing owner-private rows.
+- `recipient_snapshot.rs` no longer lists Logistics as missing after the ordinary projection owner has been integrated.
+- `match_tick.rs` retains main's connected unit reserves, withdrawal, forced-movement state, supply-network beat, convoy tick and convoy-death recording. Horde event scheduling and operative lifecycle hooks remain from the first parent.
+
+Compared function-name sets against both parent blobs in every assigned file. Every parent function remains except the equivalent main-only private `flight_contact_for` helper and the superseded first-parent operative-only `project` function. No test function was removed. No registry file was edited. The ordinary mixed-flight regression `mixed_ordinary_and_operative_grenades_keep_each_recipient_live_and_refuse_corruption`, unbacked operative row test and NET-63 exact offending-unit test remain in their automatically merged files.
+
+Read current issue #5 replies and both prerequisite PR #423/#378 comments and reviews through read-only GitHub calls. Both PR queries returned empty comment/review arrays. The latest issue reply is Axel's `axel-native-slice1x-20261017` result report, not an ack request. Current merge rules retain World closure and Unreal's existing pin. No public interface or message was changed or posted by this subtask.
+
+`git diff --check` passes for the seven owned paths, and none contains conflict markers. All seven differ from `AUTO_MERGE` because the conflict spans are resolved. The index still records them as unmerged until the parent stages the files. No Cargo, compiler, formatter, native tests, fetch, stage, commit, push or GitHub write ran in this subtask.
+
+## Server control-flow resolutions for main c391c2e8
+
+- `commander_ingress.rs` hunk 1: retain main's removal of `fire_at_and_compound_orders_remain_blocked_at_public_ingress`. Main now admits FireAt, and its separate `compound_orders_remain_blocked_at_public_ingress` preserves compound refusal; `room_command_ingress_tests` and `room_fireat_tests` exercise admitted FireAt. No replacement assertion is removed.
+- `lobby.rs` hunk 1: retain the hosted Horde roster limit of five defenders, ordinary limit two.
+- `lobby.rs` hunk 2: retain Horde command dispatch before save/trusted handling, so `nextwave` keeps its existing host path.
+- `lobby.rs` hunk 3: retain room AI test registration alongside operative tests.
+- `lobby.rs` hunk 4: retain Horde host, room AI combat and combined room AI/NET-79 registrations, then append main's room-command ingress registration. Each test module retains its `cfg(test)` attribute.
+- `lobby_saves.rs` hunk 1: retain the prepared connected spectator set instead of replacing it with an empty vector. Main's operative commander remapping is retained in the automatic merge, preserving both loaded spectators and operative membership.
+- `main.rs` hunk 1: combine host/Horde authored-map help with main's MAX_ROOMS, static-root and admitted logistics descriptions.
+- `main.rs` hunk 2: retain authored-map config and main's explicit static-root/capacity config. Remove the now-unneeded Config default update since every field is supplied.
+- `room_runtime.rs` hunk 1: retain main's latency telemetry method used by the merged pong path.
+
+The incoming main changelog already records FireAt admission and the narrower compound refusal replacement. This merge does not claim either as a new NET-79 row.
+
+# Operative test merge resolution
+
+Baseline: first parent `61766704b40ddbaeeffa1b558d7c87afc202d382`, incoming main `c391c2e8`.
+
+Only `rust/crates/server/src/operative_room_tests.rs` and `rust/crates/server/src/operative_server_tests.rs` were written. Both resolved files exactly match their first-parent stage-2 contents. No staging, commits, Cargo, formatter, fetch or GitHub writes ran.
+
+## operative_room_tests.rs
+
+Four conflict hunks, in source order:
+
+1. Keep the first-parent `assert_lobbies` helper and complete tests for NET-25 live takeover, NET-28/29 broadcasts, NET-82 offline cleanup, unsaved operative full lifecycle, and the renamed/strengthened FPS-39 loaded lifecycle. Incoming main contributes the old narrow loaded-test name `operative_load_merge_retains_membership_and_remaps_the_commander_person`; its behavior is retained by `fps39_loaded_operatives_keep_identity_through_finish_start_and_restart`, not registered again as a duplicate fixture.
+2. Keep the first-parent hold-fire/autocast/auto-retreat setup in the loaded fixture. It prevents combat from disrupting the deterministic natural-victory continuation.
+3. Keep the first-parent post-load VP arrangement and observer initialization rather than main's short nine-callback loop opening. Both parents' failed-load atomicity, commander remapping, retained soldier identity, reset sequence, role start shape, operative resume refusal and host resume assertions are identical before this continuation.
+4. Keep the complete first-parent natural victory, all 120 ending callbacks, operative lobby retention, new-match and restart continuation. It collects both canonical seat snapshots and both independent operative views at every advancing tick, retains no-fault assertions and checks contiguous ticks. Incoming main's nine-callback recipient loop and terminal tick-at-least-eight check are superseded by the longer continuation and its terminal tick bound of at least finish tick plus 59. No loaded admission or recipient behavior is dropped.
+
+The shared `assert_every_recipient_tick` helper is identical in both parents. Five first-parent tests remain, with no duplicate helpers.
+
+Preserved tests:
+- `net25_operative_live_takeover_preserves_person_and_ignores_old_socket_close`
+- `net28_net29_operative_broadcasts_keep_change_order_and_shifted_commander_identity`
+- `net82_operative_offline_identity_survives_lobby_cleanup_deadline`
+- `operative_room_members_deliver_every_tick_through_natural_finish_lobby_and_restart`
+- `fps39_loaded_operatives_keep_identity_through_finish_start_and_restart`
+
+## operative_server_tests.rs
+
+One marker-delimited conflict hunk:
+
+1. Retain first-parent module registrations for `lifecycle`, `room_protocol`, `supplemental` and `timing`. Incoming main has only `room_protocol`; retain it once, without dropping any sibling test modules.
+
+Additional automatic-merge adaptations:
+
+- Remove the second equivalent `Output::Watcher` match arm inserted by the automatic merge into `messages`.
+- Remove the second equivalent `Output::Watcher` match arm inserted by the automatic merge into `drain_commanders`.
+- Both helpers continue to panic on watcher frames, preserving each parent's role refusal. No output is ignored.
+
+All nine parent test names remain. The first parent's broader operative whitelist assertions, command matrix and canonical gameplay/denial-state equality checks remain; incoming main has a strict subset of these checks.
+
+Preserved tests:
+- `operative_join_checks_each_requirement_and_keeps_four_nonseat_members`
+- `operative_lobby_tracks_commander_identity_across_nonfinal_seat_removal`
+- `operative_presence_prevents_room_expiry_and_never_grants_host`
+- `operative_permission_whitelist_is_silent_except_name_and_latency_ping`
+- `operative_input_has_independent_twenty_millisecond_boundaries_and_pause_gate`
+- `operative_running_join_moves_and_delivers_through_pause_victory_and_next_match`
+- `operative_reconnect_keeps_soldier_resets_sequence_and_resyncs_only_its_stream`
+- `operative_trusted_room_admission_preserves_refusal_and_live_token_takeover`
+- `operative_truncated_utf16_tokens_keep_distinct_soldiers_and_input`
+
+## Verification boundary
+
+Source comparisons verify both resolved files are byte-identical to the first-parent files, contain no conflict markers, and retain the intended module registrations. This reconciliation is source-only. Parent owns final compilation, formatting, tests and merge completion.
