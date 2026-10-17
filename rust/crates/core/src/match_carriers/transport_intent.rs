@@ -192,6 +192,205 @@ fn sail(m: &mut Match, delivery: &mut DeliveryState, boat: u32, at: Point) {
     panic!("boat did not reach its ordered destination");
 }
 
+fn command(m: &mut Match, value: serde_json::Value) -> Option<Denial> {
+    m.execute_command(0, &Command::from_json(&value).unwrap(), false)
+        .unwrap()
+}
+
+fn finish_board_and_deliver(m: &mut Match, delivery: &mut DeliveryState, id: u32, carrier: u32) {
+    assert_eq!(m.world.game.units[&id].board, carrier);
+    for _ in 0..400 {
+        tick(m, delivery);
+        if m.world.game.units[&id].riding {
+            break;
+        }
+    }
+    assert!(m.world.game.units[&id].riding);
+    assert_eq!(m.combat.get(id).unwrap().carrier, Some(carrier));
+    assert!(m.combat.get(carrier).unwrap().cargo.contains(&id));
+    for _ in 0..4 {
+        tick(m, delivery);
+    }
+    assert_eq!(unload(m, &[carrier]), None);
+    for _ in 0..4 {
+        tick(m, delivery);
+    }
+    assert!(!m.world.game.units[&id].riding);
+    assert_eq!(m.combat.get(id).unwrap().carrier, None);
+    crate::unit_placement::tests::assert_current(&m.world.game, &m.grid);
+}
+
+#[test]
+fn cmb146_board_exits_garrison_before_routing_and_delivers_board_and_unload() {
+    let mut m = scene();
+    let at = Point { x: 61., z: 61. };
+    let id = add(&mut m, "rifle", at);
+    let cell = m.world.game.cell_of(at.x, at.z).unwrap();
+    m.world.set_cell(cell, b'B').unwrap();
+    let entry = Point { x: 59., z: 61. };
+    let u = m.world.game.units.get_mut(&id).unwrap();
+    crate::unit_placement::place_unit(&mut m.grid, u, |u| {
+        u.x = entry.x;
+        u.z = entry.z;
+    });
+    crate::vision::update_vision(&mut m.world.game, &m.rules, &m.grid);
+    assert_eq!(
+        command(&mut m, json!({"t":"garrison","ids":[id],"x":at.x,"z":at.z})),
+        None
+    );
+    m.apply_unit_entry_with_routes(id).unwrap();
+    assert_eq!(m.world.game.units[&id].garrison, Some(cell));
+    let carrier = add(&mut m, "halftrack", Point { x: 73., z: 61. });
+    let mut delivery = DeliveryState::new(&m).unwrap();
+    assert_eq!(
+        command(&mut m, json!({"t":"board","ids":[id],"target":carrier})),
+        None
+    );
+    let u = &m.world.game.units[&id];
+    assert_eq!(u.garrison, None);
+    assert_ne!(u.at(), at);
+    assert_eq!(
+        m.world.game.flags[m.world.game.cell_of(u.x, u.z).unwrap()] & MOVE,
+        0
+    );
+    assert!(!u.path.is_empty(), "route starts at the free exit cell");
+    finish_board_and_deliver(&mut m, &mut delivery, id, carrier);
+}
+
+#[test]
+fn cmb146_board_stops_construction_without_removing_or_refunding_the_site() {
+    let mut m = scene();
+    m.start.economy.players[0].mp = 1000.;
+    let id = add(&mut m, "engineer", Point { x: 53., z: 61. });
+    let carrier = add(&mut m, "halftrack", Point { x: 71., z: 61. });
+    crate::vision::update_vision(&mut m.world.game, &m.rules, &m.grid);
+    let site = m.next_unit_id;
+    assert_eq!(
+        command(
+            &mut m,
+            json!({"t":"build","ids":[id],"kind":"flakpos","x":57,"z":61})
+        ),
+        None
+    );
+    assert!(m.world.game.units[&id].build);
+    assert_eq!(m.commands.units[&id].build_target, Some(site));
+    let mut delivery = DeliveryState::new(&m).unwrap();
+    for _ in 0..40 {
+        tick(&mut m, &mut delivery);
+        if m.world.game.units[&site].built.unwrap() > 0. {
+            break;
+        }
+    }
+    let progress = m.world.game.units[&site].built;
+    assert!(progress.unwrap() > 0. && progress.unwrap() < 1.);
+    let mp = m.start.economy.players[0].mp;
+    assert_eq!(
+        command(&mut m, json!({"t":"board","ids":[id],"target":carrier})),
+        None
+    );
+    assert!(!m.world.game.units[&id].build);
+    assert_eq!(m.commands.units[&id].build_target, None);
+    assert_eq!(m.start.economy.players[0].mp, mp);
+    finish_board_and_deliver(&mut m, &mut delivery, id, carrier);
+    assert_eq!(
+        m.world.game.units[&site].built, progress,
+        "unattended site remains paid and unfinished"
+    );
+}
+
+#[test]
+fn cmb146_board_cancels_paid_dig_without_refund_and_survives_ticks() {
+    let mut m = scene();
+    m.start.economy.players[0].mp = 1000.;
+    let id = add(&mut m, "rifle", Point { x: 53., z: 65. });
+    let carrier = add(&mut m, "halftrack", Point { x: 73., z: 65. });
+    crate::vision::update_vision(&mut m.world.game, &m.rules, &m.grid);
+    assert_eq!(
+        command(
+            &mut m,
+            json!({"t":"dig","ids":[id],"kind":"trench","x":53,"z":65,"dir":0})
+        ),
+        None
+    );
+    assert!(m.world.game.units[&id].dig);
+    let mut delivery = DeliveryState::new(&m).unwrap();
+    tick(&mut m, &mut delivery);
+    assert!(m.field_works.jobs()[&id].elapsed > 0.);
+    let job_cells = m.field_works.jobs()[&id].cells.clone();
+    let mp = m.start.economy.players[0].mp;
+    assert_eq!(
+        command(&mut m, json!({"t":"board","ids":[id],"target":carrier})),
+        None
+    );
+    assert!(!m.world.game.units[&id].dig);
+    assert!(!m.field_works.is_active(id));
+    assert_eq!(m.start.economy.players[0].mp, mp);
+    finish_board_and_deliver(&mut m, &mut delivery, id, carrier);
+    assert!(
+        job_cells.iter().all(|c| m.world.game.chars[c.cell] != c.ch),
+        "cancelled work never stamps terrain"
+    );
+}
+
+#[test]
+fn cmb146_board_detaches_only_assigned_mass_entrenchment_workers() {
+    use crate::field_works::{FortKind, Pattern, ProjectMaterial, ProjectOrder};
+    let mut m = scene();
+    m.start.economy.players[0].mp = 1000.;
+    let worker = add(&mut m, "rifle", Point { x: 53., z: 65. });
+    let waiting = add(&mut m, "rifle", Point { x: 55., z: 65. });
+    let carrier = add(&mut m, "lcvp", Point { x: 81., z: 65. });
+    crate::vision::update_vision(&mut m.world.game, &m.rules, &m.grid);
+    let order = Command::Entrench {
+        ids: vec![i64::from(worker), i64::from(waiting)],
+        order: ProjectOrder::New {
+            pattern: Some(Pattern::Line),
+            material: ProjectMaterial::Fort(FortKind::Trench),
+            from: Some(Point { x: 53., z: 65. }),
+            to: Some(Point { x: 69., z: 65. }),
+        },
+        queue: false,
+    };
+    assert_eq!(m.execute_command(0, &order, false).unwrap(), None);
+    let project = m.field_works.membership(worker).unwrap();
+    assert_eq!(m.field_works.membership(waiting), Some(project));
+    let mut delivery = DeliveryState::new(&m).unwrap();
+    tick(&mut m, &mut delivery);
+    assert!(m.world.game.units[&worker].dig || m.world.game.units[&waiting].dig);
+    // The nearer squad gets the boat's sole seat; the other keeps its paid job.
+    let before = m.field_works.jobs().get(&worker).cloned();
+    let mp = m.start.economy.players[0].mp;
+    assert_eq!(
+        command(
+            &mut m,
+            json!({"t":"board","ids":[worker,waiting],"target":carrier})
+        ),
+        None
+    );
+    assert_eq!(m.world.game.units[&waiting].board, carrier);
+    assert!(!m.world.game.units[&waiting].entrench);
+    assert!(!m.world.game.units[&waiting].dig);
+    assert_eq!(m.field_works.membership(waiting), None);
+    assert_eq!(m.field_works.membership(worker), Some(project));
+    assert_eq!(m.field_works.jobs().get(&worker), before.as_ref());
+    assert_eq!(m.start.economy.players[0].mp, mp);
+    for _ in 0..400 {
+        tick(&mut m, &mut delivery);
+        if m.world.game.units[&waiting].riding {
+            break;
+        }
+    }
+    assert!(m.world.game.units[&waiting].riding);
+    for _ in 0..4 {
+        tick(&mut m, &mut delivery);
+    }
+    assert_eq!(unload(&mut m, &[carrier]), None);
+    for _ in 0..4 {
+        tick(&mut m, &mut delivery);
+    }
+    assert!(!m.world.game.units[&waiting].riding);
+}
+
 #[test]
 fn mov75_board_sail_refuse_deep_unload_then_land_with_every_seat_snapshots() {
     let mut m = scene();

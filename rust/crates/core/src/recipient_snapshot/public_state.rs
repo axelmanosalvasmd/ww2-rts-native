@@ -72,13 +72,17 @@ pub(super) fn capture_perspective(
     let mut result = Vec::with_capacity(g.players.len());
     for slot in 0..g.players.len() {
         let mut fields = Map::new();
+        let mode = super::mode_row(state)?;
+        if !mode.is_null() {
+            fields.insert("mode".into(), mode);
+        }
         // Reuse Source's six-field ghost rows. Never consult a hidden live building here.
-        if matches!(state.options.mode, Mode::Classic | Mode::World)
-            && let Some((_, rows)) = state
+        if state.options.mode == Mode::Classic {
+            let rows = state
                 .classic_known_buildings
                 .iter()
                 .find(|(team, _)| *team == g.players[slot].team)
-        {
+                .map_or(&[][..], |(_, rows)| rows.as_slice());
             let ghosts = rows
                 .iter()
                 .filter(|row| !seen_by(state, slot, row.id))
