@@ -47,6 +47,9 @@ impl fmt::Display for MapError {
                 f.write_str(reason)
             }
             Self::Invalid { field, reason } if field == "structures" => write!(f, "{reason}"),
+            Self::Invalid { reason, .. } if reason == "needs two non-assault spawns" => {
+                f.write_str("needs 2+ spawns that every mode can use")
+            }
             Self::Invalid { field, reason } => write!(f, "{field}: {reason}"),
             Self::Unsupported { feature } => {
                 write!(f, "unsupported authoritative map feature: {feature}")

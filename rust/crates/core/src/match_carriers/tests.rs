@@ -607,6 +607,8 @@ fn invalid_or_unavailable_carrier_work_preserves_canonical_state() {
         "wrong owner",
         "cargo identity",
         "job activity",
+        "build activity",
+        "project activity",
         "other mode",
     ] {
         let mut m = make(c);
@@ -619,6 +621,8 @@ fn invalid_or_unavailable_carrier_work_preserves_canonical_state() {
             "wrong owner" => m.world.game.units.get_mut(&2).unwrap().owner = usize::MAX,
             "cargo identity" => m.combat.get_mut(2).unwrap().cargo = vec![999, 999],
             "job activity" => m.world.game.units.get_mut(&1).unwrap().dig = true,
+            "build activity" => m.world.game.units.get_mut(&1).unwrap().build = true,
+            "project activity" => m.world.game.units.get_mut(&1).unwrap().entrench = true,
             "other mode" => m.options.mode = Mode::World,
             _ => unreachable!(),
         }
@@ -629,23 +633,14 @@ fn invalid_or_unavailable_carrier_work_preserves_canonical_state() {
         );
         assert_eq!(atomic(&m), before, "{guard}");
     }
-    for field in ["garrison", "build", "entrench", "rail"] {
-        let mut m = make(c);
-        match field {
-            "garrison" => m.world.game.units.get_mut(&1).unwrap().garrison = Some(0),
-            "build" => m.world.game.units.get_mut(&1).unwrap().build = true,
-            "entrench" => m.world.game.units.get_mut(&1).unwrap().entrench = true,
-            "rail" => m.world.game.units.get_mut(&2).unwrap().rail = true,
-            _ => unreachable!(),
-        }
-        let before = atomic(&m);
-        assert_eq!(
-            m.carrier_board_command(0, &[1], Some(2), false).unwrap(),
-            Some(Denial::Unsupported),
-            "{field}"
-        );
-        assert_eq!(atomic(&m), before, "{field}");
-    }
+    let mut m = make(c);
+    m.world.game.units.get_mut(&2).unwrap().rail = true;
+    let before = atomic(&m);
+    assert_eq!(
+        m.carrier_board_command(0, &[1], Some(2), false).unwrap(),
+        Some(Denial::Unsupported)
+    );
+    assert_eq!(atomic(&m), before);
     let mut m = make(c);
     m.carrier_board_command(0, &[1], Some(2), false).unwrap();
     m.apply_unit_boarding(1).unwrap();
