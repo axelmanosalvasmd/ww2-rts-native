@@ -2867,3 +2867,7 @@ mod save_runtime;
 #[cfg(test)]
 #[path = "room_command_ingress_tests.rs"]
 mod room_command_ingress_tests;
+
+#[cfg(test)]
+#[path = "scenario_start_tests.rs"]
+mod scenario_start_tests;

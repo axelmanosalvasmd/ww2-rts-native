@@ -10,6 +10,8 @@ Ordinary saves remain v1 and authored saves remain v2 under `docs/contracts/save
 - #383: accept equivalent formatted routing and map-loading composition. Keep one copy of each static/editor configuration field and worker initializer.
 - #386: retain full scenario condition/action/arrival execution with strict checkpoint field decoding, legacy-state refusal and the required execution clock. Retain canonical timed-state validation where that evaluator supports the definition; use the full engine's contextual consistency checks for other definitions. Keep authored and legacy execution mutually exclusive. Update the earlier group/reinforcement refusal tests to the engine behavior; preserve their other admission assertions. Keep the v1/v2 format contract.
 
+- #394: retain both room-command ingress and scenario-start test module registrations.
+
 ## Rewritten tests
 
 - `authored_scenarios_validate_ordinary_sides_and_localization_before_startup`: groups and reinforcement are admitted by the full engine; invalid sides, localization and World targets remain refused.
