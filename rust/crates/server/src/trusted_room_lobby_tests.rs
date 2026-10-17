@@ -437,7 +437,8 @@ fn trusted_canonical_map_weather_matrix_records_options_before_publication() {
                     && state.options.supply
                     && state.options.living_weather
             );
-            assert_eq!(state.options.weather_seed, None);
+            assert_eq!(state.options.weather_seed, Some(state.start.weather_seed));
+            assert!(state.start.weather_seed < (1 << 31));
             assert_eq!(
                 native.receipt.as_ref().unwrap()["derivedWeatherSeed"],
                 state.start.weather_seed
@@ -452,6 +453,187 @@ fn trusted_canonical_map_weather_matrix_records_options_before_publication() {
     assert_eq!(admitted + refused.len(), 231);
     assert_eq!(admitted, 231);
     assert!(refused.is_empty());
+}
+
+fn weather_replay(receipt: &Value) -> Match {
+    let o = &receipt["options"];
+    crate::authoritative_maps::create_match(
+        o["mapKey"].as_str().unwrap(),
+        MatchOptions {
+            seed: o["seed"].as_u64().unwrap(),
+            mode: Mode::Conquest,
+            players: o["players"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|p| PlayerConfig {
+                    name: p["name"].as_str().unwrap().into(),
+                    team: p["team"].as_i64().unwrap() as i32,
+                    faction: Faction::try_from(p["faction"].as_u64().unwrap() as u8).unwrap(),
+                })
+                .collect(),
+            shuffle: o["shuffle"].as_bool().unwrap(),
+            army: ArmySize::Standard,
+            weather: WeatherChoice::from_reference(o["weather"].as_str()),
+            weather_seed: Some(o["weatherSeed"].as_u64().unwrap() as u32),
+            living_weather: o["livingWeather"].as_bool().unwrap(),
+            map_key: Some(o["mapKey"].as_str().unwrap().into()),
+            tech: o["tech"].as_bool().unwrap(),
+            supply: o["supply"].as_bool().unwrap(),
+            logistics: o["logistics"].as_bool().unwrap(),
+            sandbox: o["sandbox"].as_bool().unwrap(),
+        },
+    )
+    .unwrap()
+}
+
+#[test]
+fn mode07_server_start_restart_records_weather_inputs_and_replays_all_seats() {
+    for choice in ["map", "clear", "fog", "rain", "mud", "snow", "random"] {
+        let (mut hub, a, mut ra, _, mut rb) = room();
+        hub.message("ABC", &a, &mut true, json!({"t":"weather","v":choice}), 0);
+        for (restart, seed, expected_epoch) in [(false, 0, 1), (true, 71, 2)] {
+            let epoch = hub
+                .start_trusted_with_weather_source("ABC", a.id, restart, 0, || Ok(seed))
+                .unwrap();
+            assert_eq!(epoch, expected_epoch);
+            let native = hub.rooms.get_mut("ABC").unwrap().native.as_mut().unwrap();
+            let receipt = native.receipt.as_ref().unwrap().clone();
+            assert_eq!(receipt["options"]["weather"], choice);
+            assert_eq!(receipt["options"]["weatherSeed"], seed);
+            assert_eq!(receipt["derivedWeatherSeed"], seed);
+            let mut replay = RoomRuntime::new(weather_replay(&receipt), 0).unwrap();
+            assert_eq!(
+                native.runtime.state().start.weather,
+                replay.state().start.weather
+            );
+            assert_eq!(
+                native.runtime.state().start.initial_rain,
+                replay.state().start.initial_rain
+            );
+            assert_eq!(
+                native.runtime.state().start.initial_wet,
+                replay.state().start.initial_wet
+            );
+            if choice == "rain" {
+                assert!(native.runtime.state().start.initial_rain > 0.0);
+            }
+            if matches!(choice, "rain" | "mud") {
+                assert!(native.runtime.state().start.initial_wet.unwrap() > 0.0);
+            }
+            let settings = crate::native_startup::StartupSettings {
+                map: receipt["options"]["mapKey"].as_str().unwrap(),
+                mode: "conquest",
+                army: "standard",
+                weather: choice,
+                sandbox: false,
+            };
+            let startup =
+                crate::native_startup::NativeStartup::prepare(replay.state(), settings).unwrap();
+            let starts = replay
+                .collect_starts(&[0, 1], &startup, &["a".into(), "b".into()], epoch)
+                .unwrap();
+            let queues = [&mut ra, &mut rb];
+            for (slot, queue) in queues.into_iter().enumerate() {
+                let mut start = None;
+                while let Ok(output) = queue.try_recv() {
+                    if let Output::Json(message) = output {
+                        assert!(message.get("options").is_none());
+                        assert!(message.get("weatherSeed").is_none());
+                        if message["t"] == "start" {
+                            start = Some(message);
+                        }
+                    }
+                }
+                assert_eq!(start.unwrap(), starts[slot].1);
+            }
+            let seats = [0, 1].map(|slot| SelectedSeat {
+                slot,
+                full: false,
+                omit: false,
+            });
+            for _ in 0..8 {
+                native.runtime.advance_tick(&[false; 2]).unwrap();
+                replay.advance_tick(&[false; 2]).unwrap();
+                let actual = native
+                    .runtime
+                    .collect_frame(&seats, FrameKind::Scheduled)
+                    .unwrap();
+                let expected = replay.collect_frame(&seats, FrameKind::Scheduled).unwrap();
+                assert_eq!(actual.len(), 2);
+                for (a, b) in actual.iter().zip(&expected) {
+                    assert_eq!(a.message, b.message);
+                }
+                assert!(native.runtime.fault().is_none() && replay.fault().is_none());
+            }
+        }
+    }
+}
+
+#[test]
+fn mode07_server_weather_lobby_is_host_only_validated_and_locked_during_play() {
+    let (mut hub, a, mut ra, b, mut rb) = room();
+    for (who, value) in [(&b, "snow"), (&a, "storm")] {
+        hub.message("ABC", who, &mut true, json!({"t":"weather","v":value}), 0);
+        assert_eq!(hub.rooms["ABC"].weather, "map");
+    }
+    for choice in ["clear", "fog", "rain", "mud", "snow", "random", "map"] {
+        hub.message("ABC", &a, &mut true, json!({"t":"weather","v":choice}), 0);
+        assert_eq!(hub.rooms["ABC"].weather, choice);
+    }
+    hub.message("ABC", &a, &mut true, json!({"t":"start"}), 0);
+    assert_eq!(hub.rooms["ABC"].native.as_ref().unwrap().epoch, 1);
+    let before = identity(&hub);
+    for who in [&a, &b] {
+        hub.message("ABC", who, &mut true, json!({"t":"weather","v":"snow"}), 0);
+        assert_eq!(hub.rooms["ABC"].weather, "map");
+        assert_eq!(identity(&hub), before);
+    }
+    let mut denied = 0;
+    for queue in [&mut ra, &mut rb] {
+        while let Ok(output) = queue.try_recv() {
+            if let Output::Json(message) = output
+                && message["t"] == "deny"
+                && message["cmd"] == "weather"
+            {
+                assert_eq!(message["reason"], "blocked");
+                denied += 1;
+            }
+        }
+    }
+    assert_eq!(denied, 2);
+    hub.message("ABC", &a, &mut true, json!({"t":"restart"}), 0);
+    let native = hub.rooms["ABC"].native.as_ref().unwrap();
+    assert_eq!(native.epoch, 2);
+    assert_eq!(hub.rooms["ABC"].weather, "map");
+    assert_eq!(
+        native.receipt.as_ref().unwrap()["options"]["weatherSeed"],
+        native.runtime.state().start.weather_seed
+    );
+    assert!(native.runtime.state().start.weather_seed < (1 << 31));
+}
+
+#[test]
+fn mode07_weather_entropy_failure_preserves_lobby_and_running_match() {
+    let (mut hub, a, mut ra, _, mut rb) = room();
+    let unavailable = || Err("weather seed unavailable: injected failure".into());
+    assert!(
+        hub.start_trusted_with_weather_source("ABC", a.id, false, 0, unavailable)
+            .is_err()
+    );
+    assert!(hub.rooms["ABC"].native.is_none() && hub.accounts.is_empty());
+    assert_eq!(hub.next_epoch, 0);
+    assert!(ra.try_recv().is_err() && rb.try_recv().is_err());
+    hub.start_trusted("ABC", a.id, false, 0).unwrap();
+    while ra.try_recv().is_ok() {}
+    while rb.try_recv().is_ok() {}
+    let before = identity(&hub);
+    assert!(
+        hub.start_trusted_with_weather_source("ABC", a.id, true, 0, unavailable)
+            .is_err()
+    );
+    assert_eq!(identity(&hub), before);
+    assert!(ra.try_recv().is_err() && rb.try_recv().is_err());
 }
 
 #[test]

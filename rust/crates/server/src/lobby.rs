@@ -985,6 +985,12 @@ const UNAVAILABLE: &[&str] = &[
 ];
 
 // Prototype server.js:353-356. This selects an option, not mode admission.
+fn fresh_weather_seed() -> Result<u32, String> {
+    getrandom::u32()
+        .map(|seed| seed & 0x7fff_ffff)
+        .map_err(|error| format!("weather seed unavailable: {error}"))
+}
+
 fn logistics_enabled_for(mode: &str, map: &Value) -> bool {
     if truthy(&map["scenario"]) {
         return map["scenario"]["logistics"] == Value::Bool(true);
@@ -1909,6 +1915,21 @@ impl Hub {
         Ok(self.publish_native(code, prepared))
     }
 
+    #[cfg(test)]
+    fn start_trusted_with_weather_source(
+        &mut self,
+        code: &str,
+        connection_id: u64,
+        restart: bool,
+        now: u64,
+        weather_seed: impl FnOnce() -> Result<u32, String>,
+    ) -> Result<u64, String> {
+        let request = self.trusted_start_request_with_weather_source(code, connection_id, restart, weather_seed)?;
+        let state = request.generate()?;
+        let prepared = self.prepare_trusted_start(code, state, now, restart)?;
+        Ok(self.publish_native(code, prepared))
+    }
+
     fn start_public(&mut self, code: &str, now: u64) -> Result<u64, String> {
         let room = self.rooms.get(code).ok_or("room absent")?;
         if room.native.is_some()
@@ -1950,7 +1971,7 @@ impl Hub {
             shuffle: true,
             army,
             weather: WeatherChoice::from_reference(Some(&room.weather)),
-            weather_seed: None,
+            weather_seed: Some(fresh_weather_seed()?),
             living_weather: true,
             map_key: Some(room.map.clone()),
             tech: true,

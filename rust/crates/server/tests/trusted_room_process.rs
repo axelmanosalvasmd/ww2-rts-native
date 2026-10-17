@@ -188,6 +188,7 @@ fn ordinary_binary_two_seats_move_stop_takeover_and_restart_with_private_seed() 
     assert_eq!(receipts.len(), 2);
     let mut fresh_settings = receipts[1]["options"].clone();
     fresh_settings["seed"] = receipts[0]["options"]["seed"].clone();
+    fresh_settings["weatherSeed"] = receipts[0]["options"]["weatherSeed"].clone();
     assert_eq!(receipts[0]["options"], fresh_settings);
     assert_ne!(
         receipts[0]["environmentSeed"],
@@ -199,7 +200,8 @@ fn ordinary_binary_two_seats_move_stop_takeover_and_restart_with_private_seed() 
             options["seed"].as_u64(),
             Some(u64::MAX.wrapping_add(index as u64))
         );
-        assert_eq!(options["weatherSeed"], Value::Null);
+        assert!(options["weatherSeed"].as_u64().unwrap() < (1 << 31));
+        assert_eq!(options["weatherSeed"], receipt["derivedWeatherSeed"]);
         for key in ["shuffle", "tech", "supply", "livingWeather", "logistics"] {
             assert_eq!(options[key], true);
         }
@@ -295,7 +297,13 @@ fn ordinary_binary_refuses_unsupported_settings_before_any_start_publication() {
         host.barrier();
         begin(&mut host, &mut guest);
         host.until(|m| m["t"] == "s");
-        assert_eq!(server.receipts()[0]["options"]["weather"], weather);
+        let receipts = server.receipts();
+        assert_eq!(receipts[0]["options"]["weather"], weather);
+        assert!(receipts[0]["options"]["weatherSeed"].as_u64().unwrap() < (1 << 31));
+        assert_eq!(
+            receipts[0]["options"]["weatherSeed"],
+            receipts[0]["derivedWeatherSeed"]
+        );
     }
 }
 

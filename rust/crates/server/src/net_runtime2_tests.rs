@@ -257,6 +257,7 @@ fn net41_r1_restart_repeats_settings_resets_pause_and_reconnects_absent_seat() {
     }
     let mut expected_options = original_options;
     expected_options.seed = expected_options.seed.wrapping_add(1);
+    expected_options.weather_seed = hub.rooms["ABC"].native.as_ref().unwrap().runtime.state().options.weather_seed;
     let expected = crate::authoritative_maps::create_match("default", expected_options).unwrap();
     let expected_spawns = json!(
         expected
@@ -275,6 +276,10 @@ fn net41_r1_restart_repeats_settings_resets_pause_and_reconnects_absent_seat() {
         .receipt
         .clone()
         .unwrap();
+    for recorded in [&original, &receipt] {
+        assert!(recorded["options"]["weatherSeed"].as_u64().unwrap() < (1 << 31));
+        assert_eq!(recorded["options"]["weatherSeed"], recorded["derivedWeatherSeed"]);
+    }
     assert_eq!(receipt["options"]["seed"], expected.options.seed);
     assert_eq!(receipt["environmentSeed"], expected.start.environment_seed);
     assert_ne!(receipt["environmentSeed"], original["environmentSeed"]);
@@ -282,6 +287,8 @@ fn net41_r1_restart_repeats_settings_resets_pause_and_reconnects_absent_seat() {
     receipt["matchId"] = original["matchId"].clone();
     receipt["options"]["seed"] = original["options"]["seed"].clone();
     receipt["environmentSeed"] = original["environmentSeed"].clone();
+    receipt["options"]["weatherSeed"] = original["options"]["weatherSeed"].clone();
+    receipt["derivedWeatherSeed"] = original["derivedWeatherSeed"].clone();
     assert_eq!(receipt, original);
     assert_eq!(hub.rooms["ABC"].weather, "rain");
     assert_eq!(hub.native_status("ABC").unwrap().tick, 0);

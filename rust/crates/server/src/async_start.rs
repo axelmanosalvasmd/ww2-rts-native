@@ -40,6 +40,16 @@ impl Hub {
         connection_id: u64,
         restart: bool,
     ) -> Result<StartRequest, String> {
+        self.trusted_start_request_with_weather_source(code, connection_id, restart, fresh_weather_seed)
+    }
+
+    pub(super) fn trusted_start_request_with_weather_source(
+        &self,
+        code: &str,
+        connection_id: u64,
+        restart: bool,
+        weather_seed: impl FnOnce() -> Result<u32, String>,
+    ) -> Result<StartRequest, String> {
         let trusted = self.trusted.as_ref().ok_or("trusted hosting is disabled")?;
         if trusted.code != code || self.is_stopped() {
             return Err("trusted room unavailable".into());
@@ -124,7 +134,7 @@ impl Hub {
                 shuffle: true,
                 army: ArmySize::from_key(&room.army),
                 weather: WeatherChoice::from_reference(Some(&room.weather)),
-                weather_seed: None,
+                weather_seed: Some(weather_seed()?),
                 living_weather: true,
                 map_key: Some(room.map.clone()),
                 tech: true,
