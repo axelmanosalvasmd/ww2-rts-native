@@ -356,11 +356,7 @@ fn retreat_through_legs(mode: Mode) {
     m.commands.units.get_mut(&id).unwrap().hold_fire = true;
     let home = m.reaction_home(id).unwrap();
     let selected = seats(&m);
-    let mut delivery = if mode == Mode::Classic {
-        None
-    } else {
-        Some(DeliveryState::new(&m).unwrap())
-    };
+    let mut delivery = DeliveryState::new(&m).unwrap();
     assert_eq!(
         m.execute_command(
             0,
@@ -378,16 +374,7 @@ fn retreat_through_legs(mode: Mode) {
     let mut reached_first_leg = false;
     let mut leg_ends = BTreeSet::new();
     for _ in 0..2500 {
-        if let Some(delivery) = &mut delivery {
-            delivered_tick(&mut m, delivery, &selected);
-        } else {
-            m.advance_tick().unwrap();
-            // Classic core ticks are supported; complete recipient delivery remains guarded.
-            assert!(matches!(
-                SnapshotCache::new(&m),
-                Err(SnapshotError::UnsupportedMode)
-            ));
-        }
+        delivered_tick(&mut m, &mut delivery, &selected);
         let u = &m.world.game.units[&id];
         if let Some(end) = u.path.last() {
             leg_ends.insert((end.x.to_bits(), end.z.to_bits()));
@@ -409,15 +396,7 @@ fn retreat_through_legs(mode: Mode) {
     assert_eq!(m.commands.units[&id].outcome, Some(MoveOutcome::Arrived));
     assert!(m.tick_state.fault().is_none());
     for _ in 0..3 {
-        if let Some(delivery) = &mut delivery {
-            delivered_tick(&mut m, delivery, &selected);
-        } else {
-            m.advance_tick().unwrap();
-            assert!(matches!(
-                SnapshotCache::new(&m),
-                Err(SnapshotError::UnsupportedMode)
-            ));
-        }
+        delivered_tick(&mut m, &mut delivery, &selected);
     }
     assert!(m.tick_state.fault().is_none());
 }
@@ -430,7 +409,7 @@ fn mov48_ordinary_retreat_traverses_multiple_legs_and_delivers_every_seat() {
 }
 
 #[test]
-fn mov48_classic_retreat_traverses_multiple_legs_with_delivery_guard_retained() {
+fn mov48_classic_retreat_traverses_multiple_legs_with_all_seat_delivery() {
     retreat_through_legs(Mode::Classic);
 }
 

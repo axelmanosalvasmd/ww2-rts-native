@@ -1,0 +1,3 @@
+- Fix queued Take Cover after garrison so it retains the house destination without faulting the room. Allow queued cover during entrenchment, and let immediate cover cancel that squad's paid work and project membership without refunding it or removing other workers.
+- Allow public Move and attack-move orders to leave a garrison. Apply the prototype's raw selection limit to garrison orders, including queued orders.
+- Keep production cancellation refused before enqueue in Conquest with the prototype's `needs` denial. Extend the public-socket match test to exercise every other admitted command successfully and collect every seat's recipient snapshot on every tick through victory.
