@@ -360,7 +360,8 @@ fn mode01_non_world_mode_rows_match_the_prototype_public_fields() {
         if mode == Mode::Conquest {
             let cache = SnapshotCache::new(&m).unwrap();
             for slot in 0..m.start.players.len() {
-                assert!(!cache.recipient(slot).unwrap().fields.contains_key("mode"));
+                let fields = cache.recipient(slot).unwrap().fields;
+                assert!(!fields.contains_key("mode"));
             }
         } else if mode == Mode::Classic {
             let count = m.start.players.len();
@@ -375,6 +376,7 @@ fn mode01_non_world_mode_rows_match_the_prototype_public_fields() {
             for slot in 0..count {
                 let projection = frame.recipient(slot).unwrap();
                 assert_eq!(projection.fields["mode"], expected, "Classic seat {slot}");
+                assert_eq!(projection.fields["ghosts"], json!([]));
                 assert_eq!(
                     projection.missing,
                     vec![

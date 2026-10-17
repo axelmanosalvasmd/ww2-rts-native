@@ -3,6 +3,7 @@ use super::*;
 use crate::{game::Point, projectiles};
 
 pub(super) fn project(state: &Match, slot: usize) -> Result<Value, SnapshotError> {
+    operative_flights::validate(state)?;
     let g = &state.world.game;
     let time = g.tick as f64 * state.rules.movement.tick;
     finite(&[time])?;

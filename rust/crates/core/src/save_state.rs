@@ -107,6 +107,7 @@ impl Match {
 fn known_string(value: &str) -> Option<&'static str> {
     const RUNTIME: &[&str] = &[
         "building",
+        "house",
         "bridge",
         "intact",
         "damaged",
