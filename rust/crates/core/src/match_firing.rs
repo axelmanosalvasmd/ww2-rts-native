@@ -966,28 +966,27 @@ impl Match {
         start_fraction: f64,
         end_fraction: f64,
     ) -> Result<Option<FlightContact>, String> {
-        self.flight_contact_query(p, a, b, start_fraction, end_fraction, false, &|_| true)
+        self.flight_contact_for(p, a, b, start_fraction, end_fraction, None)
     }
-    /// Recipient extrapolation uses current poses and only recipient-visible bodies.
+    /// Snapshot extrapolation uses current poses and only visible unit bodies.
+    /// Terrain remains canonical, matching flightUntil at the prototype pin.
     pub(crate) fn visible_flight_contact(
         &self,
         p: &LiveFlight,
         a: projectiles::Point3,
         b: projectiles::Point3,
-        seen: &impl Fn(UnitId) -> bool,
+        slot: usize,
     ) -> Result<Option<FlightContact>, String> {
-        self.flight_contact_query(p, a, b, 1., 1., true, seen)
+        self.flight_contact_for(p, a, b, 1.0, 1.0, Some(slot))
     }
-    #[allow(clippy::too_many_arguments)]
-    fn flight_contact_query(
+    fn flight_contact_for(
         &self,
         p: &LiveFlight,
         a: projectiles::Point3,
         b: projectiles::Point3,
         start_fraction: f64,
         end_fraction: f64,
-        stationary: bool,
-        seen: &impl Fn(UnitId) -> bool,
+        recipient: Option<usize>,
     ) -> Result<Option<FlightContact>, String> {
         let g = &self.world.game;
         let level_height = n(self.firing_config()?, "levelHeight", 2.5);
@@ -1039,10 +1038,10 @@ impl Match {
         // Exact unit-contact ties use numeric IDs instead of bucket or registration history.
         let mut candidates = self.grid.in_order(&g.units, center, reach, |_, t| {
             t.hp > 0.0
-                && seen(t.id)
                 && t.air.is_none()
                 && !t.riding
                 && t.id != p.shooter
+                && recipient.is_none_or(|slot| crate::recipient_snapshot::seen_by(self, slot, t.id))
                 && (p.blast_source.is_some() || !g.allied(p.owner, t.owner))
         });
         candidates.sort_unstable();
@@ -1052,7 +1051,7 @@ impl Match {
             if def.building && t.cells.as_ref().is_some_and(|c| !c.is_empty()) {
                 continue;
             }
-            let old = if stationary {
+            let old = if recipient.is_some() {
                 t.pose()
             } else {
                 self.firing
