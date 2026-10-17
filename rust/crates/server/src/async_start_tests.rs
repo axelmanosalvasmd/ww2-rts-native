@@ -298,6 +298,7 @@ fn net37_async_socket_dispatch_stays_available_for_end_while_worker_is_blocked()
             hub: Arc::new(tokio::sync::Mutex::new(hub)),
             next: Arc::new(AtomicU64::new(3)),
             clock: Instant::now(),
+            static_files: None,
             test_now_ms: Some(Arc::new(AtomicU64::new(0))),
         };
         let (started, wait_started) = std::sync::mpsc::channel();
