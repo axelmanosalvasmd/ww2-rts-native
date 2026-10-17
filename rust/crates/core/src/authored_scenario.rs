@@ -21,11 +21,22 @@ pub struct ScenarioSay {
 impl ScenarioSay {
     fn from_row(row: &Value) -> Result<Self, String> {
         Ok(Self {
-            text: row["text"].as_str().ok_or("invalid canonical Say text")?.into(),
+            text: row["text"]
+                .as_str()
+                .ok_or("invalid canonical Say text")?
+                .into(),
             localized: row["localized"].clone(),
-            recipients: row["scenarioRecipients"].as_str().ok_or("invalid canonical Say recipients")?.into(),
-            side: row["scenarioSide"].as_u64().ok_or("invalid canonical Say side")? as usize,
-            execution: row["execution"].as_str().ok_or("invalid canonical Say execution")?.into(),
+            recipients: row["scenarioRecipients"]
+                .as_str()
+                .ok_or("invalid canonical Say recipients")?
+                .into(),
+            side: row["scenarioSide"]
+                .as_u64()
+                .ok_or("invalid canonical Say side")? as usize,
+            execution: row["execution"]
+                .as_str()
+                .ok_or("invalid canonical Say execution")?
+                .into(),
             at_tick: row["atTick"].as_u64().ok_or("invalid canonical Say tick")?,
         })
     }
@@ -43,8 +54,13 @@ impl ScenarioSay {
             || self.at_tick > state.world.game.tick as u64
             || self.at_tick > MAX_INTEGER
             || !execution_valid(&self.execution)
-            || !state.authored_scenario.as_ref().unwrap().validate_canonical(state.world.game.players.len())?
-                .iter().any(|row| *row == self.shot_json())
+            || !state
+                .authored_scenario
+                .as_ref()
+                .unwrap()
+                .validate_canonical(state.world.game.players.len())?
+                .iter()
+                .any(|row| *row == self.shot_json())
         {
             return Err("invalid authored scenario announcement".into());
         }
@@ -119,7 +135,9 @@ fn execution_valid(execution: &str) -> bool {
         .and_then(|s| s.parse::<u64>().ok())
         .is_some_and(|n| (1..=MAX_INTEGER).contains(&n) && execution == format!("scenario:{n}"))
 }
-fn required_tick<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Option<u64>, D::Error> {
+fn required_tick<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<u64>, D::Error> {
     <Option<u64> as serde::Deserialize>::deserialize(deserializer)
 }
 fn list<'a>(data: &'a Value, key: &str) -> &'a [Value] {
@@ -167,39 +185,75 @@ impl AuthoredScenario {
             .map(Objective::row).collect::<Vec<_>>()})
     }
     fn canonical(&self, count: usize) -> Result<(Value, Vec<Value>), String> {
-        crate::authored_mission::AuthoredMission::canonical_checkpoint(&self.data, self.last_tick, count)
+        crate::authored_mission::AuthoredMission::canonical_checkpoint(
+            &self.data,
+            self.last_tick,
+            count,
+        )
     }
     fn validate_canonical(&self, count: usize) -> Result<Vec<Value>, String> {
         let (expected, shots) = self.canonical(count)?;
-        if serde_json::to_value(&self.executions).map_err(|e| e.to_string())? != expected["executions"]
-            || serde_json::to_value(&self.objectives).map_err(|e| e.to_string())? != expected["objectives"]
+        if serde_json::to_value(&self.executions).map_err(|e| e.to_string())?
+            != expected["executions"]
+            || serde_json::to_value(&self.objectives).map_err(|e| e.to_string())?
+                != expected["objectives"]
             || self.next_execution != expected["next_execution"].as_u64().unwrap()
         {
             return Err("persisted mission state does not match canonical execution".into());
         }
         Ok(shots)
     }
-    fn step(&mut self, tick: u64, count: usize, owners: &[(String, i32)]) -> Result<Vec<ScenarioSay>, String> {
+    fn step(
+        &mut self,
+        tick: u64,
+        count: usize,
+        owners: &[(String, i32)],
+    ) -> Result<Vec<ScenarioSay>, String> {
         self.validate_canonical(count)?;
-        if self.last_tick.map_or(tick != 1, |last| last.checked_add(1) != Some(tick)) {
+        if self
+            .last_tick
+            .map_or(tick != 1, |last| last.checked_add(1) != Some(tick))
+        {
             return Err("mission ticks must advance consecutively from one".into());
         }
-        let (canonical, shots) = crate::authored_mission::AuthoredMission::canonical_checkpoint(&self.data, Some(tick), count)?;
+        let (canonical, shots) = crate::authored_mission::AuthoredMission::canonical_checkpoint(
+            &self.data,
+            Some(tick),
+            count,
+        )?;
         for (id, owner) in owners {
             if *owner >= 0 && self.owners.get(id) != Some(owner) {
                 self.facts.captured.insert((id.clone(), *owner));
             }
             self.owners.insert(id.clone(), *owner);
         }
-        self.executions = serde_json::from_value(canonical["executions"].clone()).map_err(|e| e.to_string())?;
-        self.objectives = serde_json::from_value(canonical["objectives"].clone()).map_err(|e| e.to_string())?;
+        self.executions =
+            serde_json::from_value(canonical["executions"].clone()).map_err(|e| e.to_string())?;
+        self.objectives =
+            serde_json::from_value(canonical["objectives"].clone()).map_err(|e| e.to_string())?;
         self.next_execution = canonical["next_execution"].as_u64().unwrap();
         self.last_tick = Some(tick);
-        self.facts.trigger_counts = self.executions.iter().map(|(key, record)|
-            ( (key.strip_suffix("@match").unwrap().to_owned(), Scope::Match), record.count )).collect();
-        self.facts.completed_objectives = self.objectives.iter().filter(|o| o.state == "complete")
-            .map(|o| (o.id.clone(), Scope::Match)).collect();
-        shots.iter().filter(|row| row["atTick"].as_u64() == Some(tick)).map(ScenarioSay::from_row).collect()
+        self.facts.trigger_counts = self
+            .executions
+            .iter()
+            .map(|(key, record)| {
+                (
+                    (key.strip_suffix("@match").unwrap().to_owned(), Scope::Match),
+                    record.count,
+                )
+            })
+            .collect();
+        self.facts.completed_objectives = self
+            .objectives
+            .iter()
+            .filter(|o| o.state == "complete")
+            .map(|o| (o.id.clone(), Scope::Match))
+            .collect();
+        shots
+            .iter()
+            .filter(|row| row["atTick"].as_u64() == Some(tick))
+            .map(ScenarioSay::from_row)
+            .collect()
     }
 }
 
@@ -251,8 +305,10 @@ impl Match {
         }
         let count = self.world.game.players.len();
         s.validate_canonical(count)?;
-        if clock < 0 || s.last_tick.is_some_and(|tick| tick > clock as u64)
-            || (self.finish.is_none() && s.last_tick.unwrap_or(0) != clock as u64) {
+        if clock < 0
+            || s.last_tick.is_some_and(|tick| tick > clock as u64)
+            || (self.finish.is_none() && s.last_tick.unwrap_or(0) != clock as u64)
+        {
             return Err("authored mission clock disagrees with match tick".into());
         }
 
@@ -437,7 +493,10 @@ impl Match {
             })
             .collect::<Result<Vec<_>, String>>()?;
         let count = self.world.game.players.len();
-        self.authored_scenario.as_mut().unwrap().step(tick, count, &owners)
+        self.authored_scenario
+            .as_mut()
+            .unwrap()
+            .step(tick, count, &owners)
     }
 }
 

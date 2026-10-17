@@ -214,15 +214,21 @@ impl AuthoredMission {
         let (canonical, shots) = initial.reconstruct(last_tick.map(|_| 1), last_tick)?;
         let mut executions = serde_json::Map::new();
         for trigger in &canonical.triggers {
-            executions.insert(format!("{}@match", trigger.id), json!({
-                "count":u32::from(trigger.execution.is_some()),
-                "next":trigger.at_tick.map_or(0.0, |tick| tick as f64 * TICK_SECONDS),
-                "previous":trigger.previous,
-                "execution":trigger.execution.map(|id| format!("scenario:{id}"))
-            }));
+            executions.insert(
+                format!("{}@match", trigger.id),
+                json!({
+                    "count":u32::from(trigger.execution.is_some()),
+                    "next":trigger.at_tick.map_or(0.0, |tick| tick as f64 * TICK_SECONDS),
+                    "previous":trigger.previous,
+                    "execution":trigger.execution.map(|id| format!("scenario:{id}"))
+                }),
+            );
         }
-        Ok((json!({"executions":executions,"objectives":canonical.objectives,
-            "next_execution":canonical.next_execution}), shots))
+        Ok((
+            json!({"executions":executions,"objectives":canonical.objectives,
+            "next_execution":canonical.next_execution}),
+            shots,
+        ))
     }
 
     /// Legacy map triggers retain their existing owner. A present authored

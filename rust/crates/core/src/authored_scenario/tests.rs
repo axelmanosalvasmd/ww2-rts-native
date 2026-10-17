@@ -152,7 +152,6 @@ fn authored_checkpoint_preserves_canonical_trigger_and_objective_history() {
     assert_eq!(state.authored_scenario, before);
 }
 
-
 #[test]
 fn authored_checkpoint_rejects_missing_clock_legacy_owner_and_tampered_history() {
     let data = json!({"version":1,"objectives":[{"id":"hold","text":"Hold"}],
@@ -163,9 +162,16 @@ fn authored_checkpoint_rejects_missing_clock_legacy_owner_and_tampered_history()
     state.setup_authored_scenario().unwrap();
     let saved = state.save_json().unwrap();
     let mut missing_clock = saved.clone();
-    let owner = missing_clock[1].as_array_mut().unwrap().iter_mut()
-        .find(|entry| entry[0] == json!(["string","authored_scenario"])).unwrap();
-    owner[1][1][1].as_array_mut().unwrap().retain(|entry| entry[0] != json!(["string","last_tick"]));
+    let owner = missing_clock[1]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|entry| entry[0] == json!(["string", "authored_scenario"]))
+        .unwrap();
+    owner[1][1][1]
+        .as_array_mut()
+        .unwrap()
+        .retain(|entry| entry[0] != json!(["string", "last_tick"]));
     assert!(Match::from_save_json(missing_clock).is_err());
 
     let legacy: crate::authored_mission::AuthoredMission = serde_json::from_value(json!({
@@ -176,27 +182,46 @@ fn authored_checkpoint_rejects_missing_clock_legacy_owner_and_tampered_history()
     let mut legacy_checkpoint = saved.clone();
     let legacy_value = crate::save_codec::to_value(&Some(legacy)).unwrap();
     let fields = legacy_checkpoint[1].as_array_mut().unwrap();
-    if let Some(entry) = fields.iter_mut().find(|entry| entry[0] == json!(["string","authored_mission"])) {
+    if let Some(entry) = fields
+        .iter_mut()
+        .find(|entry| entry[0] == json!(["string", "authored_mission"]))
+    {
         entry[1] = legacy_value;
     } else {
-        fields.push(json!([["string","authored_mission"], legacy_value]));
+        fields.push(json!([["string", "authored_mission"], legacy_value]));
     }
-    assert!(Match::from_save_json(legacy_checkpoint.clone()).err().unwrap()
-        .contains("legacy authored mission checkpoints are unsupported"));
-    legacy_checkpoint[1].as_array_mut().unwrap()
-        .retain(|entry| entry[0] != json!(["string","authored_scenario"]));
-    assert!(Match::from_save_json(legacy_checkpoint).err().unwrap()
-        .contains("legacy authored mission checkpoints are unsupported"));
+    assert!(
+        Match::from_save_json(legacy_checkpoint.clone())
+            .err()
+            .unwrap()
+            .contains("legacy authored mission checkpoints are unsupported")
+    );
+    legacy_checkpoint[1]
+        .as_array_mut()
+        .unwrap()
+        .retain(|entry| entry[0] != json!(["string", "authored_scenario"]));
+    assert!(
+        Match::from_save_json(legacy_checkpoint)
+            .err()
+            .unwrap()
+            .contains("legacy authored mission checkpoints are unsupported")
+    );
     state = Match::from_save_json(saved).unwrap();
     let report = state.advance_tick().unwrap();
-    let say = report.events.iter().find_map(|event| match event {
-        crate::match_tick::TickEvent::AuthoredScenario(say) => Some(say.clone()),
-        _ => None,
-    }).unwrap();
+    let say = report
+        .events
+        .iter()
+        .find_map(|event| match event {
+            crate::match_tick::TickEvent::AuthoredScenario(say) => Some(say.clone()),
+            _ => None,
+        })
+        .unwrap();
     say.validate(&state).unwrap();
     let legacy_event = crate::match_tick::TickEvent::AuthoredMission(say.shot_json());
     assert!(crate::recipient_snapshot::ShotRef::try_from(&legacy_event).is_err());
-    assert!(Match::events_from_save_json(Match::save_events_json(&[legacy_event]).unwrap()).is_err());
+    assert!(
+        Match::events_from_save_json(Match::save_events_json(&[legacy_event]).unwrap()).is_err()
+    );
     let mut unknown_say = serde_json::to_value(&say).unwrap();
     unknown_say["x"] = json!(0);
     assert!(serde_json::from_value::<ScenarioSay>(unknown_say).is_err());

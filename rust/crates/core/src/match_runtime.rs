@@ -903,7 +903,12 @@ impl Match {
             produced_placer: crate::produced_units::ProducedPlacer::new(),
             scenario,
             authored_mission: None,
-            authored_scenario: map.source().get("scenario").filter(|value| !value.is_null()).cloned().map(crate::authored_scenario::AuthoredScenario::new),
+            authored_scenario: map
+                .source()
+                .get("scenario")
+                .filter(|value| !value.is_null())
+                .cloned()
+                .map(crate::authored_scenario::AuthoredScenario::new),
             logistics: crate::logistics::LogisticsState::default(),
             convoys: None,
             supply_net: crate::supply_network::GroundSupplyNetwork::default(),

@@ -46,7 +46,10 @@ impl Match {
         value: Value,
     ) -> Result<Vec<crate::match_tick::TickEvent>, String> {
         let events: Vec<crate::match_tick::TickEvent> = crate::save_codec::from_value(value)?;
-        if events.iter().any(|event| matches!(event, crate::match_tick::TickEvent::AuthoredMission(_))) {
+        if events
+            .iter()
+            .any(|event| matches!(event, crate::match_tick::TickEvent::AuthoredMission(_)))
+        {
             return Err("legacy authored mission checkpoint events are unsupported".into());
         }
         Ok(events)

@@ -151,7 +151,12 @@ fn mode86_ordinary_room_filters_scenario_reads_without_execution_and_keeps_norma
             objectives.push(objective("side", "active", "scenario:1", 0.05));
         }
         if slot != 1 {
-            shots.push(say("Allies", json!({"en":"Allies","es":"Allies"}), "team", 2));
+            shots.push(say(
+                "Allies",
+                json!({"en":"Allies","es":"Allies"}),
+                "team",
+                2,
+            ));
             objectives.push(objective("team", "active", "scenario:1", 0.05));
         }
         assert_eq!(first[slot]["shots"], json!([]));

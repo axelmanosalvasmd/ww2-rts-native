@@ -787,7 +787,11 @@ impl crate::match_runtime::Match {
 
         if self.options.mode != crate::economy::Mode::World && !winner_decided {
             if self.authored_scenario.is_some() {
-                events.extend(self.step_authored_scenario(tick as u64)?.into_iter().map(TickEvent::AuthoredScenario));
+                events.extend(
+                    self.step_authored_scenario(tick as u64)?
+                        .into_iter()
+                        .map(TickEvent::AuthoredScenario),
+                );
             } else {
                 crate::legacy_scenario_runtime::step_legacy_scenario_emitting(
                     self,
