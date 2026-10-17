@@ -19,6 +19,7 @@ fn outputs(hub: &mut Hub, rx: &mut mpsc::Receiver<Output>, now: u64) -> Vec<Valu
                 result.push(serde_json::from_str(&frame.json).unwrap());
                 hub.complete_snapshot(&frame, true, now);
             }
+            Output::Watcher(_) => panic!("unexpected watcher output on Horde commander channel"),
             Output::Close(code, reason) => panic!("unexpected close {code}: {reason}"),
         }
     }

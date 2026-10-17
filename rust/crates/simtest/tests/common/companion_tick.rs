@@ -555,10 +555,8 @@ impl Projection {
                 TickEvent::Scenario(event) => event.shot_json(),
                 TickEvent::Horde(event) => event.shot_json(),
                 TickEvent::AuthoredMission(row) => row.clone(),
-                TickEvent::Support(_) | TickEvent::Aviation(_) | TickEvent::Horde(_) => {
-                    panic!(
-                        "operative fixture cannot represent Support, Aviation or Horde shot events"
-                    )
+                TickEvent::Support(_) | TickEvent::Aviation(_) => {
+                    panic!("operative fixture cannot represent Support or Aviation shot events")
                 }
             };
             self.shots.push(shot);
