@@ -181,7 +181,7 @@ fn tick_and_collect(state: &mut Match, delivery: Option<&mut DeliveryState>) {
         state.validate_gate_actor(id).unwrap();
     }
     let Some(delivery) = delivery else {
-        // These existing mode snapshot bounds are independent of Gate admission.
+        // Unsupported mode snapshot bounds remain independent of Gate admission.
         assert!(matches!(
             SnapshotCache::new(state),
             Err(SnapshotError::UnsupportedMode)

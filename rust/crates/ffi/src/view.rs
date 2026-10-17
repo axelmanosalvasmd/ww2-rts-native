@@ -276,6 +276,39 @@ fn view_error(error: ViewError) -> Failure {
     }
 }
 
+/// Checks placement using only this recipient's delivered map, cells, units and snapshot fields.
+/// Request JSON: {kind,x,z,dir,team}. Output follows placementCheck: {ok,reason?,cells?,x,z,c?,node?}.
+/// Uses the JSON buffer rules of ww2_authoring_validate_map. No view state changes on success or
+/// ordinary failure. A panic poisons the handle, as with other view calls.
+///
+/// # Safety
+/// view must be null or a live exclusively owned handle. Input, output and count storage must be
+/// valid and disjoint from each other and the handle, as for ww2_authoring_validate_map.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ww2_view_placement_check(
+    view: *mut ww2_view,
+    json: *const c_char,
+    len: usize,
+    out: *mut c_char,
+    capacity: usize,
+    out_len: *mut usize,
+) -> i32 {
+    // SAFETY: the caller promises the handle and buffer requirements documented above.
+    unsafe {
+        view_guard(view, |state| {
+            if state.start().is_none() {
+                return Err(Failure {
+                    code: WW2_ERR_WRONG_STATE,
+                    message: "placement requires a recipient start".into(),
+                });
+            }
+            super::queries::json_query(json, len, out, capacity, out_len, |request| {
+                ww2_core::recipient_placement::placement_check(state, request)
+            })
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

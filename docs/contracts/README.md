@@ -12,7 +12,7 @@ These files reserve contract topics; no protocol or ABI is approved by their cre
 | [save-format.md](save-format.md) | Julio | Axel | Private JSON v1 for ordinary matches and shared authored v2; owner group I recorded in #5 comment 6217590741; implementation exact-head acknowledgement pending |
 | [startup-tables/README.md](startup-tables/README.md) | Julio | Axel | Content/schema v1 candidate explicitly accepted by both owners in PR #195 review; internal producer/platform proof integrated through PR #198 at `514e15f4`; transport #199 remains unagreed and unimplemented; Unreal adoption pending |
 | [combat-recipient-filtering.md](combat-recipient-filtering.md) | Julio | Axel | Existing prototype unit and ghost shapes; cached-path privacy mask under confirmed owner decision P; no World or Classic room admission |
-| rust-unreal-abi.md | Julio | Axel | Six ABI 2 recipient-view calls authoritative through PR #16, merged at `d88ef6d`; broader v0 contract remains draft; approved header unchanged; consumer source published in draft PR #201 at `9551d3976e9145c81030cf5a81ec7f0764b04d12`, explicitly not for merge, neither merged nor adopted on main; fresh live and complete decoder adoption pending |
+| rust-unreal-abi.md | Julio | Axel | Six ABI 2 recipient-view calls authoritative through PR #16, merged at `d88ef6d`; broader v0 contract remains draft; existing approved declarations unchanged; additive ABI 2.1 queries are a candidate in [abi-queries.md](abi-queries.md); consumer source published in draft PR #201 at `9551d3976e9145c81030cf5a81ec7f0764b04d12`, explicitly not for merge, neither merged nor adopted on main; fresh live and complete decoder adoption pending |
 
 The [R1 ingress note](r1-ingress.md) records prototype command shapes and the
 bounded #296/#366 overlap under owner decisions F and M. Exact-head runtime
@@ -25,3 +25,5 @@ Contract PRs must state native/reference baseline, version/status, fields and se
 The ABI 2 approval is limited to the six recipient-view calls in `rust-unreal-abi.md` and their staged Unreal consumer update. It does not approve additional interfaces. The operative privacy decisions recorded in `protocol.md` have separate owner confirmation. The broader drafts remain drafts; merged jointly approved scope is authoritative.
 
 [Editor maps and Horde records](editor-record-persistence.md) documents authenticated raw-map access, worker catalogue refresh and private Horde record storage under the recorded owner decisions. Hosted Horde admission and World persistence remain separate.
+
+[Additive ABI 2.1 queries](abi-queries.md) are an implementation candidate authorized by owner decision `julio-373-merged-decisions-20261016` on #5. Existing ABI 2 functions and layouts remain unchanged; exact signatures require runtime review before Unreal adoption.

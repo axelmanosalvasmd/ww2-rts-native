@@ -9,3 +9,4 @@
 - Port IF-25 Classic privacy assertions into the existing field-work and multi-leg retreat witnesses, retaining exact partial-capability checks. Keep aircraft cleanup alongside Classic Depot-node release.
 - Restore the vehicle-blocking flag import needed by editor route validation after composing it with the extracted runtime geography validator.
 - Initialize the existing empty map-ping history in the AI restore test fixture after composing it with main's Person fields.
+- Merge exact #418 head c4a9176448130a36f1f6d9a97b4248929df12784. Preserve the integration chain's stronger Classic per-seat partial projection, privacy, work and missing-capability assertions in the Gate, retreat and mode-row witnesses; retain the incoming initial Classic literal check. Full Classic snapshot delivery remains with its owning integration chain. Keep the editor persistence contract and separately authorized additive ABI query candidate.

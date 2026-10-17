@@ -173,6 +173,31 @@ static int check_view(const char *path) {
   return failures;
 }
 
+/* Link every additive query and check the caller-owned JSON buffer contract from C. */
+static int check_queries(void) {
+  typedef int32_t (*query)(const char *, size_t, char *, size_t, size_t *);
+  const query calls[] = {ww2_authoring_validate_map, ww2_authoring_migrate_scenario,
+    ww2_authoring_migrate_map, ww2_authoring_spawns_for, ww2_authoring_create_preview,
+    ww2_authoring_find_path, ww2_authoring_house_kinds, ww2_authoring_play_match};
+  int failures = ww2_abi_minor_version() != WW2_ABI_MINOR_VERSION;
+  for (size_t i = 0; i < sizeof calls / sizeof calls[0]; i++) {
+    size_t len = 99;
+    if (calls[i]("{", 1, NULL, 0, &len) != WW2_ERR_PARSE || len != 0) failures++;
+  }
+  size_t len = 0;
+  char out[32];
+  if (ww2_authoring_validate_map("null", 4, NULL, 0, &len) != WW2_ERR_CAPACITY ||
+      len != strlen("\"not a map\"") ||
+      ww2_authoring_validate_map("null", 4, out, sizeof out, &len) != WW2_OK ||
+      memcmp(out, "\"not a map\"", len) != 0) failures++;
+  ww2_view *view = NULL;
+  if (ww2_view_new(&view) != WW2_OK ||
+      ww2_view_placement_check(view, "{}", 2, out, sizeof out, &len) != WW2_ERR_WRONG_STATE ||
+      ww2_view_free(view) != WW2_OK) failures++;
+  printf("ABI 2.%" PRIu32 " additive queries: %s\n", ww2_abi_minor_version(), failures ? "FAILED" : "passed");
+  return failures;
+}
+
 int main(int argc, char **argv) {
   printf("ww2_abi_version() = %" PRIu32 " (header WW2_ABI_VERSION %d)\n", ww2_abi_version(), WW2_ABI_VERSION);
   printf("ww2_rules_hash() = %016" PRIx64 "\n", ww2_rules_hash());
@@ -180,7 +205,7 @@ int main(int argc, char **argv) {
   ww2_formation_slot_size(1, 0.5, &infantry);
   ww2_formation_slot_size(0, 2.2, &tank);
   printf("slot sizes: infantry radius 0.5 -> %.17g, vehicle radius 2.2 -> %.17g\n", infantry, tank);
-  int failures = (ww2_abi_version() != WW2_ABI_VERSION) + check_errors();
+  int failures = (ww2_abi_version() != WW2_ABI_VERSION) + check_errors() + check_queries();
 
   if (argc > 1) {
     FILE *f = fopen(argv[1], "r");

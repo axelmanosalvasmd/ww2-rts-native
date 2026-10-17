@@ -255,6 +255,7 @@ mod mov_followup_garrison_tests;
 mod save_codec;
 mod save_state;
 
+pub mod authoring_queries;
 pub mod commander_field_policy;
 pub mod commander_world_policy;
 #[cfg(test)]
@@ -264,3 +265,4 @@ mod movement_tick_privacy_tests;
 #[cfg(test)]
 mod movement_tick_speed_tests;
 mod numeric_keys;
+pub mod recipient_placement;
