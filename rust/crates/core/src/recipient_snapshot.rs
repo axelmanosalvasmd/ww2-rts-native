@@ -247,7 +247,18 @@ fn validate_snapshot(state: &Match) -> Result<(), SnapshotError> {
     state
         .prepare_companion_tick()
         .map_err(|_| SnapshotError::Unsupported {
-            unit: 0,
+            unit: g
+                .units
+                .values()
+                .find(|unit| {
+                    state
+                        .commands
+                        .units
+                        .get(&unit.id)
+                        .is_some_and(|control| control.operative)
+                        && !state.companions.soldiers.contains_key(&unit.id)
+                })
+                .map_or(0, |unit| unit.id),
             capability: SnapshotCapability::Operatives,
         })?;
     Ok(())
