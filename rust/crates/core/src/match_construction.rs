@@ -923,9 +923,8 @@ impl Match {
         queue: bool,
     ) -> Result<Option<crate::match_commands::Denial>, String> {
         use crate::{
-            game::{CELL, MOVE, Point},
+            game::{CELL, Point},
             match_commands::{Command, Denial},
-            match_runtime::{foot_center, footprint},
             unit_publication::StagedUnit,
         };
         let command = Command::Build {
@@ -1035,78 +1034,49 @@ impl Match {
         if name == "supplycache" && !self.options.logistics {
             return self.construction_denial(&selected, Denial::Blocked);
         }
-        let size = number(definition, "size")? as usize;
-        let x = math::round(at.x / CELL - size as f64 / 2.0);
-        let z = math::round(at.z / CELL - size as f64 / 2.0);
-        let g = &self.world.game;
-        if x < 0.0 || z < 0.0 || x >= g.w as f64 || z >= g.h as f64 {
-            return self.construction_denial(&selected, Denial::Blocked);
+        let placement = crate::building_placement::check(
+            &crate::building_placement::Context {
+                game: &self.world.game,
+                rules: &self.rules,
+                mode: self.options.mode,
+                logistics: self.options.logistics,
+                nodes: &[],
+                owned_cells: None,
+                rail_yard: None,
+            },
+            name,
+            at,
+            |center| self.recipient_sees(owner, center),
+        )?;
+        if let Some(reason) = placement.reason {
+            use crate::building_placement::Reason;
+            let denial = match reason {
+                Reason::Blocked => Denial::Blocked,
+                Reason::NotVisible => Denial::NotVisible,
+                Reason::Coast => Denial::Coast,
+                // World and node construction are refused before this ordinary query.
+                Reason::Territory | Reason::Rail => {
+                    return Err("unexpected World placement reason".into());
+                }
+            };
+            return self.construction_denial(&selected, denial);
         }
-        let cell = z as usize * g.w + x as usize;
-        let Some(cells) = footprint(g, cell, size) else {
-            return self.construction_denial(&selected, Denial::Blocked);
-        };
-        let center = foot_center(g, cell, size);
-        if !self.recipient_sees(owner, center)? {
-            return self.construction_denial(&selected, Denial::NotVisible);
-        }
+        let cells = placement.cells.ok_or("missing construction footprint")?;
+        let center = placement.at;
         self.world
             .preflight_cell_rows(&cells)
             .map_err(|e| e.to_string())?;
-        let g = &self.world.game;
-        if definition.get("coast").and_then(Value::boolean) == Some(true) {
-            if !g.naval {
-                return self.construction_denial(&selected, Denial::Blocked);
-            }
-            let coastal = cells.iter().any(|&cell| {
-                let x = (cell % g.w) as isize;
-                let z = (cell / g.w) as isize;
-                (-2..=2).any(|dz| {
-                    (-2..=2).any(|dx| {
-                        let (x, z) = (x + dx, z + dz);
-                        x >= 0
-                            && z >= 0
-                            && x < g.w as isize
-                            && z < g.h as isize
-                            && g.flags[z as usize * g.w + x as usize] & crate::game::LAND == 0
-                    })
-                })
-            });
-            if !coastal {
-                return self.construction_denial(&selected, Denial::Coast);
-            }
-        }
-        let min = cells
-            .iter()
-            .map(|&c| g.height.as_ref().map_or(0, |h| h[c]))
-            .min()
-            .unwrap();
         let top = cells
             .iter()
-            .map(|&c| g.height.as_ref().map_or(0, |h| h[c]))
+            .map(|&c| {
+                self.world
+                    .game
+                    .height
+                    .as_ref()
+                    .map_or(0, |heights| heights[c])
+            })
             .max()
-            .unwrap();
-        let occupied = g.units.values().any(|u| {
-            u.hp > 0.0
-                && !self.rules.kinds[u.kind].air
-                && !u.riding
-                && !self.rules.kinds[u.kind].structure
-                && u.x >= 0.0
-                && u.z >= 0.0
-                && u.x < g.w as f64 * CELL
-                && u.z < g.h as f64 * CELL
-                && cells.contains(
-                    &((u.z / CELL).floor() as usize * g.w + (u.x / CELL).floor() as usize),
-                )
-        });
-        if occupied
-            || i16::from(top) - i16::from(min) > 1
-            || cells
-                .iter()
-                .any(|&c| g.flags[c] & MOVE != 0 || b"WF=KOAQ".contains(&g.chars[c]))
-        {
-            return self.construction_denial(&selected, Denial::Blocked);
-        }
+            .ok_or("empty construction footprint")?;
         let id = self.next_unit_id;
         let next_id = id
             .checked_add(1)

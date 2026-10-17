@@ -28,6 +28,7 @@ mod native_order_intent_tests;
 pub mod ai_schedule;
 pub mod ai_view;
 pub mod assault_runtime;
+pub mod building_placement;
 pub mod catalog;
 pub mod client_view;
 pub mod combat;
