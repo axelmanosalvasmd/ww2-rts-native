@@ -270,18 +270,38 @@ mod tests {
     }
 
     #[test]
-    fn seed7_full_run_preserves_the_first_unsupported_recipient_failure() {
+    fn seed7_long_run_delivers_all_seats_beyond_the_former_projectile_boundary() {
         let map = AuthoritativeMap::from_json(include_bytes!(
             "../tests/fixtures/ai-runner-default-map.json"
         ))
         .unwrap();
-        let error = match play_match(&map, options(7), &["easy"; 3], 3600) {
-            Ok(_) => panic!("recipient support changed; review the retained AI-65 blocker"),
-            Err(error) => error,
-        };
+        let a = play_match(&map, options(7), &["easy"; 3], 3600).unwrap();
+        let b = play_match(&map, options(7), &["easy"; 3], 3600).unwrap();
+        let tick = a.state.world.game.tick as u64;
+        assert!(
+            tick > 310,
+            "the former projectile refusal must be traversed"
+        );
+        assert!(tick == 3600 || a.state.finish.is_some());
+        assert_eq!(a.snapshot_passes, tick.div_ceil(2));
+        assert_eq!(a.snapshot_passes, b.snapshot_passes);
+        assert_eq!(a.inputs, b.inputs);
+        assert_eq!(a.recipients, b.recipients);
         assert_eq!(
-            error,
-            "AI runner tick 310 recipient pass: Unsupported { unit: 0, capability: ShotsAndFlights }"
+            a.state.start.random.snapshot(),
+            b.state.start.random.snapshot()
+        );
+        assert!(a.state.tick_state.fault().is_none());
+        assert!(b.state.tick_state.fault().is_none());
+        assert_eq!(a.recipients.len(), 3);
+        for recipient in &a.recipients {
+            assert_eq!(recipient["t"], "s");
+            assert_eq!(recipient["tick"], tick);
+        }
+        assert!(
+            a.inputs
+                .iter()
+                .all(|input| { input.command.is_some() == input.accepted.is_some() })
         );
     }
 

@@ -273,17 +273,14 @@ fn cmb127_horde_reveals_only_active_final_ground_enemies_and_bosses_to_defenders
         }
         assert!(!m.world.game.players[slot].sees(enemy));
     }
-    assert!(
-        m.advance_tick()
-            .unwrap_err()
-            .reason
-            .contains("requires represented ordinary or World mode")
+    // This component fixture has a query-only plane without canonical sortie metadata.
+    let error = m.advance_tick().unwrap_err();
+    assert_eq!(
+        error.reason,
+        "aircraft admission: query aircraft has no sortie runtime metadata"
     );
     assert!(m.tick_state.fault().is_none());
-    assert!(matches!(
-        SnapshotCache::new(&m),
-        Err(SnapshotError::UnsupportedMode)
-    ));
+    assert_eq!(SnapshotCache::new(&m).err(), Some(SnapshotError::Rules));
 }
 
 #[test]
