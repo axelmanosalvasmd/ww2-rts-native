@@ -1,0 +1,1 @@
+- Preserve host End during pause when composing R1 ingress with Tutorial results. Extend the existing host-pause test to verify guest End is ignored while paused and still denied during play.

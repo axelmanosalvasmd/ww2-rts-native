@@ -676,8 +676,8 @@ impl Room {
         {
             return false;
         }
-        if t == "end" && attached {
-            if !host || me.connection.as_ref().is_none_or(|c| !c.ready()) {
+        if host && t == "end" && attached {
+            if me.connection.as_ref().is_none_or(|c| !c.ready()) {
                 me.deny(t, "blocked", now);
                 return false;
             }
