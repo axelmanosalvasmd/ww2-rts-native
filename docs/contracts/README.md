@@ -7,6 +7,7 @@ These files reserve contract topics; no protocol or ABI is approved by their cre
 | Document | Draft owner | Consumer reviewer | Status |
 | --- | --- | --- | --- |
 | protocol.md | Julio | Axel | v0 draft; technical answers recorded (#5); spectator reference behavior and cached flag mask clarified 2026-10-16 |
+| [r1-ingress.md](r1-ingress.md) | Julio | Axel | Prototype-identical ordinary R1 ingress candidate under the recorded groups F/M grant; exact-head runtime ack pending |
 | terrain.md | Julio | Axel | v0 draft; technical answers recorded (#5) |
 | [save-format.md](save-format.md) | Julio | Axel | Private JSON v1 for ordinary matches and shared authored v2; owner group I recorded in #5 comment 6217590741; implementation exact-head acknowledgement pending |
 | [construction-production.md](construction-production.md) | Julio | Axel | Prototype-identical Classic recipient fields under the recorded wire/privacy decisions; exact-head runtime review and hosted Horde/logistics integration remain pending |
