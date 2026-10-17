@@ -242,12 +242,12 @@ mod mov_followup_garrison_tests;
 mod save_codec;
 mod save_state;
 
+pub mod commander_field_policy;
+pub mod commander_world_policy;
 #[cfg(test)]
 mod movement_tick_ground_tests;
 #[cfg(test)]
 mod movement_tick_privacy_tests;
 #[cfg(test)]
 mod movement_tick_speed_tests;
-pub mod commander_field_policy;
-pub mod commander_world_policy;
 mod numeric_keys;
