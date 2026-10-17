@@ -307,6 +307,15 @@ impl Match {
     }
 
     /// Read-only admission. The sole runner calls this before inputs and again before its clock.
+    pub(crate) fn construction_tick_needed(&self) -> bool {
+        self.options.mode != crate::economy::Mode::World
+            && (self.options.mode != crate::economy::Mode::Horde
+                || self.commands.units.iter().any(|(worker, control)| {
+                    control.build_target.is_some()
+                        && self.world.game.units.get(worker).is_some_and(|unit| unit.build)
+                }))
+    }
+
     pub fn validate_construction_tick(&self) -> Result<(), String> {
         // Horde exposes assigned facility work, not the ordinary construction phase.
         if self.options.mode == crate::economy::Mode::Horde

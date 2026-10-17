@@ -22,6 +22,7 @@ pub enum ShotRef<'a> {
     Environment(&'a Effect),
     Scenario(&'a SayAction),
     AuthoredMission(&'a Value),
+    Horde(&'a crate::match_horde::HordeEvent),
 }
 
 impl<'a> TryFrom<&'a TickEvent> for ShotRef<'a> {
@@ -34,6 +35,7 @@ impl<'a> TryFrom<&'a TickEvent> for ShotRef<'a> {
             TickEvent::Environment(value) => Ok(Self::Environment(value)),
             TickEvent::Scenario(value) => Ok(Self::Scenario(value)),
             TickEvent::AuthoredMission(value) => Ok(Self::AuthoredMission(value)),
+            TickEvent::Horde(value) => Ok(Self::Horde(value)),
             TickEvent::Aviation(value) => Ok(Self::Aviation(value)),
         }
     }
@@ -206,6 +208,14 @@ fn event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
 
 fn raw_event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
     match shot {
+        ShotRef::Horde(value) => {
+            state
+                .validate_horde_phase(0.0)
+                .map_err(|_| SnapshotError::Rules)?;
+            let crate::match_horde::HordeEvent::BossSurfaced { at } = value;
+            finite(&[at.x, at.z])?;
+            Ok(value.shot_json())
+        }
         ShotRef::AuthoredMission(value) => {
             let mission = state
                 .authored_mission
@@ -380,9 +390,21 @@ fn raw_event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
                         owner(state, hit.owner)?;
                     }
                 }
-                // Horde breath effects retain their separate mode admission.
-                LaunchEvent::Breath { .. } | LaunchEvent::BreathShell { .. } => {
-                    return Err(refused());
+                LaunchEvent::Breath {
+                    shooter,
+                    target,
+                    owner: seat,
+                    target_owner,
+                    at,
+                } => {
+                    identity(u64::from(*shooter))?;
+                    identity(u64::from(*target))?;
+                    owner(state, *seat)?;
+                    owner(state, *target_owner)?;
+                    numbers(&[at.x, at.z])?;
+                }
+                LaunchEvent::BreathShell { at } => {
+                    numbers(&[at.x, at.z])?;
                 }
                 LaunchEvent::Contact(value) => {
                     kind(state, value.kind)?;

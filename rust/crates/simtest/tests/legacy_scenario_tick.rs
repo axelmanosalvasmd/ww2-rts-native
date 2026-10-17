@@ -79,8 +79,8 @@ fn shots(state: &Match, events: &[TickEvent]) -> Value {
                 TickEvent::AuthoredMission(row) => row.clone(),
                 TickEvent::Environment(effect) => effect.to_json(),
                 TickEvent::Firing(event) => event.to_json(&state.rules),
-                TickEvent::Support(_) | TickEvent::Aviation(_) => {
-                    panic!("five-map fixture has no active support or aircraft producer")
+                TickEvent::Support(_) | TickEvent::Aviation(_) | TickEvent::Horde(_) => {
+                    panic!("five-map fixture has no support, aircraft or Horde producer")
                 }
             })
             .collect::<Vec<_>>()

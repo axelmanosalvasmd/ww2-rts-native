@@ -409,7 +409,11 @@ fn intent_log45_nonconquest_point_supply_seam_refuses_before_mutation() {
             assert!(m.tick_state.fault().is_none());
             assert_eq!(
                 SnapshotCache::new(&m).err(),
-                Some(crate::recipient_snapshot::SnapshotError::UnsupportedMode)
+                Some(if mode == Mode::Horde {
+                    crate::recipient_snapshot::SnapshotError::Rules
+                } else {
+                    crate::recipient_snapshot::SnapshotError::UnsupportedMode
+                })
             );
         }
     }

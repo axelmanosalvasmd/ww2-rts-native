@@ -86,11 +86,9 @@ fn net50_ending_a_break_starts_one_wave_on_the_next_horde_phase_only() {
         m.step_horde(0.05).unwrap();
         assert_eq!(m.horde.as_ref().unwrap().wave, 1);
     }
-    assert!(
-        m.validate_tick_state().is_err(),
-        "full Horde hosting stays guarded"
-    );
-    assert!(m.preflight_ordinary_snapshot().is_err());
+    m.validate_tick_state().unwrap();
+    m.preflight_ordinary_snapshot().unwrap();
+    assert!(m.restrict_to_ordinary_snapshots().is_err());
 }
 
 #[test]
@@ -158,14 +156,8 @@ fn horde_setup_builds_one_fortified_shared_base_and_internal_enemy() {
     m.step_horde(0.05).unwrap();
     assert_eq!(m.horde.as_ref().unwrap().wave, 0);
     assert_eq!(m.horde.as_ref().unwrap().time_left, 44.95);
-    assert!(
-        m.validate_tick_state().is_err(),
-        "whole Horde tick stays guarded"
-    );
-    assert!(
-        m.validate_aviation().is_err(),
-        "Horde aircraft combat phases stay guarded"
-    );
+    m.validate_tick_state().unwrap();
+    m.validate_aviation().unwrap();
     m.validate_actor_mode().unwrap();
     let building = m
         .world
@@ -1048,14 +1040,11 @@ fn mode54_bunker_death_finishes_once_at_the_fallen_bunker_with_wave_and_defeats(
         }
         assert_eq!(m.timeline, timeline);
         assert_eq!(m.story, story);
-        assert!(
-            m.validate_tick_state().is_err(),
-            "full Horde tick stays guarded"
-        );
-        assert!(matches!(
-            crate::recipient_snapshot::SnapshotCache::new(&m),
-            Err(crate::recipient_snapshot::SnapshotError::UnsupportedMode)
-        ));
+        // This explicit phase fixture advances its own clock, so the recorded
+        // queue boundary does not qualify it for the ordinary tick runner.
+        assert!(m.validate_tick_state().is_err());
+        crate::recipient_snapshot::SnapshotCache::new(&m).unwrap();
+        assert!(m.restrict_to_ordinary_snapshots().is_err());
     }
 }
 
@@ -1204,14 +1193,8 @@ fn mode52_real_boss_wave_allows_breath_and_retirement_beside_guarded_aircraft() 
         assert!(crate::recipient_snapshot::horde_mode_row(&m).is_ok());
     }
     assert!(m.horde_projection().unwrap().boss.is_none());
-    assert!(
-        m.validate_aviation().is_err(),
-        "aircraft actuation stays guarded"
-    );
-    assert!(
-        m.validate_tick_state().is_err(),
-        "full Horde tick stays guarded"
-    );
+    m.validate_aviation().unwrap();
+    assert!(m.restrict_to_ordinary_snapshots().is_err());
 }
 
 #[test]
