@@ -50,7 +50,7 @@
 #define WW2_SHAPE_WEDGE 3
 
 // Additive revision of ABI 2. Existing signatures and layouts retain version 2.
-#define WW2_ABI_MINOR_VERSION 1
+#define WW2_ABI_MINOR_VERSION 2
 
 // An opaque recipient view. Create it with ww2_view_new and release it exactly once with
 // ww2_view_free. Use one thread at a time for each handle; different handles are independent.
@@ -340,6 +340,54 @@ int32_t ww2_authoring_play_match(const char *json,
                                  char *out,
                                  size_t capacity,
                                  size_t *out_len);
+
+// Returns the compiled movement profile or null for {type}.
+// Uses the JSON buffer, error and ownership rules of ww2_authoring_validate_map.
+//
+// # Safety
+// Readable input, writable output and count storage must be valid and disjoint as documented
+// for ww2_authoring_validate_map.
+int32_t ww2_movement_profile(const char *json,
+                             size_t len,
+                             char *out,
+                             size_t capacity,
+                             size_t *out_len);
+
+// Returns whether the compiled unit {type} is a ground vehicle.
+// Uses the JSON buffer, error and ownership rules of ww2_authoring_validate_map.
+//
+// # Safety
+// Readable input, writable output and count storage must be valid and disjoint as documented
+// for ww2_authoring_validate_map.
+int32_t ww2_is_ground_vehicle(const char *json,
+                              size_t len,
+                              char *out,
+                              size_t capacity,
+                              size_t *out_len);
+
+// Returns the compiled body radius in metres for {type}.
+// Uses the JSON buffer, error and ownership rules of ww2_authoring_validate_map.
+//
+// # Safety
+// Readable input, writable output and count storage must be valid and disjoint as documented
+// for ww2_authoring_validate_map.
+int32_t ww2_body_radius(const char *json, size_t len, char *out, size_t capacity, size_t *out_len);
+
+// Returns projectile position for {flight,time}, in metres and simulation seconds.
+// Uses the JSON buffer, error and ownership rules of ww2_authoring_validate_map.
+//
+// # Safety
+// Readable input, writable output and count storage must be valid and disjoint as documented
+// for ww2_authoring_validate_map.
+int32_t ww2_flight_at(const char *json, size_t len, char *out, size_t capacity, size_t *out_len);
+
+// Returns projectile velocity for {flight,time}, in metres per second.
+// Uses the JSON buffer, error and ownership rules of ww2_authoring_validate_map.
+//
+// # Safety
+// Readable input, writable output and count storage must be valid and disjoint as documented
+// for ww2_authoring_validate_map.
+int32_t ww2_velocity_at(const char *json, size_t len, char *out, size_t capacity, size_t *out_len);
 
 #ifdef __cplusplus
 }  // extern "C"

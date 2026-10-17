@@ -326,6 +326,9 @@ pub unsafe extern "C" fn ww2_formation_spots(
 mod queries;
 pub use queries::*;
 
+mod presentation;
+pub use presentation::*;
+
 #[cfg(test)]
 mod tests {
     use super::*;

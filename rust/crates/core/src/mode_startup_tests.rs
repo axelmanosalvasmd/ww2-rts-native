@@ -329,7 +329,7 @@ fn mode01_non_world_mode_rows_match_the_prototype_public_fields() {
     };
 
     // Prototype sim.js:5895-5898; Tutorial's initial goal is tutorial.js:11.
-    // Classic has partial delivery; the other non-Conquest modes remain refused.
+    // Conquest and partial Classic delivery preserve each recipient's literal mode row.
     for mode in MODES {
         let mut m = create(mode, ArmySize::Standard).unwrap();
         let expected = match mode {
