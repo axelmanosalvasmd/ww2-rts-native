@@ -70,15 +70,15 @@ pub(super) fn validate(state: &Match) -> Result<(), SnapshotError> {
             .iter()
             .all(|n| n.is_finite())
             || ticket.remaining < 0.0
-            || state
-                .firing
-                .flights
-                .get(&ticket.flight)
-                .is_none_or(|f| {
-                    f.owner != ticket.owner
-                        || state.commands.units.get(&f.shooter).is_some_and(|c| c.operative)
-                            && shooter(state, f.shooter, f.owner).is_err()
-                })
+            || state.firing.flights.get(&ticket.flight).is_none_or(|f| {
+                f.owner != ticket.owner
+                    || state
+                        .commands
+                        .units
+                        .get(&f.shooter)
+                        .is_some_and(|c| c.operative)
+                        && shooter(state, f.shooter, f.owner).is_err()
+            })
         {
             return Err(refused());
         }

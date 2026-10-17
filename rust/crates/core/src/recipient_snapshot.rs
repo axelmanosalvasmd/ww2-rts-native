@@ -20,16 +20,16 @@ mod delivery;
 mod engineering;
 #[path = "recipient_snapshot/falling.rs"]
 mod falling;
-#[path = "recipient_snapshot/modes.rs"]
-mod modes;
+#[path = "recipient_snapshot/flights.rs"]
+mod flights;
 #[path = "recipient_snapshot/logistics.rs"]
 mod logistics;
+#[path = "recipient_snapshot/modes.rs"]
+mod modes;
 #[path = "recipient_snapshot/operative.rs"]
 mod operative;
 #[path = "recipient_snapshot/operative_flights.rs"]
 mod operative_flights;
-#[path = "recipient_snapshot/flights.rs"]
-mod flights;
 #[path = "recipient_snapshot/owners.rs"]
 mod owners;
 #[path = "recipient_snapshot/public_state.rs"]
