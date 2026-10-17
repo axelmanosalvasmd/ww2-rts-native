@@ -114,6 +114,8 @@ pub struct VehicleProfile {
     pub reverse_speed: f64,
     /// Radians per second.
     pub hull_turn: f64,
+    /// Tracked suspension uses a different visual blend rate from wheeled suspension.
+    pub tracked: bool,
 }
 
 /// The `CFG` and `SUPPORT` numbers the passes read.

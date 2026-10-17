@@ -41,10 +41,15 @@ impl fmt::Display for MapError {
             Self::Invalid { field, .. } if field == "assaultTime" => {
                 f.write_str("assaultTime must be 300-3600 seconds")
             }
-            Self::Invalid { field, reason } if field == "rows" || field == "heights" => {
+            Self::Invalid { field, reason }
+                if field == "rows" || field == "heights" || field == "world.validation" =>
+            {
                 f.write_str(reason)
             }
             Self::Invalid { field, reason } if field == "structures" => write!(f, "{reason}"),
+            Self::Invalid { reason, .. } if reason == "needs two non-assault spawns" => {
+                f.write_str("needs 2+ spawns that every mode can use")
+            }
             Self::Invalid { field, reason } => write!(f, "{field}: {reason}"),
             Self::Unsupported { feature } => {
                 write!(f, "unsupported authoritative map feature: {feature}")

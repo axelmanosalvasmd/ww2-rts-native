@@ -133,6 +133,15 @@ fn known_string(value: &str) -> Option<&'static str> {
         "flame",
         "grenade",
         "artillery",
+        "handoff",
+        "timeout",
+        "defense",
+        "regroup-blocked",
+        "withdrawn",
+        "members-unavailable",
+        "armor",
+        "machine-gun",
+        "losses",
     ];
     if let Some(found) = RUNTIME
         .iter()
@@ -196,7 +205,7 @@ pub(crate) fn optional_static_string<'de, D: serde::Deserializer<'de>>(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::{
         economy::{Faction, Mode},
@@ -210,7 +219,7 @@ mod tests {
     };
     use serde_json::json;
 
-    fn ordinary() -> Match {
+    pub(crate) fn ordinary() -> Match {
         let map = AuthoritativeMap::from_json(
             &serde_json::to_vec(&json!({
                 "name":"Save lane", "w":64, "h":40, "rows":vec![".".repeat(64);40],

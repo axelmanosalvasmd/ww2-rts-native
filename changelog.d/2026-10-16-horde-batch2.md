@@ -1,0 +1,3 @@
+- Add core Horde final-wave and Kaiju vision markers, and complete shared rally, paid recruitment, prerequisite, assist and owner-only cancellation checks. Full Horde ticking, snapshots and hosting stay guarded.
+- Add the AI-57 scripted decision policy over delivered facts using the existing bounded Horde queue, with support, planes, abilities and ordinary-match lifecycle coverage. No new hosted actuation is admitted.
+- Extend Kaiju breath checks for beam boundaries, overlapping terrain samples, scars and seeded ignition conditions, reusing the combat component from #325.

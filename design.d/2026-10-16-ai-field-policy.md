@@ -1,0 +1,13 @@
+## AI field policy through recipient facts
+
+AI-48, AI-49, AI-50, AI-56 and AI-58 use owned observations and return existing command shapes. Field planning carries public authored terrain plus remembered recipient rows and the recipient's found-mine list. It never reads live hidden terrain, enemy economy or unseen units. Its private job maps use ordered keys and expire after 90 seconds; delivered work flags release completed assignments. HQ progress remains private per seat and per HQ, and new wall or gate assignments exclude their builders from later tactics in the same look.
+
+The World policy is a detached component. Its regions, stations, cargo and current visibility are supplied facts, with no Match adapter or World room admission. Unknown cells supply frontier exploration goals; only delivered enemy regions and remembered bases supply attack goals. Placement stays on delivered own territory. Rail cooldowns and boarding reservations remain private policy state. This implements the prototype intent at e4e579a, shared/ai.js:41-143, 629-748, 902-958 and 1041-1068, under owner decision L.
+
+Gate execution now uses the existing matching ordinary-ground-mode predicate, so paid fortifications survive the same tick and actor checks in Assault, Annihilation and Classic. The existing snapshot mode bounds are unchanged: full recipient snapshots are tested in Default and Conquest; detached mode-policy tests and real mode constructors cover the other ordinary modes. No ABI, header, wire field or recipient rule is added. Existing command encodings and cell/list privacy are reused.
+
+World construction replaces the construction stage when delivered region facts are present; region and transport orders run only for units left free by shared retreat, defense and adaptive tactics. The common commander still owns research, shopping, support and raid memory. Older detached Classic/World component inputs retain their shared policy envelope; they do not gain region goals or World room admission.
+
+Threatened World engineers are reserved for the existing rush escape before the construction stage selects workers. This preserves the shared defensive order without first creating work that the same look would cancel. Field jobs use the combat-squad envelope, so economy engineers remain available to construction and defense.
+
+Gate admission retains World, Horde, Tutorial, mismatched-mode and logistics/convoy refusals. Logistics ticks still refuse disconnected reserve and convoy phases, so this change keeps new Gate state out of those rooms. Supported ordinary modes use real constructors and normal ticks for the Gate lifecycle checks.

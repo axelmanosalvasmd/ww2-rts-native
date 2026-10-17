@@ -14,7 +14,7 @@ pub const ORDER_LIMIT: usize = 240;
 
 /// Only the owner's intent, detached at observation time. Position and health
 /// changes alone do not supersede a queued order; new routes and Stop do.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct OwnPlan {
     pub path_generation: u64,
     pub goal: Option<Point>,
@@ -36,7 +36,39 @@ pub struct OwnPlan {
     pub hold: bool,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+impl OwnPlan {
+    fn same_intent(&self, other: &Self) -> bool {
+        if self.path_generation != other.path_generation {
+            return false;
+        }
+        let equal = |left: &Self, right: &Self| {
+            left == right || crate::numeric_keys::json_fields_equal(left, right)
+        };
+        if self.dig == other.dig {
+            return equal(self, other);
+        }
+        // ai-view.js:35 decodes digging as its destination, not the paid job's
+        // elapsed work, occupied-cell retries or approach cache. Keep native
+        // fort kind as intent too, so a replacement job still supersedes it.
+        let same_dig = match (&self.dig, &other.dig) {
+            (Some(left), Some(right)) => {
+                left.kind == right.kind
+                    && crate::numeric_keys::json_fields_equal(&left.at, &right.at)
+            }
+            _ => false,
+        };
+        if !same_dig {
+            return false;
+        }
+        let mut left = self.clone();
+        let mut right = other.clone();
+        left.dig = None;
+        right.dig = None;
+        equal(&left, &right)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct OwnUnit {
     pub id: u32,
     pub owner: usize,
@@ -46,7 +78,7 @@ pub struct OwnUnit {
     pub plan: OwnPlan,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Wave {
     pub slot: usize,
     pub number: u32,
@@ -61,7 +93,7 @@ pub struct Live {
 }
 
 /// A seat-owned packet. Enemy inputs contain only a visible bunker destination.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct View {
     pub tick: i64,
     pub wave: Wave,
@@ -69,14 +101,14 @@ pub struct View {
     pub bunker: Option<Point>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 struct Pending {
     id: u32,
     before: OwnPlan,
     command: Command,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct HordeCommander {
     owner: usize,
     delivered: Option<View>,
@@ -85,9 +117,22 @@ pub struct HordeCommander {
     budget_tick: Option<i64>,
     issued: usize,
     last_think: Option<i64>,
+    #[serde(default)]
+    policy: Box<crate::horde_policy::HordePolicy>,
+    #[serde(default)]
+    policy_facts: Option<Box<crate::horde_policy::Facts>>,
 }
 
 impl HordeCommander {
+    pub(crate) fn reset_saved_delivery(&mut self) {
+        self.delivered = None;
+        self.policy_facts = None;
+    }
+
+    pub(crate) fn save_owner(&self) -> usize {
+        self.owner
+    }
+
     pub fn new(owner: usize) -> Self {
         Self {
             owner,
@@ -97,6 +142,8 @@ impl HordeCommander {
             budget_tick: None,
             issued: 0,
             last_think: None,
+            policy: Default::default(),
+            policy_facts: None,
         }
     }
     pub fn pending(&self) -> usize {
@@ -121,6 +168,7 @@ impl HordeCommander {
         self.wave = None;
         self.budget_tick = None;
         self.issued = 0;
+        self.policy_facts = None;
     }
     fn active(&mut self, live: Live, observed: Wave) -> bool {
         let valid = !live.winner
@@ -149,7 +197,7 @@ impl HordeCommander {
                     && unit.hp > 0.0
                     && !unit.air
                     && !unit.plan.retreating
-                    && unit.plan == job.before
+                    && unit.plan.same_intent(&job.before)
             });
             if !valid {
                 self.pending.pop_front();
@@ -181,6 +229,22 @@ impl HordeCommander {
             Vec::new()
         };
         self.delivered = Some(view);
+        self.policy_facts = None;
+        Ok(commands)
+    }
+    /// Deliver the complete scripted policy packet through the same private
+    /// wave queue. This does not enable a Horde recipient snapshot producer.
+    pub fn observe_policy(
+        &mut self,
+        live: Live,
+        view: View,
+        facts: crate::horde_policy::Facts,
+    ) -> Result<Vec<Command>, String> {
+        let mut next = self.clone();
+        next.policy.observe(&view, &facts)?;
+        let commands = next.observe(live, view)?;
+        next.policy_facts = Some(Box::new(facts));
+        *self = next;
         Ok(commands)
     }
     /// Submit scripted movement, splitting into one unit per ordinary command.
@@ -236,17 +300,47 @@ impl HordeCommander {
         commands.extend(self.flush(&view));
         Ok(commands)
     }
-    /// Minimal wave movement caller. Broader Horde support/ability policy is separate.
+    /// Complete scripted policy when a full packet was delivered; movement-only
+    /// packets retain the bounded caller used by the queue component.
     /// The live wave guard runs even between observations and before planning.
     pub fn act(&mut self, live: Live) -> Result<Vec<Command>, String> {
         let Some(wave) = self.delivered.as_ref().map(|view| view.wave) else {
-            self.clear();
+            // A restored queue waits for the first fresh observation. Only live
+            // termination or a changed wave can invalidate it before that view.
+            if live.winner
+                || !live.wave.is_some_and(|wave| {
+                    wave.slot == self.owner && wave.active && Some(wave.number) == self.wave
+                })
+            {
+                self.clear();
+            }
             return Ok(Vec::new());
         };
         if !self.active(live, wave) || !self.due(live.tick) || self.last_think == Some(live.tick) {
             return Ok(Vec::new());
         }
         self.last_think = Some(live.tick);
+        if let Some(facts) = self.policy_facts.clone() {
+            let view = self.delivered.as_ref().expect("delivered wave");
+            let proposed = self.policy.plan(view, &facts)?;
+            let mut commands = Vec::new();
+            for command in proposed {
+                if let Command::Ability {
+                    ids,
+                    at: Some(_),
+                    queue: false,
+                    ..
+                } = &command
+                {
+                    // The optimistic accepted local nade intent supersedes
+                    // older queued movement before any later same-look flush.
+                    // It remains an attempt until the host admits the command.
+                    self.pending.retain(|job| !ids.contains(&i64::from(job.id)));
+                }
+                commands.extend(self.submit(live, command)?);
+            }
+            return Ok(commands);
+        }
         let view = self.delivered.as_ref().expect("delivered wave");
         let Some(at) = view.bunker else {
             return Ok(Vec::new());
@@ -382,10 +476,9 @@ impl Match {
                     && g.players[owner].sees(u.id)
             })
             .collect::<Vec<_>>();
-        bunkers.sort_by(|a, b| {
+        crate::sort::sort_by(&mut bunkers, |a, b| {
             crate::math::hypot(a.x - spawn.x, a.z - spawn.z)
-                .total_cmp(&crate::math::hypot(b.x - spawn.x, b.z - spawn.z))
-                .then(a.id.cmp(&b.id))
+                - crate::math::hypot(b.x - spawn.x, b.z - spawn.z)
         });
         let round = |v| crate::math::round(v * 10.0) / 10.0;
         Ok(View {
