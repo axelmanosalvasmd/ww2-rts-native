@@ -5,7 +5,7 @@ use crate::{
     game::{CELL, Point},
     map::AuthoritativeMap,
     match_runtime::{MatchOptions, PlayerConfig},
-    recipient_snapshot::{SelectedSeat, SnapshotCache, SnapshotCapability},
+    recipient_snapshot::{SelectedSeat, SnapshotCache, SnapshotCapability, recipient_uncached},
     weather::WeatherChoice,
 };
 use serde_json::json;
