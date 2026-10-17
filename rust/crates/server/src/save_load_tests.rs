@@ -900,11 +900,7 @@ fn mode55_lobby_record_uses_current_map_defender_count_and_army_after_reload() {
     // Record lookup remains valid when the admitted Horde room starts.
     room.mode = "horde".into();
     hub.message("ABC", &host, &mut true, json!({"t":"start"}), 1);
-    assert!(
-        messages(&mut hub, &mut rx)
-            .iter()
-            .all(|m| m["t"] != "deny")
-    );
+    assert!(messages(&mut hub, &mut rx).iter().all(|m| m["t"] != "deny"));
     let runtime = &mut hub
         .rooms
         .get_mut("ABC")

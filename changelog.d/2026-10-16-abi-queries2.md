@@ -17,3 +17,4 @@
 - Keep four seated-client server test helpers exhaustive for spectator output, explicitly rejecting watcher frames on seated connections.
 - Replace `mode11_horde_switches_and_shared_base_are_constructed_without_admitting_full_runner` with `mode11_horde_switches_and_shared_base_survive_ticks_and_every_seat_delivery`: retain all setup checks, verify admitted Horde delivery, and keep World refusal.
 - Keep exact saved-envelope/settings field-set assertions independent of JSON object iteration order in `net89_manual_save_requires_running_host_and_replies_before_lobby` and `net12_saved_editor_map_restores_exact_state_and_every_seat_through_victory`. Update `mode55_lobby_record_uses_current_map_defender_count_and_army_after_reload` to verify admitted Horde startup and every-seat delivery while retaining record lookups.
+- Format the Horde record startup assertion with the pinned Rust formatter.
