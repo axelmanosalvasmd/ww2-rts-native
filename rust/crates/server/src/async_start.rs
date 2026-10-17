@@ -16,7 +16,17 @@ pub(crate) struct StartRequest {
 
 impl StartRequest {
     pub(crate) fn generate(&self) -> Result<Match, String> {
-        crate::authoritative_maps::create_match(&self.map, self.options.clone())
+        let map = crate::authoritative_maps::load(&self.map).map_err(|e| e.to_string())?;
+        let mut options = self.options.clone();
+        let mode = match options.mode {
+            Mode::Default | Mode::Conquest => "conquest",
+            Mode::Classic => "classic",
+            Mode::Annihilation => "annihilation",
+            Mode::World => "world",
+            _ => "",
+        };
+        options.logistics = logistics_enabled_for(mode, map.source());
+        crate::authoritative_maps::create_match(&self.map, options)
             .map_err(|error| error.to_string())
     }
 }
@@ -99,7 +109,6 @@ impl Hub {
                 })
             })
             .collect::<Result<Vec<_>, String>>()?;
-        let map = crate::authoritative_maps::load(&room.map).map_err(|e| e.to_string())?;
         Ok(StartRequest {
             token: Arc::new(()),
             map: room.map.clone(),
@@ -118,7 +127,7 @@ impl Hub {
                 map_key: Some(room.map.clone()),
                 tech: true,
                 supply: true,
-                logistics: logistics_enabled_for(&room.mode, map.source()),
+                logistics: false,
                 sandbox: false,
             },
         })

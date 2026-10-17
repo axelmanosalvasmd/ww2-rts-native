@@ -46,3 +46,10 @@ Every continuation collects both commanders' recipient snapshots on each
 callback while a runtime remains attached and checks that no runtime fault
 appears. Hosted Horde's missing-defender rollback branch remains guarded along
 with hosted Horde admission; these tests make no claim about that branch.
+
+During pending generation, operative FPS does not reach the retained match, and
+operative hello updates membership without starting or resetting an operative in
+that match (`server.js:360-363,598-614,630-635`). Native keeps the old match only
+as rollback state. `pending_restart_keeps_operative_input_delivery_and_membership_unchanged`
+checks ignored input, reconnect without a premature start, exact checkpoint and
+delivery preservation, resumed input after failure, and ordinary match completion.

@@ -118,7 +118,8 @@ impl Room {
         };
         *joined = true;
         self.empty_since = None;
-        if self.native.is_some()
+        if self.starting.is_none()
+            && self.native.is_some()
             && let Err(error) = self.start_operative(index, now)
         {
             self.native.as_mut().unwrap().runtime.fault_stop(error);
@@ -188,7 +189,8 @@ impl Room {
         }
         match msg["t"].as_str() {
             Some("fps") => {
-                if let Some(native) = &mut self.native
+                if self.starting.is_none()
+                    && let Some(native) = &mut self.native
                     && !native.runtime.paused()
                     && native.runtime.fault().is_none()
                     && now.saturating_sub(op.input_at) >= 20

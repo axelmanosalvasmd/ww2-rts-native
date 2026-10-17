@@ -33,6 +33,7 @@ fn drain(hub: &mut Hub, receivers: &mut [mpsc::Receiver<Output>; 2], now: u64) -
                     messages.push(serde_json::from_str(&frame.json).unwrap());
                     hub.complete_snapshot(&frame, true, now);
                 }
+                Output::Watcher(_) => panic!("unexpected watcher output for commander"),
                 Output::Close(code, reason) => panic!("unexpected close {code}: {reason}"),
             }
         }
@@ -179,6 +180,8 @@ fn net37_real_load_and_creation_failures_restore_lobby_or_previous_match_and_fin
         let (mut hub, [host, _], mut receivers) = room();
         for restart in [false, true] {
             if missing_map {
+                // Lobby metadata is valid; loading the corresponding authored map fails.
+                hub.maps["missing-authored-map"] = hub.maps["default"].clone();
                 hub.rooms.get_mut("ABC").unwrap().map = "missing-authored-map".into();
             } else {
                 hub.rooms.get_mut("ABC").unwrap().players[1].team = 6;
@@ -273,6 +276,7 @@ fn net37_async_socket_dispatch_stays_available_for_end_while_worker_is_blocked()
             hub: Arc::new(tokio::sync::Mutex::new(hub)),
             next: Arc::new(AtomicU64::new(3)),
             clock: Instant::now(),
+            static_files: None,
             test_now_ms: Some(Arc::new(AtomicU64::new(0))),
         };
         let (started, wait_started) = std::sync::mpsc::channel();
@@ -401,5 +405,102 @@ fn net37_failed_restart_settles_old_writes_and_restores_replaced_seat_before_fin
     assert!(!hub.native_status("ABC").unwrap().paused);
     assert!(hub.native_status("ABC").unwrap().fault.is_none());
     hub.rooms.get_mut("ABC").unwrap().map = "default".into();
+    finish_ordinary_match(&mut hub, &mut receivers, 150);
+}
+
+#[test]
+fn pending_restart_keeps_operative_input_delivery_and_membership_unchanged() {
+    let (mut hub, [host, _], mut receivers) = room();
+    let (tx, mut op_rx) = mpsc::channel(128);
+    let (cancel, _) = watch::channel(false);
+    let op = Connection::new(3, tx, cancel);
+    hub.message(
+        "ABC",
+        &op,
+        &mut false,
+        json!({"t":"hello","token":"operative","role":"operative","commander":0}),
+        0,
+    );
+    hub.start_trusted("ABC", host.id, false, 0).unwrap();
+    drain(&mut hub, &mut receivers, 0);
+    while op_rx.try_recv().is_ok() {}
+    let before = hub.rooms["ABC"]
+        .native
+        .as_ref()
+        .unwrap()
+        .runtime
+        .save_json()
+        .unwrap();
+    let delivery = hub.rooms["ABC"].operatives[0].net.clone();
+    let input_at = hub.rooms["ABC"].operatives[0].input_at;
+    let request = hub.claim_trusted_start("ABC", host.id, true).unwrap();
+    hub.message(
+        "ABC",
+        &op,
+        &mut true,
+        json!({"t":"fps","seq":0,"forward":1,"strafe":0,"yaw":0,"pitch":0}),
+        100,
+    );
+    let (tx, mut returning_rx) = mpsc::channel(16);
+    let (cancel, _) = watch::channel(false);
+    let returning = Connection::new(4, tx, cancel);
+    let mut joined = false;
+    hub.message(
+        "ABC",
+        &returning,
+        &mut joined,
+        json!({"t":"hello","token":"operative","role":"operative","commander":0}),
+        100,
+    );
+    assert!(joined);
+    assert_eq!(hub.rooms["ABC"].operatives.len(), 1);
+    assert_eq!(
+        hub.rooms["ABC"].operatives[0]
+            .person
+            .connection
+            .as_ref()
+            .unwrap()
+            .id,
+        returning.id
+    );
+    assert_eq!(hub.rooms["ABC"].operatives[0].input_at, input_at);
+    assert_eq!(hub.rooms["ABC"].operatives[0].net, delivery);
+    assert_eq!(
+        hub.rooms["ABC"]
+            .native
+            .as_ref()
+            .unwrap()
+            .runtime
+            .save_json()
+            .unwrap(),
+        before
+    );
+    while let Ok(output) = returning_rx.try_recv() {
+        assert!(matches!(output, Output::Json(message) if message["t"] == "lobby"));
+    }
+    assert!(
+        hub.complete_trusted_start("ABC", request, Err("generation failed".into()), 100)
+            .is_err()
+    );
+    assert_eq!(
+        hub.rooms["ABC"]
+            .native
+            .as_ref()
+            .unwrap()
+            .runtime
+            .save_json()
+            .unwrap(),
+        before
+    );
+    drain(&mut hub, &mut receivers, 100);
+    hub.message(
+        "ABC",
+        &returning,
+        &mut true,
+        json!({"t":"fps","seq":0,"forward":1,"strafe":0,"yaw":0,"pitch":0}),
+        120,
+    );
+    assert_eq!(hub.rooms["ABC"].operatives[0].input_at, 120);
+    hub.disconnected("ABC", returning.id, 120);
     finish_ordinary_match(&mut hub, &mut receivers, 150);
 }
