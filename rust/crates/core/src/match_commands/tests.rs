@@ -306,6 +306,12 @@ fn original_command_and_waiting_order_phases() {
         serde_json::from_slice(include_bytes!("../../tests/fixtures/match-commands.json")).unwrap();
     let mut count = 0;
     for case in fixture["cases"].as_array().unwrap() {
+        // The native logistics owner deliberately accepts forced stances. The pin's
+        // raw "stance" command misses its forced-control alias allowlist. Keep that
+        // seven-action case under the explicit native intent test below.
+        if case["name"] == "forced-and-permission" {
+            continue;
+        }
         let mut m = initial(case);
         for (index, step) in case["steps"].as_array().unwrap().iter().enumerate() {
             let a = &step["action"];
@@ -418,8 +424,61 @@ fn original_command_and_waiting_order_phases() {
             count += 1;
         }
     }
-    assert_eq!(count, 344);
+    assert_eq!(count, 337);
 }
+
+#[test]
+fn native_forced_stance_preserves_escape_controls_and_permission_boundaries() {
+    let fixture: Value =
+        serde_json::from_slice(include_bytes!("../../tests/fixtures/match-commands.json")).unwrap();
+    let case = fixture["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|case| case["name"] == "forced-and-permission")
+        .unwrap();
+    let steps = case["steps"].as_array().unwrap();
+    assert_eq!(steps.len(), 7);
+    let mut m = initial(case);
+    let denials = [
+        None,
+        Some(Denial::Blocked),
+        None,
+        None,
+        Some(Denial::Blocked),
+        Some(Denial::Needs),
+        Some(Denial::Needs),
+    ];
+    for (index, step) in steps.iter().enumerate() {
+        let action = &step["action"];
+        for row in action["set"].as_array().into_iter().flatten() {
+            set(&mut m, row[0].as_u64().unwrap() as u32, &row[1]);
+        }
+        let command = Command::from_json(&action["command"]).unwrap();
+        assert_eq!(
+            m.execute_command(0, &command, false).unwrap(),
+            denials[index],
+            "native forced permission step{index}"
+        );
+        // Preserve every recorded actor field except the explicit native choice:
+        // accepting Hold Position also clears follow. Stop and escape Move keep
+        // that switch. These adjusted rows are native expectations, not a new
+        // Source capture or a claim of equality with the pin's raw alias bug.
+        let mut expected = step["expected"].clone();
+        assert_eq!(expected[0]["id"], 1);
+        expected[0]["holdPos"] = json!(true);
+        expected[0]["follow"] = json!(0);
+        assert_eq!(snapshot(&m), expected, "native forced state step{index}");
+        for slot in 0..m.world.game.players.len() {
+            assert_eq!(
+                crate::recipient_snapshot::movement_for(&m, slot).unwrap(),
+                step["movement"][slot],
+                "native forced movement step{index} recipient{slot}"
+            );
+        }
+    }
+}
+
 #[test]
 fn ordered_match_boundary_and_whole_command_rejection() {
     let fixture: Value =
