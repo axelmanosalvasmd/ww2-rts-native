@@ -1,0 +1,1 @@
+- Added the parity orchestration handoff (docs/handoff/): state at the main freeze 61947c5b (776 rows ported), the four integration branches, the remaining one-pass merge plan, recorded owner decisions and the status-flip and merge scripts.
