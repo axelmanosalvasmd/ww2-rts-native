@@ -1,7 +1,7 @@
 //! Immutable World geography validation and the native generator's typed map handoff.
 //! These records are authoring data, not live ownership, capture progress or a Match.
 use crate::{
-    game::MOVE,
+    game::{MOVE, VBLOCK},
     map::{AuthoritativeMap, Building, Layers, MapError, Spawn, flags},
 };
 mod validation;
