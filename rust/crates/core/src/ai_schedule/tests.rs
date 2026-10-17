@@ -10,7 +10,7 @@ use crate::{
 use serde_json::{Value, json};
 use std::cell::RefCell;
 
-fn ordinary_match() -> Match {
+pub(super) fn ordinary_match() -> Match {
     let map = AuthoritativeMap::from_json(
         &serde_json::to_vec(&json!({
             "name":"AI delivery scheduling", "w":80,"h":80,
