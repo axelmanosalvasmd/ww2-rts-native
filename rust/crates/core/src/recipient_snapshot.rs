@@ -332,10 +332,10 @@ fn project_recipient(
     fields.extend(owners);
     fields.extend(public);
     fields.insert("falling".into(), falling::project(state, slot)?);
+    fields.insert("flights".into(), flights::project(state, slot)?);
     if let Some(logistics) = logistics::project(state, slot)? {
         fields.insert("logistics".into(), logistics);
     }
-    fields.insert("flights".into(), operative_flights::project(state, slot)?);
     Ok(RecipientProjection {
         fields,
         missing: vec![

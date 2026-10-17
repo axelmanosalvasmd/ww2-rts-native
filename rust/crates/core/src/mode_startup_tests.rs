@@ -364,6 +364,9 @@ fn mode01_non_world_mode_rows_match_the_prototype_public_fields() {
                     expected,
                     "{mode:?} seat {slot}"
                 );
+                if mode == Mode::Conquest {
+                    assert!(!projection.fields.contains_key("mode"));
+                }
                 if mode == Mode::Classic {
                     assert_eq!(projection.fields["ghosts"], json!([]));
                 }

@@ -582,26 +582,30 @@ fn original_ordinary_batches_match_selected_shot_rows_and_numeric_bits() {
                                 .is_some()
                         );
                         if !before["flights"].as_array().unwrap().is_empty() {
-                            let partial = SnapshotCache::new(&state)
-                                .unwrap()
-                                .recipient(selected[0].slot)
-                                .unwrap();
+                            let cache = SnapshotCache::new(&state).unwrap();
                             let expected = common::decoded(&frame["outputs"]);
-                            let expected_recipient = expected
-                                .as_array()
-                                .unwrap()
-                                .iter()
-                                .find(|row| row["slot"] == selected[0].slot)
-                                .unwrap();
-                            assert_eq!(
-                                partial.fields["flights"],
-                                expected_recipient["fields"]["flights"]
-                            );
-                            assert!(
-                                partial
-                                    .missing
-                                    .contains(&SnapshotCapability::ShotsAndFlights)
-                            );
+                            for seat in &selected {
+                                let partial = cache.recipient(seat.slot).unwrap();
+                                let row = expected
+                                    .as_array()
+                                    .unwrap()
+                                    .iter()
+                                    .find(|row| id(&row["slot"]) as usize == seat.slot)
+                                    .unwrap();
+                                common::exact(
+                                    &partial.fields["flights"],
+                                    &row["fields"]["flights"],
+                                    &format!(
+                                        "{name}:{} seat{} partial flights",
+                                        frame["tick"], seat.slot
+                                    ),
+                                );
+                                assert!(
+                                    partial
+                                        .missing
+                                        .contains(&SnapshotCapability::ShotsAndFlights)
+                                );
+                            }
                         }
                     }
                     // Each boundary has a fresh receipt owner on this same
