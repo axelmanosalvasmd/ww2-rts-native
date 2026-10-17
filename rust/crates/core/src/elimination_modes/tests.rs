@@ -53,16 +53,20 @@ pub(super) fn scene(mode: Mode, teams: &[i32]) -> Match {
     .unwrap()
 }
 #[test]
-fn classic_and_annihilation_keep_physical_logistics_uninitialized() {
+fn classic_and_annihilation_initialize_requested_physical_logistics() {
     for mode in [Mode::Classic, Mode::Annihilation] {
         let mut m = scene(mode, &[0, 1]);
         m.options.logistics = true;
-        let before = (m.logistics.clone(), m.convoys.clone(), m.supply_net.clone());
-        assert_eq!(
-            m.initialize_logistics().unwrap_err(),
-            "supply adapter supports ordinary Conquest only"
+        m.initialize_logistics().unwrap();
+        assert!(m.convoys.is_some());
+        assert!(
+            m.world
+                .game
+                .units
+                .values()
+                .any(|u| { !m.rules.kinds[u.kind].structure && m.logistics.get(u.id).is_some() })
         );
-        assert_eq!((m.logistics, m.convoys, m.supply_net), before);
+        m.validate_tick_state().unwrap();
     }
 }
 

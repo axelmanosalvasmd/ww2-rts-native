@@ -283,6 +283,8 @@ impl Hub {
             mode: text("mode")?,
             map: text("mapName")?,
             loaded_spawns: Some(settings["mapSpawns"].clone()),
+            loaded_logistics: settings["logistics"].as_bool(),
+            loaded_tech: settings["tech"].as_bool(),
             world_size: text("worldSize")?,
             army: text("army")?,
             weather: text("weather")?,

@@ -182,7 +182,12 @@ pub(super) fn admit_actors(state: &Match, outside_events: &[Effect]) -> Result<(
     {
         return Err(refused(SnapshotCapability::ShotsAndFlights));
     }
-    if state.firing.flights.values().any(|flight| flight.launched < 0.0) {
+    if state
+        .firing
+        .flights
+        .values()
+        .any(|flight| flight.launched < 0.0)
+    {
         return Err(refused(SnapshotCapability::ShotsAndFlights));
     }
     if !state.firing.flights.is_empty() || !state.firing.salvos.is_empty() {

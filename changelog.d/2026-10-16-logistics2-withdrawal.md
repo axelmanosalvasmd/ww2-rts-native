@@ -1,0 +1,2 @@
+- Forced supply withdrawal now accepts Hold Fire, Hold Position and Auto Retreat, matching the prototype. The prior stance-refusal test now checks accepted controls, escape movement, recovery and complete recipient delivery.
+- Connect Classic and Annihilation to the ordinary logistics adapters, including Classic construction supply sources.

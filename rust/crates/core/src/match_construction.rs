@@ -925,8 +925,8 @@ impl Match {
 
 impl Match {
     /// Pay and stamp an admitted static site before computing any crew route.
-    /// Depot nodes, coastal producers, caches and construction modes require their
-    /// canonical providers and are refused explicitly by this ordinary caller.
+    /// Depot nodes require a separate provider. Ordinary and Classic sites,
+    /// including enabled caches, use the same canonical construction publisher.
     pub fn execute_build(
         &mut self,
         owner: usize,
@@ -1224,3 +1224,7 @@ mod tests;
 #[cfg(test)]
 #[path = "base_native_intent_tests.rs"]
 mod native_intent;
+
+#[cfg(test)]
+#[path = "match_construction_logistics_tests.rs"]
+mod logistics_intent;

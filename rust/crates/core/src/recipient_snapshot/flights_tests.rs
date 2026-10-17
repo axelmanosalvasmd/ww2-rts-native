@@ -195,7 +195,7 @@ mod retained_ground {
     fn scene() -> Match {
         let fixture: Value =
             serde_json::from_str(include_str!("../../tests/fixtures/recipient-selected.json")).unwrap();
-        super::super::tests::initialize(&fixture["initial"])
+        super::super::super::tests::initialize(&fixture["initial"])
     }
 
     fn row(
@@ -207,7 +207,9 @@ mod retained_ground {
     ) -> Result<Option<Value>, SnapshotError> {
         state.world.game.tick = (time / state.rules.movement.tick) as i64;
         let team = state.world.game.players[slot].team;
-        state.routing_fog.team(&state.world.game, &state.rules, team);
+        state
+            .routing_fog
+            .team(&state.world.game, &state.rules, team);
         state.routing_fog.teams.get_mut(&team).unwrap().vis = visible.to_vec();
         state.firing.flights.clear();
         state.firing.flights.insert(p.id, p.clone());
@@ -265,7 +267,7 @@ mod retained_ground {
             "x":15,"y":101,"z":5,"v":[20,0,0],"gravity":8,
             "time":0.5,"launched":0,"expires":5,"until":0.65,"f":1,"fo":0
         });
-        super::super::tests::equal(
+        super::super::super::tests::equal(
             &row(&mut state, 0, &visible, &p, 0.5).unwrap().unwrap(),
             &expected,
             "flight",
@@ -274,7 +276,7 @@ mod retained_ground {
         let mut hidden_expected = expected;
         hidden_expected.as_object_mut().unwrap().remove("f");
         hidden_expected.as_object_mut().unwrap().remove("fo");
-        super::super::tests::equal(&hidden, &hidden_expected, "hidden shooter");
+        super::super::super::tests::equal(&hidden, &hidden_expected, "hidden shooter");
         let mut p = p;
         p.effect = None;
         assert!(
@@ -415,7 +417,7 @@ mod retained_ground {
             .unwrap()
             .unwrap();
         for seat in &selected {
-            super::super::tests::equal(
+            super::super::super::tests::equal(
                 &frame.recipient(seat.slot).unwrap().into_json()["shots"],
                 &json!([{"f":1,"fo":0,"x":5,"z":5,"k":"throw","physical":true,"local":true}]),
                 "throw",

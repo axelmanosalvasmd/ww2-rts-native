@@ -2,8 +2,8 @@
 
 Native baseline: `58986df2a7c13b6fd9c9902d8de0623e985fce08`.
 Prototype: `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`.
-Scope: the existing trusted two-human Conquest profile. This documents the
-prototype option mapping and adds no protocol field or message.
+Scope: room option selection and the existing trusted two-human Conquest profile.
+This documents the prototype option mapping and adds no protocol field or message.
 
 `server.js:353-356` enables logistics for Conquest, Classic, Annihilation and
 World. Assault, Horde, Tutorial and other mode strings default to disabled.
@@ -12,9 +12,11 @@ A truthy authored `scenario` overrides that table: only the literal JSON boolean
 string, array and object logistics values do not opt in.
 
 `server.js:380-381` passes that result to `createGame`, unless a loaded room has
-`room.logistics === false`. Loaded matches retain their serialized logistics switch. Native R1 still has no
-persistent loaded-false override for a later restart, and no public logistics
-switch. A fresh trusted Conquest start supplies the mapped
+`room.logistics === false`. Loaded matches retain their serialized logistics switch. The native room also
+retains loaded logistics and tech booleans across restart, so a loaded false
+continues to disable the corresponding feature (`server.js:419`). A loaded true
+still passes through the mode and authored-map selection. There is no public
+logistics or tech toggle. A fresh trusted Conquest start supplies the mapped
 option from the immutable authoritative map. Existing room, scenario, mode,
 World, AI and spectator admission stays in place. The helper's complete table
 does not admit those modes.
@@ -38,5 +40,6 @@ Focused checks:
   in the private receipt.
 
 These checks cover LOG-01's server mapping and the admitted Conquest slice of
-MODE-11 and NET-39. They do not prove full mode feature switches, all createGame
-options, loaded-false restart parity or unsupported room admission.
+MODE-11 and NET-39. The LOGISTICS-2 checks in [logistics2.md](../runtime/logistics2.md) add the remaining
+mode/option switch matrix and loaded-false restart coverage. Unsupported room
+admission remains separate.

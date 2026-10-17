@@ -159,7 +159,7 @@ impl WreckSourceFrame {
 pub struct RecipientLists {
     pub wrecks: Vec<WreckRow>,
     pub found_mines: Vec<usize>,
-    /// Absent in ordinary Conquest. World rows use the canonical ResourceNode owner.
+    /// Absent in Conquest and Annihilation. Classic nodes are public; World nodes are remembered.
     pub nodes: Option<Vec<[f64; 4]>>,
 }
 
@@ -183,12 +183,21 @@ impl crate::match_runtime::Match {
             .filter_map(|(&c, &bits)| ((bits >> team & 1) != 0 && g.chars[c] == b'N').then_some(c))
             .collect();
         match (self.options.mode, g.mode) {
-            (crate::economy::Mode::Default | crate::economy::Mode::Conquest, None) => {
+            _ if crate::match_actor::ordinary_ground_mode(g, self.options.mode)
+                && matches!(
+                    self.options.mode,
+                    crate::economy::Mode::Default
+                        | crate::economy::Mode::Conquest
+                        | crate::economy::Mode::Classic
+                        | crate::economy::Mode::Annihilation
+                ) =>
+            {
+                let nodes = self.ordinary_snapshot_nodes()?;
                 let wrecks = self.observed_wreck_rows(owner)?;
                 Ok(RecipientLists {
                     wrecks,
                     found_mines,
-                    nodes: None,
+                    nodes,
                 })
             }
             (crate::economy::Mode::World, Some(ModeKind::World)) => {
@@ -300,14 +309,48 @@ pub struct OrdinaryRawLists {
     pub nodes: Option<Value>,
 }
 impl crate::match_runtime::Match {
+    /// Prototype sim.js:5932,6019: Classic's canonical nodes are public in every seat frame.
+    pub(crate) fn ordinary_snapshot_nodes(&self) -> Result<Option<Vec<[f64; 4]>>, String> {
+        if self.options.mode != crate::economy::Mode::Classic {
+            return Ok(None);
+        }
+        if self.world.game.mode != Some(ModeKind::Classic) {
+            return Err("Classic nodes require Classic Game mode".into());
+        }
+        let state = self
+            .elimination
+            .as_ref()
+            .ok_or("missing Classic node owner")?;
+        let mut rows = Vec::with_capacity(state.nodes.len());
+        for node in &state.nodes {
+            let row = [
+                rounded(node.at.x),
+                rounded(node.at.z),
+                node.rate,
+                f64::from(u8::from(node.fuel)),
+            ];
+            if node.cell >= self.world.game.chars.len()
+                || ![node.at.x, node.at.z].iter().all(|n| n.is_finite())
+                || !row.iter().all(|n| n.is_finite())
+            {
+                return Err("invalid Classic node display facts".into());
+            }
+            rows.push(row);
+        }
+        Ok(Some(rows))
+    }
+
     pub fn ordinary_snapshot_raw_lists(&self) -> Result<OrdinaryRawLists, String> {
         let game = &self.world.game;
         if !matches!(
             self.options.mode,
-            crate::economy::Mode::Default | crate::economy::Mode::Conquest
-        ) || game.mode.is_some()
+            crate::economy::Mode::Default
+                | crate::economy::Mode::Conquest
+                | crate::economy::Mode::Classic
+                | crate::economy::Mode::Annihilation
+        ) || !crate::match_actor::ordinary_ground_mode(game, self.options.mode)
         {
-            return Err("global ordinary lists require absent Game mode".into());
+            return Err("global ordinary lists require represented ordinary Game mode".into());
         }
         let mut ids = std::collections::BTreeSet::new();
         let mut rows = Vec::with_capacity(game.wrecks.len());
@@ -328,7 +371,7 @@ impl crate::match_runtime::Match {
         }
         Ok(OrdinaryRawLists {
             wrecks: Value::Array(rows),
-            nodes: None,
+            nodes: self.ordinary_snapshot_nodes()?.map(|rows| json!(rows)),
         })
     }
 }
