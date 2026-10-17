@@ -133,7 +133,6 @@ impl RoomRuntime {
             .map_err(|e| format!("watcher snapshot: {e:?}"))
     }
     pub fn new(mut state: Match, now_ms: u64) -> Result<Self, String> {
-        state.tick_state.restrict_aircraft_weapons_for_delivery();
         state.validate_tick_state()?;
         state
             .restrict_to_ordinary_snapshots()

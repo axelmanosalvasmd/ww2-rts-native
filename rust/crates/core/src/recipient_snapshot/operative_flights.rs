@@ -86,5 +86,5 @@ pub(super) fn validate(state: &Match) -> Result<(), SnapshotError> {
 
 pub(super) fn project(state: &Match, slot: usize) -> Result<Value, SnapshotError> {
     validate(state)?;
-    shots::live_flights(state, slot)
+    flights::project(state, slot)
 }

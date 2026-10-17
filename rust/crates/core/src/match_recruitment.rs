@@ -281,13 +281,6 @@ impl Match {
         name: &str,
         from: Option<u32>,
     ) -> Result<CompletedRecruitUnit, RecruitError> {
-        // Parked planes need aircraft rows too. Refuse before payment or publication
-        // while the host uses the ordinary snapshot adapter.
-        if self.ordinary_snapshot_only {
-            return Err(RecruitError::Placement(
-                crate::produced_units::Error::UnsupportedAir,
-            ));
-        }
         let facts = admission_facts(
             &self.world.game,
             &self.start,
