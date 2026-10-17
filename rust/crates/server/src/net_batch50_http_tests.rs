@@ -68,20 +68,27 @@ async fn port_zero_directory_and_public_map_requests_use_the_real_router() {
                 .0,
                 403
             );
-            assert_eq!(
-                request(
+            for credential in ["", "x-edit-password: wrong\r\n"] {
+                let (status, headers, body) = request(
                     address,
                     "POST",
                     &format!("/maps/{name}"),
-                    "Content-Length: 0\r\n"
-                )
-                .0,
-                405
-            );
+                    &format!("Content-Length: 0\r\n{credential}"),
+                );
+                assert_eq!(status, 403);
+                assert!(headers.contains("content-type: application/json"));
+                assert_eq!(
+                    serde_json::from_slice::<Value>(&body).unwrap(),
+                    json!({"error":"wrong password"})
+                );
+            }
+            let (status, _, body) = request(address, "PUT", &format!("/maps/{name}"), "");
+            assert_eq!(status, 405);
+            assert_eq!(body, b"method not allowed");
         }
         assert_eq!(request(address, "GET", "/maps/not-present", "").0, 404);
         assert_eq!(request(address, "GET", "/maps/INVALID", "").0, 400);
-        // Browser assets and editing are explicitly outside this native server.
+        // Browser assets remain outside this native server.
         for path in ["/", "/play", "/?edit", "/client/main.js"] {
             assert_eq!(request(address, "GET", path, "").0, 404);
         }

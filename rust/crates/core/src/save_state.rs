@@ -377,6 +377,45 @@ pub(crate) mod tests {
         assert!(Match::from_save_json(Value::Null).is_err());
     }
     #[test]
+    fn native_checkpoint_missing_elimination_defaults_and_present_owner_keeps_float_bits() {
+        let state = ordinary();
+        let mut legacy = state.save_json().unwrap();
+        legacy[1]
+            .as_array_mut()
+            .unwrap()
+            .retain(|entry| entry[0] != json!(["string", "elimination"]));
+        let restored = Match::from_save_json(legacy).unwrap();
+        assert!(restored.elimination.is_none());
+        let elimination = crate::elimination_modes::EliminationState {
+            teams: 2,
+            bunkers: vec![1, 2],
+            time_left: Some(f64::from_bits(0x3ff0000000000001)),
+            sudden_death: true,
+            nodes: vec![crate::match_world::ResourceNode {
+                cell: 4,
+                at: crate::game::Point { x: -0.0, z: 8.0 },
+                depot: Some(5),
+                rate: f64::from_bits(0x4000000000000001),
+                fuel: true,
+            }],
+        };
+        let encoded = crate::save_codec::to_value(&elimination).unwrap();
+        let decoded: crate::elimination_modes::EliminationState = crate::save_codec::from_value(
+            serde_json::from_slice(&serde_json::to_vec(&encoded).unwrap()).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(decoded, elimination);
+        assert_eq!(
+            decoded.time_left.unwrap().to_bits(),
+            elimination.time_left.unwrap().to_bits()
+        );
+        assert_eq!(decoded.nodes[0].at.x.to_bits(), (-0.0f64).to_bits());
+        assert_eq!(
+            decoded.nodes[0].rate.to_bits(),
+            elimination.nodes[0].rate.to_bits()
+        );
+    }
+    #[test]
     fn native_checkpoint_refuses_changed_compiled_rules() {
         let mut state = ordinary();
         state.rules.kinds[0].vision += 1.0;

@@ -124,6 +124,12 @@ Intent tests cover the save portions of NET-28 and NET-80, plus NET-89, NET-91 a
 
 NET-12 (editor writes), MODE-55 (Horde records), NET-90 (World autosave), the full NET-71 callback ordering, full NET-92 seat/AI/spectator restoration and AI-63 planner memory are not claimed by ordinary match persistence.
 
+## Reconciled save stack (#373, #376, #383, #386)
+
+The elimination serialization repair and editor/record persistence retain version 1. An absent `elimination` means no elimination owner, matching an ordinary prototype game without that mode state. Present elimination values remain lossless, and elimination modes reject missing authoritative state. Editor maps and Horde records add no match checkpoint keys.
+
+Authored missions require one version increment, to version 2. The prototype restores the saved game directly (`server/saves.js:23-26`, `server.js:434-451`); it does not restart mission execution on load. Defaulting a running mission's executions, objectives, historical captures or pending arrivals would change that game. Version 1 binaries can ignore unknown struct fields, so version 2 also prevents them from silently discarding an authored owner. Both scenario PRs must use the same complete authored checkpoint schema, including contextual trigger records, objective scopes, condition facts, current target owners and deferred arrivals. The objective-only executor writes that schema before the engine extends behavior. Non-authored saves remain version 1; readers accept versions 1 and 2, and version 1 carrying authored state is refused. There is no version 3 in this stack.
+
 ## External AI memory codec (IF-27)
 
 `Match::save_ai_memories_json` and `restore_ai_memories_json` encode and restore the separate `ai` content owner. They accept an explicit AI roster; omitted human seats lose their old AI memory. This follows `shared/ai.js:159-165` and `server.js:426,447-448`. Room save/load still refuses hosted AI seats and non-null `ai`, pending their hosting integration. These core APIs do not activate that capability or claim AI-63.
