@@ -102,76 +102,88 @@ fn finish_ordinary_match(hub: &mut Hub, receivers: &mut [mpsc::Receiver<Output>;
 
 #[test]
 fn net37_cancelled_generation_cannot_replace_new_start_or_restart_and_match_finishes() {
-    let (mut hub, [host, guest], mut receivers) = room();
-    let cancelled = hub.claim_trusted_start("ABC", host.id, false).unwrap();
-    assert_eq!(
-        hub.rooms["ABC"].lobby(host.id, &hub.maps, "")["state"],
-        "play"
-    );
-    assert!(hub.rooms["ABC"].native.is_none());
-    assert!(hub.claim_trusted_start("ABC", host.id, false).is_err());
-    hub.message("ABC", &guest, &mut true, json!({"t":"end"}), 0);
-    assert!(hub.rooms["ABC"].starting.is_some());
-    assert_eq!(
-        drain(&mut hub, &mut receivers, 0)[1],
-        vec![json!({"t":"deny","cmd":"end","reason":"blocked"})]
-    );
-    hub.message("ABC", &host, &mut true, json!({"t":"end"}), 0);
-    for messages in drain(&mut hub, &mut receivers, 0) {
+    for sandbox in [false, true] {
+        let (mut hub, [host, guest], mut receivers) = room();
+        hub.rooms.get_mut("ABC").unwrap().sandbox = sandbox;
+        let cancelled = hub.claim_trusted_start("ABC", host.id, false).unwrap();
         assert_eq!(
-            messages[0],
-            json!({"t":"pause", "paused":false, "by":"", "reason":"host", "left":0})
+            hub.rooms["ABC"].lobby(host.id, &hub.maps, "")["state"],
+            "play"
         );
-        let lobby = messages
-            .iter()
-            .find(|message| message["t"] == "lobby")
-            .unwrap();
-        assert_eq!(lobby["result"], json!({"ended":true,"you":null}));
+        assert!(hub.rooms["ABC"].native.is_none());
+        assert!(hub.claim_trusted_start("ABC", host.id, false).is_err());
+        hub.message("ABC", &guest, &mut true, json!({"t":"end"}), 0);
+        assert!(hub.rooms["ABC"].starting.is_some());
+        assert_eq!(
+            drain(&mut hub, &mut receivers, 0)[1],
+            vec![json!({"t":"deny","cmd":"end","reason":"blocked"})]
+        );
+        hub.message("ABC", &host, &mut true, json!({"t":"end"}), 0);
+        for messages in drain(&mut hub, &mut receivers, 0) {
+            assert_eq!(
+                messages[0],
+                json!({"t":"pause", "paused":false, "by":"", "reason":"host", "left":0})
+            );
+            let lobby = messages
+                .iter()
+                .find(|message| message["t"] == "lobby")
+                .unwrap();
+            assert_eq!(lobby["result"], json!({"ended":true,"you":null}));
+        }
+        let fresh = hub.claim_trusted_start("ABC", host.id, false).unwrap();
+        let old_state = cancelled.generate().unwrap();
+        assert_eq!(
+            hub.complete_trusted_start("ABC", cancelled, Ok(old_state), 0)
+                .unwrap(),
+            None
+        );
+        assert!(hub.rooms["ABC"].starting.is_some());
+        let state = fresh.generate();
+        assert_eq!(
+            hub.complete_trusted_start("ABC", fresh, state, 0).unwrap(),
+            Some(1)
+        );
+        assert_eq!(retained_state(&hub).options.sandbox, sandbox);
+        for messages in drain(&mut hub, &mut receivers, 0) {
+            assert_eq!(
+                messages
+                    .iter()
+                    .find(|message| message["t"] == "start")
+                    .unwrap()["sandbox"],
+                sandbox
+            );
+        }
+        for callback in 0..4 {
+            hub.poll_native(callback * 50, callback * 50_000_000);
+            drain(&mut hub, &mut receivers, callback * 50);
+            assert!(hub.native_status("ABC").unwrap().fault.is_none());
+        }
+        let cancelled = hub.claim_trusted_start("ABC", host.id, true).unwrap();
+        let before = hub.native_status("ABC").unwrap();
+        hub.poll_native(200, 200_000_000);
+        assert_eq!(hub.native_status("ABC").unwrap(), before);
+        hub.message("ABC", &host, &mut true, json!({"t":"end"}), 200);
+        drain(&mut hub, &mut receivers, 200);
+        let fresh = hub.claim_trusted_start("ABC", host.id, false).unwrap();
+        assert_eq!(
+            hub.complete_trusted_start("ABC", cancelled, Err("obsolete load failure".into()), 200)
+                .unwrap(),
+            None
+        );
+        assert!(
+            drain(&mut hub, &mut receivers, 200)
+                .iter()
+                .all(Vec::is_empty)
+        );
+        let state = fresh.generate();
+        assert_eq!(
+            hub.complete_trusted_start("ABC", fresh, state, 200)
+                .unwrap(),
+            Some(2)
+        );
+        drain(&mut hub, &mut receivers, 200);
+        finish_ordinary_match(&mut hub, &mut receivers, 250);
     }
-    let fresh = hub.claim_trusted_start("ABC", host.id, false).unwrap();
-    let old_state = cancelled.generate().unwrap();
-    assert_eq!(
-        hub.complete_trusted_start("ABC", cancelled, Ok(old_state), 0)
-            .unwrap(),
-        None
-    );
-    assert!(hub.rooms["ABC"].starting.is_some());
-    let state = fresh.generate();
-    assert_eq!(
-        hub.complete_trusted_start("ABC", fresh, state, 0).unwrap(),
-        Some(1)
-    );
-    drain(&mut hub, &mut receivers, 0);
-    for callback in 0..4 {
-        hub.poll_native(callback * 50, callback * 50_000_000);
-        drain(&mut hub, &mut receivers, callback * 50);
-        assert!(hub.native_status("ABC").unwrap().fault.is_none());
-    }
-    let cancelled = hub.claim_trusted_start("ABC", host.id, true).unwrap();
-    let before = hub.native_status("ABC").unwrap();
-    hub.poll_native(200, 200_000_000);
-    assert_eq!(hub.native_status("ABC").unwrap(), before);
-    hub.message("ABC", &host, &mut true, json!({"t":"end"}), 200);
-    drain(&mut hub, &mut receivers, 200);
-    let fresh = hub.claim_trusted_start("ABC", host.id, false).unwrap();
-    assert_eq!(
-        hub.complete_trusted_start("ABC", cancelled, Err("obsolete load failure".into()), 200)
-            .unwrap(),
-        None
-    );
-    assert!(
-        drain(&mut hub, &mut receivers, 200)
-            .iter()
-            .all(Vec::is_empty)
-    );
-    let state = fresh.generate();
-    assert_eq!(
-        hub.complete_trusted_start("ABC", fresh, state, 200)
-            .unwrap(),
-        Some(2)
-    );
-    drain(&mut hub, &mut receivers, 200);
-    finish_ordinary_match(&mut hub, &mut receivers, 250);
 }
 
 #[test]

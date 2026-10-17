@@ -207,7 +207,12 @@ impl<'a> SnapshotCache<'a> {
 fn validate_snapshot(state: &Match) -> Result<(), SnapshotError> {
     if !matches!(
         state.options.mode,
-        Mode::Default | Mode::Conquest | Mode::Assault | Mode::Annihilation | Mode::Classic | Mode::Tutorial
+        Mode::Default
+            | Mode::Conquest
+            | Mode::Assault
+            | Mode::Annihilation
+            | Mode::Classic
+            | Mode::Tutorial
     ) || !crate::match_actor::ordinary_ground_mode(&state.world.game, state.options.mode)
         || state.world.geography().is_some()
         || (state.options.mode != Mode::Assault && state.assault.is_some())
@@ -219,7 +224,9 @@ fn validate_snapshot(state: &Match) -> Result<(), SnapshotError> {
         return Err(SnapshotError::UnsupportedMode);
     }
     if state.options.mode == Mode::Tutorial {
-        state.validate_tutorial_state().map_err(|_| SnapshotError::Rules)?;
+        state
+            .validate_tutorial_state()
+            .map_err(|_| SnapshotError::Rules)?;
     }
     if state.options.mode == Mode::Assault {
         state

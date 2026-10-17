@@ -40,7 +40,12 @@ impl Hub {
         connection_id: u64,
         restart: bool,
     ) -> Result<StartRequest, String> {
-        self.trusted_start_request_with_weather_source(code, connection_id, restart, fresh_weather_seed)
+        self.trusted_start_request_with_weather_source(
+            code,
+            connection_id,
+            restart,
+            fresh_weather_seed,
+        )
     }
 
     pub(super) fn trusted_start_request_with_weather_source(

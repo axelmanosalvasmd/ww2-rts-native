@@ -257,7 +257,14 @@ fn net41_r1_restart_repeats_settings_resets_pause_and_reconnects_absent_seat() {
     }
     let mut expected_options = original_options;
     expected_options.seed = expected_options.seed.wrapping_add(1);
-    expected_options.weather_seed = hub.rooms["ABC"].native.as_ref().unwrap().runtime.state().options.weather_seed;
+    expected_options.weather_seed = hub.rooms["ABC"]
+        .native
+        .as_ref()
+        .unwrap()
+        .runtime
+        .state()
+        .options
+        .weather_seed;
     let expected = crate::authoritative_maps::create_match("default", expected_options).unwrap();
     let expected_spawns = json!(
         expected
@@ -278,7 +285,10 @@ fn net41_r1_restart_repeats_settings_resets_pause_and_reconnects_absent_seat() {
         .unwrap();
     for recorded in [&original, &receipt] {
         assert!(recorded["options"]["weatherSeed"].as_u64().unwrap() < (1 << 31));
-        assert_eq!(recorded["options"]["weatherSeed"], recorded["derivedWeatherSeed"]);
+        assert_eq!(
+            recorded["options"]["weatherSeed"],
+            recorded["derivedWeatherSeed"]
+        );
     }
     assert_eq!(receipt["options"]["seed"], expected.options.seed);
     assert_eq!(receipt["environmentSeed"], expected.start.environment_seed);

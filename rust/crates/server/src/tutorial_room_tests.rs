@@ -24,6 +24,16 @@ impl Peer {
         hub.message("TUT", &self.connection, &mut false,
             json!({"t":"hello", "token":self.connection.id.to_string(), "name":format!("Human {}", self.connection.id), "listing":listing}), 0);
     }
+    fn join_operative(&self, hub: &mut Hub) {
+        hub.message(
+            "TUT",
+            &self.connection,
+            &mut false,
+            json!({"t":"hello", "token":self.connection.id.to_string(),
+                "name":"Operative", "role":"operative", "commander":0}),
+            0,
+        );
+    }
     fn drain(&mut self, hub: &mut Hub) -> Vec<Value> {
         let mut rows = vec![];
         while let Ok(output) = self.rx.try_recv() {
@@ -59,6 +69,11 @@ fn tick_all(hub: &mut Hub) -> Vec<Value> {
     let rt = runtime(hub);
     let count = rt.state().world.game.players.len();
     rt.advance_tick(&vec![false; count]).unwrap();
+    capture_all(hub)
+}
+fn capture_all(hub: &mut Hub) -> Vec<Value> {
+    let rt = runtime(hub);
+    let count = rt.state().world.game.players.len();
     let selected = (0..count)
         .map(|slot| SelectedSeat {
             slot,
@@ -66,10 +81,195 @@ fn tick_all(hub: &mut Hub) -> Vec<Value> {
             omit: false,
         })
         .collect::<Vec<_>>();
+    let events = rt.frame_events(FrameKind::Scheduled).to_vec();
     let frames = rt.collect_frame(&selected, FrameKind::Scheduled).unwrap();
     assert!(rt.fault().is_none());
     assert_eq!(frames.len(), count);
-    frames.into_iter().map(|f| f.message).collect()
+    let mut frames = frames.into_iter().map(|f| f.message).collect::<Vec<_>>();
+    let room = hub.rooms.get_mut("TUT").unwrap();
+    let state = room.native.as_mut().unwrap().runtime.state_mut();
+    for op in &mut room.operatives {
+        let key = String::from_utf16(&op.person.token).unwrap();
+        let mut frame = op
+            .stream
+            .as_mut()
+            .unwrap()
+            .capture(state, false, &events)
+            .unwrap();
+        frame["operative"] = state.companion_status(&key);
+        assert_eq!(frame["tick"], state.world.game.tick);
+        assert_eq!(frame["t"], "s");
+        frames.push(frame);
+    }
+    frames
+}
+
+fn operative_starts(hub: &mut Hub, operatives: &mut [Peer]) {
+    for peer in operatives {
+        let rows = peer.drain(hub);
+        let starts = rows
+            .iter()
+            .filter(|row| row["t"] == "start")
+            .collect::<Vec<_>>();
+        assert_eq!(starts.len(), 1);
+        let start = starts[0];
+        assert_eq!(start["role"], "operative");
+        assert_eq!(start["you"], 0);
+        let room = &hub.rooms["TUT"];
+        let op = room
+            .operatives
+            .iter()
+            .find(|op| op.person.connection.as_ref().unwrap().id == peer.connection.id)
+            .unwrap();
+        let state = room.native.as_ref().unwrap().runtime.state();
+        let companion = state
+            .companions
+            .get(&peer.connection.id.to_string())
+            .unwrap();
+        assert_eq!(start["operative"]["id"], companion.unit_id);
+        assert_eq!(state.world.game.units[&companion.unit_id].owner, 0);
+        assert!(state.commands.units[&companion.unit_id].operative);
+        assert!(op.stream.is_some());
+    }
+    assert!(hub.native_status("TUT").unwrap().fault.is_none());
+}
+
+fn exercise_operatives(hub: &mut Hub, operatives: &[Peer]) {
+    let ids = runtime(hub)
+        .state()
+        .companions
+        .records
+        .values()
+        .map(|op| op.unit_id)
+        .collect::<Vec<_>>();
+    let before = ids
+        .iter()
+        .map(|id| runtime(hub).state().world.game.units[id].at())
+        .collect::<Vec<_>>();
+    let tutorial = runtime(hub).state().tutorial_state().is_some();
+    let mut fired = vec![false; ids.len()];
+    let mut threw = fired.clone();
+    let mut flew = false;
+    for sequence in 0..200 {
+        for (peer, id) in operatives.iter().zip(&ids) {
+            let at = runtime(hub).state().world.game.units[id].at();
+            let moving = if tutorial { at.x < 32. } else { sequence < 8 };
+            // Cross the authored hedgerow through the road, using FPS movement.
+            let yaw = if tutorial && at.x < 30. && at.z < 43. {
+                std::f64::consts::FRAC_PI_2
+            } else if tutorial && at.x < 30. && at.z > 45. {
+                -std::f64::consts::FRAC_PI_2
+            } else {
+                0.
+            };
+            let forward = if moving { 1. } else { 0. };
+            hub.message(
+                "TUT",
+                &peer.connection,
+                &mut true,
+                json!({"t":"fps", "seq":sequence, "forward":forward, "strafe":0,
+                    "yaw":yaw, "pitch":0, "fire":sequence < 6, "nade":if sequence > 0 { 1 } else { 0 }}),
+                20 + sequence as u64 * 50,
+            );
+        }
+        let frames = tick_all(hub);
+        for (index, id) in ids.iter().enumerate() {
+            for frame in &frames {
+                for event in frame["shots"].as_array().unwrap() {
+                    if event["f"] == *id {
+                        threw[index] |= event["k"] == "throw";
+                        fired[index] |= event["k"] != "throw";
+                    }
+                }
+                flew |= frame["flights"]
+                    .as_array()
+                    .is_some_and(|rows| !rows.is_empty());
+            }
+        }
+    }
+    let state = runtime(hub).state();
+    for (index, id) in ids.iter().enumerate() {
+        let op = &state.companions.records[&state.companions.soldiers[id].companion];
+        assert_eq!(op.last_seq, 199);
+        assert!(op.shots > 0 && fired[index] && threw[index]);
+        assert_eq!(state.companions.soldiers[id].nades, 2);
+        let at = state.world.game.units[id].at();
+        assert!((at.x - before[index].x).abs() + (at.z - before[index].z).abs() > 0.01);
+        if tutorial {
+            assert!(
+                at.x >= 32.,
+                "operative must cross the Tutorial hedgerow: {at:?}"
+            );
+        }
+    }
+    assert!(flew);
+    assert!(state.firing.flights.is_empty());
+}
+
+fn ending_hold(hub: &mut Hub, peers: &mut [Peer], operatives: &mut [Peer]) {
+    let mut frames = vec![0; operatives.len()];
+    let mut commander_frames = vec![0; peers.len()];
+    let tick = runtime(hub).state().world.game.tick;
+    let statuses = operatives
+        .iter()
+        .map(|peer| {
+            let key = peer.connection.id.to_string();
+            let status = runtime(hub).state().companion_status(&key);
+            hub.message(
+                "TUT",
+                &peer.connection,
+                &mut true,
+                json!({"t":"fps", "seq":200, "forward":1, "strafe":0,
+                    "yaw":0, "pitch":0, "fire":true, "nade":2}),
+                10_020,
+            );
+            assert_eq!(runtime(hub).state().companion_status(&key), status);
+            status
+        })
+        .collect::<Vec<_>>();
+    for callback in 0..120 {
+        // Include unattended game seats in the ordinary ending snapshots.
+        capture_all(hub);
+        let now = (callback + 1) * 50;
+        hub.poll_native(now, now * 1_000_000);
+        for (index, peer) in peers.iter_mut().enumerate() {
+            commander_frames[index] += peer.drain(hub).iter().filter(|row| row["t"] == "s").count();
+        }
+        for (index, peer) in operatives.iter_mut().enumerate() {
+            for row in peer.drain(hub) {
+                if row["t"] == "s" {
+                    assert!(row["operative"].is_object());
+                    assert!(row["winner"].as_i64().is_some());
+                    for key in ["id", "seq", "shots", "nades"] {
+                        assert_eq!(row["operative"][key], statuses[index][key]);
+                    }
+                    for key in [
+                        "movement",
+                        "queues",
+                        "productionJobs",
+                        "plans",
+                        "orders",
+                        "air",
+                        "rally",
+                        "works",
+                        "covers",
+                        "sup",
+                    ] {
+                        assert!(row.get(key).is_none(), "operative leaked {key}");
+                    }
+                    frames[index] += 1;
+                }
+            }
+        }
+        assert_eq!(hub.native_status("TUT").unwrap().fault, None);
+    }
+    let status = hub.native_status("TUT").unwrap();
+    assert!(status.ending_complete);
+    assert_eq!(status.held, 120);
+    assert_eq!(status.tick, tick + 60);
+    assert!(hub.rooms["TUT"].native.is_none());
+    assert!(frames.iter().all(|count| *count == 60));
+    assert!(commander_frames.iter().all(|count| *count == 60));
 }
 
 #[test]
@@ -267,7 +467,7 @@ fn go(hub: &mut Hub, at: ww2_core::game::Point) {
         .game
         .units
         .values()
-        .filter(|u| u.owner == 0 && u.hp > 0.)
+        .filter(|u| u.owner == 0 && u.hp > 0. && !state.commands.units[&u.id].operative)
         .map(|u| MoveOrder {
             unit: i64::from(u.id),
             at,
@@ -330,7 +530,13 @@ fn tutorial_room_runs_all_steps_snapshots_dialogue_and_ending_hold() {
     use ww2_core::{game::Point, match_commands::Stance, match_end::EndReason};
     let mut hub = hub();
     let mut peer = Peer::new(1);
-    peer.join(&mut hub, json!({"tutorial":true}));
+    peer.join(&mut hub, json!({}));
+    peer.send(&mut hub, json!({"t":"mode","v":"tutorial"}));
+    let mut operatives = [Peer::new(10), Peer::new(11)];
+    operatives[0].join_operative(&mut hub);
+    peer.send(&mut hub, json!({"t":"start"}));
+    operatives[1].join_operative(&mut hub);
+    operative_starts(&mut hub, &mut operatives);
     peer.drain(&mut hub);
     let mut lines = vec![];
     for tick in 1..=40 {
@@ -346,13 +552,16 @@ fn tutorial_room_runs_all_steps_snapshots_dialogue_and_ending_hold() {
         lines[0],
         json!({"k":"say","text":"Sgt. Hollis: Morning, Lieutenant. The glider pilot missed the field by two miles, so we walk.","x":27.,"z":45.,"pub":true})
     );
-    let ids = runtime(&mut hub)
-        .state()
+    exercise_operatives(&mut hub, &operatives);
+    peer.drain(&mut hub);
+    let state = runtime(&mut hub).state();
+    let ids = state
         .world
         .game
         .units
-        .keys()
-        .map(|id| i64::from(*id))
+        .values()
+        .filter(|unit| !state.commands.units[&unit.id].operative)
+        .map(|unit| i64::from(unit.id))
         .collect();
     execute(
         &mut hub,
@@ -506,12 +715,7 @@ fn tutorial_room_runs_all_steps_snapshots_dialogue_and_ending_hold() {
     assert_eq!(state.finish.unwrap().reason, EndReason::Tutorial);
     assert_eq!(lines.len(), 18);
     // The room itself must serialize its full Enemy result and release the runtime.
-    for callback in 0..120 {
-        let now = (callback + 1) * 50;
-        hub.poll_native(now, now * 1_000_000);
-        peer.drain(&mut hub);
-        assert_eq!(hub.native_status("TUT").unwrap().fault, None);
-    }
+    ending_hold(&mut hub, std::slice::from_mut(&mut peer), &mut operatives);
     let status = hub.native_status("TUT").unwrap();
     assert!(status.ending_complete);
     assert!(hub.rooms["TUT"].native.is_none());
@@ -536,10 +740,15 @@ fn assault_room_timer_victory_survives_every_seat_snapshot_and_result_delivery()
         p.join(&mut hub, json!({"public":true}));
     }
     peers[0].send(&mut hub, json!({"t":"mode","v":"assault"}));
+    let mut operatives = [Peer::new(10), Peer::new(11)];
+    operatives[0].join_operative(&mut hub);
     peers[0].send(&mut hub, json!({"t":"start"}));
+    operatives[1].join_operative(&mut hub);
+    operative_starts(&mut hub, &mut operatives);
     for p in &mut peers {
         p.drain(&mut hub);
     }
+    exercise_operatives(&mut hub, &operatives);
     runtime(&mut hub)
         .state_mut()
         .assault
@@ -553,18 +762,75 @@ fn assault_room_timer_victory_survives_every_seat_snapshot_and_result_delivery()
         runtime(&mut hub).state().finish.unwrap().reason,
         ww2_core::match_end::EndReason::Timer
     );
-    for callback in 0..120 {
-        let now = (callback + 1) * 50;
-        hub.poll_native(now, now * 1_000_000);
-        for p in &mut peers {
-            p.drain(&mut hub);
-        }
-        assert_eq!(hub.native_status("TUT").unwrap().fault, None);
-    }
+    ending_hold(&mut hub, &mut peers, &mut operatives);
     assert!(hub.native_status("TUT").unwrap().ending_complete);
     let result = &hub.rooms["TUT"].result.as_ref().unwrap().report;
     assert_eq!(result["mode"], "assault");
     assert_eq!(result["reason"], "timer");
     assert_eq!(result["winner"], 0);
     assert_eq!(result["names"], json!(["Human 1", "Human 2"]));
+}
+
+#[test]
+fn attached_elimination_rooms_run_lobby_and_live_operatives_through_victory_and_hold() {
+    use ww2_core::{economy::Mode, match_end::EndReason};
+    for (mode, name, target, reason) in [
+        (
+            Mode::Annihilation,
+            "annihilation",
+            "bunker",
+            EndReason::Bunkers,
+        ),
+        (Mode::Classic, "classic", "hq", EndReason::Headquarters),
+    ] {
+        let mut hub = hub();
+        let mut peers = [Peer::new(1), Peer::new(2)];
+        for peer in &peers {
+            peer.join(&mut hub, json!({}));
+        }
+        peers[0].send(&mut hub, json!({"t":"mode","v":name}));
+        let mut operatives = [Peer::new(10), Peer::new(11)];
+        operatives[0].join_operative(&mut hub);
+        let mut options = native_tests::native_match().options;
+        options.mode = mode;
+        options.tech = false;
+        let map = crate::authoritative_maps::load("default").unwrap();
+        let state = match mode {
+            Mode::Annihilation => Match::new_annihilation(map, options),
+            Mode::Classic => Match::new_classic(map, options),
+            _ => unreachable!(),
+        }
+        .unwrap();
+        // Exercise existing constructor attachment without changing public Start admission.
+        hub.attach_native("TUT", state, 0).unwrap();
+        operatives[1].join_operative(&mut hub);
+        operative_starts(&mut hub, &mut operatives);
+        for peer in &mut peers {
+            peer.drain(&mut hub);
+        }
+        exercise_operatives(&mut hub, &operatives);
+        let state = runtime(&mut hub).state_mut();
+        let mut removed = 0;
+        for unit in state.world.game.units.values_mut() {
+            if unit.owner == 1 && state.rules.kinds[unit.kind].name == target {
+                unit.hp = 0.;
+                removed += 1;
+            }
+        }
+        assert!(removed > 0);
+        for _ in 0..200 {
+            if runtime(&mut hub).state().finish.is_some() {
+                break;
+            }
+            tick_all(&mut hub);
+        }
+        let finish = runtime(&mut hub).state().finish.unwrap();
+        assert_eq!(finish.winner, 0);
+        assert_eq!(finish.reason, reason);
+        ending_hold(&mut hub, &mut peers, &mut operatives);
+        let result = &hub.rooms["TUT"].result.as_ref().unwrap().report;
+        assert_eq!(result["mode"], name);
+        assert_eq!(result["winner"], 0);
+        assert_eq!(result["reason"], reason.as_str());
+    }
 }

@@ -984,13 +984,14 @@ const UNAVAILABLE: &[&str] = &[
     "logisticsResume",
 ];
 
-// Prototype server.js:353-356. This selects an option, not mode admission.
+// Server entropy is recorded in options before core construction.
 fn fresh_weather_seed() -> Result<u32, String> {
     getrandom::u32()
         .map(|seed| seed & 0x7fff_ffff)
         .map_err(|error| format!("weather seed unavailable: {error}"))
 }
 
+// Prototype server.js:353-356. This selects an option, not mode admission.
 fn logistics_enabled_for(mode: &str, map: &Value) -> bool {
     if truthy(&map["scenario"]) {
         return map["scenario"]["logistics"] == Value::Bool(true);
@@ -1924,7 +1925,12 @@ impl Hub {
         now: u64,
         weather_seed: impl FnOnce() -> Result<u32, String>,
     ) -> Result<u64, String> {
-        let request = self.trusted_start_request_with_weather_source(code, connection_id, restart, weather_seed)?;
+        let request = self.trusted_start_request_with_weather_source(
+            code,
+            connection_id,
+            restart,
+            weather_seed,
+        )?;
         let state = request.generate()?;
         let prepared = self.prepare_trusted_start(code, state, now, restart)?;
         Ok(self.publish_native(code, prepared))
