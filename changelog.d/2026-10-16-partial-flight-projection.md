@@ -1,0 +1,1 @@
+- Keep partial recipient snapshots available when an ordinary flight cannot be projected. Complete snapshots still refuse unsupported flights, and operative grenade rows retain their existing visibility rules.

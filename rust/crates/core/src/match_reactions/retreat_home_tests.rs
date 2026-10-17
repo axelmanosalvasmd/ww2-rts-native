@@ -348,7 +348,7 @@ fn mov48_manual_retreat_exits_house_moves_home_and_delivers_every_seat() {
     assert!(m.tick_state.fault().is_none());
 }
 
-fn classic_retreat_projection_tick(m: &mut Match, delivery: &mut DeliveryState) {
+fn classic_retreat_projection_tick(m: &mut Match, delivery: &mut DeliveryState, id: u32) {
     m.advance_tick().unwrap();
     let mode = m.elimination.as_ref().unwrap();
     let expected = serde_json::json!({
@@ -357,6 +357,7 @@ fn classic_retreat_projection_tick(m: &mut Match, delivery: &mut DeliveryState) 
         "suddenDeath":mode.sudden_death
     });
     let count = m.start.players.len();
+    let retreating = m.world.game.units[&id].retreating;
     let frame = delivery
         .capture(m, &vec![false; count], &vec![false; count])
         .unwrap();
@@ -376,6 +377,24 @@ fn classic_retreat_projection_tick(m: &mut Match, delivery: &mut DeliveryState) 
             ]
         );
     }
+    let projection = frame.recipient(0).unwrap();
+    let row = projection.fields["units"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|row| row[0] == serde_json::json!(id))
+        .unwrap()
+        .as_array()
+        .unwrap();
+    assert_eq!(
+        &row[..3],
+        &[
+            serde_json::json!(id),
+            serde_json::json!("rifle"),
+            serde_json::json!(0),
+        ]
+    );
+    assert_eq!(row[12].as_u64().unwrap() & 1, u64::from(retreating));
 }
 
 fn retreat_through_legs(mode: Mode) {
@@ -405,7 +424,7 @@ fn retreat_through_legs(mode: Mode) {
     let mut leg_ends = BTreeSet::new();
     for _ in 0..2500 {
         if mode == Mode::Classic {
-            classic_retreat_projection_tick(&mut m, &mut delivery);
+            classic_retreat_projection_tick(&mut m, &mut delivery, id);
         } else {
             delivered_tick(&mut m, &mut delivery, &selected);
         }
@@ -431,7 +450,7 @@ fn retreat_through_legs(mode: Mode) {
     assert!(m.tick_state.fault().is_none());
     for _ in 0..3 {
         if mode == Mode::Classic {
-            classic_retreat_projection_tick(&mut m, &mut delivery);
+            classic_retreat_projection_tick(&mut m, &mut delivery, id);
         } else {
             delivered_tick(&mut m, &mut delivery, &selected);
         }
