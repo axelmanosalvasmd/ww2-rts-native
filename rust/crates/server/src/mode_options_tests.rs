@@ -337,7 +337,7 @@ fn mode11_headless_default_and_conquest_require_explicit_logistics_and_keep_disa
 }
 
 #[test]
-fn mode11_horde_switches_and_shared_base_are_constructed_without_admitting_full_runner() {
+fn mode11_horde_switches_and_shared_base_survive_ticks_and_every_seat_delivery() {
     let (mut hub, _, _host_rx, _guest_rx) = peers();
     let room = hub.rooms.get_mut("ABC").unwrap();
     room.mode = "horde".into();
@@ -363,8 +363,9 @@ fn mode11_horde_switches_and_shared_base_are_constructed_without_admitting_full_
             if slot == 2 { 3 } else { 2 }
         );
     }
-    assert!(state.advance_tick().is_err());
-    assert!(RoomRuntime::new(state, 0).is_err());
+    state.advance_tick().unwrap();
+    let mut runtime = RoomRuntime::new(state, 0).unwrap();
+    tick_every_seat(&mut runtime, false);
     room.mode = "world".into();
     let options = room
         .native_match_options(701, 391, players(), authored.source())
