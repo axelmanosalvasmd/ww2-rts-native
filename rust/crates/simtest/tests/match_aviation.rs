@@ -336,9 +336,20 @@ fn command_snapshot(m: &Match) -> Value {
     }).collect::<Vec<_>>())
 }
 #[test]
-fn typed_aircraft_commands_match_original_selection_and_distinct_cleanup() {
+fn typed_aircraft_commands_match_original_selection_and_native_withdrawal_stances() {
     use ww2_core::match_commands::Command;
-    let f = aircraft_command_fixture();
+    let mut f = aircraft_command_fixture();
+    // LOG-13 intentionally admits the stance rejected by the pinned capture.
+    // Every other aircraft selection, cleanup and state assertion stays exact.
+    let forced = f["traces"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|trace| trace["name"] == "forced-ground-stance-remains-ineligible")
+        .unwrap();
+    forced["frames"][0]["denial"] = Value::Null;
+    forced["frames"][0]["expected"][0]["holdPos"] = json!(true);
+    forced["frames"][0]["expected"][0]["follow"] = json!(0);
     let mut checkpoints = 0;
     for trace in f["traces"].as_array().unwrap() {
         let mut m = command_scene(trace);

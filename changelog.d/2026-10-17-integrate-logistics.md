@@ -7,3 +7,6 @@
 - Update the shared-facility recruitment and room-option Horde tests to require healthy core ticks and snapshots while preserving their ownership, payment, rally and hosted-attachment checks.
 - Record the logistics integration conflict decisions and test rewrites for the final integrator.
 - Format the reconciled logistics integration sources with the pinned Rust toolchain.
+- Restore the explicit Horde Gate refusal after Horde joins the shared ground-mode predicate; retain all existing Gate refusal assertions.
+- Update the two command fixture consumers for LOG-13's admitted forced stances, retaining every checkpoint and unrelated exact value. The recorded Source files stay unchanged; the captured stance refusal and native intent difference are documented.
+- Preserve immediate Conquest aircraft purchases with exact payment, identity, metadata and private delivery checks. Keep Classic hosted aircraft training refused before payment. Malformed Horde component fixtures now require the exact metadata error after mode admission.

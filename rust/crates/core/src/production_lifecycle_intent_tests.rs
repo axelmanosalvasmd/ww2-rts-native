@@ -418,7 +418,7 @@ fn base21_training_pauses_preserves_fifo_and_rolls_back_failed_aircraft_publicat
 }
 
 #[test]
-fn aircraft_purchase_and_training_keep_bound_room_delivery_guard_without_payment() {
+fn bound_room_allows_immediate_aircraft_purchase_and_refuses_classic_training_before_payment() {
     for mode in [Mode::Conquest, Mode::Classic] {
         let mut state = scene(mode, Faction::Usa);
         let airfield = facility(&mut state, 0, "airfield", 20, 20);
@@ -439,25 +439,87 @@ fn aircraft_purchase_and_training_keep_bound_room_delivery_guard_without_payment
                     crate::produced_units::Error::UnsupportedAir
                 )
             );
-        } else {
             assert_eq!(
-                state
-                    .recorded_buy(0, "fighter", Some(airfield))
-                    .unwrap_err(),
-                RecruitError::Placement(crate::produced_units::Error::UnsupportedAir)
+                (
+                    state.start.economy.clone(),
+                    state.production.clone(),
+                    state.story.clone(),
+                    state.next_unit_id,
+                    state.world.game.units.len()
+                ),
+                before
             );
+            ordinary_ticks(&mut state, 4);
+        } else {
+            let bought = state.recorded_buy(0, "fighter", Some(airfield)).unwrap();
+            let id = before.3;
+            assert_eq!(bought.unit, id);
+            assert_eq!(
+                bought.purchase.request,
+                crate::production::RecruitRequest {
+                    building: airfield,
+                    owner: 0,
+                    kind: "fighter".into(),
+                    spend: economy::Price { mp: 280., fuel: 0. },
+                }
+            );
+            assert_eq!(bought.route_status, None);
+            let mut expected_economy = before.0.clone();
+            expected_economy.players[0].mp -= 280.;
+            assert_eq!(state.start.economy, expected_economy);
+            assert_eq!(state.production, before.1);
+            let mut expected_story = before.2.clone();
+            expected_story[0].mp_spent += 280.;
+            assert_eq!(state.story, expected_story);
+            assert_eq!(state.next_unit_id, id + 1);
+            assert_eq!(state.world.game.units.len(), before.4 + 1);
+            let unit = &state.world.game.units[&id];
+            assert_eq!((unit.id, unit.owner), (id, 0));
+            assert_eq!(state.rules.kinds[unit.kind].name, "fighter");
+            assert_eq!(unit.air, Some(PlaneState::Base));
+            assert_eq!(unit.at(), state.world.game.units[&airfield].at());
+            assert!(unit.path.is_empty());
+            assert!(unit.world_goal.is_none());
+            assert!(!unit.drift);
+            assert_eq!(
+                state.aviation.planes[&id],
+                crate::match_aviation::AircraftRuntime {
+                    fuel: 50.,
+                    ammo: 60.,
+                    timer: 0.,
+                    orbit: 0.,
+                    mission: None,
+                    attack_pick: 0,
+                    downed: false,
+                }
+            );
+            assert_eq!(
+                state.recruit_metadata[&id],
+                crate::match_runtime::RecruitMetadata {
+                    building: airfield,
+                    initial_rally: None,
+                    initial_route_status: None,
+                }
+            );
+            assert!(state.commands.units.contains_key(&id));
+            assert_eq!(state.combat.get(id).unwrap().hit_by, Some(0));
+            assert!(state.firing.get(id).is_some());
+            assert!(state.abilities.get(id).is_some());
+            assert!(state.recovery.get(id).is_some());
+            for tick in 0..=4 {
+                if tick > 0 {
+                    ordinary_ticks(&mut state, 1);
+                }
+                let cache = SnapshotCache::new(&state).unwrap();
+                assert_eq!(
+                    cache.recipient(0).unwrap().fields["air"],
+                    json!([[id, 0, 50., 60., 0.]])
+                );
+                for slot in 1..state.world.game.players.len() {
+                    assert_eq!(cache.recipient(slot).unwrap().fields["air"], json!([]));
+                }
+            }
         }
-        assert_eq!(
-            (
-                state.start.economy.clone(),
-                state.production.clone(),
-                state.story.clone(),
-                state.next_unit_id,
-                state.world.game.units.len()
-            ),
-            before
-        );
-        ordinary_ticks(&mut state, 4);
     }
 }
 

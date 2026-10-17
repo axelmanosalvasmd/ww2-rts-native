@@ -1270,9 +1270,12 @@ fn mode53_core_reveal_requires_active_spent_budget_and_at_most_three_left() {
             "wave markers do not reveal the whole map"
         );
     }
+    // This visibility component deliberately omits combat and control metadata.
+    assert!(m.combat.get(ids[0]).is_none());
+    assert!(!m.commands.units.contains_key(&ids[0]));
     assert!(m.advance_tick().is_err());
     assert!(matches!(
         crate::recipient_snapshot::SnapshotCache::new(&m),
-        Err(crate::recipient_snapshot::SnapshotError::UnsupportedMode)
+        Err(crate::recipient_snapshot::SnapshotError::Rules)
     ));
 }

@@ -21,3 +21,9 @@ The #390 test resolutions retain every-seat mode, actor identity, retreat flag a
 The #405 commander dispatcher test retains the complete existing policy block and exact command assertions. It now requires canonical Horde recipient projections while retaining the exact queued-tick diagnostic and the temporary hosted-attachment guard. Shared-facility recruitment and room-option tests require healthy core Horde ticks; purchase, ownership and rally assertions remain.
 
 An independent source review found three stale Horde refusal tests in the mode-row, shared-facility and room-option checks. Those checks were rewritten to the admitted behavior before the checkpoint run. The review did not execute Cargo. Its result does not replace execution of the combined tree.
+
+## Checkpoint diagnostics
+
+At `c3fa3647`, the full three-package run executed 1,915 tests: 1,909 passed, six failed and ten were skipped. An earlier run was killed by the scope OOM limit during compilation, before tests; the completed run used two test threads. Future builds explicitly set `CARGO_BUILD_JOBS=2` because Nextest `-j` controls test concurrency. The memory cap stays 6 GiB with zero scope swap.
+
+The six failures led to one runtime guard repair and exact test rewrites: restore Horde Gate refusal; update two forced-stance fixture consumers to the imported LOG-13 intent; require malformed Horde metadata errors after canonical mode admission; and require successful immediate Conquest aircraft purchase while preserving the hosted Classic training refusal. All fixture files remain unchanged. The stance difference from the pinned capture is recorded in the integration design fragment.

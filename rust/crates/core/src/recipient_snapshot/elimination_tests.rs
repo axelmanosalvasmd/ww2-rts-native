@@ -206,10 +206,12 @@ fn elimination_snapshot_admission_rejects_missing_state_and_other_modes() {
     ] {
         state.options.mode = mode;
         state.world.game.mode = Some(kind);
-        assert!(matches!(
-            SnapshotCache::new(&state),
-            Err(SnapshotError::UnsupportedMode)
-        ));
+        let expected = if mode == Mode::Horde {
+            SnapshotError::Rules
+        } else {
+            SnapshotError::UnsupportedMode
+        };
+        assert_eq!(SnapshotCache::new(&state).err(), Some(expected), "{mode:?}");
     }
     state.options.mode = Mode::Classic;
     state.elimination.as_mut().unwrap().time_left = Some(f64::NAN);

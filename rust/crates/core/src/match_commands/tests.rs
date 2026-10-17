@@ -301,9 +301,28 @@ fn set(m: &mut Match, id: u32, fields: &Value) {
     m.grid.rebuild(&m.world.game.units);
 }
 #[test]
-fn original_command_and_waiting_order_phases() {
-    let fixture: Value =
+fn original_command_and_waiting_order_phases_with_native_withdrawal_stances() {
+    let mut fixture: Value =
         serde_json::from_slice(include_bytes!("../../tests/fixtures/match-commands.json")).unwrap();
+    // LOG-13 admits withdrawal stances. Keep the recorded Source bytes intact
+    // and replace only this deliberately changed control's expected effects.
+    let forced = fixture["cases"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|case| case["name"] == "forced-and-permission")
+        .unwrap();
+    forced["steps"][0]["denial"] = Value::Null;
+    for step in forced["steps"].as_array_mut().unwrap() {
+        let actor = step["expected"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|actor| actor["id"] == 1)
+            .unwrap();
+        actor["holdPos"] = json!(true);
+        actor["follow"] = json!(0);
+    }
     let mut count = 0;
     for case in fixture["cases"].as_array().unwrap() {
         let mut m = initial(case);

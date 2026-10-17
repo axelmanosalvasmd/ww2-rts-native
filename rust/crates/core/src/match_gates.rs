@@ -10,8 +10,10 @@ pub struct GateControl {
 
 impl Match {
     pub(crate) fn ordinary_gate_mode(&self) -> bool {
-        self.options.mode != crate::economy::Mode::Tutorial
-            && crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode)
+        !matches!(
+            self.options.mode,
+            crate::economy::Mode::Tutorial | crate::economy::Mode::Horde
+        ) && crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode)
             && !self.options.logistics
             && self.convoys.is_none()
     }
