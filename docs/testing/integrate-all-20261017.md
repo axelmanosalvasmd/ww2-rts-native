@@ -3,7 +3,11 @@
 Base: `61947c5b8a8438eb6ccbefa02e7d269c4e032472`.
 All merges retain exact parent commits with no-ff ancestry. No squash, rebase or
 force-push. World admission remains closed and the reference pin is unchanged.
-Final combined validation and three-platform main CI are pending.
+Final combined validation and all nine three-platform main CI jobs passed at
+`4ff2e3daed31d10dfb27276a8c1916525f658af0`. See the
+[final qualification receipt](integrate-all-final-receipt-20261017.md).
+The provisional/pending statements below are chronological history, superseded
+by that final receipt.
 
 ## Current union status
 
