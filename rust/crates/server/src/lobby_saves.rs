@@ -92,7 +92,6 @@ impl Hub {
         }
         let state = native.runtime.state();
         if !matches!(state.options.mode, Mode::Default | Mode::Conquest)
-            || state.options.logistics
             || state.options.sandbox
             || state.world_runtime.is_some()
             || room.players.iter().any(|p| p.ai)
@@ -145,7 +144,6 @@ impl Hub {
         }
         let state = Match::from_save_json(saved["g"]["state"].clone())?;
         if !matches!(state.options.mode, Mode::Default | Mode::Conquest)
-            || state.options.logistics
             || state.options.sandbox
             || state.world_runtime.is_some()
         {

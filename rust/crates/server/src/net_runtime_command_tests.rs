@@ -25,7 +25,7 @@ fn drain(rx: &mut mpsc::Receiver<Output>) -> Vec<Value> {
         match output {
             Output::Json(value) => messages.push(value),
             Output::Snapshot(write) => messages.push(serde_json::from_str(&write.json).unwrap()),
-            Output::Watcher(_) => panic!("unexpected spectator output for commander"),
+            Output::Watcher(_) => panic!("watcher output reached a seated commander"),
             Output::Close(..) => panic!("unexpected close"),
         }
     }
@@ -271,10 +271,12 @@ fn every_support_kind_keeps_ordinary_r1_scheduled_snapshots_flowing() {
                 .cost;
             let funds = cost.max(200.);
             setup.start.economy.players[0].mp = funds;
+            let actor = rifles(&hub, 0)[0];
+            let at = state(&hub).world.game.units[&actor].at();
             send(
                 &mut hub,
                 &a,
-                json!({"t":"support","kind":kind,"x":1,"z":2}),
+                json!({"t":"support","kind":kind,"x":at.x,"z":at.z}),
                 0,
             );
             assert_eq!(state(&hub).start.economy.players[0].mp, funds);
@@ -305,33 +307,11 @@ fn every_support_kind_keeps_ordinary_r1_scheduled_snapshots_flowing() {
             }
             assert!(snapshots.iter().all(|count| *count >= 2), "{snapshots:?}");
             assert_eq!(state(&hub).commands.pending_commands(), 0);
-            // Supported calls must create real state; refusal cannot pass by poverty.
-            if matches!(kind.as_str(), "artillery" | "smoke" | "cover") {
-                assert_eq!(pending, 1);
-                assert!(replies.is_empty());
-                assert_eq!(state(&hub).world.game.strikes.len(), 1);
-                assert!(state(&hub).start.players[0].support[kind] > 0.);
-            } else {
-                assert_eq!(pending, 0);
-                assert_eq!(
-                    replies,
-                    vec![json!({"t":"deny","cmd":"support","reason":"unsupported"})]
-                );
-                assert!(state(&hub).world.game.strikes.is_empty());
-                assert!(state(&hub).start.players[0].support[kind] <= 0.);
-                let actor = rifles(&hub, 0)[0];
-                send(&mut hub, &a, json!({"t":"stop","ids":[actor]}), 400);
-                assert_eq!(
-                    state(&hub)
-                        .commands
-                        .pending_tick(9)
-                        .next()
-                        .unwrap()
-                        .0
-                        .sequence,
-                    1
-                );
-            }
+            // Every catalog kind is admitted by the integrated flight/event adapter.
+            assert_eq!(pending, 1);
+            assert!(replies.is_empty());
+            assert_eq!(state(&hub).world.game.strikes.len(), 1);
+            assert!(state(&hub).start.players[0].support[kind] > 0.);
             assert!(
                 hub.accounts
                     .values()
@@ -342,7 +322,7 @@ fn every_support_kind_keeps_ordinary_r1_scheduled_snapshots_flowing() {
 }
 
 #[test]
-fn recon_refuses_before_reservation_and_keeps_ordinary_r1_snapshots_flowing() {
+fn recon_reserves_once_and_keeps_ordinary_r1_snapshots_flowing() {
     for trusted in [false, true] {
         let mut hub = Hub::new(32, String::new());
         if trusted {
@@ -364,32 +344,41 @@ fn recon_refuses_before_reservation_and_keeps_ordinary_r1_snapshots_flowing() {
         drain(&mut rb);
         let actor = rifles(&hub, 0)[0];
         let at = state(&hub).world.game.units[&actor].at();
-        let wallet = state(&hub).start.economy.players[0].mp;
+        let cost = ww2_core::economy::sup_cost(state(&hub).options.mode, "recon")
+            .unwrap()
+            .cost;
+        let setup = hub
+            .rooms
+            .get_mut("ABC")
+            .unwrap()
+            .native
+            .as_mut()
+            .unwrap()
+            .runtime
+            .state_mut();
+        setup.start.players[0].support.insert("recon".into(), 0.);
+        setup.start.economy.players[0].mp = cost.max(200.);
+        let wallet = setup.start.economy.players[0].mp;
         send(
             &mut hub,
             &a,
             json!({"t":"support","kind":"recon","x":at.x,"z":at.z}),
             0,
         );
-        assert_eq!(state(&hub).commands.pending_commands(), 0);
+        assert_eq!(state(&hub).commands.pending_commands(), 1);
         assert_eq!(state(&hub).start.economy.players[0].mp, wallet);
         assert!(state(&hub).world.game.strikes.is_empty());
         assert!(state(&hub).commands.units[&actor].orders.is_empty());
-        assert_eq!(
-            drain(&mut ra),
-            vec![json!({"t":"deny","cmd":"support","reason":"unsupported"}),]
-        );
-        // A supported input still receives the first host sequence after refusal.
+        assert!(drain(&mut ra).is_empty());
+        // The following command shares the canonical queue and receives sequence two.
         send(&mut hub, &a, json!({"t":"stop","ids":[actor]}), 0);
         assert_eq!(
             state(&hub)
                 .commands
                 .pending_tick(1)
-                .next()
-                .unwrap()
-                .0
-                .sequence,
-            1
+                .map(|(key, _)| key.sequence)
+                .collect::<Vec<_>>(),
+            vec![1, 2]
         );
         let mut snapshots = [0; 2];
         for callback in 0..8 {
@@ -418,6 +407,9 @@ fn recon_refuses_before_reservation_and_keeps_ordinary_r1_snapshots_flowing() {
         }
         assert!(snapshots.iter().all(|count| *count >= 2), "{snapshots:?}");
         assert_eq!(state(&hub).commands.pending_commands(), 0);
+        assert_eq!(state(&hub).world.game.strikes.len(), 1);
+        assert!(state(&hub).start.players[0].support["recon"] > 0.);
+        assert!(state(&hub).start.economy.players[0].mp < wallet);
         assert!(
             hub.accounts
                 .values()

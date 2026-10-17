@@ -24,7 +24,7 @@ fn drain(rx: &mut mpsc::Receiver<Output>) -> Vec<Value> {
         match output {
             Output::Json(value) => messages.push(value),
             Output::Snapshot(write) => messages.push(serde_json::from_str(&write.json).unwrap()),
-            Output::Watcher(_) => panic!("unexpected spectator output for commander"),
+            Output::Watcher(_) => panic!("watcher output reached a seated commander"),
             Output::Close(..) => panic!("unexpected close"),
         }
     }
@@ -151,8 +151,8 @@ fn intent_net86_map_ping_validates_before_budget_and_reaches_only_ready_human_te
     let (unseated, mut r_unseated) = client(5);
     send(&mut hub, &unseated, json!({"t":"ping","x":1,"z":2}), 0);
     assert!(drain(&mut r_unseated).is_empty());
-    // Temporarily move an admitted person to exercise spectator ping silence.
-    // Restore the commander roster before any match tick.
+    // Native attachment admits only human commanders. Move one admitted person
+    // temporarily to exercise the spectator guard without widening admission.
     let spectator = hub.rooms.get_mut("ABC").unwrap().players.pop().unwrap();
     hub.rooms.get_mut("ABC").unwrap().spectators.push(spectator);
     send(&mut hub, &enemy, json!({"t":"ping","x":1,"z":2}), 0);

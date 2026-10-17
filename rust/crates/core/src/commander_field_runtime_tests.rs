@@ -8,7 +8,9 @@ use crate::{
     match_commands::Command,
     match_runtime::{Match, MatchOptions, PlayerConfig},
     orders::OrderKey,
-    recipient_snapshot::{DeliveryState, SelectedSeat, SnapshotCache, SnapshotError},
+    recipient_snapshot::{
+        DeliveryState, SelectedSeat, SnapshotCache, SnapshotCapability, SnapshotError,
+    },
     weather::WeatherChoice,
 };
 use serde_json::{Value, json};
@@ -97,6 +99,37 @@ fn enqueue(state: &mut Match, sequence: u64, command: Value) {
         )
         .unwrap();
 }
+fn collect_classic_partial(state: &mut Match, delivery: &mut DeliveryState) {
+    let mode = state.elimination.as_ref().unwrap();
+    let expected = json!({
+        "kind":"classic",
+        "timeLeft":crate::math::max(0.0, mode.time_left.unwrap().ceil()),
+        "suddenDeath":mode.sudden_death
+    });
+    let count = state.start.players.len();
+    let frame = delivery
+        .capture(state, &vec![false; count], &vec![false; count])
+        .unwrap();
+    assert_eq!(
+        frame.slots().collect::<Vec<_>>(),
+        (0..count).collect::<Vec<_>>()
+    );
+    for slot in 0..count {
+        let projection = frame.recipient(slot).unwrap();
+        assert_eq!(projection.fields["mode"], expected, "Classic seat {slot}");
+        assert!(projection.fields["units"].is_array());
+        assert!(projection.fields["works"].is_array());
+        assert_eq!(
+            projection.missing,
+            vec![
+                SnapshotCapability::WrecksAndFoundMines,
+                SnapshotCapability::ShotsAndFlights,
+                SnapshotCapability::TeamEffects,
+            ]
+        );
+    }
+}
+
 fn tick_and_collect(state: &mut Match, delivery: Option<&mut DeliveryState>) {
     let report = state.advance_tick().unwrap();
     assert!(
@@ -110,15 +143,17 @@ fn tick_and_collect(state: &mut Match, delivery: Option<&mut DeliveryState>) {
         state.validate_gate_actor(id).unwrap();
     }
     let Some(delivery) = delivery else {
-        // Unsupported mode snapshot bounds remain independent of Gate admission.
+        // These existing mode snapshot bounds are independent of Gate admission.
         assert!(matches!(
             SnapshotCache::new(state),
             Err(SnapshotError::UnsupportedMode)
         ));
         return;
     };
-    let classic_mode = (state.options.mode == Mode::Classic)
-        .then(|| crate::recipient_snapshot::mode_row(state).unwrap());
+    if state.options.mode == Mode::Classic {
+        collect_classic_partial(state, delivery);
+        return;
+    }
     let selected: Vec<_> = (0..state.start.players.len())
         .map(|slot| SelectedSeat {
             slot,
@@ -134,9 +169,6 @@ fn tick_and_collect(state: &mut Match, delivery: Option<&mut DeliveryState>) {
         let snapshot = frame.recipient(seat.slot).unwrap().into_json();
         assert!(snapshot["units"].is_array());
         assert!(snapshot["works"].is_array());
-        if let Some(expected) = &classic_mode {
-            assert_eq!(snapshot.get("mode"), Some(expected));
-        }
     }
 }
 fn count(state: &Match, kind: &str) -> usize {
@@ -185,6 +217,9 @@ fn intent_ai50_gate_order_completes_in_each_real_ordinary_mode_with_supported_se
             ));
             None
         };
+        if mode == Mode::Classic {
+            collect_classic_partial(&mut state, delivery.as_mut().unwrap());
+        }
         tick_and_collect(&mut state, delivery.as_mut());
         let job = state.field_works.jobs().get(&builder).unwrap();
         assert_eq!(job.kind, FortKind::Gate);
