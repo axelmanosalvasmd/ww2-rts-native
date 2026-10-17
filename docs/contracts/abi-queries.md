@@ -91,4 +91,12 @@ The `ww2-ffi` tests call these public C entry points directly. Existing header g
 
 The [Rust workflow](../../.github/workflows/rust.yml) builds `ww2-ffi` with `cargo build --locked -p ww2-ffi --release` in three independent `Release library` jobs: `ubuntu-24.04` (Linux x86_64), `windows-2025` (Win64 MSVC), and `macos-15` (macOS arm64). The crate declares `staticlib` in `rust/crates/ffi/Cargo.toml:12`. Linux also links and runs the C replay against `libww2_ffi.a`. This checks static-library builds, not Unreal adoption or packaged-client behavior.
 
-For ABI-DOCS-418, the final handoff records the pushed #418 head and direct links to all three successful hosted jobs. Use the [branch's hosted runs](https://github.com/axelmanosalvasmd/ww2-rts-native/actions/workflows/rust.yml?query=branch%3Aruntime%2Fabi-queries-20261016) to resolve that head. Results from an older head or a cancelled job do not confirm the pushed head. The workflow also permits `workflow_dispatch` if a documentation push does not start a run.
+Confirmed at #418 head `581962e768b68b36253c3d5faa4eec4c12fde2c4`, Rust tree `558fc2f5291637c8694a9455dac3ee8d578aeb5d`, by hosted run `38987359931` (attempt 2):
+
+| Platform | Hosted Release library job | Result |
+| --- | --- | --- |
+| Linux x86_64 (`x86_64-unknown-linux-gnu`) | [ubuntu-24.04](https://github.com/axelmanosalvasmd/ww2-rts-native/actions/runs/38987359931/job/117263341483) | Success, including C link/replay |
+| Win64 MSVC (`x86_64-pc-windows-msvc`) | [windows-2025](https://github.com/axelmanosalvasmd/ww2-rts-native/actions/runs/38987359931/job/117263306658) | Success |
+| macOS arm64 (`aarch64-apple-darwin`) | [macos-15](https://github.com/axelmanosalvasmd/ww2-rts-native/actions/runs/38987359931/job/117263305234) | Success |
+
+The logs confirm these target triples. An external cancellation interrupted earlier attempts; `gh run rerun --failed` preserved the Linux/Windows successes and completed macOS. The documentation-only commit recording these receipts preserves the same Rust tree. Its own pushed-head Release library results are recorded separately in the ABI-DOCS-418 final handoff and can be found in the [branch's hosted runs](https://github.com/axelmanosalvasmd/ww2-rts-native/actions/workflows/rust.yml?query=branch%3Aruntime%2Fabi-queries-20261016). Results from an older head or a cancelled job do not replace that final-head check. The workflow permits `workflow_dispatch` if a documentation push does not start a run.
