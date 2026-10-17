@@ -453,6 +453,37 @@ fn fire_at_live_flight_is_visible_without_disclosing_its_hidden_shooter() {
 }
 
 #[test]
+fn fire_at_preserves_aircraft_area_dispatch_and_mixed_selection_refusal() {
+    let (mut m, tank) = scene("tank");
+    let bomber = m.spawn_aircraft(0, "bomber").unwrap();
+    let before = serde_json::to_value((&m.commands, &m.aviation, &m.world.game)).unwrap();
+    assert_eq!(
+        dispatch(
+            &mut m,
+            json!({"t":"fireat","ids":[tank,bomber],"x":43.,"z":41.})
+        ),
+        Some(Denial::Unsupported)
+    );
+    assert_eq!(
+        serde_json::to_value((&m.commands, &m.aviation, &m.world.game)).unwrap(),
+        before
+    );
+    assert_eq!(
+        dispatch(&mut m, json!({"t":"fireat","ids":[bomber],"x":43.,"z":41.})),
+        None
+    );
+    let mission = m.aviation.planes[&bomber].mission.unwrap();
+    assert_eq!(mission.kind, crate::match_aviation::MissionKind::Area);
+    assert_eq!(m.commands.units[&tank].fire_at, None);
+    assert_eq!(
+        dispatch(&mut m, json!({"t":"fireat","ids":[tank],"x":43.,"z":41.})),
+        None
+    );
+    assert_eq!(m.commands.units[&tank].fire_at, Some(20 * 80 + 21));
+    assert_eq!(m.aviation.planes[&bomber].mission, Some(mission));
+}
+
+#[test]
 fn fire_at_mixed_aircraft_and_ground_sheller_keeps_main_refusal_atomic() {
     for queue in [false, true] {
         let (mut m, id) = scene("howitzer");

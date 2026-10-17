@@ -1,6 +1,6 @@
 //! Pure ordinary RTS projection from original Source boundary inputs and events.
 //! This test does not replay gameplay, restore MatchRandom, or adopt transport policy.
-//! Complete `shots` rows and the supported ground-flight frame are compared. Other fields,
+//! Complete `shots` rows and the live ground-flight boundary are compared. Other snapshot fields, dormant ordinary
 //! state, and source-only falling bodies are retained in the fixture but not claimed.
 #[allow(dead_code)]
 use crate::shared::companion_tick as common;
@@ -568,8 +568,9 @@ fn original_ordinary_batches_match_selected_shot_rows_and_numeric_bits() {
                         );
                     }
                     // Source snapshotFor warms teamFog at each selected query,
-                    // including the ground launch frame. The public base-field
-                    // query supplies this input history from canonical facts.
+                    // including the launch frame. The public base-field query
+                    // supplies this input history from canonical facts before
+                    // the complete-frame delivery baseline.
                     // Its disposable receipt is not complete-frame delivery.
                     if !selected.is_empty() {
                         let mut query = DeliveryState::new(&state).unwrap();
@@ -586,14 +587,11 @@ fn original_ordinary_batches_match_selected_shot_rows_and_numeric_bits() {
                     let state_before = guard(&state, &delivery);
                     let result =
                         delivery.capture_selected_with_tick_events(&mut state, &selected, &batch);
-                    if frame["refusals"]
+                    let live_flights = frame["refusals"]
                         .as_array()
                         .unwrap()
                         .iter()
-                        .any(|v| v == "live-flights")
-                    {
-                        flights += 1;
-                    }
+                        .any(|v| v == "live-flights");
                     if selected.is_empty() {
                         assert!(result.unwrap().is_none());
                         assert_eq!(guard(&state, &delivery), state_before);
@@ -616,17 +614,12 @@ fn original_ordinary_batches_match_selected_shot_rows_and_numeric_bits() {
                                 &row["fields"]["shots"],
                                 &format!("{name}:{} seat{} shots", frame["tick"], row["slot"]),
                             );
-                            if frame["refusals"]
-                                .as_array()
-                                .unwrap()
-                                .iter()
-                                .any(|v| v == "live-flights")
-                            {
+                            if live_flights {
                                 common::exact(
                                     &actual["flights"],
                                     &row["fields"]["flights"],
                                     &format!(
-                                        "{name}:{} seat{} flights",
+                                        "{name}:{} seat{} live flights",
                                         frame["tick"], row["slot"]
                                     ),
                                 );
@@ -634,6 +627,7 @@ fn original_ordinary_batches_match_selected_shot_rows_and_numeric_bits() {
                             recipients += 1;
                             shots += row["fields"]["shots"].as_array().unwrap().len();
                         }
+                        flights += usize::from(live_flights);
                         frames += 1;
                         air_frames += usize::from(air_input);
                         supplied += batch.len();
