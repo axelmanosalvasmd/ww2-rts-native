@@ -26,7 +26,8 @@ impl StartRequest {
             options.logistics = logistics_enabled_for("conquest", map.source());
             Match::new(&map, options)
         } else {
-            let map = crate::authoritative_maps::load(&self.map).map_err(|error| error.to_string())?;
+            let map =
+                crate::authoritative_maps::load(&self.map).map_err(|error| error.to_string())?;
             options.logistics = logistics_enabled_for("conquest", map.source());
             Match::new(map, options)
                 .map_err(crate::authoritative_maps::AuthoredMapError::Match)
@@ -118,7 +119,10 @@ impl Hub {
         Ok(StartRequest {
             token: Arc::new(()),
             map: room.map.clone(),
-            edited_map: self.map_editor.as_ref().and_then(|editor| editor.raw(&room.map)),
+            edited_map: self
+                .map_editor
+                .as_ref()
+                .and_then(|editor| editor.raw(&room.map)),
             restart,
             options: MatchOptions {
                 // Failed preparations leave next_epoch unchanged, so only a

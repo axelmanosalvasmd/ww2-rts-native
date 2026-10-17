@@ -118,15 +118,20 @@ fn tick_and_collect(state: &mut Match, delivery: &mut DeliveryState) {
         });
         let count = state.start.players.len();
         let mut partial = delivery.clone();
-        let frame = partial.capture(state, &vec![false; count], &vec![false; count]).unwrap();
+        let frame = partial
+            .capture(state, &vec![false; count], &vec![false; count])
+            .unwrap();
         for slot in 0..count {
             let projection = frame.recipient(slot).unwrap();
             assert_eq!(projection.fields["mode"], expected, "Classic seat {slot}");
-            assert_eq!(projection.missing, vec![
-                SnapshotCapability::WrecksAndFoundMines,
-                SnapshotCapability::ShotsAndFlights,
-                SnapshotCapability::TeamEffects,
-            ]);
+            assert_eq!(
+                projection.missing,
+                vec![
+                    SnapshotCapability::WrecksAndFoundMines,
+                    SnapshotCapability::ShotsAndFlights,
+                    SnapshotCapability::TeamEffects,
+                ]
+            );
         }
         Some(expected)
     } else {
