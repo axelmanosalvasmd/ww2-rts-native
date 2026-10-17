@@ -209,18 +209,23 @@ fn support_motor_receipts_repeat_and_enter_canonical_admission() {
 }
 
 #[test]
-fn preferred_dive_falls_back_or_waits_without_tick_or_recipient_faults() {
-    for artillery_ready in [true, false] {
+fn preferred_dive_and_artillery_fallback_survive_admission_and_recipient_lifecycles() {
+    for (dive_ready, artillery_ready, expected) in [
+        (true, true, Some("dive")),
+        (true, false, Some("dive")),
+        (false, true, Some("artillery")),
+        (false, false, None),
+    ] {
         let (mut m, enemy) = setup();
         let heavy = scene::spawn(&mut m, "tank", 1, scene::point(72.0, 50.0));
         m.recovery.initialize(heavy);
         m.world.game.players[0].visible = vec![enemy, heavy];
         m.start.economy.players[0].mun = 1000.0;
         for (kind, cd) in &mut m.start.players[0].support {
-            *cd = if kind == "artillery" && !artillery_ready {
-                100.0
-            } else {
+            *cd = if (kind == "dive" && dive_ready) || (kind == "artillery" && artillery_ready) {
                 0.0
+            } else {
+                100.0
             };
         }
         let mut memory = HumanObservationMemory::new(0);
@@ -234,8 +239,11 @@ fn preferred_dive_falls_back_or_waits_without_tick_or_recipient_faults() {
         );
         clock(&mut m, 62);
         let view = m.human_support_observation(&mut memory).unwrap();
-        // The watched heavy, wallet and ready Dive would previously outrank artillery.
-        assert_eq!(view.packet.facts.cooldowns["dive"], 0.0);
+        // Dive takes the watched heavy before artillery; cooldown permits fallback.
+        assert_eq!(
+            view.packet.facts.cooldowns["dive"],
+            if dive_ready { 0.0 } else { 100.0 }
+        );
         assert!(
             view.packet
                 .observation
@@ -245,9 +253,17 @@ fn preferred_dive_falls_back_or_waits_without_tick_or_recipient_faults() {
                 .any(|u| u.id == heavy && u.kind == "tank")
         );
         let commands = policy.plan(screen(&view), Level::Normal).unwrap();
-        assert_eq!(commands.len(), usize::from(artillery_ready));
+        assert_eq!(commands.len(), usize::from(expected.is_some()));
+        let before = m.start.economy.players[0].mp;
         for raw in commands {
-            assert_eq!(raw["kind"], "artillery");
+            let kind = expected.unwrap();
+            assert_eq!(raw["kind"], kind);
+            if kind == "dive" {
+                assert_eq!(
+                    (raw["x"].as_f64(), raw["z"].as_f64()),
+                    (Some(72.0), Some(50.0))
+                );
+            }
             assert_eq!(
                 m.execute_command(0, &Command::from_json(&raw).unwrap(), false)
                     .unwrap(),
@@ -255,7 +271,26 @@ fn preferred_dive_falls_back_or_waits_without_tick_or_recipient_faults() {
             );
             policy.accepted_call(view.tick).unwrap();
         }
-        for _ in 0..8 {
+        let cost = expected.map_or(0.0, |kind| {
+            crate::economy::sup_cost(crate::economy::Mode::Conquest, kind)
+                .unwrap()
+                .cost
+        });
+        assert_eq!(m.start.economy.players[0].mp, before - cost);
+        assert_eq!(m.world.game.strikes.len(), usize::from(expected.is_some()));
+        for tick in 0..1260 {
+            m.advance_tick().unwrap();
+            let cache = crate::recipient_snapshot::SnapshotCache::new(&m).unwrap();
+            for seat in 0..m.start.players.len() {
+                cache.recipient(seat).unwrap();
+            }
+            assert!(m.tick_state.fault().is_none());
+            if tick >= 7 && m.world.game.strikes.is_empty() {
+                break;
+            }
+        }
+        assert!(m.world.game.strikes.is_empty());
+        for _ in 0..4 {
             m.advance_tick().unwrap();
             let cache = crate::recipient_snapshot::SnapshotCache::new(&m).unwrap();
             for seat in 0..m.start.players.len() {

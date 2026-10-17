@@ -117,6 +117,7 @@ fn focus_projection_contains_own_orders_and_only_received_enemy_sight_lines() {
         None
     );
     let hidden = scene::spawn(&mut m, "rifle", 1, scene::point(110.0, 110.0));
+    m.recovery.initialize(hidden);
     let first = m
         .human_focus_observation(&mut HumanObservationMemory::new(0))
         .unwrap();
@@ -413,7 +414,8 @@ fn focus_motor_schedule_repeats_and_invalid_advances_publish_no_state() {
 fn detached_classic_base_intent_composes_with_ordinary_move_admission() {
     let mut m = scene::scene();
     for x in 0..6 {
-        scene::spawn(&mut m, "rifle", 0, scene::point(50.0 + f64::from(x), 50.0));
+        let id = scene::spawn(&mut m, "rifle", 0, scene::point(50.0 + f64::from(x), 50.0));
+        m.recovery.initialize(id);
     }
     let view = m
         .human_focus_observation(&mut HumanObservationMemory::new(0))
