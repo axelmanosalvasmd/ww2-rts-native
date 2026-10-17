@@ -29,6 +29,8 @@ impl StartRequest {
             let map = crate::authoritative_maps::load(&self.map).map_err(|error| error.to_string())?;
             options.logistics = logistics_enabled_for("conquest", map.source());
             Match::new(map, options)
+                .map_err(crate::authoritative_maps::AuthoredMapError::Match)
+                .map_err(|error| error.to_string())
         }
     }
 }
