@@ -526,6 +526,32 @@ mod tests {
     }
 
     #[test]
+    fn fire_at_reserves_canonical_input_without_immediate_world_mutation() {
+        let mut state = crate::lobby::native_tests::native_match();
+        let mut ingress = CommanderIngress::default();
+        let raw = json!({"t":"fireat","ids":[1],"x":10,"z":10});
+        let before = format!("{:?}", (&state.world.game.units, &state.commands.units));
+        assert_eq!(state.commands.pending_commands(), 0);
+        assert!(CommanderIngress::recognizes("fireat"));
+        assert_eq!(ingress.enqueue(&mut state, 0, &raw), Ok(()));
+        assert_eq!(state.commands.pending_commands(), 1);
+        let key = OrderKey {
+            tick: 1,
+            issuer: 0,
+            sequence: 1,
+        };
+        assert_eq!(
+            state.commands.pending_tick(1).collect::<Vec<_>>(),
+            vec![(&key, &Command::from_json(&raw).unwrap())]
+        );
+        assert_eq!(ingress.feedback.get(&key), Some(&"fireat"));
+        assert_eq!(
+            format!("{:?}", (&state.world.game.units, &state.commands.units)),
+            before
+        );
+    }
+
+    #[test]
     fn compound_orders_remain_blocked_at_public_ingress() {
         let mut state = crate::lobby::native_tests::native_match();
         let mut ingress = CommanderIngress::default();

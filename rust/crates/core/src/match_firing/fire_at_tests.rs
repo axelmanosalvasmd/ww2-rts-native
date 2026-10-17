@@ -425,6 +425,10 @@ fn fire_at_live_flight_is_visible_without_disclosing_its_hidden_shooter() {
         .unwrap()
         .recipient(1)
         .unwrap();
+    assert_eq!(
+        snapshot,
+        crate::recipient_snapshot::recipient_uncached(&m, 1).unwrap()
+    );
     let rows = snapshot.fields["flights"].as_array().unwrap();
     assert_eq!(rows.len(), 1);
     let row = &rows[0];
