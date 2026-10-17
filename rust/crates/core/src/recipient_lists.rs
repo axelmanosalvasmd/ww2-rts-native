@@ -302,13 +302,14 @@ pub struct OrdinaryRawLists {
 impl crate::match_runtime::Match {
     pub fn ordinary_snapshot_raw_lists(&self) -> Result<OrdinaryRawLists, String> {
         let game = &self.world.game;
-        if !matches!(
-            self.options.mode,
-            crate::economy::Mode::Default | crate::economy::Mode::Conquest
-        ) || game.mode.is_some()
-        {
-            return Err("global ordinary lists require absent Game mode".into());
-        }
+        let classic = match (self.options.mode, game.mode) {
+            (crate::economy::Mode::Default | crate::economy::Mode::Conquest, None) => false,
+            (crate::economy::Mode::Classic, Some(ModeKind::Classic)) => {
+                self.validate_elimination_state()?;
+                true
+            }
+            _ => return Err("global lists require matching Conquest or Classic".into()),
+        };
         let mut ids = std::collections::BTreeSet::new();
         let mut rows = Vec::with_capacity(game.wrecks.len());
         for hull in &game.wrecks {
@@ -326,9 +327,21 @@ impl crate::match_runtime::Match {
             .ok_or("missing global wreck display facts")?;
             rows.push(row.to_json());
         }
+        let nodes = if classic {
+            let classic = self.elimination.as_ref().expect("validated Classic state");
+            let nodes = &classic.nodes;
+            Some(Value::Array(
+                nodes
+                    .iter()
+                    .map(|n| json!([rounded(n.at.x), rounded(n.at.z), n.rate, u8::from(n.fuel)]))
+                    .collect(),
+            ))
+        } else {
+            None
+        };
         Ok(OrdinaryRawLists {
             wrecks: Value::Array(rows),
-            nodes: None,
+            nodes,
         })
     }
 }

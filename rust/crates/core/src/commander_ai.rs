@@ -321,7 +321,15 @@ impl Observation {
             if u.owner >= input.players.len() {
                 return Err(PolicyError::UnitOwner);
             }
-            if !within(u.at) || u.path.len() > 4096 || u.path.iter().any(|p| !within(*p)) {
+            let d = catalog.unit(&u.kind).map_err(|_| PolicyError::UnitKind)?;
+            let is = |name| d.get(name).and_then(Value::boolean).unwrap_or(false);
+            // Aircraft can wait at an off-map base; ground positions and paths stay bounded.
+            if !u.at.x.is_finite()
+                || !u.at.z.is_finite()
+                || (!is("air") && !within(u.at))
+                || u.path.len() > 4096
+                || u.path.iter().any(|p| !within(*p))
+            {
                 return Err(PolicyError::Position);
             }
             if !u.hp.is_finite() || !u.supp.is_finite() || u.hp < 0.0 || u.supp < 0.0 {
@@ -332,8 +340,6 @@ impl Observation {
             {
                 return Err(PolicyError::PrivateUnitFields);
             }
-            let d = catalog.unit(&u.kind).map_err(|_| PolicyError::UnitKind)?;
-            let is = |name| d.get(name).and_then(Value::boolean).unwrap_or(false);
             let health = d
                 .get("models")
                 .and_then(Value::number)

@@ -32,6 +32,8 @@ pub struct UnitFacts {
     pub amove: Option<Point>,
     pub queued_amove: Option<Point>,
     pub airborne: bool,
+    /// Owner-only readiness from the delivered aircraft base state.
+    pub air_at_base: bool,
     pub wall_work: bool,
 }
 #[derive(Clone, Debug, PartialEq)]
@@ -920,6 +922,52 @@ fn plan_inner(
     let strong_enough = !context.mode.is_construction()
         || !skill.adaptive
         || my_value > 1.1 * context.caution * their_value;
+    // Aircraft missions use current delivered contacts, never strategic memories.
+    let army: Vec<_> = mine
+        .iter()
+        .filter(|u| !boolean(definition(u), "air"))
+        .collect();
+    let front = if army.is_empty() {
+        me.spawn
+    } else {
+        Point {
+            x: army.iter().map(|u| u.at.x).sum::<f64>() / army.len() as f64,
+            z: army.iter().map(|u| u.at.z).sum::<f64>() / army.len() as f64,
+        }
+    };
+    for u in mine.iter().filter(|u| {
+        boolean(definition(u), "air") && context.units.get(&u.id).is_some_and(|f| f.air_at_base)
+    }) {
+        let nearest = |ground: bool| {
+            enemies
+                .iter()
+                .copied()
+                .filter(|e| {
+                    let d = definition(e);
+                    if ground {
+                        !boolean(d, "air")
+                            && !boolean(d, "building")
+                            && (!boolean(d, "infantry")
+                                || matches!(e.kind.as_str(), "at" | "flak" | "mortar" | "howitzer"))
+                    } else {
+                        boolean(d, "air")
+                    }
+                })
+                .min_by(|a, b| {
+                    dist(a.at, front)
+                        .total_cmp(&dist(b.at, front))
+                        .then(a.id.cmp(&b.id))
+                })
+        };
+        if u.kind == "attacker" {
+            if let Some(target) = nearest(true).filter(|e| dist(e.at, front) < 120.0) {
+                commands.push(json!({"t":"attack","ids":[u.id],"target":target.id}));
+            }
+        } else {
+            let at = nearest(false).map_or(front, |e| e.at);
+            commands.push(json!({"t":"move","orders":[[u.id,at.x,at.z]]}));
+        }
+    }
     let shopping = crate::commander_shopping::plan(
         &tactics_view,
         &mine,
@@ -1550,3 +1598,7 @@ mod field_policy_tests;
 #[cfg(test)]
 #[path = "commander_field_review_tests.rs"]
 mod field_review_tests;
+
+#[cfg(test)]
+#[path = "commander_aircraft_tests.rs"]
+mod aircraft_tests;

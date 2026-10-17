@@ -172,6 +172,7 @@ impl PublicFacts {
                     } else {
                         0
                     },
+                    air_at_base: own && air && u["air"]["state"] == "base",
                     airborne: air && u["air"]["state"] != "base" && u["air"]["state"] != "rearm",
                     wall_work: own
                         && u["orderPlan"]["kind"] == 7

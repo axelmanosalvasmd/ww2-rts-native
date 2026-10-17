@@ -462,6 +462,7 @@ impl CommanderViewMemory {
                             0
                         },
                         amove,
+                        air_at_base: own && is("air") && u["air"]["state"] == "base",
                         airborne: is("air")
                             && matches!(
                                 u["air"]["state"].as_str(),
