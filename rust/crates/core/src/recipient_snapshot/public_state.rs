@@ -7,6 +7,13 @@ use crate::{
 use std::collections::BTreeSet;
 
 pub(super) fn capture(state: &Match) -> Result<Vec<Map<String, Value>>, SnapshotError> {
+    capture_perspective(state, false)
+}
+
+pub(super) fn capture_perspective(
+    state: &Match,
+    full_map: bool,
+) -> Result<Vec<Map<String, Value>>, SnapshotError> {
     state
         .preflight_legacy_scenario()
         .map_err(|_| SnapshotError::Unsupported {
@@ -140,7 +147,7 @@ pub(super) fn capture(state: &Match) -> Result<Vec<Map<String, Value>>, Snapshot
                     point
                         .on_point
                         .iter()
-                        .filter(|id| seen_by(state, slot, **id))
+                        .filter(|id| full_map || seen_by(state, slot, **id))
                         .filter_map(|id| g.units.get(id))
                         .map(|u| g.players[u.owner].team)
                         .collect::<BTreeSet<_>>()
@@ -164,7 +171,9 @@ pub(super) fn capture(state: &Match) -> Result<Vec<Map<String, Value>>, Snapshot
             .collect::<Vec<_>>();
         fields.insert("points".into(), json!(points));
         let visible = |at: Point| {
-            g.reveal || vision::team_sees(g, &state.rules, &grid, g.players[slot].team, at)
+            full_map
+                || g.reveal
+                || vision::team_sees(g, &state.rules, &grid, g.players[slot].team, at)
         };
         fields.insert(
             "smokes".into(),

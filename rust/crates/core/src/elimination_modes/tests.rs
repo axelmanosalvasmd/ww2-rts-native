@@ -11,7 +11,7 @@ use crate::{
 };
 use serde_json::json;
 
-fn scene(mode: Mode, teams: &[i32]) -> Match {
+pub(super) fn scene(mode: Mode, teams: &[i32]) -> Match {
     let map = AuthoritativeMap::from_json(
         &serde_json::to_vec(&json!({
             "name":"Elimination intent", "w":100,"h":100,
@@ -52,7 +52,7 @@ fn scene(mode: Mode, teams: &[i32]) -> Match {
     }
     .unwrap()
 }
-fn ids(m: &Match, owner: usize, name: &str) -> Vec<u32> {
+pub(super) fn ids(m: &Match, owner: usize, name: &str) -> Vec<u32> {
     m.world
         .game
         .units
@@ -66,7 +66,7 @@ fn destroy(m: &mut Match, owner: usize, name: &str) {
         m.world.game.units.get_mut(&id).unwrap().hp = 0.0;
     }
 }
-fn add(m: &mut Match, owner: usize, name: &str, at: Point) -> u32 {
+pub(super) fn add(m: &mut Match, owner: usize, name: &str, at: Point) -> u32 {
     let id = m.next_unit_id;
     let draft = StagedUnit::ordinary(
         &m.world.game,
@@ -679,3 +679,6 @@ fn classic_support_uses_munitions_and_abilities_refuse_an_empty_munitions_wallet
         Some(Denial::Munitions)
     );
 }
+
+#[path = "classic_bases_tests.rs"]
+mod classic_bases_tests;

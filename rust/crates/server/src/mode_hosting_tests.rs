@@ -10,6 +10,7 @@ fn drain(hub: &mut Hub, rx: &mut mpsc::Receiver<Output>, now: u64) -> Vec<Value>
                 messages.push(serde_json::from_str(&frame.json).unwrap());
                 hub.complete_snapshot(&frame, true, now);
             }
+            Output::Watcher(_) => panic!("unexpected spectator output for commander"),
             Output::Close(_, _) => panic!("ordinary recipient closed"),
         }
     }
