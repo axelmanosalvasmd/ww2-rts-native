@@ -789,7 +789,7 @@ fn garrison_retreat_ticks_and_unsupported_reaction_actors_reject_before_writes()
         let error = m.advance_tick().unwrap_err();
         assert!(
             error.reason.contains(match actor {
-                "logistics" | "convoys" => "logistics requires initialized convoy state",
+                "logistics" | "convoys" => "logistics option and convoy state disagree",
                 "mode mismatch" | "unsupported mode" => {
                     "tick execution requires represented ordinary or World mode"
                 }

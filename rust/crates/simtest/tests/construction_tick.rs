@@ -514,98 +514,7 @@ fn compare(
             same!(json!(u.cells), s["cells"], "live site footprint");
         }
     }
-    same!(
-        m.world.structures.len(),
-        e["structures"].as_array().unwrap().len(),
-        "structure count"
-    );
-    for (a, s) in m
-        .world
-        .structures
-        .iter()
-        .zip(e["structures"].as_array().unwrap())
-    {
-        same!(json!(a.id), s["id"], "structure order");
-        same!(json!(a.kind), s["kind"], "structure kind");
-        same!(json!(a.entity_id), s["entityId"], "structure entity");
-        same!(
-            a.section_ids.len(),
-            s["sections"].as_array().unwrap().len(),
-            "section count"
-        );
-        for ((id, cell), source) in a
-            .section_ids
-            .iter()
-            .zip(&a.cells)
-            .zip(s["sections"].as_array().unwrap())
-        {
-            let (meta, hp) = m.world.section_by_id(id).unwrap();
-            let state = if hp.failed {
-                "failed"
-            } else {
-                match meta.appearance {
-                    Appearance::Intact => "intact",
-                    Appearance::Damaged => "damaged",
-                    Appearance::Burning => "burning",
-                }
-            };
-            let row = tagged(
-                json!({"id":meta.id,"structureId":meta.structure_id,"entityId":a.entity_id,"c":cell,"hp":hp.hp,"maxHp":hp.max_hp.unwrap(),"material":meta.material,"anchor":meta.anchor,"supports":meta.supports,"state":state,"rubble":meta.rubble}),
-            );
-            for (k, v) in row.as_object().unwrap() {
-                same!(v, &source[k], format!("section{id} {k}"));
-            }
-            let fail = &meta.failure;
-            if source.get("direction").is_some() {
-                same!(
-                    fail.direction
-                        .map(|p| tagged(json!({"x":p.x,"z":p.z})))
-                        .unwrap_or(Value::Null),
-                    source["direction"],
-                    "failure direction"
-                );
-            }
-            for (k, n) in [
-                ("impulse", fail.impulse),
-                ("failedAt", fail.failed_at),
-                ("settledAt", fail.settled_at),
-            ] {
-                if source.get(k).is_some() {
-                    same!(
-                        n.map(|n| tagged(json!(n))).unwrap_or(Value::Null),
-                        source[k],
-                        k
-                    );
-                }
-            }
-        }
-    }
-    let source_cells = e["structuralCellOrder"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|c| c.as_u64().unwrap() as usize)
-        .collect::<BTreeSet<_>>();
-    same!(
-        m.world.sections.keys().copied().collect::<BTreeSet<_>>(),
-        source_cells,
-        "structural lookup membership (Map order unrepresented)"
-    );
-    let source_buildings = e["buildingCells"].as_array().unwrap();
-    same!(
-        m.building_cells.len(),
-        source_buildings.len(),
-        "building lookup count"
-    );
-    for row in source_buildings {
-        let c = number(&row[0]) as usize;
-        let b = &m.building_cells[&c];
-        same!(
-            tagged(json!({"id":b.unit,"owner":b.owner,"x":b.at.x,"z":b.at.z})),
-            row[1],
-            "building lookup body (Map order unrepresented)"
-        );
-    }
+    compare_construction_structures(m, e, context);
     for (slot, s) in e["players"].as_array().unwrap().iter().enumerate() {
         let p = &m.start.economy.players[slot];
         same!(json!(slot), s["slot"], "slot");
@@ -792,10 +701,11 @@ fn compare(
     );
 }
 #[test]
-fn original_paid_construction_replays_full_match_ticks() {
+fn original_paid_construction_replays_full_ticks_and_isolates_invalid_reserves() {
     let fixture: Value =
         serde_json::from_str(include_str!("fixtures/construction-tick.json")).unwrap();
     let mut steps = 0;
+    let mut component_steps = 0;
     let mut snapshots = 0;
     let mut actions = 0;
     for c in fixture["cases"].as_array().unwrap() {
@@ -810,6 +720,7 @@ fn original_paid_construction_replays_full_match_ticks() {
         compare(&m, &expected, &rng, &mut cursors, &effects, name);
         snapshots += 1;
         let mut next = 0;
+        let mut component_only = false;
         for r in c["records"].as_array().unwrap() {
             actions += 1;
             let a = &r["action"];
@@ -842,13 +753,78 @@ fn original_paid_construction_replays_full_match_ticks() {
                 }
                 "prime" => {
                     prime(&mut m, &aliases, a);
+                    if name == "finished-repair-budget-and-missing-first-reserve"
+                        && m.logistics.iter().next().is_some()
+                    {
+                        component_only = true;
+                    }
                     1
                 }
                 "steps" | "until" => r["steps"].as_u64().unwrap() as usize,
                 op => panic!("unrepresented action {op}"),
             };
             for _ in 0..count {
-                if op == "steps" || op == "until" {
+                if (op == "steps" || op == "until") && component_only {
+                    // Synthetic reserve rows with logistics disabled are component inputs,
+                    // never an admitted hosted match. Preserve the complete runner guard.
+                    let boundary = |m: &Match| {
+                        format!(
+                            "{:?}",
+                            (
+                                &m.world,
+                                (
+                                    &m.commands.units,
+                                    m.commands.next_tick(),
+                                    m.commands.pending_commands()
+                                ),
+                                serde_json::to_value(&m.start).unwrap(),
+                                &m.logistics,
+                                &m.tick_state,
+                                &m.firing,
+                                &m.production,
+                                &m.combat
+                            )
+                        )
+                    };
+                    let before = boundary(&m);
+                    let error = m.advance_tick().unwrap_err();
+                    assert_eq!(error.reason, "reserves require enabled logistics");
+                    assert!(error.events.is_empty());
+                    assert_eq!(error.retirement, Default::default());
+                    assert_eq!(boundary(&m), before);
+                    let ids = m.world.game.units.keys().copied().collect::<Vec<_>>();
+                    // The recorder primes aggregate HP. Apply the same public section
+                    // reconciliation component before the isolated repair component.
+                    let sites = m
+                        .world
+                        .structures
+                        .iter()
+                        .filter_map(|s| s.entity_id)
+                        .collect::<Vec<_>>();
+                    let mut context = ww2_core::environment::Context {
+                        tick: m.world.game.tick as u64,
+                        seed: &mut m.start.environment_seed,
+                        next_id: &mut m.next_unit_id,
+                        unit_order: &ids,
+                        grid: &m.grid,
+                        rain: m.world.game.rain,
+                        wet: m.world.game.wet.unwrap_or(0.0),
+                        wind_angle: m.start.wind.0,
+                        wind_strength: m.start.wind.1,
+                    };
+                    for site in sites {
+                        let owner = m.combat.get(site).and_then(|row| row.last_hit);
+                        m.environment
+                            .sync_building_sections(&mut m.world, site, owner, &mut context)
+                            .unwrap();
+                    }
+                    let mut frame = m.begin_construction_tick().unwrap();
+                    for id in ids {
+                        m.step_construction_worker(id, &mut frame).unwrap();
+                    }
+                    m.finish_construction_tick(frame).unwrap();
+                    component_steps += 1;
+                } else if op == "steps" || op == "until" {
                     let report = m
                         .advance_tick()
                         .unwrap_or_else(|err| panic!("{name} tick{}: {err}", m.world.game.tick));
@@ -888,20 +864,27 @@ fn original_paid_construction_replays_full_match_ticks() {
                     expected["aliases"],
                     "{name}: canonical aliases"
                 );
-                compare(
-                    &m,
-                    &expected,
-                    &rng,
-                    &mut cursors,
-                    &effects,
-                    &format!("{name} snapshot{next}"),
-                );
+                if component_only {
+                    compare_reserve_construction_component(&m, &expected);
+                } else {
+                    compare(
+                        &m,
+                        &expected,
+                        &rng,
+                        &mut cursors,
+                        &effects,
+                        &format!("{name} snapshot{next}"),
+                    );
+                }
             }
             assert_eq!(next, r["lastSnapshot"].as_u64().unwrap() as usize);
         }
         assert_eq!(next + 1, c["snapshots"].as_u64().unwrap() as usize);
     }
-    assert_eq!((actions, steps, snapshots), (113, 1919, 2013));
+    assert_eq!(
+        (actions, steps, component_steps, snapshots),
+        (113, 1917, 2, 2013)
+    );
 }
 
 #[path = "construction_tick/base_selected.rs"]
@@ -909,3 +892,172 @@ mod base_selected;
 
 #[path = "construction_tick/base28_corridor.rs"]
 mod base28_corridor;
+
+// The Source recorder deliberately injects reserves while logistics is disabled.
+// Retain its exact repair/debit/assignment outcomes at the component boundary;
+// clocks, weather, movement and income are not run or claimed by this branch.
+fn compare_reserve_construction_component(m: &Match, expected: &Value) {
+    compare_construction_structures(m, expected, "reserve component");
+    assert_eq!(
+        json!(m.world.game.units.keys().copied().collect::<Vec<_>>()),
+        expected["actorOrder"]
+    );
+    assert_eq!(json!(m.next_unit_id), expected["nextId"]);
+    for row in expected["units"].as_array().unwrap() {
+        let id = row["id"].as_u64().unwrap() as u32;
+        let unit = &m.world.game.units[&id];
+        assert_eq!(bits(unit.hp), row["hp"], "component HP {id}");
+        assert_eq!(
+            unit.built.map(bits).unwrap_or(Value::Null),
+            row["built"],
+            "component progress {id}"
+        );
+        assert_eq!(
+            u64::from(m.commands.units[&id].build_target.unwrap_or(0)),
+            row["build"].as_u64().unwrap_or(0),
+            "component assignment {id}"
+        );
+        assert_eq!(unit.build, m.commands.units[&id].build_target.is_some());
+        assert_eq!(
+            json!(unit.path.iter().copied().map(point).collect::<Vec<_>>()),
+            row["path"],
+            "component path cleanup {id}"
+        );
+        assert_eq!(
+            json!(
+                m.commands.units[&id]
+                    .orders
+                    .iter()
+                    .map(order)
+                    .collect::<Vec<_>>()
+            ),
+            row["orders"],
+            "component queued orders {id}"
+        );
+
+        if row.get("logistics").is_some() {
+            assert_eq!(
+                reserve(m, id),
+                row["logistics"],
+                "component reserve debit {id}"
+            );
+            assert_eq!(
+                bits(m.logistics.recovery_rate(id)),
+                row["recoveryRate"],
+                "component recovery {id}"
+            );
+        }
+    }
+    for site in expected["sites"].as_array().unwrap() {
+        let id = site["id"].as_u64().unwrap() as u32;
+        assert_eq!(
+            m.world.game.units.contains_key(&id),
+            site["live"].as_bool().unwrap()
+        );
+        if let Some(unit) = m.world.game.units.get(&id) {
+            assert_eq!(bits(unit.hp), site["hp"]);
+            assert_eq!(unit.built.map(bits).unwrap(), site["built"]);
+            assert_eq!(json!(unit.cells), site["cells"]);
+        }
+    }
+}
+
+fn compare_construction_structures(m: &Match, e: &Value, context: &str) {
+    macro_rules! same {
+        ($a:expr,$b:expr,$field:expr) => {
+            assert_eq!($a, $b, "{context}: {}", $field)
+        };
+    }
+    same!(
+        m.world.structures.len(),
+        e["structures"].as_array().unwrap().len(),
+        "structure count"
+    );
+    for (a, s) in m
+        .world
+        .structures
+        .iter()
+        .zip(e["structures"].as_array().unwrap())
+    {
+        same!(json!(a.id), s["id"], "structure order");
+        same!(json!(a.kind), s["kind"], "structure kind");
+        same!(json!(a.entity_id), s["entityId"], "structure entity");
+        same!(
+            a.section_ids.len(),
+            s["sections"].as_array().unwrap().len(),
+            "section count"
+        );
+        for ((id, cell), source) in a
+            .section_ids
+            .iter()
+            .zip(&a.cells)
+            .zip(s["sections"].as_array().unwrap())
+        {
+            let (meta, hp) = m.world.section_by_id(id).unwrap();
+            let state = if hp.failed {
+                "failed"
+            } else {
+                match meta.appearance {
+                    Appearance::Intact => "intact",
+                    Appearance::Damaged => "damaged",
+                    Appearance::Burning => "burning",
+                }
+            };
+            let row = tagged(
+                json!({"id":meta.id,"structureId":meta.structure_id,"entityId":a.entity_id,"c":cell,"hp":hp.hp,"maxHp":hp.max_hp.unwrap(),"material":meta.material,"anchor":meta.anchor,"supports":meta.supports,"state":state,"rubble":meta.rubble}),
+            );
+            for (k, v) in row.as_object().unwrap() {
+                same!(v, &source[k], format!("section{id} {k}"));
+            }
+            let fail = &meta.failure;
+            if source.get("direction").is_some() {
+                same!(
+                    fail.direction
+                        .map(|p| tagged(json!({"x":p.x,"z":p.z})))
+                        .unwrap_or(Value::Null),
+                    source["direction"],
+                    "failure direction"
+                );
+            }
+            for (k, n) in [
+                ("impulse", fail.impulse),
+                ("failedAt", fail.failed_at),
+                ("settledAt", fail.settled_at),
+            ] {
+                if source.get(k).is_some() {
+                    same!(
+                        n.map(|n| tagged(json!(n))).unwrap_or(Value::Null),
+                        source[k],
+                        k
+                    );
+                }
+            }
+        }
+    }
+    let source_cells = e["structuralCellOrder"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| c.as_u64().unwrap() as usize)
+        .collect::<BTreeSet<_>>();
+    same!(
+        m.world.sections.keys().copied().collect::<BTreeSet<_>>(),
+        source_cells,
+        "structural lookup membership (Map order unrepresented)"
+    );
+    let source_buildings = e["buildingCells"].as_array().unwrap();
+    same!(
+        m.building_cells.len(),
+        source_buildings.len(),
+        "building lookup count"
+    );
+    for row in source_buildings {
+        let c = number(&row[0]) as usize;
+        let b = &m.building_cells[&c];
+        same!(
+            tagged(json!({"id":b.unit,"owner":b.owner,"x":b.at.x,"z":b.at.z})),
+            row[1],
+            "building lookup body (Map order unrepresented)"
+        );
+    }
+}

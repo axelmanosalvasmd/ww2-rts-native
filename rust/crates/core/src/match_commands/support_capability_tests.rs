@@ -754,7 +754,7 @@ fn hosted_recorded_support_refuses_unseen_drops_and_unknown_kinds_without_public
     for (kind, denial) in [("para", Denial::Unseen), ("unknown", Denial::Unsupported)] {
         let mut state = scene();
         state.restrict_to_ordinary_snapshots().unwrap();
-        record(&mut state, kind);
+        record_at(&mut state, kind, Point { x: 128.0, z: 128.0 });
         let before = (
             state.start.economy.clone(),
             state.start.players[0].support.clone(),

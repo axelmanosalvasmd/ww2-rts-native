@@ -465,10 +465,7 @@ mod retained_ground {
         let before = delivery.clone();
         assert!(matches!(
             delivery.capture_selected_with_tick_events(&mut state, &selected, &[]),
-            Err(SnapshotError::Unsupported {
-                capability: SnapshotCapability::ShotsAndFlights,
-                ..
-            })
+            Err(SnapshotError::Rules)
         ));
         assert_eq!(delivery, before);
         assert_eq!(format!("{:?}", state.world), world);

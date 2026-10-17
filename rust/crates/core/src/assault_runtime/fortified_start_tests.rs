@@ -1,11 +1,8 @@
 //! BASE-53: prototype shared/sim.js:975-1002 and the three constructor callers.
 use super::*;
 use crate::{
-    economy::Faction,
-    economy_state::ArmySize,
-    match_runtime::PlayerConfig,
-    recipient_snapshot::{SnapshotCache, SnapshotError},
-    weather::WeatherChoice,
+    economy::Faction, economy_state::ArmySize, match_runtime::PlayerConfig,
+    recipient_snapshot::SnapshotCache, weather::WeatherChoice,
 };
 use serde_json::json;
 use std::collections::BTreeSet;
@@ -276,15 +273,8 @@ fn base53_mode_constructors_fortify_defenders_all_annihilation_seats_and_shared_
             for _ in 0..4 {
                 m.step_horde(0.05).unwrap();
             }
-            assert_eq!(
-                m.validate_tick_state().unwrap_err(),
-                "tick execution requires represented ordinary or World mode"
-            );
-            assert!(matches!(
-                SnapshotCache::new(&m),
-                Err(SnapshotError::UnsupportedMode)
-            ));
-        } else {
+        }
+        {
             for _ in 0..4 {
                 m.advance_tick().unwrap();
                 let cache = SnapshotCache::new(&m).unwrap();

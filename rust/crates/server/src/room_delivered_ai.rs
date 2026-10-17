@@ -56,7 +56,18 @@ impl RoomAi {
         }
         // The prototype retries the whole save without AI memory if any clone fails.
         (0..seats)
-            .map(|slot| self.consumers.get(&slot).map(&mut encode).transpose())
+            .map(|slot| {
+                self.consumers
+                    .get(&slot)
+                    .filter(|consumer| {
+                        !matches!(
+                            consumer.commander.brain(),
+                            ww2_core::seat_commander::Brain::Horde(_)
+                        )
+                    })
+                    .map(&mut encode)
+                    .transpose()
+            })
             .collect::<Result<Vec<_>, _>>()
             .map_or(Value::Null, |memories| json!(memories))
     }

@@ -116,6 +116,18 @@ impl Hub {
             return Err("start requires lobby state".into());
         }
         if !room.start_ready(&self.maps) {
+            if matches!(
+                room.mode.as_str(),
+                "conquest" | "classic" | "annihilation" | "assault" | "tutorial"
+            ) && self.maps.get(&room.map).is_none()
+                && self
+                    .map_editor
+                    .as_ref()
+                    .and_then(|editor| editor.raw(&room.map))
+                    .is_none()
+            {
+                return Err("unknown authored map".into());
+            }
             return Err(
                 "start requires one through capacity players and both Assault sides".into(),
             );

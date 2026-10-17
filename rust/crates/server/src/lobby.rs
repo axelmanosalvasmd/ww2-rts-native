@@ -551,13 +551,15 @@ impl Room {
             .players
             .iter()
             .position(|p| p.connection.as_ref().is_some_and(|c| c.id == id));
+        let mut map_names = maps.as_object().unwrap().keys().collect::<Vec<_>>();
+        map_names.sort();
         let mut result = json!({
             "t":"lobby", "proto":0, "code": self.code, "state":if self.native.is_some() || self.starting.is_some() { "play" } else { "lobby" },
             "role":"commander", "operatives":[], "spectator":you.is_none(),
             "amHost":self.is_host(id), "spectators":self.spectators.iter().map(|p| &p.name).collect::<Vec<_>>(),
             "listed":self.listed, "saves":self.saves.lobby_list(&self.code), "hordeBest":if self.mode == "horde" { self.records.lookup(&self.map,self.players.len(),&self.army).unwrap_or(Value::Null) } else { Value::Null },
             "you":you.map_or(-1, |i| i as i64), "host":self.host().map_or(-1, |i| i as i64),
-            "maps":maps.as_object().unwrap().keys().collect::<Vec<_>>(),
+            "maps":map_names,
             "mapName":if self.mode == "world" { "world" } else { &self.map },
             "spawns":self.capacity(maps), "publicUrl":public_url,
             "mode":self.mode,"worldSize":self.world_size,"defenderTeam":self.defender,
@@ -577,14 +579,15 @@ impl Room {
             result["result"] = report;
         }
         if self.mode == "horde" {
-            result["hordeMaps"] = json!(
-                maps.as_object()
-                    .unwrap()
-                    .iter()
-                    .filter(|(_, m)| m["horde"] == true)
-                    .map(|(name, _)| name)
-                    .collect::<Vec<_>>()
-            );
+            let mut horde_maps = maps
+                .as_object()
+                .unwrap()
+                .iter()
+                .filter(|(_, m)| m["horde"] == true)
+                .map(|(name, _)| name)
+                .collect::<Vec<_>>();
+            horde_maps.sort();
+            result["hordeMaps"] = json!(horde_maps);
         }
         result
     }

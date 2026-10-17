@@ -28,12 +28,58 @@ fn drain(
     out
 }
 fn warm_human(native: &mut AttachedRuntime, slot: usize) {
-    let (seat, memory) = &mut native.ai.pairs[slot];
-    let view = native
+    use ww2_core::ai_view::{CommanderViewMemory, PublicMap};
+    let mut recipient = native
         .runtime
-        .state_mut()
-        .human_commander_observation(memory)
+        .state()
+        .ordinary_ai_view_memory(slot)
         .unwrap();
+    let raw = native
+        .runtime
+        .collect_frame(
+            &[SelectedSeat {
+                slot,
+                full: true,
+                omit: false,
+            }],
+            FrameKind::Current,
+        )
+        .unwrap()
+        .remove(0)
+        .message;
+    let decoded = recipient.decode(&raw).unwrap();
+    let public = PublicMap {
+        width: native.runtime.state().world.game.w,
+        height: native.runtime.state().world.game.h,
+        players: decoded.players.clone(),
+        points: decoded.points.clone(),
+    };
+    let mut decoder = CommanderViewMemory::new(
+        slot,
+        public,
+        decoded.initial_chars.clone(),
+        decoded.initial_height.clone(),
+        decoded.naval,
+    )
+    .unwrap();
+    let view = decoder.observe(&decoded, &raw).unwrap();
+    let (seat, memory) = &mut native.ai.pairs[slot];
+    // This inactive compatibility helper can retain an older serialized observation.
+    // Seed that observation exclusively from the actual delivered packet, then
+    // prove takeover/restart replaces both it and the exercised human policy.
+    let sightings = view
+        .sightings
+        .iter()
+        .map(|seen| {
+            let p = &seen.payload;
+            json!({"id":seen.id,"kind":p["type"],"owner":p["owner"],
+            "at":{"x":p["x"],"z":p["z"]},"time":p["t"],"worth":p["val"]})
+        })
+        .collect::<Vec<_>>();
+    *memory = serde_json::from_value(
+        json!({"owner":slot,"tick":view.tick,"sightings":sightings,"still":[]}),
+    )
+    .unwrap();
     let tick = native.runtime.state().world.game.tick as u64;
     native
         .runtime
@@ -335,6 +381,43 @@ fn net92_ai_memory_human_reset_and_surplus_watchers_restore_transactionally_thro
     assert_eq!(hub.next_epoch, epoch);
     assert!(hub.rooms["ABC"].native.is_none());
     assert_eq!(hub.rooms["ABC"].spectators.len(), 2);
+    // Exact stored fields restore before the opening observation. Loading then
+    // refreshes recipient memory from the current canonical start packet.
+    let mut expected_runtime = RoomRuntime::new(
+        Match::from_save_json(saved["g"]["state"].clone()).unwrap(),
+        0,
+    )
+    .unwrap();
+    expected_runtime.activate_ai(&raw, 1, "hard").unwrap();
+    expected_runtime.restore_ai_memories(&saved["ai"]).unwrap();
+    assert_same_json(&expected_runtime.save_ai_memories(), &saved["ai"]);
+    assert_eq!(expected_runtime.save_ai_memories()[1], expected_memory);
+    let selected = (0..2)
+        .map(|slot| SelectedSeat {
+            slot,
+            full: true,
+            omit: false,
+        })
+        .collect::<Vec<_>>();
+    expected_runtime
+        .collect_frame(&selected, FrameKind::Current)
+        .unwrap();
+    let expected_after_start = expected_runtime.save_ai_memories();
+    let Brain::Human {
+        policy: expected_restored_policy,
+        ..
+    } = expected_runtime.ai_commander(1).unwrap().brain()
+    else {
+        panic!("ordinary policy")
+    };
+    let expected_restored_policy = expected_restored_policy.clone();
+    // The recorded save contract restores strategic fields, but starts a fresh
+    // commander and private random stream instead of continuing motor history.
+    assert_ne!(
+        expected_restored_policy, expected_policy,
+        "the full policy includes a freshly seeded private random owner after restoring exact strategy"
+    );
+    drop(expected_runtime);
     hub.load_room("ABC", a.id, &id, 8003).unwrap();
     let room = &hub.rooms["ABC"];
     assert_eq!(
@@ -353,7 +436,7 @@ fn net92_ai_memory_human_reset_and_surplus_watchers_restore_transactionally_thro
     let native = room.native.as_ref().unwrap();
     assert!(native.runtime.paused());
     assert_eq!(native.ai.pairs[0], fresh_pair(native, 0, Level::Normal));
-    assert_same_json(&native.runtime.save_ai_memories(), &saved["ai"]);
+    assert_same_json(&native.runtime.save_ai_memories(), &expected_after_start);
     let Brain::Human {
         state,
         policy,
@@ -364,14 +447,30 @@ fn net92_ai_memory_human_reset_and_surplus_watchers_restore_transactionally_thro
     };
     assert!(state.snapshot().is_none());
     assert!(delivered.is_none());
-    assert_eq!(policy, &expected_policy);
-    assert_eq!(native.runtime.save_ai_memories()[1], expected_memory);
+    assert_eq!(policy, &expected_restored_policy);
+    assert_eq!(
+        native.runtime.save_ai_memories()[1],
+        expected_after_start[1]
+    );
     for (c, rx) in [(&a, &mut ra), (&b, &mut rb), (&extra, &mut re)] {
         let messages = drain(&mut hub, c, rx, 8003);
         let start = messages.iter().position(|m| m["t"] == "start").unwrap();
-        assert!(messages[..start].iter().any(|m| m["t"] == "lobby"));
+        let lobby = messages
+            .iter()
+            .position(|m| m["t"] == "lobby" && m["state"] == "play")
+            .unwrap();
+        let pause = messages
+            .iter()
+            .position(|m| m["t"] == "pause" && m["paused"] == true)
+            .unwrap();
+        assert!(
+            lobby < pause && pause < start,
+            "loaded lobby and pause must precede every role's start"
+        );
+        assert_eq!(messages.iter().filter(|m| m["t"] == "start").count(), 1);
+        assert!(messages[..start].iter().all(|m| m["t"] != "s"));
         assert_eq!(
-            messages[start + 1],
+            messages[pause],
             json!({"t":"pause","paused":true,"by":"host","reason":"host","left":0})
         );
     }

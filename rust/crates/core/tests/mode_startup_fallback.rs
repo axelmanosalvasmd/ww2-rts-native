@@ -239,7 +239,18 @@ fn mode02_fallback_retains_option_and_mode_guards() {
     let map = map(&source(true));
     let mut endless_horde = options(Mode::Horde, 2);
     endless_horde.army = ArmySize::Endless;
-    assert!(Match::new_horde(&map, endless_horde).is_err());
+    let mut endless = Match::new_horde(&map, endless_horde).unwrap();
+    assert_eq!(endless.options.mode, Mode::Horde);
+    assert_eq!(endless.options.army, ArmySize::Endless);
+    assert_eq!(endless.horde.as_ref().unwrap().defenders, 2);
+    for _ in 0..4 {
+        endless.advance_tick().unwrap();
+        let cache = ww2_core::recipient_snapshot::SnapshotCache::new(&endless).unwrap();
+        for slot in 0..endless.start.players.len() {
+            cache.recipient(slot).unwrap();
+        }
+        assert!(endless.tick_state.fault().is_none());
+    }
 }
 
 #[test]

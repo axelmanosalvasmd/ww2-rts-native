@@ -416,7 +416,7 @@ fn classic_node_memory_stays_dormant_through_ordinary_ticks_and_every_seat_snaps
                 .human_commander_observation(&mut memories[slot])
                 .unwrap();
             let context = view.packet.input().runtime.as_ref().unwrap();
-            assert_eq!(context.mode, Mode::Conquest);
+            assert_eq!(context.mode, Mode::Default);
             assert!(context.nodes.is_empty() && context.claimed_nodes.is_empty());
             let commands = commander_tactics::plan(
                 &view.packet,

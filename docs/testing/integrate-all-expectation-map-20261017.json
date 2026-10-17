@@ -1,0 +1,726 @@
+{
+  "status": "Original failure families and expanded operative lifecycle passed focused diagnostics; full unchanged-tree qualification pending",
+  "path_note": "Paths name the final union source location; same-path owner files moved during composition. Exact head hashes identify the originating behavior, not a guarantee that every final path existed under that same name at each head.",
+  "scope": "Changed expectations and fixture setup repairs after first full union diagnostic. Runtime repairs whose tests retain identical expectations are listed separately in the integration receipt.",
+  "entries": [
+    {
+      "test_or_shared_fixture": "classic_node_memory_stays_dormant_through_ordinary_ticks_and_every_seat_snapshot",
+      "classification": "superseded expectation",
+      "before": "Expected Conquest enum from a packet with absent mode row.",
+      "after": "Expect Default decoded alias; keep dormant node-memory and planner command assertions.",
+      "behavior_sources": [
+        {
+          "pr": 420,
+          "head": "f0b947e3b4b73fa8ee8eef00a4e299462728db7c",
+          "title": "runtime: complete AI privacy and command union for ordinary modes"
+        }
+      ],
+      "source_paths": [
+        "rust/crates/core/src/match_human_observation/recipient_packet.rs: PublicFacts::packet mode from delivered kind",
+        "rust/crates/core/src/recipient_snapshot/modes.rs: ordinary null mode"
+      ],
+      "verification": "fresh targeted/full run pending"
+    },
+    {
+      "test_or_shared_fixture": "base53_mode_constructors_fortify_defenders_all_annihilation_seats_and_shared_horde_base",
+      "classification": "superseded expectation",
+      "before": "Horde full ticks or snapshots refused after component-only setup.",
+      "after": "Admit full ticks and every-seat snapshots, retain all original fortress/research assertions.",
+      "behavior_sources": [
+        {
+          "pr": 399,
+          "head": "c9c2a784afb4ad588befb45ba4791e736a80e902",
+          "title": "runtime: connect core Horde ticks and Kaiju lifecycle delivery"
+        },
+        {
+          "pr": 405,
+          "head": "28c6a0f5dae8840462595474d8129f022d57b5dd",
+          "title": "runtime: connect Horde ground production and Classic logistics training"
+        },
+        {
+          "pr": 422,
+          "head": "42e3afe6b32ff289181407ff7ed9f99236fa96b5",
+          "title": "runtime: connect recipient support priorities and hosted Horde aviation"
+        }
+      ],
+      "source_paths": [
+        "rust/crates/core/src/match_tick.rs: Horde validation",
+        "rust/crates/core/src/recipient_snapshot.rs: Horde complete admission"
+      ],
+      "verification": "fresh targeted/full run pending"
+    },
+    {
+      "test_or_shared_fixture": "base49_base50_horde_research_uses_shared_defender_labs_and_private_progress",
+      "classification": "superseded expectation",
+      "before": "Horde full ticks or snapshots refused after component-only setup.",
+      "after": "Admit full ticks and every-seat snapshots, retain all original fortress/research assertions.",
+      "behavior_sources": [
+        {
+          "pr": 399,
+          "head": "c9c2a784afb4ad588befb45ba4791e736a80e902",
+          "title": "runtime: connect core Horde ticks and Kaiju lifecycle delivery"
+        },
+        {
+          "pr": 405,
+          "head": "28c6a0f5dae8840462595474d8129f022d57b5dd",
+          "title": "runtime: connect Horde ground production and Classic logistics training"
+        },
+        {
+          "pr": 422,
+          "head": "42e3afe6b32ff289181407ff7ed9f99236fa96b5",
+          "title": "runtime: connect recipient support priorities and hosted Horde aviation"
+        }
+      ],
+      "source_paths": [
+        "rust/crates/core/src/match_tick.rs: Horde validation",
+        "rust/crates/core/src/recipient_snapshot.rs: Horde complete admission"
+      ],
+      "verification": "fresh targeted/full run pending"
+    },
+    {
+      "test_or_shared_fixture": "mode02_fallback_retains_option_and_mode_guards",
+      "classification": "superseded expectation",
+      "before": "Endless Horde constructor refused.",
+      "after": "Endless Horde constructor succeeds with two defenders and four full ticks/every-seat snapshots; all other option guards remain.",
+      "behavior_sources": [
+        {
+          "pr": 442,
+          "head": "6a9621eff16002c29366bf9fdece3b7370d02ddc",
+          "title": "runtime: complete non-World C authoring queries and fairness"
+        }
+      ],
+      "source_paths": [
+        "rust/crates/core/src/match_horde.rs: origin fd8d35d69, Endless constructor and income"
+      ],
+      "verification": "fresh targeted/full run pending"
+    },
+    {
+      "test_or_shared_fixture": "commander_union_tests::look (AI-13 union tests)",
+      "classification": "fixture setup repair",
+      "before": "Synthetic planner fixtures omitted complete field facts and entered the older fallback policy.",
+      "after": "Supply public initial terrain and delivered ground/mines/nodes to the active field owner; every emitted command assertion remains.",
+      "behavior_sources": [
+        {
+          "pr": 407,
+          "head": "dfa37967cadc97deb786fa4c09393994ef2e3168",
+          "title": "runtime: plan ground AI orders from recipient packets"
+        },
+        {
+          "pr": 420,
+          "head": "f0b947e3b4b73fa8ee8eef00a4e299462728db7c",
+          "title": "runtime: complete AI privacy and command union for ordinary modes"
+        },
+        {
+          "pr": 423,
+          "head": "4453acf5b95fe5303278ef21b80736fa70c276c7",
+          "title": "runtime: start hosted Horde AI and all recipient roles together"
+        }
+      ],
+      "source_paths": [
+        "rust/crates/core/src/ai_view/commander_view.rs",
+        "rust/crates/core/src/commander_field_policy.rs"
+      ],
+      "verification": "fresh targeted/full run pending"
+    },
+    {
+      "test_or_shared_fixture": "intent_ai28_delivered_stock_uses_public_two_decimal_precision",
+      "classification": "fixture setup repair",
+      "before": "Called the direct human observation producer for an enabled-logistics match.",
+      "after": "Decode an actual selected recipient packet. Preserve precision, non-retreat and reset/restore assertions; no direct-producer guard relaxation.",
+      "behavior_sources": [
+        {
+          "pr": 420,
+          "head": "f0b947e3b4b73fa8ee8eef00a4e299462728db7c",
+          "title": "runtime: complete AI privacy and command union for ordinary modes"
+        },
+        {
+          "pr": 431,
+          "head": "96841c7dad4afb48706256eb247f4b18132689b4",
+          "title": "runtime: deliver private logistics and replay ordinary AI matches"
+        },
+        {
+          "pr": 423,
+          "head": "4453acf5b95fe5303278ef21b80736fa70c276c7",
+          "title": "runtime: start hosted Horde AI and all recipient roles together"
+        }
+      ],
+      "source_paths": [
+        "rust/crates/core/src/match_human_observation.rs: delivered-logistics refusal",
+        "rust/crates/core/src/ai_view/commander_view.rs"
+      ],
+      "verification": "fresh targeted/full run pending"
+    },
+    {
+      "test_or_shared_fixture": "reset_restore_tests::warm_human (NET-25 and NET-92)",
+      "classification": "fixture setup repair",
+      "before": "Called the direct human observation producer for an enabled-logistics match.",
+      "after": "Decode an actual selected recipient packet. Preserve precision, non-retreat and reset/restore assertions; no direct-producer guard relaxation.",
+      "behavior_sources": [
+        {
+          "pr": 420,
+          "head": "f0b947e3b4b73fa8ee8eef00a4e299462728db7c",
+          "title": "runtime: complete AI privacy and command union for ordinary modes"
+        },
+        {
+          "pr": 431,
+          "head": "96841c7dad4afb48706256eb247f4b18132689b4",
+          "title": "runtime: deliver private logistics and replay ordinary AI matches"
+        },
+        {
+          "pr": 423,
+          "head": "4453acf5b95fe5303278ef21b80736fa70c276c7",
+          "title": "runtime: start hosted Horde AI and all recipient roles together"
+        }
+      ],
+      "source_paths": [
+        "rust/crates/core/src/match_human_observation.rs: delivered-logistics refusal",
+        "rust/crates/core/src/ai_view/commander_view.rs"
+      ],
+      "verification": "fresh targeted/full run pending"
+    },
+    {
+      "test_or_shared_fixture": "logistics_runtime_full_tick_requires_matching_convoy_state",
+      "classification": "superseded expectation",
+      "before": "Expected the older initialized-convoy diagnostic.",
+      "after": "Expect logistics option and convoy state disagree; retain refusal and atomicity assertions.",
+      "behavior_sources": [
+        {
+          "pr": 431,
+          "head": "96841c7dad4afb48706256eb247f4b18132689b4",
+          "title": "runtime: deliver private logistics and replay ordinary AI matches"
+        }
+      ],
+      "source_paths": [
+        "rust/crates/core/src/match_logistics.rs: validate_logistics_runtime"
+      ],
+      "verification": "fresh targeted/full run pending"
+    },
+    {
+      "test_or_shared_fixture": "garrison_retreat_ticks_and_unsupported_reaction_actors_reject_before_writes",
+      "classification": "superseded expectation",
+      "before": "Expected the older initialized-convoy diagnostic.",
+      "after": "Expect logistics option and convoy state disagree; retain refusal and atomicity assertions.",
+      "behavior_sources": [
+        {
+          "pr": 431,
+          "head": "96841c7dad4afb48706256eb247f4b18132689b4",
+          "title": "runtime: deliver private logistics and replay ordinary AI matches"
+        }
+      ],
+      "source_paths": [
+        "rust/crates/core/src/match_logistics.rs: validate_logistics_runtime"
+      ],
+      "verification": "fresh targeted/full run pending"
+    },
+    {
+      "test_or_shared_fixture": "hosted_recorded_support_refuses_unseen_drops_and_unknown_kinds_without_publication",
+      "classification": "fixture setup repair, not a changed expected behavior",
+      "before": "Shared positive paradrop helper moved the recorded request to an own-visible location.",
+      "after": "Use explicit unseen coordinates for the negative case; all refusal and no-publication assertions stay.",
+      "behavior_sources": [
+        {
+          "pr": 422,
+          "head": "42e3afe6b32ff289181407ff7ed9f99236fa96b5",
+          "title": "runtime: connect recipient support priorities and hosted Horde aviation"
+        }
+      ],
+      "source_paths": [
+        "rust/crates/core/src/match_commands/support_capability_tests.rs",
+        "rust/crates/core/src/match_support.rs"
+      ],
+      "verification": "fresh targeted/full run pending"
+    },
+    {
+      "test_or_shared_fixture": "sandbox_horde_enemy_activates_wave_zero_and_attacks_bunker",
+      "classification": "superseded expectation",
+      "before": "Expected no boss row at wave zero.",
+      "after": "Expect the explicitly spawned sandbox boss bar [6000,6000], retaining attack/wave assertions.",
+      "behavior_sources": [
+        {
+          "pr": 430,
+          "head": "eeca34057f33cd61aef0136e007e59d156f36489",
+          "title": "runtime: complete room command and event composition"
+        }
+      ],
+      "source_paths": [
+        "rust/crates/core/src/recipient_snapshot.rs: horde_mode_row; origin 4fb21b5a7a1782b0aae33ed3dc7e0fb41314a55f"
+      ],
+      "verification": "fresh targeted/full run pending"
+    },
+    {
+      "test_or_shared_fixture": "net63_hidden_invalid_units_have_the_same_cached_and_uncached_refusal",
+      "classification": "superseded expectation",
+      "before": "Expected operative diagnostic unit 0.",
+      "after": "Expect the actual malformed operative id from the common validator; cached and uncached refusal still exactly match.",
+      "behavior_sources": [
+        {
+          "pr": 441,
+          "head": "b5c269f3fcc050a66f62830c4808b867646ea1df",
+          "title": "runtime: prove combined pause for AI and operatives (NET-79)"
+        }
+      ],
+      "source_paths": [
+        "rust/crates/core/src/recipient_snapshot.rs: prepare_companion_tick error; origin 98977caa7f4cc312906e284918183e7affce9a52"
+      ],
+      "verification": "fresh targeted/full run pending"
+    },
+    {
+      "test_or_shared_fixture": "classic_complete_snapshots_keep_private_currency_and_public_prototype_nodes",
+      "classification": "superseded expectation",
+      "before": "Used raw floating node fuel flags as the complete-wire expected value.",
+      "after": "Assert integer wire fuel flags explicitly, preserving raw floating-list checks and all row values/order.",
+      "behavior_sources": [
+        {
+          "pr": 431,
+          "head": "96841c7dad4afb48706256eb247f4b18132689b4",
+          "title": "runtime: deliver private logistics and replay ordinary AI matches"
+        }
+      ],
+      "source_paths": [
+        "rust/crates/core/src/recipient_snapshot/composition.rs: complete; origin c0ee6c6cdd2042a6ab52e4f9b869e32a8f4fb1d8"
+      ],
+      "verification": "fresh targeted/full run pending"
+    },
+    {
+      "test_or_shared_fixture": "base59_classic_snapshots_publish_exact_nodes_and_private_research_rallies_through_ticks",
+      "classification": "superseded expectation",
+      "before": "Used raw floating node fuel flags as the complete-wire expected value.",
+      "after": "Assert integer wire fuel flags explicitly, preserving raw floating-list checks and all row values/order.",
+      "behavior_sources": [
+        {
+          "pr": 431,
+          "head": "96841c7dad4afb48706256eb247f4b18132689b4",
+          "title": "runtime: deliver private logistics and replay ordinary AI matches"
+        }
+      ],
+      "source_paths": [
+        "rust/crates/core/src/recipient_snapshot/composition.rs: complete; origin c0ee6c6cdd2042a6ab52e4f9b869e32a8f4fb1d8"
+      ],
+      "verification": "fresh targeted/full run pending"
+    },
+    {
+      "test_or_shared_fixture": "results2_tests::assert_mode (MODE-90 and MODE-96)",
+      "classification": "superseded expectation",
+      "before": "Used raw floating node fuel flags as the complete-wire expected value.",
+      "after": "Assert integer wire fuel flags explicitly, preserving raw floating-list checks and all row values/order.",
+      "behavior_sources": [
+        {
+          "pr": 431,
+          "head": "96841c7dad4afb48706256eb247f4b18132689b4",
+          "title": "runtime: deliver private logistics and replay ordinary AI matches"
+        }
+      ],
+      "source_paths": [
+        "rust/crates/core/src/recipient_snapshot/composition.rs: complete; origin c0ee6c6cdd2042a6ab52e4f9b869e32a8f4fb1d8"
+      ],
+      "verification": "fresh targeted/full run pending"
+    },
+    {
+      "test_or_shared_fixture": "base21_hosted_classic_aircraft_train_fifo_at_exact_times_and_pause_without_losing_jobs",
+      "classification": "superseded expectation",
+      "before": "Used raw floating node fuel flags as the complete-wire expected value.",
+      "after": "Assert integer wire fuel flags explicitly, preserving raw floating-list checks and all row values/order.",
+      "behavior_sources": [
+        {
+          "pr": 431,
+          "head": "96841c7dad4afb48706256eb247f4b18132689b4",
+          "title": "runtime: deliver private logistics and replay ordinary AI matches"
+        }
+      ],
+      "source_paths": [
+        "rust/crates/core/src/recipient_snapshot/composition.rs: complete; origin c0ee6c6cdd2042a6ab52e4f9b869e32a8f4fb1d8"
+      ],
+      "verification": "fresh targeted/full run pending"
+    },
+    {
+      "test_or_shared_fixture": "elimination_snapshot_admission_rejects_missing_state_and_other_modes",
+      "classification": "superseded expectation",
+      "before": "Expected Rules after relabeling Classic as Horde without a canonical Horde owner.",
+      "after": "Retained Classic logistics refuses first with Unsupported Logistics. After removing that incompatible component, the absent Horde owner refuses with Rules. Restore all logistics before remaining cases.",
+      "behavior_sources": [
+        {
+          "pr": 431,
+          "head": "96841c7dad4afb48706256eb247f4b18132689b4",
+          "title": "runtime: deliver private logistics and replay ordinary AI matches"
+        }
+      ],
+      "source_paths": [
+        "rust/crates/core/src/recipient_snapshot/logistics.rs: validate",
+        "rust/crates/core/src/match_logistics.rs: validate_logistics_runtime",
+        "rust/crates/core/src/recipient_snapshot.rs: validate_horde_economy"
+      ],
+      "verification": "fresh targeted/full run pending"
+    },
+    {
+      "test_or_shared_fixture": "invalid_retained_flight_refuses_before_publication_and_aircraft_sources_deliver",
+      "classification": "superseded expectation",
+      "before": "Expected older capability refusal for NaN retained-flight metadata.",
+      "after": "Expect Rules from canonical firing validation, retaining no-publication and positive aircraft-source delivery.",
+      "behavior_sources": [
+        {
+          "pr": 422,
+          "head": "42e3afe6b32ff289181407ff7ed9f99236fa96b5",
+          "title": "runtime: connect recipient support priorities and hosted Horde aviation"
+        },
+        {
+          "pr": 430,
+          "head": "eeca34057f33cd61aef0136e007e59d156f36489",
+          "title": "runtime: complete room command and event composition"
+        }
+      ],
+      "source_paths": [
+        "rust/crates/core/src/recipient_snapshot/projectiles.rs: validate",
+        "rust/crates/core/src/recipient_snapshot/flights.rs"
+      ],
+      "verification": "fresh targeted/full run pending"
+    },
+    {
+      "test_or_shared_fixture": "commander_ingress::garrison_and_construction_auto_retreat_enqueue_through_canonical_executor",
+      "classification": "fixture setup repair",
+      "before": "Applied command tick 1 twice to the same queue in two fixture branches.",
+      "after": "Use a fresh canonical state per garrison/construction branch; all enqueue, retreat cleanup and malformed-input assertions remain.",
+      "behavior_sources": [
+        {
+          "pr": 430,
+          "head": "eeca34057f33cd61aef0136e007e59d156f36489",
+          "title": "runtime: complete room command and event composition"
+        }
+      ],
+      "source_paths": [
+        "rust/crates/server/src/commander_ingress.rs"
+      ],
+      "verification": "fresh targeted/full run pending"
+    },
+    {
+      "test_or_shared_fixture": "async_start_tests::finish_ordinary_match",
+      "classification": "fixture setup repair",
+      "before": "Expected an external lobby message on an absent AI socket.",
+      "after": "Require lobby results for connected humans and no messages on absent AI sockets; retain every-seat internal delivery counts.",
+      "behavior_sources": [
+        {
+          "pr": 423,
+          "head": "4453acf5b95fe5303278ef21b80736fa70c276c7",
+          "title": "runtime: start hosted Horde AI and all recipient roles together"
+        },
+        {
+          "pr": 426,
+          "head": "df6c1f9e377f5e8fc079194aec1a9870be2c10ad",
+          "title": "runtime: complete hosted Horde results, saves and records"
+        }
+      ],
+      "source_paths": [
+        "rust/crates/server/src/lobby.rs",
+        "rust/crates/server/src/room_delivered_ai.rs"
+      ],
+      "verification": "fresh targeted/full run pending"
+    },
+    {
+      "test_or_shared_fixture": "mode04_trusted_start_checks_capacity_and_assault_sides_before_r1_policy",
+      "classification": "superseded expectation",
+      "before": "Expected obsolete two-human commander wording.",
+      "after": "Expect two commander seats on opposing teams; the capacity/Assault/token guard assertions remain.",
+      "behavior_sources": [
+        {
+          "pr": 423,
+          "head": "4453acf5b95fe5303278ef21b80736fa70c276c7",
+          "title": "runtime: start hosted Horde AI and all recipient roles together"
+        }
+      ],
+      "source_paths": [
+        "rust/crates/server/src/async_start.rs"
+      ],
+      "verification": "fresh targeted/full run pending"
+    },
+    {
+      "test_or_shared_fixture": "room_ai3_tests::assert_production_queue",
+      "classification": "new union witness repair; original helper introduced at 50c4c184",
+      "before": "New union-only trace helper assumed each wall-clock poll advances exactly one tick.",
+      "after": "Check unique (logical tick,slot), non-future trace ticks and exact surviving next-tick queue, plus zero legacy-owner production input.",
+      "behavior_sources": [
+        {
+          "pr": 423,
+          "head": "4453acf5b95fe5303278ef21b80736fa70c276c7",
+          "title": "runtime: start hosted Horde AI and all recipient roles together"
+        },
+        {
+          "pr": 441,
+          "head": "b5c269f3fcc050a66f62830c4808b867646ea1df",
+          "title": "runtime: prove combined pause for AI and operatives (NET-79)"
+        }
+      ],
+      "source_paths": [
+        "rust/crates/server/src/lobby.rs",
+        "rust/crates/server/src/room_runtime.rs"
+      ],
+      "verification": "fresh targeted/full run pending"
+    },
+    {
+      "test_or_shared_fixture": "hosted_horde_save_restores_wave_inputs_and_brain_then_resumes_to_full_ending_hold",
+      "classification": "fixture setup repair",
+      "before": "Claimed scheduled AI delivery after only a Current read.",
+      "after": "Supply actual Scheduled frames before tick_ai(true); leave read-only capture paths Current.",
+      "behavior_sources": [
+        {
+          "pr": 423,
+          "head": "4453acf5b95fe5303278ef21b80736fa70c276c7",
+          "title": "runtime: start hosted Horde AI and all recipient roles together"
+        },
+        {
+          "pr": 426,
+          "head": "df6c1f9e377f5e8fc079194aec1a9870be2c10ad",
+          "title": "runtime: complete hosted Horde results, saves and records"
+        }
+      ],
+      "source_paths": [
+        "rust/crates/server/src/room_delivered_ai.rs: fresh selected packet ownership"
+      ],
+      "verification": "fresh targeted/full run pending"
+    },
+    {
+      "test_or_shared_fixture": "hosted_horde_save_restores_sandbox_flag_and_resumes_every_seat",
+      "classification": "fixture setup repair",
+      "before": "Claimed scheduled AI delivery after only a Current read.",
+      "after": "Supply actual Scheduled frames before tick_ai(true); leave read-only capture paths Current.",
+      "behavior_sources": [
+        {
+          "pr": 423,
+          "head": "4453acf5b95fe5303278ef21b80736fa70c276c7",
+          "title": "runtime: start hosted Horde AI and all recipient roles together"
+        },
+        {
+          "pr": 426,
+          "head": "df6c1f9e377f5e8fc079194aec1a9870be2c10ad",
+          "title": "runtime: complete hosted Horde results, saves and records"
+        }
+      ],
+      "source_paths": [
+        "rust/crates/server/src/room_delivered_ai.rs: fresh selected packet ownership"
+      ],
+      "verification": "fresh targeted/full run pending"
+    },
+    {
+      "test_or_shared_fixture": "sandbox_start_flag_host_authority_restart_and_every_seat_snapshots",
+      "classification": "superseded expectation",
+      "before": "Exact key membership was implicitly tied to serde_json BTreeMap iteration.",
+      "after": "Sort exact key sets in the test; keep all required/forbidden keys and values. No wire object order change.",
+      "behavior_sources": [
+        {
+          "pr": 442,
+          "head": "6a9621eff16002c29366bf9fdece3b7370d02ddc",
+          "title": "runtime: complete non-World C authoring queries and fairness"
+        }
+      ],
+      "source_paths": [
+        "rust/crates/core/Cargo.toml: serde_json preserve_order"
+      ],
+      "verification": "fresh targeted/full run pending"
+    },
+    {
+      "test_or_shared_fixture": "intent_net26_spectator_start_precedes_lobby_and_pause_without_changing_seat_memory",
+      "classification": "superseded expectation",
+      "before": "Exact key membership was implicitly tied to serde_json BTreeMap iteration.",
+      "after": "Sort exact key sets in the test; keep all required/forbidden keys and values. No wire object order change.",
+      "behavior_sources": [
+        {
+          "pr": 442,
+          "head": "6a9621eff16002c29366bf9fdece3b7370d02ddc",
+          "title": "runtime: complete non-World C authoring queries and fairness"
+        }
+      ],
+      "source_paths": [
+        "rust/crates/core/Cargo.toml: serde_json preserve_order"
+      ],
+      "verification": "fresh targeted/full run pending"
+    },
+    {
+      "test_or_shared_fixture": "spectator_tests::start_mask (NET-57)",
+      "classification": "superseded expectation",
+      "before": "Exact key membership was implicitly tied to serde_json BTreeMap iteration.",
+      "after": "Sort exact key sets in the test; keep all required/forbidden keys and values. No wire object order change.",
+      "behavior_sources": [
+        {
+          "pr": 442,
+          "head": "6a9621eff16002c29366bf9fdece3b7370d02ddc",
+          "title": "runtime: complete non-World C authoring queries and fairness"
+        }
+      ],
+      "source_paths": [
+        "rust/crates/core/Cargo.toml: serde_json preserve_order"
+      ],
+      "verification": "fresh targeted/full run pending"
+    },
+    {
+      "test_or_shared_fixture": "net18_tutorial_hello_autostarts_once_and_delivers_every_seat",
+      "classification": "superseded expectation",
+      "before": "Exact key membership was implicitly tied to serde_json BTreeMap iteration.",
+      "after": "Sort exact key sets in the test; keep all required/forbidden keys and values. No wire object order change.",
+      "behavior_sources": [
+        {
+          "pr": 442,
+          "head": "6a9621eff16002c29366bf9fdece3b7370d02ddc",
+          "title": "runtime: complete non-World C authoring queries and fairness"
+        }
+      ],
+      "source_paths": [
+        "rust/crates/core/Cargo.toml: serde_json preserve_order"
+      ],
+      "verification": "fresh targeted/full run pending"
+    },
+    {
+      "test_or_shared_fixture": "net36_public_start_checks_host_capacity_and_assault_readiness",
+      "classification": "superseded expectation",
+      "before": "Exact key membership was implicitly tied to serde_json BTreeMap iteration.",
+      "after": "Sort exact key sets in the test; keep all required/forbidden keys and values. No wire object order change.",
+      "behavior_sources": [
+        {
+          "pr": 442,
+          "head": "6a9621eff16002c29366bf9fdece3b7370d02ddc",
+          "title": "runtime: complete non-World C authoring queries and fairness"
+        }
+      ],
+      "source_paths": [
+        "rust/crates/core/Cargo.toml: serde_json preserve_order"
+      ],
+      "verification": "fresh targeted/full run pending"
+    },
+    {
+      "test_or_shared_fixture": "compiled_rules_match_every_recorded_field_and_float_bit",
+      "classification": "fixture loader repair",
+      "before": "Independent fixture loader inherited object iteration order for terrainHp.",
+      "after": "Sort fixture terrainHp by character, matching unchanged compiled catalog. Every field and floating-bit equality assertion remains.",
+      "behavior_sources": [
+        {
+          "pr": 442,
+          "head": "6a9621eff16002c29366bf9fdece3b7370d02ddc",
+          "title": "runtime: complete non-World C authoring queries and fairness"
+        }
+      ],
+      "source_paths": [
+        "rust/crates/core/Cargo.toml",
+        "rust/crates/simtest/src/load.rs: movement_rules"
+      ],
+      "verification": "fresh targeted/full run pending"
+    },
+    {
+      "test_or_shared_fixture": "net55_classic_mission_recipient_extension_keeps_spawn_and_damage_actuators_refused -> net55_classic_mission_actions_compose_with_recipient_delivery",
+      "classification": "superseded expectation",
+      "before": "Classic refused reinforcement and destroy actions.",
+      "after": "Observe real tree destruction and one reinforcement over twelve full ticks with every seat delivered.",
+      "behavior_sources": [
+        {
+          "pr": 419,
+          "head": "e4c0801df68f886c1f019c680f7e6da304d9cffa",
+          "title": "runtime: complete ordinary logistics modes scenarios and restart options"
+        },
+        {
+          "pr": 442,
+          "head": "6a9621eff16002c29366bf9fdece3b7370d02ddc",
+          "title": "runtime: complete non-World C authoring queries and fairness"
+        }
+      ],
+      "source_paths": [
+        "rust/crates/core/src/scenario_actuators.rs"
+      ],
+      "verification": "fresh targeted/full run pending"
+    },
+    {
+      "test_or_shared_fixture": "original_paid_construction_replays_full_match_ticks -> original_paid_construction_replays_full_ticks_and_isolates_invalid_reserves",
+      "classification": "superseded expectation",
+      "before": "Ran two synthetic repair turns with reserves injected while logistics was disabled.",
+      "after": "Preserve 1917 complete turns; the two synthetic turns assert atomic full-runner refusal and separately execute exact section/repair/debit components. No guard weakening.",
+      "behavior_sources": [
+        {
+          "pr": 431,
+          "head": "96841c7dad4afb48706256eb247f4b18132689b4",
+          "title": "runtime: deliver private logistics and replay ordinary AI matches"
+        }
+      ],
+      "source_paths": [
+        "rust/crates/core/src/match_logistics.rs: reserves require enabled logistics",
+        "rust/crates/core/src/match_construction.rs",
+        "rust/crates/core/src/environment_lifecycle.rs"
+      ],
+      "verification": "fresh targeted/full run pending"
+    },
+    {
+      "test_or_shared_fixture": "authored_objectives_save_v2_rejects_downgrade_and_restores_mission_and_pending_say",
+      "classification": "additional witness for handoff decision; timed-v1 compatibility from #442 deliberately excluded",
+      "before": "Core legacy-owner refusal existed; room-level timed-v1 envelope was not explicitly covered.",
+      "after": "Add explicit unsupported legacy-owner error and unchanged lobby/epoch for v1 envelope. Ordinary v1 remains supported; complete authored state remains v2.",
+      "behavior_sources": [
+        {
+          "pr": 376,
+          "head": "790ea3a0e972ebf3a70d4478c9916537efa47e75",
+          "title": "runtime: persist editor maps and Horde records"
+        },
+        {
+          "pr": 383,
+          "head": "870ee6afe70025b47b747830b1b5cc262259145f",
+          "title": "runtime: filter ordinary scenario objectives and announcements by recipient"
+        },
+        {
+          "pr": 386,
+          "head": "390b4657721711babec72dbe26c0c3bcca38742d",
+          "title": "runtime: execute ordinary scenario conditions, actions and arrivals"
+        },
+        {
+          "pr": 442,
+          "head": "6a9621eff16002c29366bf9fdece3b7370d02ddc",
+          "title": "runtime: complete non-World C authoring queries and fairness"
+        }
+      ],
+      "source_paths": [
+        "docs/contracts/save-format.md",
+        "rust/crates/core/src/authored_scenario/tests.rs",
+        "rust/crates/server/src/lobby_saves.rs"
+      ],
+      "verification": "fresh targeted/full run pending"
+    },
+    {
+      "test_or_shared_fixture": "net92_ai_memory_human_reset_and_surplus_watchers_restore_transactionally_through_victory",
+      "classification": "fixture boundary repair",
+      "before": "Compared all recipient memory byte-equal after the fresh opening packet.",
+      "after": "Require exact complete restoration before observation, then compare every field after an independently captured current start packet. Preserve exact serialized planner state, human reset, atomic bad-load checks and full victory delivery. Compare the complete restored policy to an independent restore, including the fresh private RNG, rather than the exercised pre-save stream; the existing core ai63_planner_checkpoint_retains_full_memory_without_random_streams directly checks the codec exclusion. Loaded messages must be playing lobby, exact host pause, then one start per role, with no preceding snapshots, replacing the obsolete pause-after-start expectation.",
+      "behavior_sources": [
+        {
+          "pr": 423,
+          "head": "4453acf5b95fe5303278ef21b80736fa70c276c7",
+          "title": "runtime: start hosted Horde AI and all recipient roles together"
+        },
+        {
+          "pr": 426,
+          "head": "df6c1f9e377f5e8fc079194aec1a9870be2c10ad",
+          "title": "runtime: complete hosted Horde results, saves and records"
+        }
+      ],
+      "source_paths": [
+        "rust/crates/server/src/room_delivered_ai.rs: restore_memories and observe",
+        "rust/crates/server/src/room_delivered_ai_tests.rs: ai63_hosted_save_restores_planners_resets_humans_and_restarts_commanders",
+        "rust/crates/core/src/human_commander_policy.rs: PlannerMemory excludes random"
+      ],
+      "verification": "fresh targeted/full run pending"
+    },
+    {
+      "test_or_shared_fixture": "if28_native_input_log_replays_tick_order_away_pause_and_operative_throttle",
+      "classification": "test storage/resource repair; expected behavior unchanged",
+      "before": "Stored multiple full deeply allocated tagged JSON checkpoint trees; isolated binary reached 6943104 KiB RSS and was killed with signal9.",
+      "after": "Retain complete lossless gzip JSON buffers and compare every buffer byte, plus the reversed-order negative case. No input, field, or comparison is removed.",
+      "behavior_sources": [
+        {
+          "pr": 441,
+          "head": "b5c269f3fcc050a66f62830c4808b867646ea1df",
+          "title": "runtime: prove combined pause for AI and operatives (NET-79)"
+        }
+      ],
+      "source_paths": [
+        "rust/crates/server/src/operative_timing_tests.rs"
+      ],
+      "verification": "fresh targeted/full run pending"
+    }
+  ],
+  "sigkill_tests_retained": [
+    "lobby::operative_tests::timing::if28_native_input_log_replays_tick_order_away_pause_and_operative_throttle",
+    "match_support::actual_support_admission_strikes_and_timers_match_source"
+  ],
+  "local_resource_policy": "All four slots reserved for these two memory-intensive test families; no retries, skips or timeout changes. Cause not labeled without evidence."
+}

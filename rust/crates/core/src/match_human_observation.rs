@@ -612,6 +612,11 @@ pub(crate) fn complete_ordinary_facts(
     let Some(context) = &mut input.runtime else {
         return;
     };
+    context.node_worth = context
+        .nodes
+        .iter()
+        .map(|node| if node.fuel { 2.5 } else { node.rate })
+        .collect();
     context.known_depots = context
         .known_buildings
         .iter()

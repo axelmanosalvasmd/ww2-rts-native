@@ -87,111 +87,127 @@ fn operative_start_orders_publication_resets_edges_and_respects_missing_commande
 
 #[test]
 fn operative_disconnect_idles_retains_membership_and_waits_offline_past_respawn() {
-    let (mut hub, _, mut commanders) = room();
-    let (op, mut receiver) = client(3);
-    join_operative(&mut hub, &op, "friend", 0);
-    hub.attach_native("ABC", native_tests::native_match(), 0)
-        .unwrap();
-    messages(&mut receiver);
-    drain_commanders(&mut hub, &mut commanders, 0);
-    let mut input = fps(7);
-    input["fire"] = json!(true);
-    command(&mut hub, &op, input, 20);
-    hub.poll_native(0, 0);
-    hub.poll_native(50, 50_000_000);
-    messages(&mut receiver);
-    drain_commanders(&mut hub, &mut commanders, 50);
-    let soldier = state(&hub).companions.get("friend").unwrap().unit_id;
-    let shots = state(&hub).companions.get("friend").unwrap().shots;
-    hub.disconnected("ABC", op.id, 51);
-    let dropped = drain_commanders(&mut hub, &mut commanders, 51);
-    for output in dropped {
-        assert_eq!(output.len(), 1);
-        assert_eq!(output[0]["t"], "lobby");
-        assert_eq!(
-            output[0]["operatives"],
-            json!([{"name":"friend","commander":0,"online":false}])
+    for logistics in [false, true] {
+        let (mut hub, _, mut commanders) = room();
+        let (op, mut receiver) = client(3);
+        join_operative(&mut hub, &op, "friend", 0);
+        let mut options = native_tests::native_match().options;
+        options.logistics = logistics;
+        let match_state = crate::authoritative_maps::create_match("default", options).unwrap();
+        hub.attach_native("ABC", match_state, 0).unwrap();
+        messages(&mut receiver);
+        drain_commanders(&mut hub, &mut commanders, 0);
+        let mut input = fps(7);
+        input["fire"] = json!(true);
+        command(&mut hub, &op, input, 20);
+        hub.poll_native(0, 0);
+        hub.poll_native(50, 50_000_000);
+        messages(&mut receiver);
+        drain_commanders(&mut hub, &mut commanders, 50);
+        let soldier = state(&hub).companions.get("friend").unwrap().unit_id;
+        assert_eq!(state(&hub).logistics.get(soldier).is_some(), logistics);
+        let shots = state(&hub).companions.get("friend").unwrap().shots;
+        hub.disconnected("ABC", op.id, 51);
+        let dropped = drain_commanders(&mut hub, &mut commanders, 51);
+        for output in dropped {
+            assert_eq!(output.len(), 1);
+            assert_eq!(output[0]["t"], "lobby");
+            assert_eq!(
+                output[0]["operatives"],
+                json!([{"name":"friend","commander":0,"online":false}])
+            );
+        }
+        command(&mut hub, &op, fps(99), 80);
+        assert_eq!(last_seq(&hub, "friend"), 7);
+        let mut resting = None;
+        let mut alive_frames = 0;
+        for callback in 2..=20_u64 {
+            let now = callback * 50;
+            hub.poll_native(now, now * 1_000_000);
+            assert!(!hub.native_status("ABC").unwrap().paused);
+            assert!(hub.native_status("ABC").unwrap().fault.is_none());
+            let record = state(&hub).companions.get("friend").unwrap();
+            assert!(!record.online && record.input.is_none());
+            assert_eq!(record.unit_id, soldier);
+            assert_eq!(record.shots, shots);
+            let unit = &state(&hub).world.game.units[&soldier];
+            if callback == 10 {
+                resting = Some((unit.x, unit.z));
+            }
+            if callback > 10 {
+                assert_eq!(Some((unit.x, unit.z)), resting);
+            }
+            alive_frames += drain_commanders(&mut hub, &mut commanders, now)[0]
+                .iter()
+                .filter(|m| m["t"] == "s")
+                .count();
+            assert!(messages(&mut receiver).is_empty());
+        }
+        assert!(alive_frames > 0);
+        hub.rooms
+            .get_mut("ABC")
+            .unwrap()
+            .native
+            .as_mut()
+            .unwrap()
+            .runtime
+            .state_mut()
+            .world
+            .game
+            .units
+            .get_mut(&soldier)
+            .unwrap()
+            .hp = 0.;
+        let mut dead_frames = 0;
+        for callback in 21..=190_u64 {
+            let now = callback * 50;
+            hub.poll_native(now, now * 1_000_000);
+            assert!(hub.native_status("ABC").unwrap().fault.is_none());
+            assert!(!hub.native_status("ABC").unwrap().paused);
+            assert_eq!(state(&hub).companions.get("friend").unwrap().unit_id, 0);
+            assert!(state(&hub).start.economy.players[0].mp >= 10.);
+            dead_frames += drain_commanders(&mut hub, &mut commanders, now)[0]
+                .iter()
+                .filter(|m| m["t"] == "s")
+                .count();
+        }
+        assert!(dead_frames > 0);
+        assert!(
+            state(&hub).world.game.tick > state(&hub).companions.get("friend").unwrap().respawn_at
         );
-    }
-    command(&mut hub, &op, fps(99), 80);
-    assert_eq!(last_seq(&hub, "friend"), 7);
-    let mut resting = None;
-    let mut alive_frames = 0;
-    for callback in 2..=20_u64 {
-        let now = callback * 50;
-        hub.poll_native(now, now * 1_000_000);
-        assert!(!hub.native_status("ABC").unwrap().paused);
-        assert!(hub.native_status("ABC").unwrap().fault.is_none());
+        assert_eq!(hub.rooms["ABC"].operatives.len(), 1);
+        let (replacement, mut returned) = client(4);
+        assert!(hello(
+            &mut hub,
+            &replacement,
+            json!({"t":"hello","token":"friend","name":"Returned"}),
+            9501
+        ));
+        assert_eq!(
+            messages(&mut returned)
+                .iter()
+                .find(|m| m["t"] == "start")
+                .unwrap()["operative"]["id"],
+            0
+        );
+        command(&mut hub, &replacement, fps(0), 9521);
+        hub.poll_native(9550, 9_550_000_000);
         let record = state(&hub).companions.get("friend").unwrap();
-        assert!(!record.online && record.input.is_none());
-        assert_eq!(record.unit_id, soldier);
-        assert_eq!(record.shots, shots);
-        let unit = &state(&hub).world.game.units[&soldier];
-        if callback == 10 {
-            resting = Some((unit.x, unit.z));
-        }
-        if callback > 10 {
-            assert_eq!(Some((unit.x, unit.z)), resting);
-        }
-        alive_frames += drain_commanders(&mut hub, &mut commanders, now)[0]
-            .iter()
-            .filter(|m| m["t"] == "s")
-            .count();
-        assert!(messages(&mut receiver).is_empty());
-    }
-    assert!(alive_frames > 0);
-    hub.rooms
-        .get_mut("ABC")
-        .unwrap()
-        .native
-        .as_mut()
-        .unwrap()
-        .runtime
-        .state_mut()
-        .world
-        .game
-        .units
-        .get_mut(&soldier)
-        .unwrap()
-        .hp = 0.;
-    let mut dead_frames = 0;
-    for callback in 21..=190_u64 {
-        let now = callback * 50;
-        hub.poll_native(now, now * 1_000_000);
+        assert!(record.online);
+        assert_eq!(record.last_seq, 0);
+        assert_ne!(record.unit_id, 0);
+        assert_ne!(record.unit_id, soldier);
+        assert!(
+            state(&hub).logistics.get(soldier).is_none(),
+            "retired operative reserves must not survive"
+        );
+        assert_eq!(
+            state(&hub).logistics.get(record.unit_id).is_some(),
+            logistics,
+            "the respawned operative must publish canonical reserves with its new body"
+        );
         assert!(hub.native_status("ABC").unwrap().fault.is_none());
-        assert!(!hub.native_status("ABC").unwrap().paused);
-        assert_eq!(state(&hub).companions.get("friend").unwrap().unit_id, 0);
-        assert!(state(&hub).start.economy.players[0].mp >= 10.);
-        dead_frames += drain_commanders(&mut hub, &mut commanders, now)[0]
-            .iter()
-            .filter(|m| m["t"] == "s")
-            .count();
     }
-    assert!(dead_frames > 0);
-    assert!(state(&hub).world.game.tick > state(&hub).companions.get("friend").unwrap().respawn_at);
-    assert_eq!(hub.rooms["ABC"].operatives.len(), 1);
-    let (replacement, mut returned) = client(4);
-    assert!(hello(
-        &mut hub,
-        &replacement,
-        json!({"t":"hello","token":"friend","name":"Returned"}),
-        9501
-    ));
-    assert_eq!(
-        messages(&mut returned)
-            .iter()
-            .find(|m| m["t"] == "start")
-            .unwrap()["operative"]["id"],
-        0
-    );
-    command(&mut hub, &replacement, fps(0), 9521);
-    hub.poll_native(9550, 9_550_000_000);
-    let record = state(&hub).companions.get("friend").unwrap();
-    assert!(record.online);
-    assert_eq!(record.last_seq, 0);
-    assert_ne!(record.unit_id, 0);
-    assert_ne!(record.unit_id, soldier);
-    assert!(hub.native_status("ABC").unwrap().fault.is_none());
 }
 
 fn direct_frames(hub: &mut Hub, receiver: &mut mpsc::Receiver<Output>) -> Value {

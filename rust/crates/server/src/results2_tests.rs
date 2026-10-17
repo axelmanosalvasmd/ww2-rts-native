@@ -196,12 +196,12 @@ fn assert_mode(state: &Match, snapshot: &Value, slot: usize) {
             json!(
                 nodes
                     .iter()
-                    .map(|n| [
+                    .map(|n| json!([
                         ww2_core::math::round(n.at.x * 10.) / 10.,
                         ww2_core::math::round(n.at.z * 10.) / 10.,
                         n.rate,
-                        f64::from(u8::from(n.fuel))
-                    ])
+                        u8::from(n.fuel)
+                    ]))
                     .collect::<Vec<_>>()
             )
         );

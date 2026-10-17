@@ -94,6 +94,34 @@ fn fixture(mut units: Vec<UnitObservation>) -> Input {
 }
 fn look(mut input: Input, state: &mut State, level: Level) -> Vec<Value> {
     input.units.sort_by_key(|u| u.id);
+    let context = input.runtime.as_mut().unwrap();
+    let initial = context.initial_chars.clone().unwrap();
+    context.field = Some(crate::commander_field_policy::Facts {
+        bridges: initial
+            .iter()
+            .zip(&input.chars)
+            .enumerate()
+            .filter_map(|(cell, (a, b))| (*a == b'=' || *b == b'=').then_some(cell))
+            .collect(),
+        initial_chars: initial,
+        initial_height: context.initial_height.clone(),
+        ground: input
+            .chars
+            .iter()
+            .map(|ch| {
+                if b".D+MWF".contains(ch) {
+                    *ch
+                } else if *ch == b'=' {
+                    b'W'
+                } else {
+                    b'.'
+                }
+            })
+            .collect(),
+        mines: context.mines.clone(),
+        found_mines: context.found_mines.clone(),
+        free_nodes: context.site_nodes.clone(),
+    });
     commander_tactics::plan(
         &Observation::new(input).unwrap(),
         &[],

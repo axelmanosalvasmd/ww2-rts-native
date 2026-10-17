@@ -307,10 +307,10 @@ fn mode04_trusted_start_checks_capacity_and_assault_sides_before_r1_policy() {
     }
     hub.rooms.get_mut("ABC").unwrap().players[0].team = 4;
     assert!(hub.rooms["ABC"].start_ready(&hub.maps));
-    // Readiness is necessary; the separate R1 two-human policy still applies.
+    // Readiness is necessary; the separate R1 two-seat policy still applies.
     let denial = hub.start_trusted("ABC", host.id, false, 0).unwrap_err();
     assert!(
-        denial.contains("exactly two human commander tokens"),
+        denial.contains("exactly two commander seats on opposing teams"),
         "{denial}"
     );
     assert!(hub.rooms["ABC"].native.is_none());

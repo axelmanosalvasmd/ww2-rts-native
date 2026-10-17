@@ -115,7 +115,7 @@ fn logistics_runtime_full_tick_requires_matching_convoy_state() {
         assert!(
             error
                 .reason
-                .contains("logistics requires initialized convoy state")
+                .contains("logistics option and convoy state disagree")
         );
         assert!(error.events.is_empty());
         assert_eq!(m.world.game.tick, tick);

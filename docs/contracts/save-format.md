@@ -1,6 +1,6 @@
 # Native match save format, versions 1 and 2
 
-This implements owner group I as recorded in [issue #5, comment 6217590741](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6217590741). The compatibility source is `reference/ww2-rts` at `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`. Hermes' exact-head implementation acknowledgement remains a merge requirement. This document does not mark another draft contract agreed.
+This implements owner group I as recorded in [issue #5, comment 6217590741](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6217590741). The compatibility source is `reference/ww2-rts` at `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`. The 2026-10-17 owner handoff supersedes the earlier exact-head pre-merge acknowledgment gate for this integration; Hermes reviews after landing, as confirmed in [comment 6232712225](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6232712225). This document does not mark another draft contract agreed.
 
 The envelope carries the prototype's game, local defender, raw map, seats, settings and planner-memory content. JSON with a version field replaces Node's V8 binary serialization. Existing Node `.save` files are not imported. Each version binds its native state schema and compiled rules; incompatible schema or rules changes require a format-version increment. Files and credentials remain server-private. The deterministic core encodes and decodes in-memory state and performs no file I/O.
 

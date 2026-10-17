@@ -1053,10 +1053,22 @@ fn base21_hosted_classic_aircraft_train_fifo_at_exact_times_and_pause_without_lo
         .unwrap()
         .nodes
         .unwrap();
-    assert_eq!(owner["nodes"], raw_nodes);
+    let wire_nodes = json!(
+        raw_nodes
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|row| {
+                let mut row = row.clone();
+                row[3] = json!(u8::from(row[3].as_f64().unwrap() != 0.0));
+                row
+            })
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(owner["nodes"], wire_nodes);
     assert!(raw_nodes.as_array().is_some_and(|nodes| !nodes.is_empty()));
     for frame in &initial_frames {
-        assert_eq!(frame.message["nodes"], raw_nodes);
+        assert_eq!(frame.message["nodes"], wire_nodes);
         assert_eq!(frame.list_versions.nodes, 1);
     }
     let jobs = owner["productionJobs"]
@@ -1132,7 +1144,7 @@ fn base21_hosted_classic_aircraft_train_fifo_at_exact_times_and_pause_without_lo
                 .unwrap();
             assert_eq!(frames.len(), 2);
             for frame in &frames {
-                assert_eq!(frame.message["nodes"], raw_nodes);
+                assert_eq!(frame.message["nodes"], wire_nodes);
                 assert_eq!(frame.list_versions.nodes, 1);
             }
             let state = runtime.state();
@@ -1201,7 +1213,7 @@ fn base21_hosted_classic_aircraft_train_fifo_at_exact_times_and_pause_without_lo
     let classic = state.elimination.as_mut().unwrap();
     classic.nodes[0].rate += 0.25;
     let rate = classic.nodes[0].rate;
-    let mut changed_nodes = raw_nodes.clone();
+    let mut changed_nodes = wire_nodes.clone();
     changed_nodes[0][2] = json!(rate);
     for _ in 0..2 {
         let frames = runtime

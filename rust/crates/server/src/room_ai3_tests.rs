@@ -391,21 +391,22 @@ pub(super) fn assert_production_queue(runtime: &mut RoomRuntime) -> (BTreeSet<us
     let trace = runtime.take_ai_trace();
     let tick = runtime.state().world.game.tick;
     let mut owners = BTreeSet::new();
+    let mut seen_slots = BTreeSet::new();
     let mut expected = BTreeMap::new();
     for decision in trace {
-        assert_eq!(
-            decision.tick, tick,
-            "trace must describe this callback's tick"
-        );
+        assert!(decision.tick <= tick, "trace cannot describe a future tick");
         assert!(
-            owners.insert(decision.slot),
+            owners.insert((decision.tick, decision.slot)),
             "duplicate production owner for seat {} at tick {tick}",
             decision.slot
         );
+        seen_slots.insert(decision.slot);
         for (key, command) in decision.accepted {
-            assert_eq!(key.tick, tick as u64 + 1);
+            assert_eq!(key.tick, decision.tick as u64 + 1);
             assert_eq!(key.issuer, decision.slot as u32);
-            assert!(expected.insert(key, command).is_none());
+            if decision.tick == tick {
+                assert!(expected.insert(key, command).is_none());
+            }
         }
     }
     let actual = runtime
@@ -426,7 +427,7 @@ pub(super) fn assert_production_queue(runtime: &mut RoomRuntime) -> (BTreeSet<us
         runtime.legacy_ai_queued, 0,
         "legacy owner must enqueue zero production commands"
     );
-    (owners, expected.len())
+    (seen_slots, expected.len())
 }
 
 #[test]

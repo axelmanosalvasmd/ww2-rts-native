@@ -249,12 +249,12 @@ impl RoomRuntime {
         let mut memories = self
             .delivered_ai
             .save_memories(self.state.start.players.len());
-        if let Some(horde) = &self.state.horde {
-            if let Some(rows) = memories.as_array_mut() {
-                rows[horde.slot] = Value::Null;
-                if rows.iter().all(Value::is_null) {
-                    return Value::Null;
-                }
+        if let Some(horde) = &self.state.horde
+            && let Some(rows) = memories.as_array_mut()
+        {
+            rows[horde.slot] = Value::Null;
+            if rows.iter().all(Value::is_null) {
+                return Value::Null;
             }
         }
         memories

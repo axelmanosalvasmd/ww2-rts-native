@@ -85,6 +85,9 @@ fn setup(
     (hub, host, host_rx, guest, guest_rx)
 }
 fn snapshot_every_seat(runtime: &mut RoomRuntime) {
+    snapshot_every_seat_kind(runtime, FrameKind::Current);
+}
+fn snapshot_every_seat_kind(runtime: &mut RoomRuntime, kind: FrameKind) {
     let selected = (0..3)
         .map(|slot| SelectedSeat {
             slot,
@@ -92,9 +95,7 @@ fn snapshot_every_seat(runtime: &mut RoomRuntime) {
             omit: false,
         })
         .collect::<Vec<_>>();
-    let frames = runtime
-        .collect_frame(&selected, FrameKind::Current)
-        .unwrap();
+    let frames = runtime.collect_frame(&selected, kind).unwrap();
     assert_eq!(frames.len(), 3);
     for (slot, frame) in frames.iter().enumerate() {
         assert_eq!(frame.slot, slot);
@@ -233,7 +234,7 @@ fn hosted_horde_save_restores_wave_inputs_and_brain_then_resumes_to_full_ending_
         assert!(state.world.game.players[0].sees(unit.id));
         assert!(state.world.game.players[1].sees(unit.id));
     }
-    snapshot_every_seat(runtime);
+    snapshot_every_seat_kind(runtime, FrameKind::Scheduled);
     runtime.tick_ai(true).unwrap();
     assert!(runtime.state().finish.is_none());
     let saved_wave = runtime.state().horde.clone();
@@ -531,7 +532,7 @@ fn hosted_horde_save_restores_sandbox_flag_and_resumes_every_seat() {
     assert!(runtime.state().options.sandbox);
     for _ in 0..3 {
         runtime.advance_tick(&[false; 3]).unwrap();
-        snapshot_every_seat(runtime);
+        snapshot_every_seat_kind(runtime, FrameKind::Scheduled);
         runtime.tick_ai(true).unwrap();
     }
     let saved_tick = runtime.state().world.game.tick;

@@ -94,16 +94,6 @@ impl Match {
 
     /// Startup admission uses immutable terrain, before any mission damage or arrivals.
     pub(crate) fn scenario_action_allowed(&self, action: &Value, side: usize) -> bool {
-        if self.options.mode == Mode::Classic
-            && self.world.game.mode == Some(crate::game::ModeKind::Classic)
-            && self.world.geography().is_none()
-            && self.world_runtime.is_none()
-        {
-            return matches!(
-                action["kind"].as_str(),
-                Some("say" | "objectiveActivate" | "objectiveComplete")
-            );
-        }
         if !self.scenario_ordinary_mode() {
             return false;
         }

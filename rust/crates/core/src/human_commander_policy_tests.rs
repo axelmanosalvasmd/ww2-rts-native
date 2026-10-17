@@ -1470,11 +1470,41 @@ fn intent_ai28_delivered_stock_uses_public_two_decimal_precision() {
     stock.provisions = 59.6;
     stock.fuel = Some(36.4);
     stock.ammo = stock.ammo_max * 0.499;
-    let view = m
-        .human_commander_observation(
-            &mut crate::match_human_observation::HumanObservationMemory::new(0),
+    use crate::ai_view::{CommanderViewMemory, PublicMap};
+    use crate::recipient_snapshot::{DeliveryState, SelectedSeat};
+    let mut memory = m.ordinary_ai_view_memory(0).unwrap();
+    let mut delivery = DeliveryState::new(&m).unwrap();
+    let raw = delivery
+        .capture_selected_with_tick_events(
+            &mut m,
+            &[SelectedSeat {
+                slot: 0,
+                full: true,
+                omit: false,
+            }],
+            &[],
         )
-        .unwrap();
+        .unwrap()
+        .unwrap()
+        .recipient(0)
+        .unwrap()
+        .into_json();
+    let decoded = memory.decode(&raw).unwrap();
+    let public = PublicMap {
+        width: m.world.game.w,
+        height: m.world.game.h,
+        players: decoded.players.clone(),
+        points: decoded.points.clone(),
+    };
+    let mut policy_view = CommanderViewMemory::new(
+        0,
+        public,
+        decoded.initial_chars.clone(),
+        decoded.initial_height.clone(),
+        decoded.naval,
+    )
+    .unwrap();
+    let view = policy_view.observe(&decoded, &raw).unwrap();
     let delivered = view.packet.input().runtime.as_ref().unwrap().units[&id]
         .stock
         .as_ref()

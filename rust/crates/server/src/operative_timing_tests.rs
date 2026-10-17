@@ -14,7 +14,15 @@ enum Input {
 fn if28_native_input_log_replays_tick_order_away_pause_and_operative_throttle() {
     // Prototype sim.js:27 and server.js:633,713,784,791-800. The native queue
     // stamps the next tick; the host clock and socket transitions are replay inputs.
-    fn replay(reverse_orders: bool) -> (Vec<Value>, Value) {
+    // Retain complete lossless checkpoints in compressed form instead of
+    // holding three deeply allocated JSON trees for every recorded input.
+    fn checkpoint(state: &ww2_core::match_runtime::Match) -> Vec<u8> {
+        let mut compressed =
+            flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+        serde_json::to_writer(&mut compressed, &state.save_json().unwrap()).unwrap();
+        compressed.finish().unwrap()
+    }
+    fn replay(reverse_orders: bool) -> (Vec<Vec<u8>>, Vec<u8>) {
         let (mut hub, seats, mut receivers) = room();
         let (operative, mut op_rx) = client(3);
         join_operative(&mut hub, &operative, "friend", 0);
@@ -185,17 +193,29 @@ fn if28_native_input_log_replays_tick_order_away_pause_and_operative_throttle() 
                 assert_eq!(returned_messages.last().unwrap()["t"], "lobby");
             }
             messages(&mut op_rx);
-            checkpoints.push(state(&hub).save_json().unwrap());
+            checkpoints.push(checkpoint(state(&hub)));
         }
-        let final_state = state(&hub).save_json().unwrap();
+        let final_state = checkpoint(state(&hub));
         (checkpoints, final_state)
     }
     let (recorded, final_state) = replay(false);
     let (replayed, replay_final) = replay(false);
     // Full tagged checkpoints compare all canonical state, queues and RNG bits,
     // rather than accepting a coincidentally equal unit count or winner.
-    assert_eq!(recorded, replayed);
-    assert_eq!(final_state, replay_final);
+    assert_eq!(recorded.len(), replayed.len());
+    for (index, (expected, actual)) in recorded.iter().zip(&replayed).enumerate() {
+        assert!(
+            expected == actual,
+            "complete lossless checkpoint differs at input {index}"
+        );
+    }
+    assert!(
+        final_state == replay_final,
+        "complete final checkpoint differs"
+    );
     let (_, changed_order) = replay(true);
-    assert_ne!(final_state, changed_order);
+    assert!(
+        final_state != changed_order,
+        "reversing input order must change the complete checkpoint"
+    );
 }

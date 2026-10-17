@@ -861,6 +861,53 @@ fn authored_objectives_save_v2_rejects_downgrade_and_restores_mission_and_pendin
     );
     assert_eq!(hub.next_epoch, epoch);
     assert!(hub.rooms["ABC"].native.is_none());
+    // Current-main timed-v1 saves are deliberately decode-only, never silently
+    // accepted after dropping their old mission owner.
+    let mut timed_v1 = saved.clone();
+    timed_v1["version"] = json!(1);
+    let fields = timed_v1["g"]["state"][1].as_array_mut().unwrap();
+    fields.retain(|entry| {
+        entry[0] != json!(["string", "authored_scenario"])
+            && entry[0] != json!(["string", "authored_mission"])
+    });
+    fields.push(json!([
+        ["string", "authored_mission"],
+        [
+            "some",
+            [
+                "map",
+                [
+                    [
+                        ["string", "definition"],
+                        [
+                            "map",
+                            [
+                                [["string", "version"], ["u", 1]],
+                                [["string", "triggers"], ["seq", []]],
+                                [["string", "objectives"], ["seq", []]]
+                            ]
+                        ]
+                    ],
+                    [["string", "first_tick"], ["none"]],
+                    [["string", "last_tick"], ["none"]],
+                    [["string", "triggers"], ["seq", []]],
+                    [["string", "objectives"], ["seq", []]],
+                    [["string", "next_execution"], ["u", 1]]
+                ]
+            ]
+        ]
+    ]));
+    let old_timed = hub
+        .saves
+        .write("ABC", "manual", &timed_v1, json!({}), 1_800_000_000_003)
+        .unwrap();
+    let epoch = hub.next_epoch;
+    assert_eq!(
+        hub.load_room("ABC", host.id, &old_timed, 2).unwrap_err(),
+        "legacy authored mission checkpoints are unsupported"
+    );
+    assert_eq!(hub.next_epoch, epoch);
+    assert!(hub.rooms["ABC"].native.is_none());
     saved["version"] = json!(1);
     let downgraded = hub
         .saves

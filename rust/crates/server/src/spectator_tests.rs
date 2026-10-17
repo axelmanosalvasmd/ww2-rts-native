@@ -264,6 +264,8 @@ fn intent_net57_seated_fog_starts_deltas_and_reconnect_leave_watchers_unmasked()
                 .unwrap()
                 .keys()
                 .map(String::as_str)
+                .collect::<std::collections::BTreeSet<_>>()
+                .into_iter()
                 .collect::<Vec<_>>(),
             ["e", "v"]
         );
@@ -582,6 +584,8 @@ fn intent_net26_spectator_start_precedes_lobby_and_pause_without_changing_seat_m
             .unwrap()
             .keys()
             .map(String::as_str)
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
             .collect::<Vec<_>>(),
         expected_keys
     );

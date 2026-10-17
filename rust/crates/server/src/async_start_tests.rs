@@ -85,7 +85,16 @@ fn finish_ordinary_match(hub: &mut Hub, receivers: &mut [mpsc::Receiver<Output>;
         if status.ending_complete {
             assert_eq!(status.held, 120);
             assert!(frames.into_iter().all(|count| count >= 60));
-            for messages in delivered {
+            for (slot, messages) in delivered.into_iter().enumerate() {
+                if hub.rooms["ABC"].players[slot].ai
+                    && hub.rooms["ABC"].players[slot].connection.is_none()
+                {
+                    assert!(
+                        messages.is_empty(),
+                        "an absent AI socket gets no external lobby result"
+                    );
+                    continue;
+                }
                 let lobby = messages
                     .iter()
                     .find(|message| message["t"] == "lobby")

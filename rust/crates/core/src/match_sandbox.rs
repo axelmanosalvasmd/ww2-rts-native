@@ -339,7 +339,7 @@ mod tests {
         assert!(m.horde.as_ref().unwrap().active);
         let mode = crate::recipient_snapshot::horde_mode_row(&m).unwrap();
         assert_eq!(mode["active"], true);
-        assert!(mode.get("boss").is_none());
+        assert_eq!(mode["boss"], json!([6000.0, 6000.0]));
         assert!(mode.get("profile").is_none());
         assert_eq!(m.horde_projection().unwrap().boss, Some([6000.0, 6000.0]));
         m.world.game.units.get_mut(&id).unwrap().hp = 0.0;

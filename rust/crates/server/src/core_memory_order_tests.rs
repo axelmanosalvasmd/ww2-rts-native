@@ -368,12 +368,18 @@ fn net55_classic_nonempty_team_ghosts_compose_with_mission_recipients_through_fi
 }
 
 #[test]
-fn net55_classic_mission_recipient_extension_keeps_spawn_and_damage_actuators_refused() {
+fn net55_classic_mission_actions_compose_with_recipient_delivery() {
     let (base, mut raw) = scene(Mode::Classic);
     for action in [
         json!({"kind":"destroy","box":[20,20,20,20]}),
         json!({"kind":"reinforce","group":"later","side":0,"at":[20,20],"roster":[{"type":"rifle","count":1}],"expires":10,"order":{"kind":"hold"}}),
     ] {
+        let destroy = action["kind"] == "destroy";
+        let mut row = vec![b'.'; 96];
+        if destroy {
+            row[20] = b'T';
+        }
+        raw["rows"][20] = json!(String::from_utf8(row).unwrap());
         raw["scenario"]["groups"] = if action["kind"] == "reinforce" {
             json!([{"id":"later","units":[]}])
         } else {
@@ -384,6 +390,20 @@ fn net55_classic_mission_recipient_extension_keeps_spawn_and_damage_actuators_re
         let mut ordinary = base.options.clone();
         ordinary.mode = Mode::Conquest;
         Match::new(&map, ordinary).expect("the mission itself is valid outside Classic");
-        assert!(Match::new_classic(&map, base.options.clone()).is_err());
+        let admitted = Match::new_classic(&map, base.options.clone()).unwrap();
+        let before = admitted.world.game.units.len();
+        if destroy {
+            assert_eq!(admitted.world.game.chars[20 * 96 + 20], b'T');
+        }
+        let mut runtime = RoomRuntime::new(admitted, 0).unwrap();
+        let frames = advance(&mut runtime, 12);
+        assert_eq!(frames.len(), 3);
+        if raw["scenario"]["triggers"][0]["actions"][0]["kind"] == "reinforce" {
+            assert_eq!(runtime.state().world.game.units.len(), before + 1);
+        }
+        if destroy {
+            assert_ne!(runtime.state().world.game.chars[20 * 96 + 20], b'T');
+        }
+        assert!(runtime.fault().is_none());
     }
 }

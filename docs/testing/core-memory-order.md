@@ -35,10 +35,11 @@ acknowledgment, hosted CI, parity status and merge belong to the orchestrator.
   Complement: #394's
   `net55_scenario_contexts_inherit_and_override_recipient_policy_without_reveal_leaks`
   covers player/team/match policies and nonempty covers, works and found mines.
-- NET-55 admission guard:
-  `room_runtime::core_memory_order_tests::net55_classic_mission_recipient_extension_keeps_spawn_and_damage_actuators_refused`.
-  Classic admits objective and announcement actions only; its authored groups,
-  reinforcement and terrain damage remain outside this composition.
+- NET-55 admitted mission composition:
+  `room_runtime::core_memory_order_tests::net55_classic_mission_actions_compose_with_recipient_delivery`.
+  The union carries #419's complete Classic mission action admission. The witness
+  now observes a real tree destruction and a new reinforcement through twelve
+  full ticks with every seat delivered, replacing the earlier narrow refusal.
 - BASE-54: [detached component mapping](corememory-base54.md).
 - AI-66: [RNG and recipient-only lifecycle mapping](corememory-ai66.md).
 - IF-25: [complete inventory and bounded consumer evidence](corememory-if25.md).

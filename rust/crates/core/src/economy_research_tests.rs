@@ -354,10 +354,15 @@ fn base49_base50_horde_research_uses_shared_defender_labs_and_private_progress()
             .level(Technology::Infantry),
         0
     );
-    assert!(
-        m.validate_tick_state().is_err(),
-        "Horde full tick admission stays guarded"
-    );
+    m.validate_tick_state().unwrap();
+    for _ in 0..4 {
+        m.advance_tick().unwrap();
+        let cache = crate::recipient_snapshot::SnapshotCache::new(&m).unwrap();
+        for slot in 0..m.start.players.len() {
+            cache.recipient(slot).unwrap();
+        }
+        assert!(m.tick_state.fault().is_none());
+    }
 }
 
 #[test]

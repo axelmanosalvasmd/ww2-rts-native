@@ -122,7 +122,7 @@ fn classic_complete_snapshots_keep_private_currency_and_public_prototype_nodes()
         assert_eq!(msg["fuel"], json!(41. + slot as f64 * 10.));
         assert_eq!(msg["fuelInc"], json!([2.3, 3.3, 4.3][slot]));
         assert_eq!(msg["upkeep"], json!([3.1, 4.1, 5.1][slot]));
-        assert_eq!(msg["nodes"], expected_nodes);
+        assert_eq!(msg["nodes"], json!([[320.1, 320.2, 2.345, 1]]));
         assert_eq!(
             msg["ghosts"],
             if slot == 2 {
@@ -158,7 +158,7 @@ fn classic_complete_snapshots_keep_private_currency_and_public_prototype_nodes()
         .unwrap();
     assert_eq!(
         frame.recipient(2).unwrap().into_json()["nodes"],
-        expected_nodes
+        json!([[320.1, 320.2, 2.345, 1]])
     );
     drop(frame);
     state.elimination.as_mut().unwrap().nodes.clear();
@@ -215,10 +215,22 @@ fn elimination_snapshot_admission_rejects_missing_state_and_other_modes() {
     // Horde is represented, but changing a Classic tag does not create its owner.
     state.options.mode = Mode::Horde;
     state.world.game.mode = Some(ModeKind::Horde);
-    assert!(matches!(
-        SnapshotCache::new(&state),
-        Err(SnapshotError::Rules)
-    ));
+    assert_eq!(
+        SnapshotCache::new(&state).err(),
+        Some(SnapshotError::Unsupported {
+            unit: 0,
+            capability: SnapshotCapability::Logistics,
+        })
+    );
+    // Without the incompatible retained Classic logistics, the missing Horde
+    // owner itself still refuses. Restore all logistics before later cases.
+    let convoys = state.convoys.take();
+    let reserves = std::mem::take(&mut state.logistics);
+    state.options.logistics = false;
+    assert_eq!(SnapshotCache::new(&state).err(), Some(SnapshotError::Rules));
+    state.options.logistics = true;
+    state.convoys = convoys;
+    state.logistics = reserves;
     state.options.mode = Mode::Classic;
     state.world.game.mode = Some(ModeKind::Classic);
     state.elimination.as_mut().unwrap().time_left = Some(f64::NAN);

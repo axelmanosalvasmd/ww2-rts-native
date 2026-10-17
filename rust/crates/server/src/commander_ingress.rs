@@ -600,109 +600,111 @@ mod tests {
     }
     #[test]
     fn garrison_and_construction_auto_retreat_enqueue_through_canonical_executor() {
-        let mut state = crate::lobby::native_tests::native_match();
-        let actor = state
-            .world
-            .game
-            .units
-            .values()
-            .find(|u| u.owner == 0 && state.rules.kinds[u.kind].name == "rifle")
-            .unwrap()
-            .id;
-        state.commands.units.get_mut(&actor).unwrap().auto_retreat = false;
-        let original = state.world.game.units[&actor].at();
-        let width = state.world.game.w;
-        let center = |cell: usize| ww2_core::game::Point {
-            x: (cell % width) as f64 * ww2_core::game::CELL + ww2_core::game::CELL / 2.,
-            z: (cell / width) as f64 * ww2_core::game::CELL + ww2_core::game::CELL / 2.,
-        };
-        let house = state
-            .world
-            .game
-            .chars
-            .iter()
-            .enumerate()
-            .filter(|(_, ch)| **ch == b'B')
-            .max_by_key(|(cell, _)| {
-                let at = center(*cell);
-                ((at.x - original.x).abs() + (at.z - original.z).abs()) as u64
-            })
-            .unwrap()
-            .0;
-        let at = center(house);
-        let unit = state.world.game.units.get_mut(&actor).unwrap();
-        unit.x = at.x;
-        unit.z = at.z;
-        state.grid.update(actor, unit);
-        let mut ingress = CommanderIngress::default();
         for building in [false, true] {
-            let unit = state.world.game.units.get_mut(&actor).unwrap();
-            unit.hp = 1.;
-            unit.garrison = (!building).then_some(house);
-            if building {
-                // Repair a constructor-created HQ through the canonical assignment API.
-                let site = state
-                    .world
-                    .game
-                    .units
-                    .values()
-                    .find(|u| u.owner == 0 && state.rules.kinds[u.kind].name == "hq")
-                    .unwrap()
-                    .id;
-                state.world.game.units.get_mut(&site).unwrap().hp = 1.;
-                assert_eq!(
-                    state
-                        .execute_assist(0, &[i64::from(actor)], i64::from(site), false)
-                        .unwrap(),
-                    None
-                );
-                assert!(state.world.game.units[&actor].build);
-                assert_eq!(state.commands.units[&actor].build_target, Some(site));
-            }
-            state.validate_tick_state().unwrap();
-            state.commands.units.get_mut(&actor).unwrap().auto_retreat = true;
-            assert!(state.automatic_retreat_candidate(actor).unwrap());
-            // Both construction and garrison retreat use the canonical queued executor.
-            state.validate_tick_state().unwrap();
+            let mut state = crate::lobby::native_tests::native_match();
+            let actor = state
+                .world
+                .game
+                .units
+                .values()
+                .find(|u| u.owner == 0 && state.rules.kinds[u.kind].name == "rifle")
+                .unwrap()
+                .id;
             state.commands.units.get_mut(&actor).unwrap().auto_retreat = false;
-            ingress
-                .enqueue(
-                    &mut state,
-                    0,
-                    &json!({"t":"stance","ids":[actor],"key":"autoRetreat","on":true}),
-                )
-                .unwrap();
-            assert_eq!(state.commands.pending_commands(), 1);
-            let results = state.apply_commands(1, false).unwrap();
-            assert!(ingress.complete(&results).is_empty());
-            assert!(state.commands.units[&actor].auto_retreat);
-            assert_eq!(state.commands.pending_commands(), 0);
-        }
-        state.commands.units.get_mut(&actor).unwrap().auto_retreat = true;
-        assert!(state.automatic_retreat_unit(actor).unwrap());
-        assert!(state.world.game.units[&actor].retreating);
-        assert!(!state.world.game.units[&actor].build);
-        assert_eq!(state.commands.units[&actor].build_target, None);
-        let before = format!(
-            "{:?}",
-            (&state.world.game.units, &state.commands.units, &ingress)
-        );
-        assert_eq!(
-            ingress.enqueue(
-                &mut state,
-                0,
-                &json!({"t":"move","orders":[[actor,2,"bad"]]})
-            ),
-            Err(Denial::Blocked)
-        );
-        assert_eq!(
-            format!(
+            let original = state.world.game.units[&actor].at();
+            let width = state.world.game.w;
+            let center = |cell: usize| ww2_core::game::Point {
+                x: (cell % width) as f64 * ww2_core::game::CELL + ww2_core::game::CELL / 2.,
+                z: (cell / width) as f64 * ww2_core::game::CELL + ww2_core::game::CELL / 2.,
+            };
+            let house = state
+                .world
+                .game
+                .chars
+                .iter()
+                .enumerate()
+                .filter(|(_, ch)| **ch == b'B')
+                .max_by_key(|(cell, _)| {
+                    let at = center(*cell);
+                    ((at.x - original.x).abs() + (at.z - original.z).abs()) as u64
+                })
+                .unwrap()
+                .0;
+            let at = center(house);
+            let unit = state.world.game.units.get_mut(&actor).unwrap();
+            unit.x = at.x;
+            unit.z = at.z;
+            state.grid.update(actor, unit);
+            let mut ingress = CommanderIngress::default();
+            {
+                let unit = state.world.game.units.get_mut(&actor).unwrap();
+                unit.hp = 1.;
+                unit.garrison = (!building).then_some(house);
+                if building {
+                    // Repair a constructor-created HQ through the canonical assignment API.
+                    let site = state
+                        .world
+                        .game
+                        .units
+                        .values()
+                        .find(|u| u.owner == 0 && state.rules.kinds[u.kind].name == "hq")
+                        .unwrap()
+                        .id;
+                    state.world.game.units.get_mut(&site).unwrap().hp = 1.;
+                    assert_eq!(
+                        state
+                            .execute_assist(0, &[i64::from(actor)], i64::from(site), false)
+                            .unwrap(),
+                        None
+                    );
+                    assert!(state.world.game.units[&actor].build);
+                    assert_eq!(state.commands.units[&actor].build_target, Some(site));
+                }
+                state.validate_tick_state().unwrap();
+                state.commands.units.get_mut(&actor).unwrap().auto_retreat = true;
+                assert!(state.automatic_retreat_candidate(actor).unwrap());
+                // Both construction and garrison retreat use the canonical queued executor.
+                state.validate_tick_state().unwrap();
+                state.commands.units.get_mut(&actor).unwrap().auto_retreat = false;
+                ingress
+                    .enqueue(
+                        &mut state,
+                        0,
+                        &json!({"t":"stance","ids":[actor],"key":"autoRetreat","on":true}),
+                    )
+                    .unwrap();
+                assert_eq!(state.commands.pending_commands(), 1);
+                let results = state.apply_commands(1, false).unwrap();
+                assert!(ingress.complete(&results).is_empty());
+                assert!(state.commands.units[&actor].auto_retreat);
+                assert_eq!(state.commands.pending_commands(), 0);
+            }
+            state.commands.units.get_mut(&actor).unwrap().auto_retreat = true;
+            assert!(state.automatic_retreat_unit(actor).unwrap());
+            assert!(state.world.game.units[&actor].retreating);
+            assert!(!state.world.game.units[&actor].build);
+            assert_eq!(state.commands.units[&actor].build_target, None);
+            let before = format!(
                 "{:?}",
                 (&state.world.game.units, &state.commands.units, &ingress)
-            ),
-            before
-        );
-        assert_eq!(state.commands.pending_commands(), 0);
+            );
+            assert_eq!(
+                ingress.enqueue(
+                    &mut state,
+                    0,
+                    &json!({"t":"move","orders":[[actor,2,"bad"]]})
+                ),
+                Err(Denial::Blocked)
+            );
+            assert_eq!(
+                format!(
+                    "{:?}",
+                    (&state.world.game.units, &state.commands.units, &ingress)
+                ),
+                before
+            );
+            assert_eq!(state.commands.pending_commands(), 0);
+        }
     }
 }
 

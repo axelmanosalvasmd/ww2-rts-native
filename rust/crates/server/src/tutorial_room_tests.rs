@@ -331,6 +331,8 @@ fn net18_tutorial_hello_autostarts_once_and_delivers_every_seat() {
             .unwrap()
             .keys()
             .map(String::as_str)
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
             .collect::<Vec<_>>(),
         [
             "cells", "factions", "fog", "map", "matchId", "names", "sandbox", "spawn", "spawns",
@@ -462,6 +464,8 @@ fn net36_public_start_checks_host_capacity_and_assault_readiness() {
                                 .unwrap()
                                 .keys()
                                 .map(String::as_str)
+                                .collect::<std::collections::BTreeSet<_>>()
+                                .into_iter()
                                 .collect::<Vec<_>>(),
                             [
                                 "attackerTeam",

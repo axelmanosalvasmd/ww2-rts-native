@@ -751,9 +751,9 @@ mod tests {
             Mode::Tutorial
         );
         let view = delivery.decode(&snap).unwrap();
-        for kind in ["world"] {
+        {
             let mut view = view.clone();
-            view.mode = json!({"kind":kind});
+            view.mode = json!({"kind":"world"});
             assert!(
                 CommanderMemory::new(0, 40, 40)
                     .unwrap()

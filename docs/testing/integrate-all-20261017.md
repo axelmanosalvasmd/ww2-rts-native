@@ -5,6 +5,122 @@ All merges retain exact parent commits with no-ff ancestry. No squash, rebase or
 force-push. World admission remains closed and the reference pin is unchanged.
 Final combined validation and three-platform main CI are pending.
 
+## Current union status
+
+The sections below are a chronological merge record, not independent claims
+about the final runtime. In particular, #423 supersedes the earlier split-owner
+composition: one selected-delivery production owner now handles ordinary AI,
+Horde defender AI and the internal Horde enemy. The logistics owner is cfg(test)
+only. Tutorial retains its scripted enemy and human-only startup.
+
+The first full optimized diagnostic at `50c4c1847c3efe714242536ffc9ccde67f57063e`
+(Rust tree `87fbaee256a6192564e8b87dbec466c3de61f3f1`) compiled and ran all
+2,448 enabled workspace tests: 2,396 passed, 52 failed, 16 skipped, in 1,139.344
+seconds. Two failures were SIGKILL. This is not a qualification receipt.
+Repairs and fresh full-tree validation remain pending. The changed expectations
+and fixture repairs are enumerated with exact source heads in
+[integrate-all-expectation-map-20261017.json](integrate-all-expectation-map-20261017.json).
+
+The diagnostic passed the expanded 119/118-callback ending/ticket test, the
+ordinary AI save/restore queue witness, and the existing production
+`paused_scheduled_event_clear_resets_ai_alert_cursor_before_resume` witness.
+The combined-role owner witness failed on operative reserve publication and
+cannot yet be cited as passing. Production aircraft witnesses remain registered;
+old blanket aviation refusals are intentionally replaced by #422's delivery
+and malformed-flight guards, not restored as a capability restriction.
+
+### First repair verification
+
+The first repair prebuild passed in 18m57s. Its 53 selected checks completed in
+189.709s: 45 passed and eight failed. The selection deliberately skipped 2,411
+nonselected/ignored entries; this is not a full-workspace qualification.
+The combined-role sole-owner/actual-queue witness and timed-v1 room-envelope
+refusal now pass. The support replay previously killed in the full diagnostic
+passed in 6.107s with an exclusive local resource slot weight.
+
+The operative timing replay was still killed. An isolated unchanged-binary
+measurement reproduced signal 9 after 32.434s at 6,943,104 KiB peak RSS. Kernel
+OOM records were not available, so the signal is not labeled as a proven OOM.
+Its repair stores the same complete tagged checkpoints as lossless gzip JSON
+and compares their complete bytes, rather than retaining many JSON object trees.
+Other remaining failures concerned raw-versus-wire numeric flags, an async
+missing-map boundary, current-start memory refresh, and a component fixture's
+null build sentinel. Fresh validation of those repairs is pending.
+
+The second repair selection completed 53 tests in 286.167s: 52 passed and one
+failed. Both previously killed tests passed, including the complete compressed
+operative replay (120.947s). All canonical scenario, operative, wire-node,
+Horde save, component-construction and combined-role queue repairs passed.
+The remaining NET-92 expectation incorrectly included the old private policy
+random stream, although the recorded contract creates a fresh commander after
+restoring serialized strategy. Its corrected witness compares the entire policy
+against an independent fresh-commander restore, including its RNG. The existing
+core `ai63_planner_checkpoint_retains_full_memory_without_random_streams`
+witness directly checks that the codec leaves the new random owner unchanged.
+The final NET-92 focused run passed (1 test, 1.271 seconds; run ID
+`e863d767-f7d9-4d25-b51c-d51677aff02e`). Formatting and strict workspace
+Clippy passed after the repairs. These separate diagnostics do not replace
+full-tree qualification, which remains pending.
+
+### Replay and JSON-order audit
+
+The IF-28 checkpoint helper is used by both identical replays and the reversed
+order counterexample at the same original input boundaries. It serializes the
+complete `Match::save_json()` value with the same `serde_json::to_writer` and
+lossless gzip encoder. Full buffer equality is stricter than JSON Value equality;
+no key-order-only failure has been re-pinned. The compressed replay passed.
+The uncompressed signal-9 measurement does not establish a runtime memory
+regression or its absence. The named test does not exist at freeze `61947c5b`
+(`git grep` over that complete tree found no symbol); it was introduced by the
+operative chain. Therefore an identical main-baseline RSS comparison is unavailable
+without backporting a different test and its missing runtime capabilities. No
+baseline RSS number is claimed, and total simulation footprint is not claimed
+unchanged. The measured failure and the checkpoint-storage mitigation remain
+separate facts.
+
+`preserve_order` changes JSON object iteration globally. Byte identity to main
+is not claimed. Its direct serialization effect is object-key ordering, not
+array order or numeric values; other integrated gameplay/schema additions have
+their own documented changes. The public map-name arrays are explicitly sorted.
+A source audit found no production save/view/WebSocket JSON checksum or digest.
+`map_editor.rs` SHA-256 hashes password bytes, not JSON; the lobby seed hasher
+hashes unit entropy, not messages. The World metadata test digest explicitly
+sorts object keys by UTF-16 before hashing (`world_recipient_metadata/tests.rs`,
+`digest`). World terrain SHA-256 tests hash joined terrain character rows.
+Startup-table golden bytes use the immutable compiled catalog buffer, not
+`serde_json::Map` serialization. Recorded fixture hash checks refer to immutable
+original captures. These checks remain enabled and their golden values are
+unchanged. Same-run replay byte equality remains deliberately order-sensitive.
+The full validation must still confirm all these witnesses together; this audit
+is not a claim that every final-union message equals frozen-main content.
+
+The construction component's null-to-zero unassigned build normalization matches
+the original full comparator at `50c4c184`,
+`rust/crates/simtest/tests/construction_tick.rs:415-416`. No new sentinel is
+introduced. The synthetic Horde fixture separately asserts the Classic-only
+logistics admission refusal before removing logistics state/options solely to
+exercise the missing-Horde-owner guard; neither guard is narrowed.
+
+The operative disconnect/respawn lifecycle witness additionally runs with
+physical logistics disabled and enabled, requiring reserve publication on first
+spawn and respawn and reserve removal with the retired body. All preexisting
+lifecycle assertions are retained. Its expanded focused verification passed; full unchanged-tree qualification is pending.
+
+### Explicit #442 save compatibility exclusion
+
+The union deliberately does not carry #442's timed-v1 compatibility. Current-main
+version-1 files carrying `authored_mission` become explicitly unsupported, never
+silently stripped or defaulted. Non-authored version-1 files remain supported;
+complete authored scenarios use version 2 and a required nullable clock. The
+core legacy-owner refusal and the room-envelope v1 refusal are both required
+witnesses. `save-format.md` describes the old owner as decode-only and refused.
+
+Retained #442 scope: ordered localization and map binding, authoring fairness,
+Horde defender scenario behavior, and C-entry coverage. This exclusion follows
+the recorded handoff and [Hermes' clarification](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6232712225).
+There is no new pre-landing acknowledgment gate; Hermes reviews after landing,
+following full local qualification and the authorized one-pass integration.
+
 ## Chain 1: AI
 
 Merged exact `bc30b71012ba3c4ce25f4237128d337e03849e24` automatically. The handoff

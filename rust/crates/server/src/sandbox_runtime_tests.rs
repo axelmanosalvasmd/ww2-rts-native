@@ -125,6 +125,8 @@ fn sandbox_start_flag_host_authority_restart_and_every_seat_snapshots() {
                 .unwrap()
                 .keys()
                 .map(String::as_str)
+                .collect::<std::collections::BTreeSet<_>>()
+                .into_iter()
                 .collect::<Vec<_>>(),
             [
                 "cells", "factions", "fog", "map", "matchId", "names", "sandbox", "spawn",

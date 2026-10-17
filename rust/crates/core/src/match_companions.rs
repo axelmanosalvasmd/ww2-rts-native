@@ -609,7 +609,8 @@ impl Match {
         draft.control.auto_cast = false;
         draft.control.auto_retreat = false;
         draft.control.hold_fire = true;
-        if self.firing.get(id).is_some()
+        if self.logistics.get(id).is_some()
+            || self.firing.get(id).is_some()
             || self.combat.get(id).is_some()
             || self.abilities.get(id).is_some()
             || self.recovery.get(id).is_some()
@@ -645,6 +646,11 @@ impl Match {
             .map_err(|_| "companion scatter capacity exhausted")?;
         let unit = self.next_unit_id;
         let draft = self.stage_companion_soldier(&op, unit, index, None)?;
+        let reserves = crate::match_logistics::initial_unit_reserves(
+            self.options.logistics,
+            &draft.unit,
+            &self.rules,
+        )?;
         let publication = prepare_publication(
             PublicationParts {
                 units: &mut self.world.game.units,
@@ -664,6 +670,9 @@ impl Match {
             self.abilities.initialize(u.id);
             self.recovery.initialize(u.id);
         });
+        if let Some(reserves) = reserves {
+            self.logistics.insert(unit, reserves);
+        }
         op.unit_id = unit;
         self.companions
             .soldiers
@@ -735,6 +744,17 @@ impl Match {
         if drafts.is_empty() {
             return Ok(Vec::new());
         }
+        let reserves = drafts
+            .iter()
+            .map(|draft| {
+                crate::match_logistics::initial_unit_reserves(
+                    self.options.logistics,
+                    &draft.unit,
+                    &self.rules,
+                )
+                .map(|stock| (draft.unit.id, stock))
+            })
+            .collect::<Result<Vec<_>, String>>()?;
         let mut publication = prepare_publication(
             PublicationParts {
                 units: &mut self.world.game.units,
@@ -762,6 +782,11 @@ impl Match {
             self.abilities.initialize(u.id);
             self.recovery.initialize(u.id);
         });
+        for (id, stock) in reserves {
+            if let Some(stock) = stock {
+                self.logistics.insert(id, stock);
+            }
+        }
         for (companion, unit, weapon) in bodies {
             self.companions
                 .soldiers

@@ -240,14 +240,14 @@ fn base59_classic_snapshots_publish_exact_nodes_and_private_research_rallies_thr
             .unwrap()
             .nodes
             .iter()
-            .map(|node| [
-                r(node.at.x),
-                r(node.at.z),
-                node.rate,
-                if node.fuel { 1. } else { 0. }
-            ])
+            .map(|node| json!([r(node.at.x), r(node.at.z), node.rate, u8::from(node.fuel)]))
             .collect::<Vec<_>>()
     );
+    let mut expected_raw_nodes = expected_nodes.clone();
+    for row in expected_raw_nodes.as_array_mut().unwrap() {
+        row[3] = json!(row[3].as_u64().unwrap() as f64);
+    }
+    crate::match_firing::normalize_json_zero(&mut expected_raw_nodes);
     assert!(!expected_nodes.as_array().unwrap().is_empty());
     let mut delivery = DeliveryState::new(&m).unwrap();
     for step in 0..6 {
@@ -290,7 +290,7 @@ fn base59_classic_snapshots_publish_exact_nodes_and_private_research_rallies_thr
         }
         assert_eq!(
             m.ordinary_snapshot_raw_lists().unwrap().nodes,
-            Some(expected_nodes.clone())
+            Some(expected_raw_nodes.clone())
         );
         assert!(m.tick_state.fault().is_none());
     }
