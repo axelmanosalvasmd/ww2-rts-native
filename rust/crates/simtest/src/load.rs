@@ -186,6 +186,7 @@ fn profile(v: &Value) -> Result<VehicleProfile> {
         braking: num(v, "braking")?,
         reverse_speed: num(v, "reverseSpeed")?,
         hull_turn: num(v, "hullTurn")?,
+        tracked: flag(v, "tracked"),
     })
 }
 

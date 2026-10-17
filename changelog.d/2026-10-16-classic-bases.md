@@ -1,0 +1,2 @@
+- Classic resource nodes now preserve enemy-pair discovery order and avoid footprints occupied by living ground troops, matching the prototype's placement rules.
+- Add native intent checks for Classic resource-node placement, construction crews and unfinished-building restrictions, and the Sudden Death transition through normal ticks. Full logistics repair, complete starting-base and fortification coverage, and Classic production snapshots remain open.

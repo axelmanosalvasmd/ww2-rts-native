@@ -65,6 +65,16 @@ impl Match {
         }
     }
 
+    fn validate_construction_mode(&self) -> Result<(), String> {
+        if self.options.mode == crate::economy::Mode::Horde {
+            self.validate_horde_economy()
+        } else if crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode) {
+            self.validate_actor_mode()
+        } else {
+            Err("construction phases require ordinary ground or canonical Horde".into())
+        }
+    }
+
     /// Tear down an owned unfinished site for the original 75 percent MP refund.
     /// This administrative removal creates no death, bounty, rubble or built counter.
     pub fn cancel_construction(
@@ -101,6 +111,9 @@ impl Match {
         }
         let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
         let refund = number(catalog.unit(&kind.name).map_err(|e| e.to_string())?, "cost")? * 0.75;
+        if refund < 0.0 {
+            return Err("invalid cancellation cost".into());
+        }
         let wallet = self.start.economy.players[owner].mp + refund;
         if !wallet.is_finite() {
             return Err("construction refund overflow".into());
@@ -114,6 +127,16 @@ impl Match {
         let structure_id = structure.id.clone();
         let cells = structure.cells.clone();
         let sections: BTreeSet<_> = structure.section_ids.iter().cloned().collect();
+        self.world
+            .preflight_cell_rows(&cells)
+            .map_err(|e| e.to_string())?;
+        if cells.is_empty()
+            || sections
+                .iter()
+                .any(|id| self.world.section_by_id(id).is_none())
+        {
+            return Err("inconsistent cancellation structure".into());
+        }
         let mut physical = self.world.begin_transaction().map_err(|e| e.to_string())?;
         physical.world.game.units.remove(&id);
         for &cell in &cells {
@@ -133,10 +156,17 @@ impl Match {
             .detached_sections
             .retain(|key, _| !sections.contains(key));
         for &cell in &cells {
-            physical
+            let change = physical
                 .world
                 .set_cell(cell, b'.')
                 .map_err(|e| e.to_string())?;
+            if change.logged_index.is_none() {
+                // A failed corner may already be open. Publish its removed section metadata.
+                physical
+                    .world
+                    .log_cell(cell, false)
+                    .map_err(|e| e.to_string())?;
+            }
         }
         let physical = physical
             .prepare_publication(&mut self.world)
@@ -164,6 +194,7 @@ impl Match {
         self.production.remove_building(id);
         self.building_rallies.remove(&id);
         self.recruit_metadata.remove(&id);
+        self.aviation.remove(id);
         self.start.economy.players[owner].mp = wallet;
         story.commit();
         self.release_depot_claim(id);
@@ -277,11 +308,27 @@ impl Match {
 
     /// Read-only admission. The sole runner calls this before inputs and again before its clock.
     pub fn validate_construction_tick(&self) -> Result<(), String> {
-        if self.validate_actor_mode().is_err()
-            || !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode)
-            || self.world.game.tick < 0
+        // Horde exposes assigned facility work, not the ordinary construction phase.
+        if self.options.mode == crate::economy::Mode::Horde
+            && !self.commands.units.iter().any(|(worker, control)| {
+                control.build_target.is_some()
+                    && self
+                        .world
+                        .game
+                        .units
+                        .get(worker)
+                        .is_some_and(|unit| unit.build)
+            })
         {
             return Err("construction phases require ordinary Conquest".into());
+        }
+        self.validate_construction_inputs()
+    }
+
+    fn validate_construction_inputs(&self) -> Result<(), String> {
+        self.validate_construction_mode()?;
+        if self.world.game.tick < 0 {
+            return Err("construction phases require a nonnegative tick".into());
         }
         self.validate_building_activity_rows()?;
         for (&id, unit) in &self.world.game.units {
@@ -335,11 +382,7 @@ impl Match {
         id: UnitId,
         frame: &mut ConstructionFrame,
     ) -> Result<(), String> {
-        if self.validate_actor_mode().is_err()
-            || !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode)
-        {
-            return Err("construction worker requires ordinary Conquest".into());
-        }
+        self.validate_construction_mode()?;
         if frame.tick != self.world.game.tick || frame.workers.contains(&id) {
             return Err("stale or repeated construction worker turn".into());
         }
@@ -424,7 +467,8 @@ impl Match {
         if frame.tick != self.world.game.tick {
             return Err("stale construction crew frame".into());
         }
-        self.validate_ordinary_finish_state()?;
+        self.validate_construction_mode()?;
+        self.validate_match_finish_state()?;
         let dt = self.rules.movement.tick;
         if !dt.is_finite() || dt <= 0.0 {
             return Err("invalid construction interval".into());
@@ -570,8 +614,9 @@ impl Match {
         ids: &[i64],
         command: &crate::match_commands::Command,
     ) -> Result<Vec<UnitId>, String> {
-        self.validate_construction_tick()?;
-        self.validate_ordinary_finish_state()?;
+        // Build and Assist must admit a canonical Horde facility before it has a crew.
+        self.validate_construction_inputs()?;
+        self.validate_match_finish_state()?;
         if owner >= self.world.game.players.len()
             || !self.start.economy.players[owner].mp.is_finite()
         {
@@ -981,7 +1026,13 @@ impl Match {
         }
         if let Some(needs) = definition.get("needs").and_then(Value::string)
             && !self.world.game.units.values().any(|u| {
-                u.owner == owner
+                (u.owner == owner
+                    || (self.options.mode == crate::economy::Mode::Horde
+                        && self
+                            .horde
+                            .as_ref()
+                            .is_some_and(|horde| owner != horde.slot && u.owner != horde.slot)
+                        && self.world.game.allied(u.owner, owner)))
                     && self.rules.kinds[u.kind].name == needs
                     && u.hp > 0.0
                     && u.built.is_some_and(|b| b >= 1.0)
