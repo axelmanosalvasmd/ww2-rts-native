@@ -283,10 +283,7 @@ fn cmb127_horde_reveals_only_active_final_ground_enemies_and_bosses_to_defenders
     );
     assert_eq!(m.world.game.tick, tick);
     assert!(m.tick_state.fault().is_none());
-    assert!(matches!(
-        SnapshotCache::new(&m),
-        Err(SnapshotError::Rules)
-    ));
+    assert!(matches!(SnapshotCache::new(&m), Err(SnapshotError::Rules)));
 }
 
 #[test]
