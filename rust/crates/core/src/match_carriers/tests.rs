@@ -203,6 +203,7 @@ fn intent_mov74_rider_follows_carrier_pose_and_skips_ordinary_turn() {
         carrier.x = 26.;
         carrier.z = 24.;
         carrier.rot = 1.25;
+        m.grid.update(2, carrier);
     }
     m.firing.get_mut(1).unwrap().target_id = 2;
     m.abilities.get_mut(1).unwrap().cooldown = 3.;
@@ -219,6 +220,7 @@ fn intent_mov74_rider_follows_carrier_pose_and_skips_ordinary_turn() {
     assert_eq!(rider.repath, previous_repath);
     assert_eq!(m.firing.get(1).unwrap().target_id, 0);
     assert_eq!(m.abilities.get(1).unwrap().cooldown, 2.95);
+    crate::unit_placement::tests::assert_current(&m.world.game, &m.grid);
 }
 
 #[test]
@@ -424,6 +426,7 @@ fn intent_mov73_boat_needs_explicit_target_and_boards_from_clear_bank() {
     );
     assert!(m.world.game.units[&1].riding);
     assert_eq!(m.combat.get(2).unwrap().cargo, [1]);
+    crate::unit_placement::tests::assert_current(&m.world.game, &m.grid);
 }
 
 #[test]

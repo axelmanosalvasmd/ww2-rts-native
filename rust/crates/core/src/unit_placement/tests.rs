@@ -14,7 +14,7 @@ use crate::{
     weather::WeatherChoice,
 };
 use serde_json::{Value, json};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 fn sorted_ids(mut ids: Vec<UnitId>) -> Vec<UnitId> {
     ids.sort_unstable();
@@ -26,39 +26,52 @@ pub(crate) fn assert_current(game: &Game, grid: &SpatialGrid) {
     let fresh = SpatialGrid::new(units, 16.0);
     // A fresh BTreeMap index has ID order; the live index retains first-seen order.
     // Compare membership here. The Source placement fixture checks exact query order.
-    for owner in 0..game.players.len() {
+    let mut owners: BTreeSet<_> = (0..game.players.len()).map(|owner| owner as i32).collect();
+    owners.extend(units.values().map(|unit| unit.owner as i32));
+    for owner in owners {
         assert_eq!(
-            sorted_ids(grid.owned_by(units, owner as i32)),
-            sorted_ids(fresh.owned_by(units, owner as i32))
+            sorted_ids(grid.owned_by(units, owner)),
+            sorted_ids(fresh.owned_by(units, owner))
         );
     }
+    let mut buckets = BTreeSet::new();
     for z in -1..=(game.h as i64 * 2 / 16 + 1) {
         for x in -1..=(game.w as i64 * 2 / 16 + 1) {
-            let at = (x as f64 * 16.0 + 8.0, z as f64 * 16.0 + 8.0);
-            assert_eq!(
-                sorted_ids(grid.in_order(units, at, 0.0, |_, _| true)),
-                sorted_ids(fresh.in_order(units, at, 0.0, |_, _| true)),
-                "ordered query membership {at:?}"
-            );
-            let mut actual = grid.unordered(units, at, 0.0, |_, _| true);
-            let mut expected = fresh.unordered(units, at, 0.0, |_, _| true);
-            actual.sort_unstable();
-            expected.sort_unstable();
-            assert_eq!(actual, expected, "bucket membership {at:?}");
-            let mut actual = grid.heavy(units, at, 0.0, |_, _| true);
-            let mut expected = fresh.heavy(units, at, 0.0, |_, _| true);
-            actual.sort_unstable();
-            expected.sort_unstable();
-            assert_eq!(actual, expected, "heavy membership {at:?}");
-            assert_eq!(
-                grid.has(units, at, 0.0, |_, _| true),
-                fresh.has(units, at, 0.0, |_, _| true)
-            );
-            assert_eq!(
-                grid.has_heavy(units, at, 0.0, |_, _| true),
-                fresh.has_heavy(units, at, 0.0, |_, _| true)
-            );
+            buckets.insert((x, z));
         }
+    }
+    // Aircraft bases can lie farther outside the map than its border buckets.
+    buckets.extend(units.values().map(|unit| {
+        (
+            (unit.x / 16.0).floor() as i64,
+            (unit.z / 16.0).floor() as i64,
+        )
+    }));
+    for (x, z) in buckets {
+        let at = (x as f64 * 16.0 + 8.0, z as f64 * 16.0 + 8.0);
+        assert_eq!(
+            sorted_ids(grid.in_order(units, at, 0.0, |_, _| true)),
+            sorted_ids(fresh.in_order(units, at, 0.0, |_, _| true)),
+            "ordered query membership {at:?}"
+        );
+        let mut actual = grid.unordered(units, at, 0.0, |_, _| true);
+        let mut expected = fresh.unordered(units, at, 0.0, |_, _| true);
+        actual.sort_unstable();
+        expected.sort_unstable();
+        assert_eq!(actual, expected, "bucket membership {at:?}");
+        let mut actual = grid.heavy(units, at, 0.0, |_, _| true);
+        let mut expected = fresh.heavy(units, at, 0.0, |_, _| true);
+        actual.sort_unstable();
+        expected.sort_unstable();
+        assert_eq!(actual, expected, "heavy membership {at:?}");
+        assert_eq!(
+            grid.has(units, at, 0.0, |_, _| true),
+            fresh.has(units, at, 0.0, |_, _| true)
+        );
+        assert_eq!(
+            grid.has_heavy(units, at, 0.0, |_, _| true),
+            fresh.has_heavy(units, at, 0.0, |_, _| true)
+        );
     }
     for unit in units.values() {
         let at = (unit.x, unit.z);

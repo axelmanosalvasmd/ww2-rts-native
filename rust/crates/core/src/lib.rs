@@ -254,10 +254,15 @@ mod save_state;
 
 pub mod commander_field_policy;
 pub mod commander_world_policy;
+mod match_terrain_orders;
 #[cfg(test)]
 mod movement_tick_ground_tests;
+#[cfg(test)]
+mod movement_tick_phase_tests;
 #[cfg(test)]
 mod movement_tick_privacy_tests;
 #[cfg(test)]
 mod movement_tick_speed_tests;
 mod numeric_keys;
+#[cfg(test)]
+mod terrain_fire_tests;

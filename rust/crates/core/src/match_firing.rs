@@ -1569,6 +1569,17 @@ impl Match {
     }
 
     pub fn apply_unit_firing(&mut self, id: UnitId, moving: bool, dt: f64) -> Result<(), String> {
+        let suppression = self.world.game.units.get(&id).map_or(0.0, |u| u.supp);
+        self.apply_unit_firing_with_suppression(id, moving, dt, suppression)
+    }
+
+    pub(crate) fn apply_unit_firing_with_suppression(
+        &mut self,
+        id: UnitId,
+        moving: bool,
+        dt: f64,
+        terrain_suppression: f64,
+    ) -> Result<(), String> {
         self.supported_firing_mode()?;
         if !dt.is_finite() || dt < 0.0 {
             return Err("invalid firing step".into());
@@ -1594,8 +1605,8 @@ impl Match {
             .units
             .get(&id)
             .ok_or("missing canonical unit control")?;
-        if kind.air || kind.rail || control.operative || control.nade.is_some() {
-            return Err("air, rail, operative and aimed ability firing are unsupported".into());
+        if kind.air || kind.rail || control.operative {
+            return Err("air, rail and operative firing are unsupported".into());
         }
         if u.riding {
             return Ok(());
@@ -1657,7 +1668,7 @@ impl Match {
             return Ok(());
         }
         if self.commands.units[&id].fire_at.is_some() {
-            return self.fire_at_weapon(id);
+            return self.fire_at_weapon(id, terrain_suppression);
         }
         let current = self.firing.get(id).copied().unwrap_or_default();
         if hold_fire && attack == 0 {
