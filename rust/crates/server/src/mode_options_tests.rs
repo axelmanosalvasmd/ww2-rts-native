@@ -352,7 +352,8 @@ fn mode11_horde_switches_and_shared_base_are_constructed_without_admitting_full_
             if slot == 2 { 3 } else { 2 }
         );
     }
-    assert!(state.advance_tick().is_err());
+    state.advance_tick().unwrap();
+    assert!(state.tick_state.fault().is_none());
     assert!(RoomRuntime::new(state, 0).is_err());
     room.mode = "world".into();
     let options = room
