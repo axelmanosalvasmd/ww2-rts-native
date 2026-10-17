@@ -274,6 +274,53 @@ impl Match {
             state.support_provision(ctx, unit, owner, amount, reserves, world)
         })
     }
+    /// Prototype convoy commands run before ordinary troop selection and keep duplicates.
+    pub(crate) fn execute_convoy_input(
+        &mut self,
+        owner: usize,
+        ids: &[i64],
+        target: Option<i64>,
+    ) -> Result<Option<crate::match_commands::Denial>, String> {
+        use crate::match_commands::Denial;
+        let Some(convoys) = self.convoys.as_ref() else {
+            return Ok(Some(Denial::Blocked));
+        };
+        let trucks = ids
+            .iter()
+            .filter_map(|raw| u32::try_from(*raw).ok())
+            .filter(|id| {
+                self.world.game.units.get(id).is_some_and(|u| {
+                    u.owner == owner
+                        && u.hp > 0.
+                        && self.rules.kinds[u.kind].name == "truck"
+                        && convoys.trucks.contains_key(id)
+                })
+            })
+            .collect::<Vec<_>>();
+        if trucks.is_empty() {
+            return Ok(Some(Denial::Needs));
+        }
+        let success = if let Some(raw) = target {
+            let Some(unit) = u32::try_from(raw)
+                .ok()
+                .and_then(|id| self.world.game.units.get(&id))
+            else {
+                return Ok(Some(Denial::Needs));
+            };
+            let cache = self.rules.kinds[unit.kind].name == "supplycache";
+            if unit.hp <= 0.
+                || !self.world.game.allied(unit.owner, owner)
+                || (self.logistics.get(unit.id).is_none() && !cache)
+                || cache && !unit.built.is_some_and(|built| built >= 1.)
+            {
+                return Ok(Some(Denial::Needs));
+            }
+            self.supply_convoys(owner, &trucks, unit.id)?
+        } else {
+            self.resume_convoys(owner, &trucks)?
+        };
+        Ok((!success).then_some(Denial::Blocked))
+    }
     /// Manual supply uses canonical stores, reserves and the owner's remembered routes.
     pub fn supply_convoys(
         &mut self,
@@ -1124,3 +1171,6 @@ fn physical_handoff(
         )
         .expect("validated physical handoff")
 }
+
+#[cfg(test)]
+mod room_command_tests;

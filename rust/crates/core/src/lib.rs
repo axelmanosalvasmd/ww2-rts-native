@@ -84,6 +84,7 @@ mod human_commander_test_facts;
 pub mod legacy_scenario;
 pub mod legacy_scenario_runtime;
 pub mod match_companion_effects;
+mod match_companion_status;
 mod match_companion_tick;
 pub mod match_companions;
 mod scenario_actuators;

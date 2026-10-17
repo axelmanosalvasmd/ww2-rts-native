@@ -1,0 +1,1 @@
+- Exercise ground, bomber and destroyer FireAt through ordinary rooms with logistics enabled, and record the final merge integrity audit.

@@ -425,6 +425,10 @@ fn fire_at_live_flight_is_visible_without_disclosing_its_hidden_shooter() {
         .unwrap()
         .recipient(1)
         .unwrap();
+    assert_eq!(
+        snapshot,
+        crate::recipient_snapshot::recipient_uncached(&m, 1).unwrap()
+    );
     let rows = snapshot.fields["flights"].as_array().unwrap();
     assert_eq!(rows.len(), 1);
     let row = &rows[0];
@@ -449,53 +453,49 @@ fn fire_at_live_flight_is_visible_without_disclosing_its_hidden_shooter() {
 }
 
 #[test]
-fn fire_at_preserves_aircraft_area_dispatch_and_mixed_selection_refusal() {
+fn fire_at_preserves_aircraft_area_and_direct_shell_mixed_dispatch() {
     let (mut m, tank) = scene("tank");
     let bomber = m.spawn_aircraft(0, "bomber").unwrap();
-    let before = serde_json::to_value((&m.commands, &m.aviation, &m.world.game)).unwrap();
     assert_eq!(
         dispatch(
             &mut m,
             json!({"t":"fireat","ids":[tank,bomber],"x":43.,"z":41.})
         ),
-        Some(Denial::Unsupported)
-    );
-    assert_eq!(
-        serde_json::to_value((&m.commands, &m.aviation, &m.world.game)).unwrap(),
-        before
-    );
-    assert_eq!(
-        dispatch(&mut m, json!({"t":"fireat","ids":[bomber],"x":43.,"z":41.})),
         None
     );
     let mission = m.aviation.planes[&bomber].mission.unwrap();
     assert_eq!(mission.kind, crate::match_aviation::MissionKind::Area);
-    assert_eq!(m.commands.units[&tank].fire_at, None);
+    assert_eq!(m.commands.units[&tank].fire_at, Some(20 * 80 + 21));
     assert_eq!(
-        dispatch(&mut m, json!({"t":"fireat","ids":[tank],"x":43.,"z":41.})),
+        dispatch(&mut m, json!({"t":"fireat","ids":[bomber],"x":45.,"z":41.})),
         None
     );
     assert_eq!(m.commands.units[&tank].fire_at, Some(20 * 80 + 21));
-    assert_eq!(m.aviation.planes[&bomber].mission, Some(mission));
+    assert_eq!(m.aviation.planes[&bomber].mission.unwrap().at.x, 45.);
 }
 
 #[test]
-fn fire_at_mixed_aircraft_and_ground_sheller_keeps_main_refusal_atomic() {
+fn fire_at_mixed_aircraft_and_ground_sheller_preserves_queue_semantics() {
     for queue in [false, true] {
         let (mut m, id) = scene("howitzer");
         let bomber = m.spawn_aircraft(0, "bomber").unwrap();
-        let before = format!("{:?}", (&m.world, &m.commands.units, &m.aviation));
         let random = m.start.random.snapshot();
         assert_eq!(
             dispatch(
                 &mut m,
                 json!({"t":"fireat","ids":[bomber,id],"x":41,"z":41,"queue":queue})
             ),
-            Some(Denial::Unsupported)
+            None
         );
         assert_eq!(
-            format!("{:?}", (&m.world, &m.commands.units, &m.aviation)),
-            before
+            m.commands.units[&id].fire_at,
+            (!queue).then_some(20 * 80 + 20)
+        );
+        assert_eq!(m.commands.units[&id].orders.len(), usize::from(queue));
+        assert!(m.commands.units[&bomber].orders.is_empty());
+        assert_eq!(
+            m.aviation.planes[&bomber].mission.unwrap().kind,
+            crate::match_aviation::MissionKind::Area
         );
         assert_eq!(m.start.random.snapshot(), random);
     }
