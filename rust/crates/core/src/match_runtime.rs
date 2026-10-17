@@ -208,12 +208,11 @@ impl StartPlan {
         }
         let world_mode = matches!(&profile, StartupProfile::World(_));
         let tutorial = matches!(&profile, StartupProfile::Tutorial);
-        if let Some(data) = map.source().get("scenario") {
-            crate::authored_scenario::validate_definition(
-                data,
-                options.players.len(),
-                options.mode,
-            )?;
+        // Admit only the timed message/objective subset owned by this runtime.
+        if crate::authored_mission::AuthoredMission::from_map(map)?.is_some()
+            && !matches!(options.mode, Mode::Default | Mode::Conquest)
+        {
+            return Err("authored missions require ordinary Conquest admission".into());
         }
         let horde_mode = matches!(&profile, StartupProfile::Horde);
         let defender_team = match &profile {
@@ -703,6 +702,9 @@ pub struct Match {
     pub recruit_metadata: BTreeMap<u32, RecruitMetadata>,
     pub(crate) produced_placer: crate::produced_units::ProducedPlacer,
     pub scenario: Option<crate::legacy_scenario::LegacyScenario>,
+    // Decode-only legacy checkpoint owner. Live matches use authored_scenario.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authored_mission: Option<crate::authored_mission::AuthoredMission>,
     #[serde(default)]
     pub authored_scenario: Option<crate::authored_scenario::AuthoredScenario>,
     pub logistics: crate::logistics::LogisticsState,
@@ -846,12 +848,12 @@ impl Match {
             .collect::<Result<Vec<_>, String>>()?;
         let production =
             crate::production::ProductionState::new(initial_research).map_err(|e| e.to_string())?;
-        let authored_scenario = map
+        let scenario = if map
             .source()
             .get("scenario")
-            .cloned()
-            .map(crate::authored_scenario::AuthoredScenario::new);
-        let scenario = if authored_scenario.is_some() || map.triggers().is_empty() {
+            .is_some_and(|value| !value.is_null())
+            || map.triggers().is_empty()
+        {
             None
         } else {
             let owners = start
@@ -900,7 +902,8 @@ impl Match {
             recruit_metadata: BTreeMap::new(),
             produced_placer: crate::produced_units::ProducedPlacer::new(),
             scenario,
-            authored_scenario,
+            authored_mission: None,
+            authored_scenario: map.source().get("scenario").filter(|value| !value.is_null()).cloned().map(crate::authored_scenario::AuthoredScenario::new),
             logistics: crate::logistics::LogisticsState::default(),
             convoys: None,
             supply_net: crate::supply_network::GroundSupplyNetwork::default(),

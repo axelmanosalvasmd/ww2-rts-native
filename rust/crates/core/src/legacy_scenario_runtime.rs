@@ -181,8 +181,11 @@ fn emit_destroy(
 }
 
 impl Match {
-    /// Preflight only the migrated public legacy-trigger subset used by the tick and snapshot.
+    /// Validate admitted mission owners before ticks, snapshots and checkpoint restoration.
     pub fn preflight_legacy_scenario(&self) -> Result<(), String> {
+        if self.authored_mission.is_some() {
+            return Err("legacy authored mission checkpoints are unsupported".into());
+        }
         self.preflight_authored_scenario()?;
         let Some(scenario) = &self.scenario else {
             return Ok(());

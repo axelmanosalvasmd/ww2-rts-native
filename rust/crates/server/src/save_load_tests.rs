@@ -76,6 +76,7 @@ fn small_match_from_raw(raw: Value) -> (Match, Value) {
     let map =
         ww2_core::map::AuthoritativeMap::from_json(&serde_json::to_vec(&raw).unwrap()).unwrap();
     let mut options = native_tests::native_match().options;
+    options.logistics = true;
     options.living_weather = true;
     let mut state = Match::new(&map, options).unwrap();
     state.start.win_vp = 1.;

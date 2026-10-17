@@ -324,12 +324,14 @@ fn base52_first_fitting_site_moves_away_from_a_nearby_income_point() {
 
 #[test]
 fn mode01_non_world_mode_rows_match_the_prototype_public_fields() {
-    use crate::recipient_snapshot::{SnapshotCache, SnapshotError, mode_row};
+    use crate::recipient_snapshot::{
+        DeliveryState, SnapshotCache, SnapshotCapability, SnapshotError, mode_row,
+    };
 
     // Prototype sim.js:5895-5898; Tutorial's initial goal is tutorial.js:11.
-    // Check each public row independently of that mode's complete snapshot admission.
+    // Classic has partial delivery; the other non-Conquest modes remain refused.
     for mode in MODES {
-        let m = create(mode, ArmySize::Standard).unwrap();
+        let mut m = create(mode, ArmySize::Standard).unwrap();
         let expected = match mode {
             Mode::Conquest => Json::Null,
             Mode::Assault => json!({
@@ -355,16 +357,34 @@ fn mode01_non_world_mode_rows_match_the_prototype_public_fields() {
             _ => unreachable!(),
         };
         assert_eq!(mode_row(&m).unwrap(), expected, "{mode:?}");
-        if matches!(mode, Mode::Conquest | Mode::Classic) {
+        if mode == Mode::Conquest {
             let cache = SnapshotCache::new(&m).unwrap();
             for slot in 0..m.start.players.len() {
                 let snapshot = cache.recipient(slot).unwrap();
-                if expected.is_null() {
-                    assert!(!snapshot.fields.contains_key("mode"));
-                } else {
-                    assert_eq!(snapshot.fields.get("mode"), Some(&expected));
-                }
+                assert!(!snapshot.fields.contains_key("mode"));
                 assert!(snapshot.fields["units"].is_array());
+            }
+        } else if mode == Mode::Classic {
+            let count = m.start.players.len();
+            let mut delivery = DeliveryState::new(&m).unwrap();
+            let frame = delivery
+                .capture(&mut m, &vec![true; count], &vec![false; count])
+                .unwrap();
+            assert_eq!(
+                frame.slots().collect::<Vec<_>>(),
+                (0..count).collect::<Vec<_>>()
+            );
+            for slot in 0..count {
+                let projection = frame.recipient(slot).unwrap();
+                assert_eq!(projection.fields["mode"], expected, "Classic seat {slot}");
+                assert_eq!(
+                    projection.missing,
+                    vec![
+                        SnapshotCapability::WrecksAndFoundMines,
+                        SnapshotCapability::ShotsAndFlights,
+                        SnapshotCapability::TeamEffects,
+                    ]
+                );
             }
         } else {
             assert!(matches!(

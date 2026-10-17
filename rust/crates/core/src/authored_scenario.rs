@@ -9,6 +9,7 @@ use crate::{economy::Mode, match_runtime::Match};
 const MAX_INTEGER: u64 = 9_007_199_254_740_991;
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ScenarioSay {
     pub text: String,
     pub localized: Value,
@@ -18,19 +19,32 @@ pub struct ScenarioSay {
     pub at_tick: u64,
 }
 impl ScenarioSay {
+    fn from_row(row: &Value) -> Result<Self, String> {
+        Ok(Self {
+            text: row["text"].as_str().ok_or("invalid canonical Say text")?.into(),
+            localized: row["localized"].clone(),
+            recipients: row["scenarioRecipients"].as_str().ok_or("invalid canonical Say recipients")?.into(),
+            side: row["scenarioSide"].as_u64().ok_or("invalid canonical Say side")? as usize,
+            execution: row["execution"].as_str().ok_or("invalid canonical Say execution")?.into(),
+            at_tick: row["atTick"].as_u64().ok_or("invalid canonical Say tick")?,
+        })
+    }
+
     pub fn shot_json(&self) -> Value {
         json!({"k":"say", "text":self.text, "localized":self.localized,
             "scenarioRecipients":self.recipients, "scenarioSide":self.side,
             "pub":self.recipients=="public", "execution":self.execution, "atTick":self.at_tick})
     }
     pub(crate) fn validate(&self, state: &Match) -> Result<(), String> {
-        if state.authored_scenario.is_none()
+        if state.world.game.tick < 0
+            || state.authored_scenario.is_none()
             || self.side >= state.world.game.players.len()
             || !policy_valid(&self.recipients)
             || self.at_tick > state.world.game.tick as u64
             || self.at_tick > MAX_INTEGER
             || !execution_valid(&self.execution)
-            || localized_text(&self.localized).as_deref() != Some(&self.text)
+            || !state.authored_scenario.as_ref().unwrap().validate_canonical(state.world.game.players.len())?
+                .iter().any(|row| *row == self.shot_json())
         {
             return Err("invalid authored scenario announcement".into());
         }
@@ -39,6 +53,7 @@ impl ScenarioSay {
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 struct Objective {
     id: String,
     scope: String,
@@ -57,6 +72,7 @@ impl Objective {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 struct TriggerState {
     count: u32,
     next: f64,
@@ -64,11 +80,13 @@ struct TriggerState {
     execution: Option<String>,
 }
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 struct ArrivalUnit {
     kind: String,
     authored: Option<String>,
 }
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 struct Arrival {
     group: String,
     side: usize,
@@ -78,7 +96,10 @@ struct Arrival {
     expires: f64,
 }
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct AuthoredScenario {
+    #[serde(deserialize_with = "required_tick")]
+    last_tick: Option<u64>,
     data: Value,
     executions: BTreeMap<String, TriggerState>,
     // Preserve first activation order, as Object.values does in the prototype.
@@ -98,59 +119,18 @@ fn execution_valid(execution: &str) -> bool {
         .and_then(|s| s.parse::<u64>().ok())
         .is_some_and(|n| (1..=MAX_INTEGER).contains(&n) && execution == format!("scenario:{n}"))
 }
-fn supported_localization(text: &Value) -> bool {
-    text.as_object()
-        .is_none_or(|m| m.len() == 1 || m.contains_key("en"))
-}
-fn localized_text(text: &Value) -> Option<String> {
-    text.as_str().map(str::to_owned).or_else(|| {
-        text.get("en")
-            .and_then(Value::as_str)
-            .or_else(|| text.as_object()?.values().next()?.as_str())
-            .or_else(|| text.as_array()?.first()?.as_str())
-            .map(str::to_owned)
-    })
+fn required_tick<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Option<u64>, D::Error> {
+    <Option<u64> as serde::Deserialize>::deserialize(deserializer)
 }
 fn list<'a>(data: &'a Value, key: &str) -> &'a [Value] {
     data[key].as_array().map_or(&[], Vec::as_slice)
 }
-fn policy<'a>(value: &'a Value, fallback: &'a str) -> &'a str {
-    value["recipients"].as_str().unwrap_or(fallback)
-}
-fn side(value: &Value, fallback: usize) -> usize {
-    value["side"].as_u64().map_or(fallback, |n| n as usize)
-}
-
-/// Match-only, once-only objective missions. Unsupported actions and modes refuse at startup.
+/// Preserve the main runtime's bounded authored definition guard.
 pub(crate) fn validate_definition(data: &Value, count: usize, mode: Mode) -> Result<(), String> {
-    let side_exists = |v: &Value| {
-        v.get("side")
-            .is_none_or(|s| s.as_u64().is_some_and(|n| n < count as u64))
-    };
-    if !data.is_object()
-        || data["version"] != 1
-        || !matches!(mode, Mode::Default | Mode::Conquest)
-        || !list(data, "groups").is_empty()
-        || list(data, "objectives").iter().any(|o| !side_exists(o))
-        || list(data, "triggers").iter().any(|t| {
-            t["scope"] != "match"
-                || !side_exists(t)
-                || t["condition"]["kind"] != "time"
-                || !side_exists(&t["condition"])
-                || t.get("repeat")
-                    .is_some_and(|r| !r.is_null() && r["mode"] != "once")
-                || list(t, "actions").iter().any(|a| {
-                    !side_exists(a)
-                        || (a["kind"] == "say" && !supported_localization(&a["text"]))
-                        || !matches!(
-                            a["kind"].as_str(),
-                            Some("say" | "objectiveActivate" | "objectiveComplete")
-                        )
-                })
-        })
-    {
-        return Err("authored scenarios currently require ordinary match-scoped once-only objective and announcement triggers".into());
+    if !matches!(mode, Mode::Default | Mode::Conquest) {
+        return Err("authored missions require ordinary Conquest admission".into());
     }
+    crate::authored_mission::AuthoredMission::canonical_checkpoint(data, None, count)?;
     Ok(())
 }
 
@@ -165,6 +145,7 @@ impl AuthoredScenario {
             );
         }
         Self {
+            last_tick: None,
             data,
             executions: BTreeMap::new(),
             objectives: Vec::new(),
@@ -174,112 +155,52 @@ impl AuthoredScenario {
             next_execution: 1,
         }
     }
-    pub(crate) fn recipient(&self, state: &Match, slot: usize) -> Value {
-        json!({"version":1,"objectives":self.objectives.iter()
-            .filter(|o| permitted(state,&o.recipients,o.side,slot)).map(Objective::row).collect::<Vec<_>>()})
+    pub fn definition(&self) -> &Value {
+        &self.data
     }
-    fn step(&mut self, tick: u64, owners: &[(String, i32)]) -> Vec<ScenarioSay> {
+    pub fn matches_map(&self, map: &crate::map::AuthoritativeMap) -> bool {
+        map.source().get("scenario") == Some(&self.data)
+    }
+    pub(crate) fn recipient(&self, state: &Match, slot: usize, full_map: bool) -> Value {
+        json!({"version":1,"objectives":self.objectives.iter()
+            .filter(|o| o.recipients == "public" || (!full_map && permitted(state,&o.recipients,o.side,slot)))
+            .map(Objective::row).collect::<Vec<_>>()})
+    }
+    fn canonical(&self, count: usize) -> Result<(Value, Vec<Value>), String> {
+        crate::authored_mission::AuthoredMission::canonical_checkpoint(&self.data, self.last_tick, count)
+    }
+    fn validate_canonical(&self, count: usize) -> Result<Vec<Value>, String> {
+        let (expected, shots) = self.canonical(count)?;
+        if serde_json::to_value(&self.executions).map_err(|e| e.to_string())? != expected["executions"]
+            || serde_json::to_value(&self.objectives).map_err(|e| e.to_string())? != expected["objectives"]
+            || self.next_execution != expected["next_execution"].as_u64().unwrap()
+        {
+            return Err("persisted mission state does not match canonical execution".into());
+        }
+        Ok(shots)
+    }
+    fn step(&mut self, tick: u64, count: usize, owners: &[(String, i32)]) -> Result<Vec<ScenarioSay>, String> {
+        self.validate_canonical(count)?;
+        if self.last_tick.map_or(tick != 1, |last| last.checked_add(1) != Some(tick)) {
+            return Err("mission ticks must advance consecutively from one".into());
+        }
+        let (canonical, shots) = crate::authored_mission::AuthoredMission::canonical_checkpoint(&self.data, Some(tick), count)?;
         for (id, owner) in owners {
             if *owner >= 0 && self.owners.get(id) != Some(owner) {
                 self.facts.captured.insert((id.clone(), *owner));
             }
             self.owners.insert(id.clone(), *owner);
         }
-        let now = tick as f64 * 0.05;
-        let mut budget = 4096;
-        let mut shots = Vec::new();
-        for trigger in list(&self.data.clone(), "triggers") {
-            let id = trigger["id"].as_str().expect("validated trigger ID");
-            let key = format!("{id}@match");
-            self.facts
-                .trigger_counts
-                .entry((id.into(), Scope::Match))
-                .or_insert(0);
-            let record = self.executions.entry(key).or_default();
-            if budget == 0 {
-                break;
-            }
-            budget -= 1;
-            let yes = now
-                >= trigger["condition"]["seconds"]
-                    .as_f64()
-                    .expect("validated time");
-            let actions = list(trigger, "actions");
-            if budget < actions.len() {
-                break;
-            }
-            record.previous = yes;
-            if !yes || record.count >= 1 || now < record.next {
-                continue;
-            }
-            budget -= actions.len();
-            let execution = format!("scenario:{}", self.next_execution);
-            self.next_execution += 1;
-            record.count += 1;
-            record.next = now + trigger["repeat"]["cooldown"].as_f64().unwrap_or(0.0);
-            record.execution = Some(execution.clone());
-            self.facts
-                .trigger_counts
-                .insert((id.into(), Scope::Match), record.count);
-            for action in actions {
-                let recipients = policy(action, policy(trigger, "public"));
-                let side = side(action, side(trigger, 0));
-                if action["kind"] == "say" {
-                    shots.push(ScenarioSay {
-                        text: localized_text(&action["text"]).expect("validated text"),
-                        localized: action["text"].clone(),
-                        recipients: recipients.into(),
-                        side,
-                        execution: execution.clone(),
-                        at_tick: tick,
-                    });
-                } else {
-                    let id = action["objective"]
-                        .as_str()
-                        .expect("validated objective ID");
-                    let existing = self.objectives.iter().position(|o| o.id == id);
-                    if action["kind"] == "objectiveActivate"
-                        && existing.is_some_and(|i| self.objectives[i].state == "complete")
-                    {
-                        continue;
-                    }
-                    let def = list(&self.data, "objectives")
-                        .iter()
-                        .find(|o| o["id"] == id)
-                        .expect("validated objective");
-                    let objective = Objective {
-                        id: id.into(),
-                        scope: "match".into(),
-                        text: def["text"].clone(),
-                        state: if action["kind"] == "objectiveComplete" {
-                            "complete"
-                        } else {
-                            "active"
-                        }
-                        .into(),
-                        recipients: policy(def, recipients).into(),
-                        side: side_for_objective(def, side),
-                        updated: now,
-                        execution: execution.clone(),
-                    };
-                    if objective.state == "complete" {
-                        self.facts
-                            .completed_objectives
-                            .insert((id.into(), Scope::Match));
-                    }
-                    if let Some(i) = existing {
-                        self.objectives[i] = objective;
-                    } else {
-                        self.objectives.push(objective);
-                    }
-                }
-            }
-        }
-        shots
+        self.executions = serde_json::from_value(canonical["executions"].clone()).map_err(|e| e.to_string())?;
+        self.objectives = serde_json::from_value(canonical["objectives"].clone()).map_err(|e| e.to_string())?;
+        self.next_execution = canonical["next_execution"].as_u64().unwrap();
+        self.last_tick = Some(tick);
+        self.facts.trigger_counts = self.executions.iter().map(|(key, record)|
+            ( (key.strip_suffix("@match").unwrap().to_owned(), Scope::Match), record.count )).collect();
+        self.facts.completed_objectives = self.objectives.iter().filter(|o| o.state == "complete")
+            .map(|o| (o.id.clone(), Scope::Match)).collect();
+        shots.iter().filter(|row| row["atTick"].as_u64() == Some(tick)).map(ScenarioSay::from_row).collect()
     }
-}
-fn side_for_objective(value: &Value, fallback: usize) -> usize {
-    side(value, fallback)
 }
 
 pub(crate) fn permitted(state: &Match, policy: &str, side: usize, slot: usize) -> bool {
@@ -313,6 +234,12 @@ impl Match {
         self.preflight_authored_scenario()
     }
     pub(crate) fn preflight_authored_scenario(&self) -> Result<(), String> {
+        self.preflight_authored_scenario_at(self.world.game.tick)
+    }
+    fn preflight_authored_scenario_at(&self, clock: i64) -> Result<(), String> {
+        if self.authored_mission.is_some() {
+            return Err("legacy authored mission checkpoints are unsupported".into());
+        }
         let Some(s) = &self.authored_scenario else {
             return Ok(());
         };
@@ -323,6 +250,12 @@ impl Match {
             return Err("authored scenarios require an ordinary match".into());
         }
         let count = self.world.game.players.len();
+        s.validate_canonical(count)?;
+        if clock < 0 || s.last_tick.is_some_and(|tick| tick > clock as u64)
+            || (self.finish.is_none() && s.last_tick.unwrap_or(0) != clock as u64) {
+            return Err("authored mission clock disagrees with match tick".into());
+        }
+
         let points: Vec<_> = self
             .start
             .points
@@ -481,7 +414,7 @@ impl Match {
         Ok(())
     }
     pub(crate) fn step_authored_scenario(&mut self, tick: u64) -> Result<Vec<ScenarioSay>, String> {
-        self.preflight_authored_scenario()?;
+        self.preflight_authored_scenario_at(self.world.game.tick - 1)?;
         if tick >= MAX_INTEGER {
             return Err("authored scenario tick exceeds exact integer range".into());
         }
@@ -503,10 +436,8 @@ impl Match {
                 ))
             })
             .collect::<Result<Vec<_>, String>>()?;
-        Ok(self
-            .authored_scenario
-            .as_mut()
-            .map_or_else(Vec::new, |s| s.step(tick, &owners)))
+        let count = self.world.game.players.len();
+        self.authored_scenario.as_mut().unwrap().step(tick, count, &owners)
     }
 }
 

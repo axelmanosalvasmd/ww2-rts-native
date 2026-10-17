@@ -79,6 +79,11 @@ pub(super) fn capture(state: &Match) -> Result<Vec<Map<String, Value>>, Snapshot
                     } if orders.len() == 1 && orders[0].unit == i64::from(u.id) => {
                         (if *attack_move { 2 } else { 1 }, orders[0].at)
                     }
+                    Command::FireAt {
+                        ids,
+                        at,
+                        queue: false,
+                    } if ids.as_slice() == [i64::from(u.id)] => (5, *at),
                     Command::Attack {
                         ids,
                         target,

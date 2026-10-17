@@ -44,14 +44,18 @@ impl Match {
         // Do not clear a job flag while leaving its owning descriptor alive.
         if selected.iter().any(|id| {
             let u = &self.world.game.units[id];
-            !u.retreating && (u.entrench || u.build)
+            !u.retreating && u.build
         }) {
             return Ok(Some(Denial::Unsupported));
         }
         // Validate the sole job owner before any queue, path or observation mutation.
         for id in &selected {
             let unit = &self.world.game.units[id];
-            if !unit.retreating && (unit.id != *id || unit.dig != self.field_works.is_active(*id)) {
+            if !unit.retreating
+                && (unit.id != *id
+                    || unit.dig != self.field_works.is_active(*id)
+                    || unit.entrench != self.field_works.membership(*id).is_some())
+            {
                 return Err("unrepresented or inconsistent cover field work".into());
             }
         }
@@ -82,6 +86,7 @@ impl Match {
                         | Command::Ability { at: Some(at), .. }
                         | Command::Attack { at: Some(at), .. }
                         | Command::Assist { at: Some(at), .. }
+                        | Command::Enter { at, .. }
                         | Command::Dig { at, .. }
                         | Command::Entrench {
                             order: crate::field_works::ProjectOrder::Join { at: Some(at), .. },

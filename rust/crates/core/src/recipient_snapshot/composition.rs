@@ -105,9 +105,7 @@ pub(super) fn complete(
     projection.fields.insert("t".into(), json!("s"));
     // Admission inspected each actual canonical actor/list owner. Their
     // absent output is a represented source result for this bounded frame.
-    for name in ["flights", "shots"] {
-        projection.fields.insert(name.into(), json!([]));
-    }
+    projection.fields.insert("shots".into(), json!([]));
     projection.fields.entry("air").or_insert_with(|| json!([]));
     projection.fields.insert(
         "wrecks".into(),
@@ -179,25 +177,35 @@ pub(super) fn admit_actors(state: &Match, outside_events: &[Effect]) -> Result<(
     };
     if !outside_events.is_empty()
         || !state.firing.events.is_empty()
-        || !state.firing.flights.is_empty()
-        || !state.firing.salvos.is_empty()
-        || !state.firing.grenades.is_empty()
         || !state.support.events.is_empty()
     {
         return Err(refused(SnapshotCapability::ShotsAndFlights));
     }
-    // Aircraft state has an owner adapter. Aviation shot encodings still need
-    // a contract, so undrained event payloads retain their admission guard.
+    if !state.firing.flights.is_empty() || !state.firing.salvos.is_empty() {
+        state
+            .validate_firing_tick_state()
+            .map_err(|_| refused(SnapshotCapability::ShotsAndFlights))?;
+        if state.firing.salvos.iter().any(|s| {
+            s.owner >= state.world.game.players.len()
+                || ![s.at.x, s.at.z, s.next, s.every, s.spread]
+                    .iter()
+                    .all(|v| v.is_finite())
+                || s.left == 0
+                || s.left > 4096
+                || s.every <= 0.
+                || s.spread < 0.
+        }) {
+            return Err(refused(SnapshotCapability::ShotsAndFlights));
+        }
+    }
+    // The caller must drain aviation events into the chronological tick batch
+    // before delivery, just as it drains firing and support events above.
     if !state.aviation.events.is_empty() {
         return Err(refused(SnapshotCapability::Air));
     }
     state
         .preflight_legacy_scenario()
         .map_err(|_| refused(SnapshotCapability::Scenario))?;
-    if state.options.logistics || state.logistics.iter().next().is_some() || state.convoys.is_some()
-    {
-        return Err(refused(SnapshotCapability::Logistics));
-    }
     Ok(())
 }
 

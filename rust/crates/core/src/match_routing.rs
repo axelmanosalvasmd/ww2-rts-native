@@ -93,6 +93,7 @@ impl Match {
             pointers.extend(recipient.save_storage_pointers());
         }
         pointers.extend(self.commands.paths.storage_pointers());
+        pointers.extend(self.supply_routes.save_storage_pointers());
         pointers
     }
 
@@ -111,6 +112,7 @@ impl Match {
             }
         }
         self.commands.paths.relocate_save_storage(&bindings);
+        self.supply_routes.relocate_save_storage(&bindings);
         for recipient in &mut self.recipients {
             recipient.relocate_save_storage(&bindings);
         }
@@ -472,7 +474,7 @@ impl Match {
 
     /// The source teamSees point predicate at current positions. This is not a
     /// fog-mask query or a remembered-wreck/smoke policy.
-    pub fn recipient_sees(&mut self, owner: usize, at: Point) -> Result<bool, String> {
+    pub fn recipient_sees(&self, owner: usize, at: Point) -> Result<bool, String> {
         self.validate_recipient(owner)?;
         if !at.x.is_finite() || !at.z.is_finite() {
             return Err("invalid visibility point".into());

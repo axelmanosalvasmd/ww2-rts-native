@@ -14,7 +14,7 @@ fn mission() -> (Match, Value) {
         "spawns":[{"x":4,"y":4},{"x":58,"y":58},{"x":4,"y":58}],
         "points":[{"id":"front","x":32,"y":32}],
         "scenario":{"version":1,"groups":[],"areas":[],"objectives":[
-            {"id":"team","text":{"es":"Equipo"},"recipients":"team","side":2},
+            {"id":"team","text":{"en":"Equipo","es":"Equipo"},"recipients":"team","side":2},
             {"id":"side","text":"Side","recipients":"side","side":0},
             {"id":"public","text":{"en":"Public","es":"Publico"}}],
             "triggers":[
@@ -24,7 +24,7 @@ fn mission() -> (Match, Value) {
                     {"kind":"objectiveActivate","objective":"team"},
                     {"kind":"say","text":{"en":"Everyone","es":"Todos"}},
                     {"kind":"say","text":"One seat","recipients":"side","side":0},
-                    {"kind":"say","text":{"es":"Allies"},"recipients":"team","side":2}]},
+                    {"kind":"say","text":{"en":"Allies","es":"Allies"},"recipients":"team","side":2}]},
                 {"id":"done","scope":"match","condition":{"kind":"time","seconds":0.15},"actions":[
                     {"kind":"objectiveComplete","objective":"public"},
                     {"kind":"objectiveComplete","objective":"side"},
@@ -83,7 +83,7 @@ fn objective(id: &str, state: &str, execution: &str, updated: f64) -> Value {
     let (text, recipients, side) = match id {
         "public" => (json!({"en":"Public","es":"Publico"}), "public", 0),
         "side" => (json!("Side"), "side", 0),
-        "team" => (json!({"es":"Equipo"}), "team", 2),
+        "team" => (json!({"en":"Equipo","es":"Equipo"}), "team", 2),
         _ => unreachable!(),
     };
     json!({"id":id,"scope":"match","text":text,"state":state,"recipients":recipients,
@@ -151,7 +151,7 @@ fn mode86_ordinary_room_filters_scenario_reads_without_execution_and_keeps_norma
             objectives.push(objective("side", "active", "scenario:1", 0.05));
         }
         if slot != 1 {
-            shots.push(say("Allies", json!({"es":"Allies"}), "team", 2));
+            shots.push(say("Allies", json!({"en":"Allies","es":"Allies"}), "team", 2));
             objectives.push(objective("team", "active", "scenario:1", 0.05));
         }
         assert_eq!(first[slot]["shots"], json!([]));
@@ -223,6 +223,7 @@ fn mode86_ordinary_room_filters_scenario_reads_without_execution_and_keeps_norma
     assert_eq!(finish.winner, 1);
     assert_eq!(finish.reason, ww2_core::match_end::EndReason::VictoryPoints);
     read(&mut runtime, FrameKind::Scheduled);
+    let completed_at_victory = runtime.state().authored_scenario.clone();
     for _ in 0..120 {
         let ending = runtime.hold_callback().unwrap().unwrap();
         if ending.advance {
@@ -232,7 +233,7 @@ fn mode86_ordinary_room_filters_scenario_reads_without_execution_and_keeps_norma
             }
         }
         assert!(runtime.fault().is_none());
-        assert_eq!(runtime.state().authored_scenario, completed);
+        assert_eq!(runtime.state().authored_scenario, completed_at_victory);
     }
     assert_eq!(runtime.held(), 120);
 }

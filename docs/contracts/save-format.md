@@ -57,7 +57,7 @@ The setting keys and values are:
 | `logistics` | Match logistics switch. |
 | `tech` | Match technology switch. |
 
-The list is identical to `server.js:419`. In particular, `sandbox` is not a setting key. Native sandbox and logistics room restoration remain refused by this batch's existing room capability boundary.
+The list is identical to `server.js:419`. In particular, `sandbox` is not a setting key. Sandbox restoration remains refused. Ordinary logistics checkpoints preserve reserves, convoy stores, cargo, routes and supply state through the existing versioned match checkpoint.
 
 ## Game checkpoint encoding
 
@@ -79,7 +79,7 @@ Each node is `[tag, payload]`, except `["unit"]` and `["none"]`. A unit enum var
 
 All fields in `Match` and its nested mutable owners participate in the checkpoint. This includes `world`, `start` (economy, points, weather and RNG streams), `options`, commands and pending orders, production, rallies, field work, combat, firing, abilities, recovery, environment, logistics, supply, unit allocation, story, fallen locations, finish state and timeline. Recipient routing knowledge, fog, remembered buildings, path requests, retries and route caches also survive. Immutable compiled rules are reconstructed from the binary. World runtime and geography are excluded behind an explicit save/load refusal.
 
-Native cache identities that refer to vector allocations must be rebound to restored storage. They are not dereferenced from saved addresses. This is an internal native persistence choice under IF-27, recorded in `design.d/2026-10-16-save-load.md`: the prototype loses WeakMap path/cache state (`shared/sim.js:2865,3035`), while native checkpoints retain state required for deterministic continuation. It does not claim JavaScript tick equality or import compatibility.
+Native cache identities that refer to vector allocations must be rebound to restored storage, including convoy handoff paths, per-owner ordinary and danger paths, and their owned danger and vehicle buffers. They are not dereferenced from saved addresses. This is an internal native persistence choice under IF-27, recorded in `design.d/2026-10-16-save-load.md`: the prototype loses WeakMap path/cache state (`shared/sim.js:2865,3035`), while native checkpoints retain state required for deterministic continuation. It does not claim JavaScript tick equality or import compatibility.
 
 The `state` struct field keys are listed below. These are native component boundaries for the prototype's whole-game payload (`shared/sim.js:709-728`, terrain and optional arrays at `:735-766`), rather than additional socket keys. Nested records use the same tagged struct/map/sequence rules and the typed fields of the named canonical owner.
 
@@ -97,7 +97,8 @@ The `state` struct field keys are listed below. These are native component bound
 | `capture_ticks`, `tick_state`, `ordinary_snapshot_only` | Capture clocks, tick phase state and the existing delivery capability restriction. |
 | `story`, `fallen`, `finish`, `timeline`, `next_unit_id` | Match statistics, fall locations, terminal decision, result samples and the canonical actor allocator. |
 | `assault`, `horde`, `tutorial`, `scenario`, `companions`, `rail_runs` | Existing mode and operative owners. Inactive records are retained; their presence does not grant room admission. |
-| `authored_scenario` | Optional bounded ordinary mission owner: `data`, `executions`, insertion-ordered `objectives`, `next_execution`. Absent in older checkpoints; defaults to `None`. See [scenario objectives](scenario-objectives.md). |
+| `authored_scenario` | Optional bounded ordinary mission owner with the complete v2 schema below, including its execution clock. Non-authored checkpoints default to absent; present state is validated against canonical execution. See [scenario objectives](scenario-objectives.md). |
+| `authored_mission` | Decode-only legacy timed owner. A present legacy owner is refused instead of silently discarded; newly written matches use `authored_scenario` alone. |
 | `elimination` | Optional Annihilation/Classic owner: `teams`, `bunkers`, `time_left`, `sudden_death`, `nodes`. Each resource node retains `cell`, `at` (`x`, `z`), `depot`, `rate`, `fuel`. |
 | `rules` | Omitted and reconstructed from compiled rules. Saving modified rules is refused. |
 | `world_runtime` | Omitted; saving or loading a World runtime is refused. |
@@ -143,8 +144,9 @@ The authored owner has one shared schema for the objective and engine branches:
 | `owners` | Current owner of every authored capture target. |
 | `deferred` | Pending arrivals with `group, side, units, at, order, expires`; units retain `kind, authored`. |
 | `next_execution` | The next deterministic `scenario:<number>` identity. |
+| `last_tick` | Required nullable execution clock. Null before tick one; otherwise the last executed ordinary mission tick. A stale clock is refused. |
 
-These values mirror persisted prototype scenario owners at `shared/scenarios.js:88-98,136-170`. Missing complete authored state defaults only to `None` for a non-authored match. Required nested fields are never rebuilt from empty defaults. The objective-only runtime retains empty groups and arrivals, but writes real trigger records, capture history, objective dependencies and area definitions. Old experimental objective-only v2 bodies with string execution values or missing required fields are refused, rather than silently migrated. The superseded v3 envelope is unsupported.
+These values mirror persisted prototype scenario owners at `shared/scenarios.js:88-98,136-170`. Missing complete authored state defaults only to `None` for a non-authored match. Required nested fields are never rebuilt from empty defaults. The objective-only runtime retains empty groups and arrivals, but writes real trigger records, capture history, objective dependencies and empty area definitions. Old experimental objective-only v2 bodies with string execution values or missing required fields are refused, rather than silently migrated. The superseded v3 envelope is unsupported.
 ## External AI memory codec (IF-27)
 
 `Match::save_ai_memories_json` and `restore_ai_memories_json` encode and restore the separate `ai` content owner. They accept an explicit AI roster; omitted human seats lose their old AI memory. This follows `shared/ai.js:159-165` and `server.js:426,447-448`. Room save/load still refuses hosted AI seats and non-null `ai`, pending their hosting integration. These core APIs do not activate that capability or claim AI-63.

@@ -166,7 +166,27 @@ fn map15_map_loading_uses_the_existing_complete_scenario_validator() {
         );
     }
     let error = Match::new(&loaded, options()).err().unwrap();
-    assert!(error.contains("authored scenarios currently require ordinary match-scoped once-only objective and announcement triggers"));
+    assert_eq!(
+        error,
+        "authored mission: authored groups and areas are unsupported"
+    );
+
+    // The timed-message subset is admitted, while the complete loader still
+    // retains and validates the unsupported group definition above.
+    valid["scenario"]["groups"] = json!([]);
+    let timed = AuthoritativeMap::from_value(valid).unwrap();
+    let mut state = Match::new(&timed, options()).unwrap();
+    assert!(state.authored_scenario.is_some());
+    let report = state.advance_tick().unwrap();
+    assert!(report.events.iter().any(|event| matches!(
+        event,
+        crate::match_tick::TickEvent::AuthoredScenario(shot)
+            if shot.shot_json()["k"] == "say" && shot.shot_json()["text"] == "Ready" && shot.shot_json()["pub"] == true
+    )));
+    let cache = SnapshotCache::new(&state).unwrap();
+    for slot in 0..2 {
+        cache.recipient(slot).unwrap();
+    }
 }
 
 #[test]

@@ -28,6 +28,7 @@ mod native_order_intent_tests;
 pub mod ai_schedule;
 pub mod ai_view;
 pub mod assault_runtime;
+pub mod building_placement;
 pub mod catalog;
 pub mod client_view;
 pub mod combat;
@@ -40,6 +41,7 @@ mod commander_construction;
 mod commander_fortification;
 mod commander_forward_hq;
 pub mod commander_mind;
+mod commander_mirror;
 mod commander_shopping;
 pub mod commander_tactics;
 pub mod companion_ray;
@@ -70,6 +72,7 @@ pub mod recipient_availability;
 
 #[cfg(test)]
 use crate as core_api;
+pub mod authored_mission;
 pub mod authored_scenario;
 #[cfg(test)]
 #[path = "../tests/support/human_commander_facts.rs"]

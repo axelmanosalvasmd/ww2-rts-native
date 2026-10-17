@@ -1,0 +1,1 @@
+- Preserve convoy routing cache bindings when loading a logistics-enabled match, including private danger terrain and vehicle buffers. This fixes a checkpoint round-trip mismatch found by the existing save/load continuation test.
