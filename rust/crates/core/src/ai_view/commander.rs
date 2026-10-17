@@ -288,6 +288,9 @@ impl CommanderMemory {
                     UnitFacts {
                         built: optional_number(&u["built"])?.unwrap_or(1.0),
                         hold_position: own && truth(&u["holdPos"]),
+                        hold_fire: own && truth(&u["holdFire"]),
+                        auto_cast: own && truth(&u["auto"]),
+                        cooldown: if own { number(&u["cd"])? } else { 0.0 },
                         queued_orders: if own { array(&u["orders"])?.len() } else { 0 },
                         auto_retreat: own && truth(&u["autoRetreat"]),
                         convoy: own && trucks.contains(&id),

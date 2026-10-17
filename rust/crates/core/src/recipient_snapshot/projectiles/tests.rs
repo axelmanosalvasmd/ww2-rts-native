@@ -211,7 +211,6 @@ fn ordinary_horde_grenade_and_barrage_deliver_every_seat_until_retained_state_ex
         control.auto_retreat = false;
     }
     state.world.game.reveal = true;
-    state.tick_state.restrict_aircraft_weapons_for_delivery();
     state.restrict_to_ordinary_snapshots().unwrap();
     for id in [rifle, mortar] {
         assert_eq!(
