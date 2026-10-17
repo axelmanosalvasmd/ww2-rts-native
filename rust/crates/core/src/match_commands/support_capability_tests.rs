@@ -63,6 +63,10 @@ fn scene() -> Match {
 }
 
 fn record(state: &mut Match, kind: &str) {
+    record_at(state, kind, Point { x: 128.0, z: 128.0 });
+}
+
+fn record_at(state: &mut Match, kind: &str, at: Point) {
     state
         .enqueue_command(
             OrderKey {
@@ -72,7 +76,7 @@ fn record(state: &mut Match, kind: &str) {
             },
             Command::Support {
                 kind: kind.into(),
-                at: Point { x: 128.0, z: 128.0 },
+                at,
                 direction: Some(0.0),
             },
         )
@@ -80,12 +84,47 @@ fn record(state: &mut Match, kind: &str) {
 }
 
 #[test]
-fn hosted_recorded_support_rejects_undeliverable_effects_before_any_payment_or_publication() {
+fn hosted_recorded_plane_support_pays_once_and_delivers_every_seat_through_retirement() {
     for kind in ["recon", "strafe", "bombing", "dive", "para"] {
         let mut state = scene();
         state.restrict_to_ordinary_snapshots().unwrap();
-        record(&mut state, kind);
-        let before = (
+        state
+            .initialize_tick_scene(0, TickPathConfig::default())
+            .unwrap();
+        // Para requires a visible landing site. The owner's spawn is visible.
+        let at = state.start.players[0].spawn;
+        record_at(&mut state, kind, at);
+        let wallet = state.start.economy.players[0].clone();
+        let spent = state.story[0].mp_spent;
+        let calls = state.story[0].support_calls;
+        let next_id = state.next_unit_id;
+        let price = economy::sup_cost(Mode::Conquest, kind).unwrap();
+        assert_eq!(price.currency, economy::Currency::Manpower);
+        let definition = crate::catalog::Catalog::compiled()
+            .unwrap()
+            .support(kind)
+            .unwrap();
+        let cooldown = definition.get("cd").unwrap().number().unwrap();
+        let delay = definition.get("delay").unwrap().number().unwrap();
+        let results = state.apply_commands(1, false).unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].denial, None, "{kind}");
+        assert_eq!(state.commands.pending_commands(), 0);
+        assert_eq!(state.start.economy.players[0].mp, wallet.mp - price.cost);
+        assert_eq!(state.start.economy.players[0].mun, wallet.mun);
+        assert_eq!(state.start.players[0].support[kind], cooldown);
+        assert_eq!(state.story[0].mp_spent, spent + price.cost);
+        assert_eq!(state.story[0].support_calls, calls + 1.0);
+        assert_eq!(state.next_unit_id, next_id);
+        assert_eq!(state.world.game.strikes.len(), 1);
+        let strike = &state.world.game.strikes[0];
+        assert_eq!(
+            (strike.owner, strike.x, strike.z, strike.dir, strike.live),
+            (0, at.x, at.z, 0.0, false)
+        );
+        assert_eq!(strike.runtime.as_ref().unwrap().kind.name(), kind);
+        assert_eq!(strike.runtime.as_ref().unwrap().delay, delay);
+        let paid = (
             state.start.economy.clone(),
             state.start.players[0].support.clone(),
             state.world.game.strikes.clone(),
@@ -94,9 +133,20 @@ fn hosted_recorded_support_rejects_undeliverable_effects_before_any_payment_or_p
             state.start.random.clone(),
             state.next_unit_id,
         );
-        let results = state.apply_commands(1, false).unwrap();
-        assert_eq!(results.len(), 1);
-        assert_eq!(results[0].denial, Some(Denial::Unsupported), "{kind}");
+        assert_eq!(
+            state
+                .execute_command(
+                    0,
+                    &Command::Support {
+                        kind: kind.into(),
+                        at,
+                        direction: Some(0.0),
+                    },
+                    false
+                )
+                .unwrap(),
+            Some(Denial::Cooldown)
+        );
         assert_eq!(
             (
                 state.start.economy.clone(),
@@ -107,15 +157,66 @@ fn hosted_recorded_support_rejects_undeliverable_effects_before_any_payment_or_p
                 state.start.random.clone(),
                 state.next_unit_id,
             ),
-            before,
-            "rejection must leave paid and published state unchanged: {kind}"
+            paid,
+            "cooldown rejection leaves paid and published state unchanged: {kind}"
         );
-        assert_eq!(state.commands.pending_commands(), 0);
         state.preflight_ordinary_snapshot().unwrap();
+        let selected = (0..2)
+            .map(|slot| SelectedSeat {
+                slot,
+                full: false,
+                omit: false,
+            })
+            .collect::<Vec<_>>();
+        let mut delivery = DeliveryState::new(&state).unwrap();
+        let mut arrived = false;
+        for _ in 0..2000 {
+            let report = state.advance_tick().unwrap();
+            assert!(report.commands.is_empty());
+            let plane = report.events.iter().any(|event| {
+                matches!(event,
+                crate::match_tick::TickEvent::Support(crate::match_support::SupportEvent::Plane {
+                    kind: observed, ..
+                }) if observed.name() == kind)
+            });
+            arrived |= plane;
+            let retired = state.world.game.strikes.is_empty();
+            let frame = delivery
+                .capture_selected_with_tick_events(&mut state, &selected, &report.events)
+                .unwrap()
+                .unwrap();
+            for slot in 0..2 {
+                let snapshot = frame.recipient(slot).unwrap().into_json();
+                assert_eq!(snapshot["t"], "s");
+                if plane {
+                    let arrivals = snapshot["shots"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .filter(|shot| shot["k"] == kind)
+                        .cloned()
+                        .collect::<Vec<_>>();
+                    assert_eq!(
+                        arrivals,
+                        vec![json!({
+                            "k":kind,"x":at.x,"z":at.z,"dir":0.0,"fo":0,"pub":true
+                        })]
+                    );
+                }
+            }
+            if retired {
+                break;
+            }
+        }
+        assert!(arrived, "{kind} must arrive through ordinary tick events");
+        assert!(state.world.game.strikes.is_empty(), "{kind} must retire");
+        assert_eq!(state.story[0].support_calls, calls + 1.0);
+        assert_eq!(state.story[0].mp_spent, spent + price.cost);
+        assert!(state.tick_state.fault().is_none());
     }
 
     let mut state = scene();
-    // The capability binding belongs to hosted matches, not the unrestricted component API.
+    // Unrestricted component admission keeps the same canonical publication.
     record(&mut state, "recon");
     assert_eq!(state.apply_commands(1, false).unwrap()[0].denial, None);
     assert_eq!(

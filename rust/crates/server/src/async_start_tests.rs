@@ -186,7 +186,15 @@ fn net37_real_load_and_creation_failures_restore_lobby_or_previous_match_and_fin
         let (mut hub, [host, _], mut receivers) = room();
         for restart in [false, true] {
             if missing_map {
+                hub.maps.as_object_mut().unwrap().remove("missing-authored-map");
                 hub.rooms.get_mut("ABC").unwrap().map = "missing-authored-map".into();
+                assert_eq!(
+                    hub.claim_trusted_start("ABC", host.id, restart).err().unwrap(),
+                    "start requires one through capacity players and both Assault sides"
+                );
+                assert!(hub.rooms["ABC"].starting.is_none());
+                // A stale catalogue can retain capacity after its raw map disappears.
+                hub.maps["missing-authored-map"] = hub.maps["default"].clone();
             } else {
                 hub.rooms.get_mut("ABC").unwrap().players[1].team = 6;
             }
