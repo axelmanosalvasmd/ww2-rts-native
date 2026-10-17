@@ -8,7 +8,7 @@ use crate::{
     match_commands::Command,
     match_runtime::{Match, MatchOptions, PlayerConfig},
     orders::OrderKey,
-    recipient_snapshot::{DeliveryState, SelectedSeat, SnapshotCache, SnapshotCapability},
+    recipient_snapshot::{DeliveryState, SelectedSeat, SnapshotCapability},
     weather::WeatherChoice,
 };
 use serde_json::{Value, json};
@@ -116,9 +116,11 @@ fn tick_and_collect(state: &mut Match, delivery: &mut DeliveryState) {
             "timeLeft":crate::math::max(0.0, mode.time_left.unwrap().ceil()),
             "suddenDeath":mode.sudden_death
         });
-        let cache = SnapshotCache::new(state).unwrap();
-        for slot in 0..state.start.players.len() {
-            let projection = cache.recipient(slot).unwrap();
+        let count = state.start.players.len();
+        let mut partial = delivery.clone();
+        let frame = partial.capture(state, &vec![false; count], &vec![false; count]).unwrap();
+        for slot in 0..count {
+            let projection = frame.recipient(slot).unwrap();
             assert_eq!(projection.fields["mode"], expected, "Classic seat {slot}");
             assert_eq!(projection.missing, vec![
                 SnapshotCapability::WrecksAndFoundMines,
