@@ -127,57 +127,119 @@ fn hold_fire(m: &mut Match) {
 
 #[test]
 fn tutorial_roster_features_and_instant_ground_home_recruitment() {
-    let mut m = Match::new_tutorial(&map(), options(2)).unwrap();
-    assert_eq!(
-        m.start
-            .players
-            .iter()
-            .map(|p| (p.config.name.as_str(), p.config.team, p.config.faction))
-            .collect::<Vec<_>>(),
-        vec![
-            ("Player 0", 0, Faction::Usa),
-            ("Player 1", 0, Faction::Usa),
-            ("Enemy", 1, Faction::Germany)
-        ]
-    );
-    assert_eq!(m.start.players[0].spawn, Point { x: 11.0, z: 43.0 });
-    assert_eq!(m.start.players[1].spawn, m.start.players[0].spawn);
-    assert_eq!(m.start.players[2].spawn, Point { x: 137.0, z: 77.0 });
-    assert!(m.building_cells.is_empty());
-    assert!(!m.options.tech && !m.options.supply && !m.options.logistics);
-    for owner in 0..2 {
-        assert_eq!(
+    // MODE-58: sim.js:688-708, 746, 784, 799 and tutorial.js:102-106 at e4e579a.
+    // Exercise the shared HQ with every allowed human roster, not just two seats.
+    for humans in 1..=5 {
+        let mut m = Match::new_tutorial(&map(), options(humans)).unwrap();
+        let enemy = humans;
+        assert_eq!(m.tutorial_state().unwrap().enemy(), enemy);
+        assert_eq!(m.start.players.len(), humans + 1);
+        assert_eq!(m.options.players.len(), humans + 1);
+        assert_eq!(m.world.game.players.len(), humans + 1);
+        for owner in 0..humans {
+            let player = &m.start.players[owner];
+            assert_eq!(player.config.name, format!("Player {owner}"));
+            assert_eq!(player.config.team, 0);
+            assert_eq!(player.config.faction, Faction::Usa);
+            assert_eq!(m.options.players[owner].team, 0);
+            assert_eq!(m.world.game.players[owner].team, 0);
+            assert_eq!(m.start.economy.players[owner].team, 0);
+            assert_eq!(player.spawn, Point { x: 11.0, z: 43.0 });
+            assert_eq!(
+                m.world
+                    .game
+                    .units
+                    .values()
+                    .filter(|u| u.owner == owner)
+                    .map(|u| m.rules.kinds[u.kind].name.as_str())
+                    .collect::<Vec<_>>(),
+                vec!["rifle", "rifle", "mg"]
+            );
+        }
+        let foe = &m.start.players[enemy];
+        assert_eq!(foe.config.name, "Enemy");
+        assert_eq!(foe.config.team, 1);
+        assert_eq!(foe.config.faction, Faction::Germany);
+        assert_eq!(foe.spawn, Point { x: 137.0, z: 77.0 });
+        assert_eq!(m.start.economy.players[enemy].mp, 0.0);
+        assert!(!m.world.game.units.values().any(|u| u.owner == enemy));
+        assert!(m.building_cells.is_empty());
+        assert!(
             m.world
                 .game
                 .units
                 .values()
-                .filter(|u| u.owner == owner)
-                .map(|u| m.rules.kinds[u.kind].name.as_str())
-                .collect::<Vec<_>>(),
-            vec!["rifle", "rifle", "mg"]
+                .all(|u| !m.rules.kinds[u.kind].structure)
         );
+        assert!(!m.options.tech && !m.options.supply && !m.options.logistics);
+        assert!(m.logistics.iter().next().is_none());
+        assert!(m.convoys.is_none());
+
+        // Every human recruits immediately at the shared home, without a base or a tick.
+        for owner in 0..humans {
+            let wallet = m.start.economy.players[owner].mp;
+            let id = m.next_unit_id;
+            let count = m.world.game.units.len();
+            let tick = m.world.game.tick;
+            command(
+                &mut m,
+                owner,
+                Command::Buy {
+                    kind: "rifle".into(),
+                    from: None,
+                },
+            );
+            assert_eq!(m.world.game.tick, tick);
+            assert_eq!(m.world.game.units.len(), count + 1);
+            let unit = &m.world.game.units[&id];
+            assert_eq!(unit.owner, owner);
+            assert_eq!(m.rules.kinds[unit.kind].name, "rifle");
+            assert!(m.start.economy.players[owner].mp < wallet);
+            assert!(math::hypot(unit.x - 11.0, unit.z - 43.0) < 20.0);
+        }
+        // Tutorial bypasses HQ tier gates, including for a tier-2 vehicle.
+        assert_eq!(crate::economy::tier_of("tank").unwrap(), 2);
+        assert_eq!(m.production.player(0).unwrap().tech().tier(), 1);
+        m.start.economy.players[0].mp = 1000.0;
+        let tank = m.next_unit_id;
+        let tick = m.world.game.tick;
+        command(
+            &mut m,
+            0,
+            Command::Buy {
+                kind: "tank".into(),
+                from: None,
+            },
+        );
+        assert_eq!(m.world.game.tick, tick);
+        assert_eq!(m.world.game.units[&tank].owner, 0);
+        assert_eq!(m.rules.kinds[m.world.game.units[&tank].kind].name, "tank");
+        assert!(
+            math::hypot(
+                m.world.game.units[&tank].x - 11.0,
+                m.world.game.units[&tank].z - 43.0
+            ) < 20.0
+        );
+        assert_eq!(m.production.player(0).unwrap().tech().tier(), 1);
+        let count = m.world.game.units.len();
+        for _ in 0..6 {
+            let report = m.advance_tick().unwrap();
+            assert!(report.commands.is_empty(), "no autonomous Enemy orders");
+            assert_eq!(m.commands.pending_commands(), 0);
+            assert_eq!(m.tutorial_state().unwrap().step(), TutorialStep::Hedgerow);
+            assert_eq!(m.start.economy.players[enemy].mp, 0.0);
+            assert_eq!(m.start.economy.players[enemy].inc, 0.0);
+            assert!(!m.world.game.units.values().any(|u| u.owner == enemy));
+            assert_eq!(
+                m.world.game.units.len(),
+                count,
+                "recruits were already born"
+            );
+        }
     }
-    assert!(!m.world.game.units.values().any(|u| u.owner == 2));
-    let wallet = m.start.economy.players[0].mp;
-    let id = m.next_unit_id;
-    command(
-        &mut m,
-        0,
-        Command::Buy {
-            kind: "rifle".into(),
-            from: None,
-        },
-    );
-    assert_eq!(m.world.game.units[&id].owner, 0);
-    assert!(m.start.economy.players[0].mp < wallet);
-    assert!(
-        math::hypot(
-            m.world.game.units[&id].x - 11.0,
-            m.world.game.units[&id].z - 43.0
-        ) < 20.0
-    );
-    m.advance_tick().unwrap();
-    assert_eq!(m.start.economy.players[2].mp, 0.0);
+    for humans in [0, 6] {
+        assert!(Match::new_tutorial(&map(), options(humans)).is_err());
+    }
 }
 
 #[test]
@@ -542,6 +604,71 @@ fn tutorial_guards_reject_missing_runtime_and_preserve_no_defeat_rule() {
         empty.advance_tick().unwrap();
     }
     assert!(empty.finish.is_none());
+}
+
+#[test]
+fn base19_tutorial_buy_faces_personal_rally_or_centre_and_walks_without_a_producer() {
+    // Prototype e4e579a shared/sim.js:3798-3803: immediate spawn, facing, personal rally.
+    for rally in [
+        None,
+        Some(Point { x: 21.0, z: 57.0 }),
+        Some(Point { x: 21.0, z: 29.0 }),
+    ] {
+        let mut m = tutorial();
+        assert!(m.building_cells.is_empty());
+        assert!(
+            !m.world
+                .game
+                .units
+                .values()
+                .any(|u| m.rules.kinds[u.kind].building)
+        );
+        if let Some(at) = rally {
+            command(
+                &mut m,
+                0,
+                Command::Rally {
+                    ids: vec![],
+                    id: None,
+                    at: Some(at),
+                },
+            );
+        }
+        let home = m.start.players[0].spawn;
+        let facing = rally.unwrap_or(Point {
+            x: m.world.game.w as f64 * CELL / 2.0,
+            z: m.world.game.h as f64 * CELL / 2.0,
+        });
+        let id = m.next_unit_id;
+        command(
+            &mut m,
+            0,
+            Command::Buy {
+                kind: "rifle".into(),
+                from: None,
+            },
+        );
+        let u = &m.world.game.units[&id];
+        assert_eq!(u.owner, 0);
+        assert_eq!(m.rules.kinds[u.kind].name, "rifle");
+        assert!(math::hypot(u.x - home.x, u.z - home.z) < 12.0);
+        assert_eq!(u.rot, math::atan2(facing.z - home.z, facing.x - home.x));
+        assert_eq!(u.world_goal, rally);
+        if let Some(at) = rally {
+            assert!(m.commands.units[&id].rally_drift);
+            assert!(!u.path.is_empty());
+            let before = math::hypot(u.x - at.x, u.z - at.z);
+            for _ in 0..40 {
+                m.advance_tick().unwrap();
+            }
+            let u = &m.world.game.units[&id];
+            assert!(math::hypot(u.x - at.x, u.z - at.z) < before - 1.0);
+            assert_eq!(m.tick_state.fault(), None);
+        } else {
+            assert!(u.path.is_empty());
+            assert!(!m.commands.units[&id].rally_drift);
+        }
+    }
 }
 
 #[test]

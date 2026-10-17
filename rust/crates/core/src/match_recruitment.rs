@@ -238,7 +238,7 @@ macro_rules! recruit_parts {
     };
 }
 impl Match {
-    /// Execute recorded Conquest purchases against the canonical finish and seat state.
+    /// Execute recorded ordinary or Horde purchases against canonical finish and seat state.
     /// Routing borrows the actual refreshed recipient projection, never a copied view.
     pub fn recorded_buy(
         &mut self,
@@ -255,12 +255,16 @@ impl Match {
         if self.finish.is_some() || wallet.away || wallet.out {
             return Err(production::Error::Denied(Denial::Blocked).into());
         }
-        if self.options.mode == crate::economy::Mode::Tutorial {
-            self.validate_tutorial_state()
+        if self.options.mode == crate::economy::Mode::Horde {
+            self.validate_horde_economy().map_err(RecruitError::Story)?;
+        } else {
+            if self.options.mode == crate::economy::Mode::Tutorial {
+                self.validate_tutorial_state()
+                    .map_err(RecruitError::Story)?;
+            }
+            self.validate_match_finish_state()
                 .map_err(RecruitError::Story)?;
         }
-        self.validate_match_finish_state()
-            .map_err(RecruitError::Story)?;
         if self
             .rules
             .kind(kind)
@@ -277,13 +281,6 @@ impl Match {
         name: &str,
         from: Option<u32>,
     ) -> Result<CompletedRecruitUnit, RecruitError> {
-        // Parked planes need aircraft rows too. Refuse before payment or publication
-        // while the host uses the ordinary snapshot adapter.
-        if self.ordinary_snapshot_only {
-            return Err(RecruitError::Placement(
-                crate::produced_units::Error::UnsupportedAir,
-            ));
-        }
         let facts = admission_facts(
             &self.world.game,
             &self.start,

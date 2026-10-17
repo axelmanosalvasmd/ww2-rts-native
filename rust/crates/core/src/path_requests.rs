@@ -358,3 +358,7 @@ impl PathRequests {
 fn valid_goal(p: Point) -> bool {
     p.x.is_finite() && p.z.is_finite()
 }
+
+#[cfg(test)]
+#[path = "path_requests_if26_tests.rs"]
+mod if26_tests;

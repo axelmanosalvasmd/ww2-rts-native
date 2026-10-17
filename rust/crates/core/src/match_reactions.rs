@@ -107,6 +107,9 @@ impl Match {
     }
 
     pub(crate) fn reaction_home_for(&self, unit: &Unit) -> Result<Point, String> {
+        if let Some(home) = self.convoy_retreat_home(unit) {
+            return Ok(home);
+        }
         if self.uses_world_routes() {
             return self.world_ground_home_for(unit);
         }
@@ -125,6 +128,21 @@ impl Match {
             &self.world.game.players,
             self.horde.as_ref().map(|horde| horde.slot),
         )
+    }
+
+    /// Convoys prefer the nearest active allied source before the mode's home.
+    /// Store order breaks equal-distance ties, as in the prototype's stable sort.
+    pub(crate) fn convoy_retreat_home(&self, unit: &Unit) -> Option<Point> {
+        self.convoys
+            .as_ref()
+            .filter(|state| state.trucks.contains_key(&unit.id))?
+            .stores
+            .iter()
+            .filter(|store| {
+                store.active && store.source && self.world.game.allied(unit.owner, store.owner)
+            })
+            .min_by(|a, b| distance(unit.at(), a.at).total_cmp(&distance(unit.at(), b.at)))
+            .map(|store| store.at)
     }
 
     /// Ground retreat reset, sharing the command's staged house exit when needed.
@@ -594,3 +612,7 @@ mod tests;
 #[cfg(test)]
 #[path = "match_reactions/intent_tests.rs"]
 mod intent_tests;
+
+#[cfg(test)]
+#[path = "match_reactions/retreat_home_tests.rs"]
+mod retreat_home_tests;

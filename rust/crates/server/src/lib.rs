@@ -6,6 +6,7 @@ mod lobby;
 mod maps;
 mod native_startup;
 mod saves;
+mod static_files;
 mod trusted_room;
 pub use trusted_room::TrustedRoomConfig;
 pub mod room_runtime;
@@ -17,11 +18,12 @@ pub mod tick_timing;
 
 use axum::{
     Json, Router,
+    body::Body,
     extract::{
-        RawQuery, State, WebSocketUpgrade,
+        OriginalUri, RawQuery, State, WebSocketUpgrade,
         ws::{CloseFrame, Message, WebSocket},
     },
-    http::header,
+    http::{HeaderMap, Method, Response, header},
     routing::{any, get},
 };
 use lobby::{Connection, Hub, Output};
@@ -48,6 +50,8 @@ const MAX_MESSAGE: usize = 16 * 1024;
 pub struct Config {
     pub max_rooms: usize,
     pub public_url: String,
+    /// Optional browser asset root, with access limited to the prototype's static prefixes.
+    pub static_root: Option<std::path::PathBuf>,
     /// Opt-in host JSONL output. No diagnostic fields enter recipient messages.
     pub diagnostic_dir: Option<std::path::PathBuf>,
     pub tick_log: bool,
@@ -59,6 +63,7 @@ impl Default for Config {
         Self {
             max_rooms: 32,
             public_url: String::new(),
+            static_root: None,
             diagnostic_dir: None,
             tick_log: false,
             saves_dir: "saves".into(),
@@ -77,6 +82,7 @@ struct Server {
     hub: Arc<Mutex<Hub>>,
     next: Arc<AtomicU64>,
     clock: Instant,
+    static_files: Option<static_files::StaticFiles>,
     #[cfg(test)]
     test_now_ms: Option<Arc<AtomicU64>>,
 }
@@ -167,6 +173,7 @@ async fn serve_inner(
         hub: Arc::new(Mutex::new(hub)),
         next: Arc::new(AtomicU64::new(1)),
         clock: Instant::now(),
+        static_files: config.static_root.map(static_files::StaticFiles::new),
         #[cfg(test)]
         test_now_ms: None,
     };
@@ -201,7 +208,7 @@ async fn serve_inner(
         .route("/api/rooms", get(directory))
         .route("/maps", any(maps::serve))
         .route("/ws", get(upgrade))
-        .fallback(maps::serve)
+        .fallback(static_or_maps)
         .with_state((server, stop.subscribe()));
     let result = axum::serve(listener, app)
         .with_graceful_shutdown(async move {
@@ -220,6 +227,27 @@ async fn maintenance_stop(server: &Server) {
 }
 
 type App = (Server, watch::Receiver<bool>);
+async fn static_or_maps(
+    State((server, _)): State<App>,
+    OriginalUri(uri): OriginalUri,
+    method: Method,
+    headers: HeaderMap,
+) -> Response<Body> {
+    serve_static_or_maps(server.static_files.as_ref(), uri, method, headers).await
+}
+
+async fn serve_static_or_maps(
+    files: Option<&static_files::StaticFiles>,
+    uri: axum::http::Uri,
+    method: Method,
+    headers: HeaderMap,
+) -> Response<Body> {
+    if uri.path().starts_with("/maps/") || files.is_none() {
+        return maps::serve(OriginalUri(uri), method, headers).await;
+    }
+    files.unwrap().serve(uri, headers).await
+}
+
 async fn directory(
     State((server, _)): State<App>,
 ) -> ([(header::HeaderName, &'static str); 1], Json<Value>) {
@@ -307,9 +335,17 @@ async fn socket_loop(
             _ = stop.changed() => { close(&mut socket,1001,"server shutdown").await; break; }
             _ = cancelled.changed() => { close(&mut socket,1013,"too far behind").await; break; }
             Some(output) = rx.recv() => {
-                let diagnostic_bytes = if diagnostics { output.diagnostic_bytes() } else { 0 };
+                let diagnostic_bytes = output.diagnostic_bytes();
                 match output {
                     Output::Json(v) => if socket.send(Message::Text(v.to_string().into())).await.is_err() { break; },
+                    Output::Watcher(json) => {
+                        let result = tokio::select! {
+                            result = socket.send(Message::Text(json.to_string().into())) => result.is_ok(),
+                            _ = stop.changed() => false,
+                            _ = cancelled.changed() => false,
+                        };
+                        if !result { break; }
+                    },
                     Output::Snapshot(mut write) => {
                         let message = Message::Text(std::mem::take(&mut write.json).into());
                         let result = tokio::select! {

@@ -1,5 +1,6 @@
-//! Internal Conquest projections and an explicitly admitted quiet seat envelope.
+//! Internal ordinary recipient projections and an explicitly admitted quiet seat envelope.
 //! Unsupported canonical actors remain explicit. No transport contract is added.
+//! Projectile and aviation fields follow the pinned prototype recipient rules.
 use crate::{
     catalog::Catalog,
     combat,
@@ -20,8 +21,12 @@ mod delivery;
 mod engineering;
 #[path = "recipient_snapshot/falling.rs"]
 mod falling;
+#[path = "recipient_snapshot/flights.rs"]
+mod flights;
 #[path = "recipient_snapshot/logistics.rs"]
 mod logistics;
+#[path = "recipient_snapshot/modes.rs"]
+mod modes;
 #[path = "recipient_snapshot/owners.rs"]
 mod owners;
 #[path = "recipient_snapshot/public_state.rs"]
@@ -30,12 +35,16 @@ mod public_state;
 mod selected;
 #[path = "recipient_snapshot/shots.rs"]
 mod shots;
+#[path = "recipient_snapshot/spectator.rs"]
+mod spectator;
 #[path = "recipient_snapshot/support.rs"]
 mod support;
 pub use composition::{GroundListDeliveryFrame, QuiescentDeliveryFrame, SupportedSeatSnapshot};
 pub use delivery::{DeliveryFrame, DeliveryState};
+pub use modes::mode_row;
 pub use selected::{SelectedDeliveryFrame, SelectedGroundListFrame, SelectedSeat};
 pub use shots::{SelectedGroundShotFrame, ShotRef};
+pub use spectator::SpectatorDelivery;
 pub use support::SUPPORTED_SUPPORT_KINDS;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -75,7 +84,7 @@ pub enum SnapshotError {
     Rules,
 }
 
-/// Only implemented fields, kept separate from the capability list so callers
+/// Implemented fields, kept separate from the capability list so callers
 /// cannot accidentally serialize a partial result as a complete snapshot.
 #[derive(Clone, Debug, PartialEq)]
 pub struct RecipientProjection {
@@ -92,10 +101,14 @@ pub fn horde_mode_row(state: &Match) -> Result<Value, SnapshotError> {
     let mut row = json!({
         "kind": "horde", "defenderTeam": 0, "attackerTeam": 1,
         "timeLeft": mode.time_left, "suddenDeath": false,
-        "profile": mode.profile.as_str(), "wave": mode.wave,
-        "left": mode.left, "active": mode.active, "boss": mode.boss,
+        "wave": mode.wave,
+        "left": mode.left, "active": mode.active,
         "slot": horde.slot
     });
+    if mode.wave > 0 {
+        row["profile"] = json!(mode.profile.as_str());
+        row["boss"] = json!(mode.boss);
+    }
     if let Some(profile) = mode.next_profile {
         row["nextProfile"] = json!(profile.as_str());
     }
@@ -110,50 +123,22 @@ pub struct SnapshotCache<'a> {
     owners: Vec<Map<String, Value>>,
     public: Vec<Map<String, Value>>,
 }
+
+/// Owned send facts can pass through mutable terrain/list publication without
+/// rebuilding unit rows. Those publications do not change these facts.
+struct SnapshotRows {
+    rows: Vec<Value>,
+    owners: Vec<Map<String, Value>>,
+    public: Vec<Map<String, Value>>,
+}
+#[cfg(test)]
+thread_local! { static CACHE_BUILDS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) }; }
+
 impl<'a> SnapshotCache<'a> {
     pub fn new(state: &'a Match) -> Result<Self, SnapshotError> {
-        if !matches!(state.options.mode, Mode::Default | Mode::Conquest)
-            || state.world.game.mode.is_some()
-            || state.world.geography().is_some()
-            || state.assault.is_some()
-            || state.world_runtime.is_some()
-        {
-            return Err(SnapshotError::UnsupportedMode);
-        }
-        let g = &state.world.game;
-        let cells = g.w.checked_mul(g.h).ok_or(SnapshotError::Rules)?;
-        if g.tick < 0 {
-            return Err(SnapshotError::InvalidNumber);
-        }
-        if g.w == 0
-            || g.h == 0
-            || g.flags.len() != cells
-            || g.chars.len() != cells
-            || g.house.len() != cells
-        {
-            return Err(SnapshotError::Rules);
-        }
-        if g.players.len() != state.start.economy.players.len()
-            || g.players.iter().enumerate().any(|(slot, p)| {
-                p.slot != slot
-                    || !(0..6).contains(&p.team)
-                    || p.visible.windows(2).any(|ids| ids[0] >= ids[1])
-            })
-        {
-            return Err(SnapshotError::InvalidRecipient);
-        }
-        for (id, u) in &g.units {
-            if *id != u.id
-                || u.id == 0
-                || u.kind >= state.rules.kinds.len()
-                || u.owner >= g.players.len()
-            {
-                return Err(SnapshotError::Rules);
-            }
-            finite(&[u.x, u.z])?;
-        }
-        engineering::validate(state)?;
-        aircraft::validate(state)?;
+        validate_snapshot(state)?;
+        #[cfg(test)]
+        CACHE_BUILDS.with(|count| count.set(count.get() + 1));
         let rows = state
             .world
             .game
@@ -178,51 +163,171 @@ impl<'a> SnapshotCache<'a> {
             public,
         })
     }
+    fn into_rows(self) -> SnapshotRows {
+        SnapshotRows {
+            rows: self.rows,
+            owners: self.owners,
+            public: self.public,
+        }
+    }
+    fn with_rows(state: &'a Match, rows: SnapshotRows) -> Self {
+        Self {
+            state,
+            rows: rows.rows,
+            owners: rows.owners,
+            public: rows.public,
+        }
+    }
     pub fn recipient(&self, slot: usize) -> Result<RecipientProjection, SnapshotError> {
         let g = &self.state.world.game;
         if slot >= g.players.len() || slot >= self.state.start.economy.players.len() {
             return Err(SnapshotError::InvalidRecipient);
         }
-        let seen = |id| seen_by(self.state, slot, id);
         let units = self
             .rows
             .iter()
-            .filter(|row| seen(row[0].as_u64().unwrap() as u32))
-            .map(|row| {
-                let mut row = row.as_array().unwrap().clone();
-                if !seen(row[9].as_u64().unwrap() as u32) {
-                    row[9] = json!(0);
-                }
-                if row[2].as_u64() != Some(slot as u64) {
-                    row[11] = json!(0);
-                    row[12] =
-                        json!(row[12].as_u64().unwrap() & (2047 | 32768 | (7 << 20) | 262144));
-                }
-                Value::Array(row)
-            })
+            .filter(|row| seen_by(self.state, slot, row[0].as_u64().unwrap() as u32))
+            .map(|row| recipient_unit_row(self.state, slot, row.clone()))
             .collect::<Vec<_>>();
-        let mut fields = economy_fields(self.state, slot)?;
-        fields.insert("units".into(), json!(units));
-        fields.extend(self.owners[slot].clone());
-        fields.extend(self.public[slot].clone());
-        fields.insert("falling".into(), falling::project(self.state, slot)?);
-        if let Some(logistics) = logistics::project(self.state, slot)? {
-            fields.insert("logistics".into(), logistics);
-        }
-        Ok(RecipientProjection {
-            fields,
-            missing: vec![
-                SnapshotCapability::WrecksAndFoundMines,
-                SnapshotCapability::Terrain,
-                SnapshotCapability::Fog,
-                SnapshotCapability::ShotsAndFlights,
-                SnapshotCapability::TeamEffects,
-            ],
-        })
+        project_recipient(
+            self.state,
+            slot,
+            units,
+            self.owners[slot].clone(),
+            self.public[slot].clone(),
+        )
     }
 }
 
-fn seen_by(state: &Match, slot: usize, id: u32) -> bool {
+fn validate_snapshot(state: &Match) -> Result<(), SnapshotError> {
+    if !matches!(
+        (state.options.mode, state.world.game.mode),
+        (Mode::Default | Mode::Conquest, None)
+            | (Mode::Classic, Some(crate::game::ModeKind::Classic))
+    ) || state.world.geography().is_some()
+        || state.assault.is_some()
+        || state.world_runtime.is_some()
+    {
+        return Err(SnapshotError::UnsupportedMode);
+    }
+    let g = &state.world.game;
+    let cells = g.w.checked_mul(g.h).ok_or(SnapshotError::Rules)?;
+    if g.tick < 0 {
+        return Err(SnapshotError::InvalidNumber);
+    }
+    if g.w == 0
+        || g.h == 0
+        || g.flags.len() != cells
+        || g.chars.len() != cells
+        || g.house.len() != cells
+    {
+        return Err(SnapshotError::Rules);
+    }
+    if g.players.len() != state.start.economy.players.len()
+        || g.players.iter().enumerate().any(|(slot, p)| {
+            p.slot != slot
+                || !(0..6).contains(&p.team)
+                || p.visible.windows(2).any(|ids| ids[0] >= ids[1])
+        })
+    {
+        return Err(SnapshotError::InvalidRecipient);
+    }
+    for (id, u) in &g.units {
+        if *id != u.id
+            || u.id == 0
+            || u.kind >= state.rules.kinds.len()
+            || u.owner >= g.players.len()
+        {
+            return Err(SnapshotError::Rules);
+        }
+        finite(&[u.x, u.z])?;
+    }
+    engineering::validate(state)?;
+    aircraft::validate(state)?;
+    Ok(())
+}
+
+/// Build one recipient directly from canonical state, without a send cache.
+/// Owner decision P uses the cached prototype mask for both native paths.
+pub fn recipient_uncached(
+    state: &Match,
+    slot: usize,
+) -> Result<RecipientProjection, SnapshotError> {
+    validate_snapshot(state)?;
+    if slot >= state.world.game.players.len() {
+        return Err(SnapshotError::InvalidRecipient);
+    }
+    let units = state
+        .world
+        .game
+        .units
+        .values()
+        .map(|unit| unit_row(state, unit))
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .filter(|row| seen_by(state, slot, row[0].as_u64().unwrap() as u32))
+        .map(|row| recipient_unit_row(state, slot, row))
+        .collect::<Vec<_>>();
+    let owners = owners::capture(state)?;
+    let mut public = public_state::capture(state)?;
+    for (fields, support) in public.iter_mut().zip(support::capture(state)?) {
+        fields.extend(support);
+    }
+    for (fields, works) in public.iter_mut().zip(engineering::capture(state)?) {
+        fields.insert("works".into(), works);
+    }
+    project_recipient(
+        state,
+        slot,
+        units,
+        owners[slot].clone(),
+        public[slot].clone(),
+    )
+}
+
+fn recipient_unit_row(state: &Match, slot: usize, row: Value) -> Value {
+    let Value::Array(mut row) = row else {
+        unreachable!("unit_row always produces an array")
+    };
+    if !seen_by(state, slot, row[9].as_u64().unwrap() as u32) {
+        row[9] = json!(0);
+    }
+    if row[2].as_u64() != Some(slot as u64) {
+        row[11] = json!(0);
+        row[12] = json!(row[12].as_u64().unwrap() & (2047 | 32768 | (7 << 20) | 262144));
+    }
+    Value::Array(row)
+}
+
+fn project_recipient(
+    state: &Match,
+    slot: usize,
+    units: Vec<Value>,
+    owners: Map<String, Value>,
+    public: Map<String, Value>,
+) -> Result<RecipientProjection, SnapshotError> {
+    let mut fields = economy_fields(state, slot)?;
+    fields.insert("units".into(), json!(units));
+    fields.extend(owners);
+    fields.extend(public);
+    fields.insert("falling".into(), falling::project(state, slot)?);
+    fields.insert("flights".into(), flights::project(state, slot)?);
+    if let Some(logistics) = logistics::project(state, slot)? {
+        fields.insert("logistics".into(), logistics);
+    }
+    Ok(RecipientProjection {
+        fields,
+        missing: vec![
+            SnapshotCapability::WrecksAndFoundMines,
+            SnapshotCapability::Terrain,
+            SnapshotCapability::Fog,
+            SnapshotCapability::ShotsAndFlights,
+            SnapshotCapability::TeamEffects,
+        ],
+    })
+}
+
+pub(crate) fn seen_by(state: &Match, slot: usize, id: u32) -> bool {
     let g = &state.world.game;
     let u = g.units.get(&id);
     g.reveal && u.is_some()
@@ -1047,9 +1152,11 @@ pub(crate) mod tests {
             let cache = SnapshotCache::new(&m).unwrap();
             for (slot, expected) in case["outputs"].as_array().unwrap().iter().enumerate() {
                 let projection = cache.recipient(slot).unwrap();
+                let mut expected = expected.clone();
+                expected["flights"] = case["fullOutputs"][slot]["flights"].clone();
                 equal(
                     &Value::Object(projection.fields),
-                    expected,
+                    &expected,
                     &format!("{} recipient{slot}", case["name"]),
                 );
                 assert!(!projection.missing.is_empty());
@@ -1116,3 +1223,7 @@ mod map_house_selected_tests;
 #[cfg(test)]
 #[path = "recipient_snapshot/net52_tests.rs"]
 mod net52_tests;
+
+#[cfg(test)]
+#[path = "recipient_snapshot/combat_filter_tests.rs"]
+mod combat_filter_tests;

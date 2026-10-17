@@ -47,6 +47,16 @@ fn number(value: &Value, key: &str) -> Result<f64, String> {
 }
 
 impl Match {
+    fn validate_construction_mode(&self) -> Result<(), String> {
+        if self.options.mode == crate::economy::Mode::Horde {
+            self.validate_horde_economy()
+        } else if crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode) {
+            self.validate_actor_mode()
+        } else {
+            Err("construction phases require ordinary ground or canonical Horde".into())
+        }
+    }
+
     /// Tear down an owned unfinished site for the original 75 percent MP refund.
     /// This administrative removal creates no death, bounty, rubble or built counter.
     pub fn cancel_construction(
@@ -83,6 +93,9 @@ impl Match {
         }
         let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
         let refund = number(catalog.unit(&kind.name).map_err(|e| e.to_string())?, "cost")? * 0.75;
+        if refund < 0.0 {
+            return Err("invalid cancellation cost".into());
+        }
         let wallet = self.start.economy.players[owner].mp + refund;
         if !wallet.is_finite() {
             return Err("construction refund overflow".into());
@@ -96,6 +109,16 @@ impl Match {
         let structure_id = structure.id.clone();
         let cells = structure.cells.clone();
         let sections: BTreeSet<_> = structure.section_ids.iter().cloned().collect();
+        self.world
+            .preflight_cell_rows(&cells)
+            .map_err(|e| e.to_string())?;
+        if cells.is_empty()
+            || sections
+                .iter()
+                .any(|id| self.world.section_by_id(id).is_none())
+        {
+            return Err("inconsistent cancellation structure".into());
+        }
         let mut physical = self.world.begin_transaction().map_err(|e| e.to_string())?;
         physical.world.game.units.remove(&id);
         for &cell in &cells {
@@ -115,10 +138,17 @@ impl Match {
             .detached_sections
             .retain(|key, _| !sections.contains(key));
         for &cell in &cells {
-            physical
+            let change = physical
                 .world
                 .set_cell(cell, b'.')
                 .map_err(|e| e.to_string())?;
+            if change.logged_index.is_none() {
+                // A failed corner may already be open. Publish its removed section metadata.
+                physical
+                    .world
+                    .log_cell(cell, false)
+                    .map_err(|e| e.to_string())?;
+            }
         }
         let physical = physical
             .prepare_publication(&mut self.world)
@@ -146,6 +176,7 @@ impl Match {
         self.production.remove_building(id);
         self.building_rallies.remove(&id);
         self.recruit_metadata.remove(&id);
+        self.aviation.remove(id);
         if let Some(world) = self.world_runtime.as_mut() {
             for node in &mut world.nodes {
                 if node.depot == Some(id) {
@@ -265,11 +296,27 @@ impl Match {
 
     /// Read-only admission. The sole runner calls this before inputs and again before its clock.
     pub fn validate_construction_tick(&self) -> Result<(), String> {
-        if self.validate_actor_mode().is_err()
-            || !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode)
-            || self.world.game.tick < 0
+        // Horde exposes assigned facility work, not the ordinary construction phase.
+        if self.options.mode == crate::economy::Mode::Horde
+            && !self.commands.units.iter().any(|(worker, control)| {
+                control.build_target.is_some()
+                    && self
+                        .world
+                        .game
+                        .units
+                        .get(worker)
+                        .is_some_and(|unit| unit.build)
+            })
         {
             return Err("construction phases require ordinary Conquest".into());
+        }
+        self.validate_construction_inputs()
+    }
+
+    fn validate_construction_inputs(&self) -> Result<(), String> {
+        self.validate_construction_mode()?;
+        if self.world.game.tick < 0 {
+            return Err("construction phases require a nonnegative tick".into());
         }
         self.validate_building_activity_rows()?;
         for (&id, unit) in &self.world.game.units {
@@ -323,11 +370,7 @@ impl Match {
         id: UnitId,
         frame: &mut ConstructionFrame,
     ) -> Result<(), String> {
-        if self.validate_actor_mode().is_err()
-            || !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode)
-        {
-            return Err("construction worker requires ordinary Conquest".into());
-        }
+        self.validate_construction_mode()?;
         if frame.tick != self.world.game.tick || frame.workers.contains(&id) {
             return Err("stale or repeated construction worker turn".into());
         }
@@ -412,7 +455,8 @@ impl Match {
         if frame.tick != self.world.game.tick {
             return Err("stale construction crew frame".into());
         }
-        self.validate_ordinary_finish_state()?;
+        self.validate_construction_mode()?;
+        self.validate_match_finish_state()?;
         let dt = self.rules.movement.tick;
         if !dt.is_finite() || dt <= 0.0 {
             return Err("invalid construction interval".into());
@@ -558,8 +602,9 @@ impl Match {
         ids: &[i64],
         command: &crate::match_commands::Command,
     ) -> Result<Vec<UnitId>, String> {
-        self.validate_construction_tick()?;
-        self.validate_ordinary_finish_state()?;
+        // Build and Assist must admit a canonical Horde facility before it has a crew.
+        self.validate_construction_inputs()?;
+        self.validate_match_finish_state()?;
         if owner >= self.world.game.players.len()
             || !self.start.economy.players[owner].mp.is_finite()
         {
@@ -892,9 +937,8 @@ impl Match {
         queue: bool,
     ) -> Result<Option<crate::match_commands::Denial>, String> {
         use crate::{
-            game::{CELL, MOVE, Point},
+            game::{CELL, Point},
             match_commands::{Command, Denial},
-            match_runtime::{foot_center, footprint},
             unit_publication::StagedUnit,
         };
         let command = Command::Build {
@@ -973,7 +1017,13 @@ impl Match {
         }
         if let Some(needs) = definition.get("needs").and_then(Value::string)
             && !self.world.game.units.values().any(|u| {
-                u.owner == owner
+                (u.owner == owner
+                    || (self.options.mode == crate::economy::Mode::Horde
+                        && self
+                            .horde
+                            .as_ref()
+                            .is_some_and(|horde| owner != horde.slot && u.owner != horde.slot)
+                        && self.world.game.allied(u.owner, owner)))
                     && self.rules.kinds[u.kind].name == needs
                     && u.hp > 0.0
                     && u.built.is_some_and(|b| b >= 1.0)
@@ -998,78 +1048,49 @@ impl Match {
         if name == "supplycache" && !self.options.logistics {
             return self.construction_denial(&selected, Denial::Blocked);
         }
-        let size = number(definition, "size")? as usize;
-        let x = math::round(at.x / CELL - size as f64 / 2.0);
-        let z = math::round(at.z / CELL - size as f64 / 2.0);
-        let g = &self.world.game;
-        if x < 0.0 || z < 0.0 || x >= g.w as f64 || z >= g.h as f64 {
-            return self.construction_denial(&selected, Denial::Blocked);
+        let placement = crate::building_placement::check(
+            &crate::building_placement::Context {
+                game: &self.world.game,
+                rules: &self.rules,
+                mode: self.options.mode,
+                logistics: self.options.logistics,
+                nodes: &[],
+                owned_cells: None,
+                rail_yard: None,
+            },
+            name,
+            at,
+            |center| self.recipient_sees(owner, center),
+        )?;
+        if let Some(reason) = placement.reason {
+            use crate::building_placement::Reason;
+            let denial = match reason {
+                Reason::Blocked => Denial::Blocked,
+                Reason::NotVisible => Denial::NotVisible,
+                Reason::Coast => Denial::Coast,
+                // World and node construction are refused before this ordinary query.
+                Reason::Territory | Reason::Rail => {
+                    return Err("unexpected World placement reason".into());
+                }
+            };
+            return self.construction_denial(&selected, denial);
         }
-        let cell = z as usize * g.w + x as usize;
-        let Some(cells) = footprint(g, cell, size) else {
-            return self.construction_denial(&selected, Denial::Blocked);
-        };
-        let center = foot_center(g, cell, size);
-        if !self.recipient_sees(owner, center)? {
-            return self.construction_denial(&selected, Denial::NotVisible);
-        }
+        let cells = placement.cells.ok_or("missing construction footprint")?;
+        let center = placement.at;
         self.world
             .preflight_cell_rows(&cells)
             .map_err(|e| e.to_string())?;
-        let g = &self.world.game;
-        if definition.get("coast").and_then(Value::boolean) == Some(true) {
-            if !g.naval {
-                return self.construction_denial(&selected, Denial::Blocked);
-            }
-            let coastal = cells.iter().any(|&cell| {
-                let x = (cell % g.w) as isize;
-                let z = (cell / g.w) as isize;
-                (-2..=2).any(|dz| {
-                    (-2..=2).any(|dx| {
-                        let (x, z) = (x + dx, z + dz);
-                        x >= 0
-                            && z >= 0
-                            && x < g.w as isize
-                            && z < g.h as isize
-                            && g.flags[z as usize * g.w + x as usize] & crate::game::LAND == 0
-                    })
-                })
-            });
-            if !coastal {
-                return self.construction_denial(&selected, Denial::Coast);
-            }
-        }
-        let min = cells
-            .iter()
-            .map(|&c| g.height.as_ref().map_or(0, |h| h[c]))
-            .min()
-            .unwrap();
         let top = cells
             .iter()
-            .map(|&c| g.height.as_ref().map_or(0, |h| h[c]))
+            .map(|&c| {
+                self.world
+                    .game
+                    .height
+                    .as_ref()
+                    .map_or(0, |heights| heights[c])
+            })
             .max()
-            .unwrap();
-        let occupied = g.units.values().any(|u| {
-            u.hp > 0.0
-                && !self.rules.kinds[u.kind].air
-                && !u.riding
-                && !self.rules.kinds[u.kind].structure
-                && u.x >= 0.0
-                && u.z >= 0.0
-                && u.x < g.w as f64 * CELL
-                && u.z < g.h as f64 * CELL
-                && cells.contains(
-                    &((u.z / CELL).floor() as usize * g.w + (u.x / CELL).floor() as usize),
-                )
-        });
-        if occupied
-            || i16::from(top) - i16::from(min) > 1
-            || cells
-                .iter()
-                .any(|&c| g.flags[c] & MOVE != 0 || b"WF=KOAQ".contains(&g.chars[c]))
-        {
-            return self.construction_denial(&selected, Denial::Blocked);
-        }
+            .ok_or("empty construction footprint")?;
         let id = self.next_unit_id;
         let next_id = id
             .checked_add(1)
