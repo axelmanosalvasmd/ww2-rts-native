@@ -8,6 +8,8 @@ These files reserve contract topics; no protocol or ABI is approved by their cre
 | --- | --- | --- | --- |
 | protocol.md | Julio | Axel | v0 draft; technical answers recorded (#5); operative hit-position, spectator reference behavior and cached-mask decisions confirmed by both owners on 2026-10-16, recorded in protocol.md |
 | [r1-ingress.md](r1-ingress.md) | Julio | Axel | Prototype-identical ordinary R1 ingress candidate under the recorded groups F/M grant; exact-head runtime ack pending |
+| [start-cancellation.md](start-cancellation.md) | Julio | Axel | Identical prototype v0 pending-start cancellation and scenario-denial shapes; exact-head acknowledgement pending |
+| [ordinary-results.md](ordinary-results.md) | Julio | Axel | Identical prototype v0 ordinary mode/result fields; owner groups N/P recorded in #5 comment 6217590741; exact-head acknowledgement pending |
 | terrain.md | Julio | Axel | v0 draft; technical answers recorded (#5) |
 | [save-format.md](save-format.md) | Julio | Axel | Private JSON format v1; owner group I recorded in #5 comment 6217590741; implementation exact-head acknowledgement pending |
 | [startup-tables/README.md](startup-tables/README.md) | Julio | Axel | Content/schema v1 candidate explicitly accepted by both owners in PR #195 review; internal producer/platform proof integrated through PR #198 at `514e15f4`; transport #199 remains unagreed and unimplemented; Unreal adoption pending |

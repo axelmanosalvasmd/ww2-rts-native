@@ -59,9 +59,26 @@ impl NativeStartup {
         settings: StartupSettings<'_>,
         authored: &ww2_core::map::AuthoritativeMap,
     ) -> Result<Self, String> {
-        if settings.mode != "conquest"
-            || !matches!(state.options.mode, Mode::Default | Mode::Conquest)
-            || state.world.game.mode.is_some()
+        let mode_matches = matches!(
+            (settings.mode, state.options.mode, state.world.game.mode),
+            ("conquest", Mode::Default | Mode::Conquest, None)
+                | (
+                    "assault",
+                    Mode::Assault,
+                    Some(ww2_core::game::ModeKind::Assault)
+                )
+                | (
+                    "annihilation",
+                    Mode::Annihilation,
+                    Some(ww2_core::game::ModeKind::Annihilation)
+                )
+                | (
+                    "classic",
+                    Mode::Classic,
+                    Some(ww2_core::game::ModeKind::Classic)
+                )
+        );
+        if !mode_matches
             || state.options.map_key.as_deref() != Some(settings.map)
             || state.options.weather != WeatherChoice::from_reference(Some(settings.weather))
             || state.options.sandbox != settings.sandbox
@@ -109,7 +126,21 @@ impl NativeStartup {
         {
             return Err("native startup mission definition disagrees with the bound map".into());
         }
-        let plan = StartPlan::prepare(authored, &state.options, &state.rules)?;
+        let plan = match state.options.mode {
+            Mode::Assault => StartPlan::prepare_assault(
+                authored,
+                &state.options,
+                &state.rules,
+                state
+                    .assault
+                    .ok_or("missing Assault startup state")?
+                    .defender_team,
+            )?,
+            Mode::Classic | Mode::Annihilation => {
+                StartPlan::prepare_elimination(authored, &state.options, &state.rules)?
+            }
+            _ => StartPlan::prepare(authored, &state.options, &state.rules)?,
+        };
         if plan.players.len() != state.start.players.len()
             || plan
                 .players

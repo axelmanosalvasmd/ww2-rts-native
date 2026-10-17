@@ -260,6 +260,7 @@ struct Room {
     defender: usize,
     empty_since: Option<u64>,
     native: Option<AttachedRuntime>,
+    starting: Option<async_start::PendingStart>,
     result: Option<RoomResult>,
 }
 
@@ -388,6 +389,61 @@ impl Room {
         }
         removed
     }
+    fn end_native(&mut self, now: u64) -> Result<(), String> {
+        if self
+            .native
+            .as_ref()
+            .is_some_and(|native| native.runtime.fault().is_some())
+        {
+            return Err("faulted native room cannot end".into());
+        }
+        if self.native.is_none() && self.starting.is_none() {
+            return Err("no native match to end".into());
+        }
+        let status = if let Some(native) = &mut self.native {
+            let status = crate::NativeRoomStatus {
+                epoch: native.epoch,
+                tick: native.runtime.state().world.game.tick,
+                held: native.runtime.held(),
+                ending_complete: true,
+                paused: false,
+                fault: None,
+            };
+            let resume = native.runtime.resume(now);
+            for person in self.people() {
+                if let Some(connection) = &person.connection {
+                    connection.send(resume.clone());
+                }
+            }
+            status
+        } else {
+            let resume = json!({"t":"pause", "paused":false, "by":"", "reason":"host", "left":0});
+            for person in self.people() {
+                if let Some(connection) = &person.connection {
+                    connection.send(resume.clone());
+                }
+            }
+            crate::NativeRoomStatus {
+                epoch: 0,
+                tick: 0,
+                held: 0,
+                ending_complete: true,
+                paused: false,
+                fault: None,
+            }
+        };
+        self.starting = None;
+        self.native = None;
+        self.result = Some(RoomResult {
+            report: json!({"ended":true}),
+            status,
+        });
+        self.retain_seats(|_, person| {
+            person.ai || person.connection.as_ref().is_some_and(Connection::ready)
+        });
+        Ok(())
+    }
+
     fn finish_native(&mut self, now: u64) -> Result<(), String> {
         let native = self.native.as_mut().ok_or("native runtime absent")?;
         if native.runtime.held() != 120 {
@@ -450,7 +506,7 @@ impl Room {
             .iter()
             .position(|p| p.connection.as_ref().is_some_and(|c| c.id == id));
         let mut result = json!({
-            "t":"lobby", "proto":0, "code": self.code, "state":if self.native.is_some() { "play" } else { "lobby" },
+            "t":"lobby", "proto":0, "code": self.code, "state":if self.native.is_some() || self.starting.is_some() { "play" } else { "lobby" },
             "role":"commander", "operatives":[], "spectator":you.is_none(),
             "amHost":self.is_host(id), "spectators":self.spectators.iter().map(|p| &p.name).collect::<Vec<_>>(),
             "listed":self.listed, "saves":self.saves.lobby_list(&self.code), "hordeBest":null,
@@ -489,10 +545,10 @@ impl Room {
     fn directory(&self, maps: &Value) -> Value {
         let mut v = json!({
             "code":self.code,"title":self.title,"mode":self.mode,
-            "map":if self.mode == "world" { "world" } else { &self.map },"state":if self.native.is_some() { "play" } else { "lobby" },
+            "map":if self.mode == "world" { "world" } else { &self.map },"state":if self.native.is_some() || self.starting.is_some() { "play" } else { "lobby" },
             "humans":self.players.iter().filter(|p| !p.ai && p.connection.is_some()).count(),
             "ai":self.players.iter().filter(|p| p.ai).count(),"occupied":self.players.len(),
-            "capacity":self.capacity(maps),"joinable":self.native.is_none() && self.players.len() < self.capacity(maps)
+            "capacity":self.capacity(maps),"joinable":self.native.is_none() && self.starting.is_none() && self.players.len() < self.capacity(maps)
         });
         if self.mode == "world" {
             v["worldSize"] = json!(self.world_size);
@@ -588,7 +644,21 @@ impl Room {
             }
             return false;
         }
-        if host && matches!(t, "pause" | "resume" | "end") && self.native.is_some() {
+        if self.starting.is_some() {
+            return false;
+        }
+        if host && t == "end" && attached {
+            if me.connection.as_ref().is_none_or(|c| !c.ready()) {
+                me.deny(t, "blocked", now);
+                return false;
+            }
+            if self.end_native(now).is_err() {
+                self.players[seated.expect("seated host")].deny(t, "blocked", now);
+                return false;
+            }
+            return true;
+        }
+        if host && matches!(t, "pause" | "resume") && self.native.is_some() {
             let native = self.native.as_mut().unwrap();
             if native.runtime.fault().is_some()
                 || !me.connection.as_ref().is_some_and(Connection::ready)
@@ -618,25 +688,6 @@ impl Room {
                     native.runtime.fault_stop(error);
                     return false;
                 }
-            }
-            if t == "end" {
-                let status = crate::NativeRoomStatus {
-                    epoch: native.epoch,
-                    tick: native.runtime.state().world.game.tick,
-                    held: native.runtime.held(),
-                    ending_complete: true,
-                    paused: false,
-                    fault: None,
-                };
-                self.result = Some(RoomResult {
-                    report: json!({"ended":true}),
-                    status,
-                });
-                self.native = None;
-                self.retain_seats(|_, person| {
-                    person.ai || person.connection.as_ref().is_some_and(Connection::ready)
-                });
-                return true;
             }
             return false;
         }
@@ -1018,6 +1069,13 @@ impl Hub {
         Ok(())
     }
     pub fn attach_native(&mut self, code: &str, state: Match, now: u64) -> Result<u64, String> {
+        if self
+            .rooms
+            .get(code)
+            .is_some_and(|room| room.starting.is_some())
+        {
+            return Err("match generation is already pending".into());
+        }
         let prepared = self.prepare_native(code, state, now, false)?;
         Ok(self.publish_native(code, prepared))
     }
@@ -1069,6 +1127,13 @@ impl Hub {
             })
         {
             return Err("native match seats disagree with the room roster".into());
+        }
+        if state.options.mode == Mode::Assault
+            && state
+                .assault
+                .is_none_or(|mode| mode.defender_team != room.defender as i32)
+        {
+            return Err("native Assault defender disagrees with the lobby".into());
         }
         let epoch = self
             .next_epoch
@@ -1276,6 +1341,7 @@ impl Hub {
         let playing = self
             .rooms
             .get(&write.room)
+            .filter(|room| room.starting.is_none())
             .and_then(|room| room.native.as_ref())
             .is_some_and(|native| {
                 native.epoch == write.epoch
@@ -1579,6 +1645,9 @@ impl Hub {
                 let Some(room) = self.rooms.get_mut(code) else {
                     continue;
                 };
+                if room.starting.is_some() {
+                    continue;
+                }
                 let Some(native) = &mut room.native else {
                     continue;
                 };
@@ -1803,99 +1872,9 @@ impl Hub {
         restart: bool,
         now: u64,
     ) -> Result<u64, String> {
-        let trusted = self.trusted.as_ref().ok_or("trusted hosting is disabled")?;
-        if trusted.code != code || self.is_stopped() {
-            return Err("trusted room unavailable".into());
-        }
-        let room = self.rooms.get(code).ok_or("trusted room absent")?;
-        if !room.is_host(connection_id)
-            || !room.players.iter().any(|p| {
-                p.connection
-                    .as_ref()
-                    .is_some_and(|c| c.id == connection_id && c.ready())
-            })
-        {
-            return Err("only the current commander host may start or restart".into());
-        }
-        if restart {
-            let native = room
-                .native
-                .as_ref()
-                .ok_or("restart requires an attached match")?;
-            if let Some(fault) = native.runtime.fault() {
-                return Err(format!(
-                    "faulted match restart awaits a recovery policy: {fault}"
-                ));
-            }
-        } else if room.native.is_some() {
-            return Err("start requires lobby state".into());
-        }
-        if !room.start_ready(&self.maps) {
-            return Err(
-                "start requires one through capacity players and both Assault sides".into(),
-            );
-        }
-        if room.listed || room.mode != "conquest" || room.sandbox {
-            return Err("R1 requires private Conquest and sandbox off".into());
-        }
-        if room.players.len() != 2
-            || room.players.iter().any(|p| p.ai || p.token.is_empty())
-            || room.players[0].team == room.players[1].team
-            || room.players[0].token == room.players[1].token
-        {
-            return Err("R1 requires exactly two human commander tokens on opposing teams".into());
-        }
-        if !matches!(
-            room.army.as_str(),
-            "standard" | "large" | "massive" | "endless"
-        ) {
-            return Err("R1 army choice is unsupported".into());
-        }
-        if !matches!(
-            room.weather.as_str(),
-            "map" | "clear" | "fog" | "rain" | "mud" | "snow" | "random"
-        ) {
-            return Err("R1 weather choice is unsupported".into());
-        }
-        let players = room
-            .players
-            .iter()
-            .map(|p| {
-                Ok(PlayerConfig {
-                    name: p.name.clone(),
-                    team: i32::try_from(p.team).map_err(|_| "invalid R1 team")?,
-                    faction: Faction::try_from(
-                        u8::try_from(p.faction).map_err(|_| "invalid R1 faction")?,
-                    )
-                    .map_err(|e| e.to_string())?,
-                })
-            })
-            .collect::<Result<Vec<_>, String>>()?;
-        let map = crate::authoritative_maps::load(&room.map).map_err(|e| e.to_string())?;
-        let state = crate::authoritative_maps::create_match(
-            &room.map,
-            MatchOptions {
-                // Failed preparations leave next_epoch unchanged, so only a
-                // published match advances the deterministic seed sequence.
-                seed: trusted.seed.wrapping_add(self.next_epoch),
-                mode: Mode::Conquest,
-                players,
-                shuffle: true,
-                army: ArmySize::from_key(&room.army),
-                weather: WeatherChoice::from_reference(Some(&room.weather)),
-                weather_seed: None,
-                living_weather: true,
-                map_key: Some(room.map.clone()),
-                tech: true,
-                supply: true,
-                logistics: logistics_enabled_for(&room.mode, map.source()),
-                sandbox: false,
-            },
-        )
-        .map_err(|e| e.to_string())?;
-        let mut prepared = self.prepare_native(code, state, now, restart)?;
-        prepared.attached.receipt =
-            Some(trusted.receipt(prepared.attached.runtime.state(), prepared.attached.epoch));
+        let request = self.trusted_start_request(code, connection_id, restart)?;
+        let state = request.generate()?;
+        let prepared = self.prepare_trusted_start(code, state, now, restart)?;
         Ok(self.publish_native(code, prepared))
     }
 
@@ -2007,6 +1986,17 @@ impl Hub {
                 }
                 return;
             }
+            if self.pending_start_command(code, connection.id, &msg, now) {
+                return;
+            }
+            if self
+                .rooms
+                .get(code)
+                .is_some_and(|room| room.starting.is_some())
+                && matches!(msg["t"].as_str(), Some("save" | "loadSave" | "resume"))
+            {
+                return;
+            }
             if self.save_command(code, connection.id, &msg, now) {
                 return;
             }
@@ -2015,6 +2005,7 @@ impl Hub {
             }
             if msg["t"] == "resync"
                 && let Some(room) = self.rooms.get_mut(code)
+                && room.starting.is_none()
                 && room
                     .spectators
                     .iter()
@@ -2028,6 +2019,7 @@ impl Hub {
             }
             if msg["t"] == "resync"
                 && let Some(room) = self.rooms.get(code)
+                && room.starting.is_none()
                 && let Some(native) = &room.native
                 && let Some(slot) = room
                     .players
@@ -2101,6 +2093,7 @@ impl Hub {
                 defender: 0,
                 empty_since: None,
                 native: None,
+                starting: None,
                 result: None,
             }
         });
@@ -2124,6 +2117,7 @@ impl Hub {
             .position(|p| !token.is_empty() && p.token == token);
         let mut prepared_start = None;
         if let Some(slot) = returning
+            && room.starting.is_none()
             && let Some(native) = &mut room.native
         {
             let mut names = room
@@ -2167,6 +2161,11 @@ impl Hub {
             p.name = name;
             p.disconnected = None;
         } else {
+            if room.starting.is_some() {
+                connection.send(json!({"t":"deny","cmd":"join","reason":"blocked"}));
+                connection.close(1008, "native roster fixed");
+                return;
+            }
             let p = Person {
                 token,
                 name,
@@ -2272,6 +2271,7 @@ impl Hub {
         let Some(room) = self.rooms.get_mut(code) else {
             return;
         };
+        let active = active && room.starting.is_none();
         let mut changed = false;
         let mut pauses = Vec::new();
         for (slot, p) in room.players.iter_mut().enumerate() {
@@ -2322,7 +2322,7 @@ impl Hub {
             {
                 return false;
             }
-            if room.native.is_some() {
+            if room.native.is_some() || room.starting.is_some() {
                 return true;
             }
             let size = room.players.len();
@@ -2345,12 +2345,16 @@ fn result_number(value: f64) -> Value {
     if value == 0.0 { json!(0) } else { json!(value) }
 }
 fn result_message(result: MatchResult, names: Vec<String>) -> Result<Value, String> {
-    if result.mode != "conquest" {
+    if !matches!(
+        result.mode,
+        "conquest" | "assault" | "annihilation" | "classic"
+    ) {
         return Err("result serializer requires represented ordinary mode".into());
     }
     let timeline = result.timeline.into_iter().map(|sample| match sample {
-        MatchSample::Conquest { t, vp } => Ok(json!({"t":result_number(t), "vp":vp.into_iter().map(result_number).collect::<Vec<_>>()})),
-        MatchSample::Territories { .. } => Err("ordinary result cannot serialize a territory timeline".to_owned()),
+        MatchSample::Conquest { t, vp } if result.mode == "conquest" => Ok(json!({"t":result_number(t), "vp":vp.into_iter().map(result_number).collect::<Vec<_>>()})),
+        MatchSample::Territories { t, points, structures } if result.mode != "conquest" => Ok(json!({"t":result_number(t), "points":points.into_iter().map(result_number).collect::<Vec<_>>(), "structures":structures.into_iter().map(result_number).collect::<Vec<_>>()})),
+        _ => Err("result timeline disagrees with its mode".to_owned()),
     }).collect::<Result<Vec<_>, _>>()?;
     let story = result
         .story
@@ -2791,3 +2795,15 @@ mod save_runtime;
 #[cfg(test)]
 #[path = "room_command_ingress_tests.rs"]
 mod room_command_ingress_tests;
+
+#[path = "async_start.rs"]
+mod async_start;
+pub(crate) use async_start::StartRequest;
+
+#[cfg(test)]
+#[path = "async_start_tests.rs"]
+mod async_start_tests;
+
+#[cfg(test)]
+#[path = "results2_tests.rs"]
+mod results2_tests;
