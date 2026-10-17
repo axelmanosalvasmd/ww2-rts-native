@@ -107,8 +107,11 @@ fn hosted_horde_ai_grenade_survives_every_seat_delivery_until_natural_detonation
     );
     state.commands.units.get_mut(&mg).unwrap().nade = None;
     // AI targets up to range + 4. At 20 m the rifle must approach its 18 m throw.
-    // A short initial reload expires while that aimed approach is still active.
-    state.firing.get_mut(rifle).unwrap().cooldown = 0.15;
+    // Both the initial reload and target scan expire during the approach. Without
+    // this scan delay, the first tick acquires a target and the ability clears it
+    // while the 0.5 s retarget timer lasts until the grenade reaches range.
+    state.firing.get_mut(rifle).unwrap().cooldown = 0.3;
+    state.firing.get_mut(rifle).unwrap().retarget = 0.3;
     // Declared initial scene: visible opposing infantry beyond grenade range. The
     // ordinary tick phase, policy and command queue own everything after setup.
     state.world.game.reveal = true;
@@ -128,6 +131,7 @@ fn hosted_horde_ai_grenade_survives_every_seat_delivery_until_natural_detonation
     let mut after_expiration = 0;
     let mut approach_ticks = 0;
     let mut approach_shots = 0;
+    let mut approach_trace = Vec::new();
     for _ in 0..180 {
         let report = runtime.advance_tick(&[false, false]).unwrap();
         for result in &report.commands {
@@ -151,6 +155,11 @@ fn hosted_horde_ai_grenade_survives_every_seat_delivery_until_natural_detonation
             );
             assert!(!actor.path.is_empty());
             assert!(runtime.state().abilities.get(rifle).unwrap().aimed_walked);
+            let firing = runtime.state().firing.get(rifle).unwrap();
+            approach_trace.push(json!({"tick":report.tick,"x":actor.x,"z":actor.z,
+                "cooldown":firing.cooldown,"retarget":firing.retarget,"target":firing.target_id,
+                "shotAt":actor.shot_at,"supp":actor.supp,"retreating":actor.retreating,
+                "canShootTarget":runtime.state().can_shoot_target(rifle, mg).unwrap()}));
         }
         for grenade in &runtime.state().firing.grenades {
             if runtime
@@ -251,7 +260,7 @@ fn hosted_horde_ai_grenade_survives_every_seat_delivery_until_natural_detonation
     );
     assert!(
         approach_shots > 0,
-        "ordinary firing stopped during the aimed approach"
+        "ordinary firing stopped during the aimed approach: {approach_trace:?}"
     );
     assert_eq!(
         aimed, accepted,
