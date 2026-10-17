@@ -37,11 +37,14 @@ pub mod command_destinations;
 pub mod command_feedback;
 pub mod commander_abilities;
 pub mod commander_ability_policy;
+mod commander_actions;
 pub mod commander_ai;
 pub mod commander_assault;
 mod commander_classic_economy;
 pub mod commander_classic_rules;
 mod commander_construction;
+#[cfg(test)]
+mod commander_engineering_tests;
 mod commander_fortification;
 mod commander_forward_hq;
 pub mod commander_mind;

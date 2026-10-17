@@ -19,6 +19,8 @@ use crate::{
 use serde_json::json;
 use std::collections::BTreeMap;
 
+mod recipient_packet;
+
 const SAFE_TICK: i64 = 9_007_199_254_740_991;
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -141,12 +143,6 @@ impl HumanShot {
     }
 }
 
-fn rounded(at: Point) -> Point {
-    Point {
-        x: math::round(at.x * 10.0) / 10.0,
-        z: math::round(at.z * 10.0) / 10.0,
-    }
-}
 fn finite(at: Point) -> bool {
     at.x.is_finite() && at.z.is_finite()
 }
@@ -298,6 +294,12 @@ impl Match {
         memory: &mut HumanObservationMemory,
     ) -> Result<HumanView<Observation>, String> {
         let owner = memory.owner;
+        if self.options.logistics
+            || self.logistics.iter().next().is_some()
+            || self.convoys.is_some()
+        {
+            return Err("human commander requires delivered logistics support".into());
+        }
         let g = &self.world.game;
         if g.units.iter().any(|(id, u)| {
             *id != u.id
@@ -307,9 +309,12 @@ impl Match {
         }) {
             return Err("invalid canonical human observation unit identity or owner".into());
         }
-        self.validate_opening_projection(owner)?;
+        self.recipient_routing(owner)?;
         let g = &self.world.game;
-        if g.mode.is_some() || !(0..=SAFE_TICK).contains(&g.tick) {
+        if self.options.mode == crate::economy::Mode::World
+            || g.mode.is_some()
+            || !(0..=SAFE_TICK).contains(&g.tick)
+        {
             return Err("human commander requires an ordinary observation boundary".into());
         }
         let expected = (g.tick > 0).then(|| g.tick - (g.tick - 1) % 4);
@@ -342,81 +347,17 @@ impl Match {
         {
             return Err("human observation memory binding or clock mismatch".into());
         }
-        let mut input = self
-            .commander_observation_from_rows(owner, &[])?
-            .input()
-            .clone();
-        let mut units = Vec::with_capacity(input.units.len());
-        for row in &input.units {
-            let u = &g.units[&row.id];
-            let mut world_goal = None;
-            let mut amove = None;
-            if row.owner == owner && !self.rules.kinds[u.kind].structure {
-                let c = &self.commands.units[&u.id];
-                crate::match_construction::validate_build_activity(u, c)?;
-                let project = if u.entrench {
-                    Some(
-                        self.field_works
-                            .member_project(u.id)
-                            .ok_or("missing human observation project descriptor")?,
-                    )
-                } else {
-                    None
-                };
-                if u.dig && !self.field_works.is_active(u.id) {
-                    return Err("missing human observation paid field descriptor".into());
-                }
-                let ride = u.board != 0 && g.units.contains_key(&u.board);
-                let attack = c.attack_id != 0
-                    && g.units.contains_key(&c.attack_id)
-                    && g.players[owner].sees(c.attack_id);
-                let project_plan = project.is_some_and(|p| !p.jobs.is_empty() || p.active != 0);
-                if !(u.build
-                    || ride
-                    || u.retreating
-                    || attack
-                    || c.fire_at.is_some()
-                    || c.nade.is_some()
-                    || u.dig
-                    || project_plan
-                    || c.enter.is_some())
-                {
-                    if let Some(at) = u.amove {
-                        amove = Some(at);
-                    } else {
-                        world_goal = u.world_goal.or_else(|| u.path.last().copied());
-                    }
-                }
-            }
-            if world_goal.is_some_and(|p| !finite(p)) || amove.is_some_and(|p| !finite(p)) {
-                return Err("invalid human observation own motion goal".into());
-            }
-            units.push(HumanUnit {
-                motion: human_commander_inputs::Unit {
-                    id: row.id,
-                    at: row.at,
-                    world_goal: world_goal.map(rounded),
-                    amove: amove.map(rounded),
-                    target_id: row.target_id,
-                    retreating: row.retreating,
-                },
-                owner: row.owner as u32,
-                kind: row.kind.clone(),
-                hp: row.hp,
-                air: u.air.is_some(),
-                build: row.build,
-                dig: row.dig,
-                entrench: row.entrench,
-                garrison: row.garrison,
-            });
-        }
-        if let Some(context) = &mut input.runtime {
-            for unit in &units {
-                if let Some(facts) = context.units.get_mut(&unit.motion.id) {
-                    facts.amove = unit.motion.amove;
-                }
-            }
-        }
+        // Use the exact recipient producer for every dynamic fact, including own plans.
+        // Its partial capability list stays separate from complete delivery admission.
+        let snapshot = crate::recipient_snapshot::SnapshotCache::new(self)
+            .and_then(|cache| cache.recipient(owner))
+            .map_err(|error| format!("human recipient projection: {error:?}"))?;
+        let lists = self.prepare_ordinary_recipient_lists(&[owner])?;
+        let found_mines = lists.results()[0].1.found_mines.clone();
+        let public = recipient_packet::PublicFacts::capture(self, owner)?;
+        let mut snapshot = serde_json::Value::Object(snapshot.fields);
+        snapshot["foundMines"] = json!(found_mines);
+        let (mut input, units) = public.decode(&snapshot)?;
         let visible: Vec<_> = input
             .units
             .iter()
@@ -560,7 +501,19 @@ impl Match {
             owner,
             None,
         )?;
+        snapshot["cells"] = json!(
+            preview
+                .remembered()
+                .iter()
+                .map(|observed| {
+                    let row = &observed.row;
+                    json!([row.cell, char::from(row.ch).to_string(), row.height, row.state,
+                {"mineOwned": observed.mine_owned.unwrap_or(false)}])
+                })
+                .collect::<Vec<_>>()
+        );
         apply_view_rows(&mut input, preview.remembered(), terrain)?;
+        public.populate_mines(&mut input, &snapshot)?;
         let packet =
             Observation::new(input).map_err(|e| format!("human strategic observation: {e:?}"))?;
         let view = HumanView {

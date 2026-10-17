@@ -360,8 +360,9 @@ fn mode01_non_world_mode_rows_match_the_prototype_public_fields() {
         if mode == Mode::Conquest {
             let cache = SnapshotCache::new(&m).unwrap();
             for slot in 0..m.start.players.len() {
-                let fields = cache.recipient(slot).unwrap().fields;
-                assert!(!fields.contains_key("mode"));
+                let snapshot = cache.recipient(slot).unwrap();
+                assert!(!snapshot.fields.contains_key("mode"));
+                assert!(snapshot.fields["units"].is_array());
             }
         } else if mode == Mode::Classic {
             let count = m.start.players.len();

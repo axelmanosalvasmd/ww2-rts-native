@@ -337,6 +337,26 @@ fn intent_ai33_fort_jobs_charge_gate_and_leave_deferred_wall_segments_for_ticks(
             &mut BTreeMap::from([(4, step)]),
         )
         .unwrap();
+        let gate = Catalog::compiled()
+            .unwrap()
+            .table("FORTS")
+            .unwrap()
+            .get("gate")
+            .unwrap()
+            .get("cost")
+            .and_then(Rule::number)
+            .unwrap();
+        assert_eq!(r.remaining_mp, if step == 3 { 300.0 - gate } else { 300.0 });
+        assert_eq!(r.reserve, 0.0);
+        assert_eq!(r.commands.len(), if step == 2 { 2 } else { 1 });
+        assert!(
+            r.commands
+                .iter()
+                .all(|c| c["t"] == if step == 3 { "dig" } else { "entrench" })
+        );
+        for command in &r.commands {
+            crate::match_commands::Command::from_json(command).unwrap();
+        }
         assert_eq!(r.remaining_mp, if step == 3 { 150.0 } else { 300.0 });
         assert_eq!(r.reserve, 0.0);
         assert!(!r.commands.is_empty());

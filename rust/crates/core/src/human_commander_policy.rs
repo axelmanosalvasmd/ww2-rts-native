@@ -64,7 +64,7 @@ impl HumanPolicy {
         Ok(())
     }
 
-    fn plan(
+    pub(crate) fn plan(
         &mut self,
         screen: ScreenView<'_, Observation>,
         level: Level,

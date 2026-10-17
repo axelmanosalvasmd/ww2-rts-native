@@ -1,0 +1,3 @@
+- Plan ground abilities, focus fire, engineering repairs and point and headquarters fortifications from detached recipient facts. Preserve earlier spending, pending jobs and onward attack-move orders within each look.
+- Add command-emission and ordinary-match lifecycle checks. Ground FireAt and unrestricted aircraft delivery still require #337/#369; World transport and the complete Classic/Assault/Horde privacy matrix remain incomplete.
+- Replace the old test that treated deferred wall jobs as absent with checks for emitted wall plans and the gate payment reservation.

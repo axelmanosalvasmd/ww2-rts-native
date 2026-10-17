@@ -24,11 +24,13 @@ pub struct UnitFacts {
     pub hold_fire: bool,
     pub auto_cast: bool,
     pub cooldown: f64,
+    pub attack_target: u32,
     pub queued_orders: usize,
     pub auto_retreat: bool,
     pub convoy: bool,
     pub stock: Option<Stock>,
     pub amove: Option<Point>,
+    pub queued_amove: Option<Point>,
     pub airborne: bool,
     pub wall_work: bool,
 }
@@ -73,6 +75,14 @@ pub struct Context {
     pub build_reserve: f64,
     pub fort_reserve: f64,
     pub claimed_nodes: BTreeSet<usize>,
+    /// Public start terrain and recipient-delivered mine knowledge only.
+    pub initial_chars: Option<Vec<u8>>,
+    pub initial_height: Option<Vec<i8>>,
+    pub mines: Vec<Point>,
+    pub found_mines: Vec<Point>,
+    /// Caller capability, never inferred from visible actors. Complete live-flight
+    /// delivery must be integrated before an ordinary human packet enables it.
+    pub ground_flights: bool,
     pub field: Option<crate::commander_field_policy::Facts>,
     pub world: Option<crate::commander_world_policy::Facts>,
 }
@@ -102,6 +112,11 @@ impl Default for Context {
             build_reserve: 0.0,
             fort_reserve: 0.0,
             claimed_nodes: BTreeSet::new(),
+            initial_chars: None,
+            initial_height: None,
+            mines: Vec::new(),
+            found_mines: Vec::new(),
+            ground_flights: false,
             field: None,
             world: None,
         }
@@ -602,7 +617,7 @@ fn plan_inner(
         0.0
     };
     commands.extend(research_commands);
-    let mut budget = input.manpower - reserved;
+    let mut budget = mirrored(observation, &commands)?.input().manpower - tier_savings;
     let mut newly_busy = BTreeSet::new();
     let adaptive = context.mode.is_construction() && skill.adaptive;
     let rush_at = crate::commander_classic_rules::rush_at(observation, strategic_recent, skill)?;
@@ -961,6 +976,37 @@ fn plan_inner(
     let mut armed = adaptive.busy.clone();
     let mut busy = adaptive.busy;
     busy.extend(newly_busy);
+    let action_view = mirrored(observation, &commands)?;
+    let action_workers: BTreeSet<_> = available_units.iter().map(|unit| unit.id).collect();
+    let action = crate::commander_actions::plan(
+        &action_view,
+        &enemies
+            .iter()
+            .filter(|enemy| watched(enemy.id))
+            .map(|enemy| enemy.id)
+            .collect(),
+        skill,
+        &busy
+            .iter()
+            .copied()
+            .chain(
+                input
+                    .units
+                    .iter()
+                    .filter(|unit| unit.owner == input.slot && !action_workers.contains(&unit.id))
+                    .map(|unit| unit.id),
+            )
+            .collect(),
+    )?;
+    busy.extend(action.busy);
+    commands.extend(action.commands);
+    let ground_view = mirrored(observation, &commands)?;
+    let mine = mirrored_units(&ground_view, &mine);
+    support.mp = math::min(support.mp, ground_view.input().manpower - tier_savings);
+    support.mun = math::min(
+        support.mun,
+        ground_view.input().runtime.as_ref().unwrap().munitions,
+    );
     if let Some((kind, at)) = adaptive.support
         && let Some(command) = support.call(kind, at, None, &sit, context, skill, now)?
     {

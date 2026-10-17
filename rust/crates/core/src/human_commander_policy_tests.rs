@@ -611,38 +611,27 @@ fn intent_ai36_runtime_policy_retreat_reaches_the_canonical_command_queue() {
 }
 
 #[test]
-fn intent_ai28_delivered_stock_uses_public_two_decimal_precision() {
+fn undelivered_logistics_refuses_before_publishing_human_observation() {
     let mut m = runtime_match();
     m.options.logistics = true;
     m.initialize_logistics().unwrap();
-    let id = *m
-        .world
-        .game
-        .units
-        .iter()
-        .find(|(_, u)| u.owner == 0 && m.rules.kinds[u.kind].name == "rifle")
-        .unwrap()
-        .0;
-    let stock = m.logistics.get_mut(id).unwrap();
-    stock.provisions = 59.6;
-    stock.fuel = Some(36.4);
-    stock.ammo = stock.ammo_max * 0.499;
-    let view = m
-        .human_commander_observation(
-            &mut crate::match_human_observation::HumanObservationMemory::new(0),
-        )
-        .unwrap();
-    let delivered = view.packet.input().runtime.as_ref().unwrap().units[&id]
-        .stock
-        .as_ref()
-        .unwrap();
-    assert_eq!(delivered.provisions, 59.6);
-    assert_eq!(delivered.fuel, Some(36.4));
-    assert_eq!(delivered.ammo, Some(0.5));
-    let commands = HumanPolicy::new(0, 771)
-        .plan(screen(&view), Level::Normal)
-        .unwrap();
-    assert!(!commands.iter().any(|c| c["t"] == "retreat"));
+    let mut memory = crate::match_human_observation::HumanObservationMemory::new(0);
+    let before = memory.clone();
+    let random = m.start.random.snapshot();
+    let queue = m.commands.queue.snapshot();
+    let routing = format!("{:?}", m.recipients);
+    assert_eq!(
+        m.human_commander_observation(&mut memory),
+        Err("human commander requires delivered logistics support".into())
+    );
+    assert_eq!(memory, before);
+    assert_eq!(m.start.random.snapshot(), random);
+    assert_eq!(m.commands.queue.snapshot(), queue);
+    assert_eq!(format!("{:?}", m.recipients), routing);
+    // A stale stock owner cannot bypass the guard by clearing the option alone.
+    m.options.logistics = false;
+    assert!(m.human_commander_observation(&mut memory).is_err());
+    assert_eq!(memory, before);
 }
 
 #[test]
