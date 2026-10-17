@@ -324,12 +324,10 @@ fn base52_first_fitting_site_moves_away_from_a_nearby_income_point() {
 
 #[test]
 fn mode01_non_world_mode_rows_match_the_prototype_public_fields() {
-    use crate::recipient_snapshot::{
-        DeliveryState, SnapshotCache, SnapshotCapability, SnapshotError, mode_row,
-    };
+    use crate::recipient_snapshot::{DeliveryState, SnapshotCache, SnapshotCapability, mode_row};
 
     // Prototype sim.js:5895-5898; Tutorial's initial goal is tutorial.js:11.
-    // Classic has partial delivery; the other non-Conquest modes remain refused.
+    // Partial delivery retains its explicit missing capabilities in every admitted mode.
     for mode in MODES {
         let mut m = create(mode, ArmySize::Standard).unwrap();
         let expected = match mode {
@@ -357,35 +355,38 @@ fn mode01_non_world_mode_rows_match_the_prototype_public_fields() {
             _ => unreachable!(),
         };
         assert_eq!(mode_row(&m).unwrap(), expected, "{mode:?}");
-        if mode == Mode::Conquest {
-            assert!(SnapshotCache::new(&m).is_ok());
-        } else if mode == Mode::Classic {
-            let count = m.start.players.len();
-            let mut delivery = DeliveryState::new(&m).unwrap();
-            let frame = delivery
-                .capture(&mut m, &vec![true; count], &vec![false; count])
-                .unwrap();
+        let count = m.start.players.len();
+        let cache = SnapshotCache::new(&m).unwrap();
+        for slot in 0..count {
             assert_eq!(
-                frame.slots().collect::<Vec<_>>(),
-                (0..count).collect::<Vec<_>>()
+                cache.recipient(slot).unwrap(),
+                crate::recipient_snapshot::recipient_uncached(&m, slot).unwrap(),
+                "cached/uncached {mode:?} seat {slot}"
             );
-            for slot in 0..count {
-                let projection = frame.recipient(slot).unwrap();
-                assert_eq!(projection.fields["mode"], expected, "Classic seat {slot}");
-                assert_eq!(
-                    projection.missing,
-                    vec![
-                        SnapshotCapability::WrecksAndFoundMines,
-                        SnapshotCapability::ShotsAndFlights,
-                        SnapshotCapability::TeamEffects,
-                    ]
-                );
+        }
+        let mut delivery = DeliveryState::new(&m).unwrap();
+        let frame = delivery
+            .capture(&mut m, &vec![true; count], &vec![false; count])
+            .unwrap();
+        assert_eq!(
+            frame.slots().collect::<Vec<_>>(),
+            (0..count).collect::<Vec<_>>()
+        );
+        for slot in 0..count {
+            let projection = frame.recipient(slot).unwrap();
+            if mode == Mode::Conquest {
+                assert!(projection.fields.get("mode").is_none());
+            } else {
+                assert_eq!(projection.fields["mode"], expected, "{mode:?} seat {slot}");
             }
-        } else {
-            assert!(matches!(
-                SnapshotCache::new(&m),
-                Err(SnapshotError::UnsupportedMode)
-            ));
+            assert_eq!(
+                projection.missing,
+                vec![
+                    SnapshotCapability::WrecksAndFoundMines,
+                    SnapshotCapability::ShotsAndFlights,
+                    SnapshotCapability::TeamEffects,
+                ]
+            );
         }
     }
     let mut default = create(Mode::Conquest, ArmySize::Standard).unwrap();

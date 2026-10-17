@@ -4,7 +4,7 @@ use crate::{
     game::PlaneState,
     match_commands::{Command, MoveOutcome, UnitControl},
     misc_retreat_support_tests::{delivered_tick, publish_rifle, scene, seats},
-    recipient_snapshot::{DeliveryState, SnapshotCache, SnapshotCapability, SnapshotError},
+    recipient_snapshot::{DeliveryState, SnapshotCache, SnapshotError},
     supply_convoys::{ConvoyState, Store, StoreId, Truck, TruckState},
 };
 
@@ -348,36 +348,6 @@ fn mov48_manual_retreat_exits_house_moves_home_and_delivers_every_seat() {
     assert!(m.tick_state.fault().is_none());
 }
 
-fn classic_retreat_projection_tick(m: &mut Match, delivery: &mut DeliveryState) {
-    m.advance_tick().unwrap();
-    let mode = m.elimination.as_ref().unwrap();
-    let expected = serde_json::json!({
-        "kind":"classic",
-        "timeLeft":crate::math::max(0.0, mode.time_left.unwrap().ceil()),
-        "suddenDeath":mode.sudden_death
-    });
-    let count = m.start.players.len();
-    let frame = delivery
-        .capture(m, &vec![false; count], &vec![false; count])
-        .unwrap();
-    assert_eq!(
-        frame.slots().collect::<Vec<_>>(),
-        (0..count).collect::<Vec<_>>()
-    );
-    for slot in 0..count {
-        let projection = frame.recipient(slot).unwrap();
-        assert_eq!(projection.fields["mode"], expected, "Classic seat {slot}");
-        assert_eq!(
-            projection.missing,
-            vec![
-                SnapshotCapability::WrecksAndFoundMines,
-                SnapshotCapability::ShotsAndFlights,
-                SnapshotCapability::TeamEffects,
-            ]
-        );
-    }
-}
-
 fn retreat_through_legs(mode: Mode) {
     let mut m = long_route_scene(mode);
     let at = Point { x: 281., z: 41. };
@@ -404,11 +374,7 @@ fn retreat_through_legs(mode: Mode) {
     let mut reached_first_leg = false;
     let mut leg_ends = BTreeSet::new();
     for _ in 0..2500 {
-        if mode == Mode::Classic {
-            classic_retreat_projection_tick(&mut m, &mut delivery);
-        } else {
-            delivered_tick(&mut m, &mut delivery, &selected);
-        }
+        delivered_tick(&mut m, &mut delivery, &selected);
         let u = &m.world.game.units[&id];
         if let Some(end) = u.path.last() {
             leg_ends.insert((end.x.to_bits(), end.z.to_bits()));
@@ -430,11 +396,7 @@ fn retreat_through_legs(mode: Mode) {
     assert_eq!(m.commands.units[&id].outcome, Some(MoveOutcome::Arrived));
     assert!(m.tick_state.fault().is_none());
     for _ in 0..3 {
-        if mode == Mode::Classic {
-            classic_retreat_projection_tick(&mut m, &mut delivery);
-        } else {
-            delivered_tick(&mut m, &mut delivery, &selected);
-        }
+        delivered_tick(&mut m, &mut delivery, &selected);
     }
     assert!(m.tick_state.fault().is_none());
 }
@@ -447,7 +409,7 @@ fn mov48_ordinary_retreat_traverses_multiple_legs_and_delivers_every_seat() {
 }
 
 #[test]
-fn mov48_classic_retreat_traverses_multiple_legs_with_every_seat_partial_delivery() {
+fn mov48_classic_retreat_traverses_multiple_legs_with_every_seat_projection() {
     retreat_through_legs(Mode::Classic);
 }
 
