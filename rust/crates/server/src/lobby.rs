@@ -3216,6 +3216,9 @@ mod horde_host;
 #[path = "lobby_options.rs"]
 mod lobby_options;
 #[cfg(test)]
+#[path = "logistics3_tests.rs"]
+mod logistics3_tests;
+#[cfg(test)]
 #[path = "mode_hosting_tests.rs"]
 mod mode_hosting_tests;
 #[cfg(test)]
@@ -3233,8 +3236,6 @@ pub(crate) use async_start::StartRequest;
 #[path = "async_start_tests.rs"]
 mod async_start_tests;
 
-#[path = "horde_host.rs"]
-mod horde_host;
 #[cfg(test)]
 #[path = "results2_tests.rs"]
 mod results2_tests;

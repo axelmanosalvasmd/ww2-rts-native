@@ -6,7 +6,7 @@ The recipient fields below are identical to the prototype. This document adds no
 
 ## Admitted execution
 
-Default and Conquest matches admit authored groups, all ordinary condition kinds, match/player/team contexts, once/risingEdge/whileTrue repeats, announcements, objective actions, reinforcement rosters and per-cell damage/destroy actions. Region targets require World and remain refused. Classic additionally admits empty authored groups with objective and announcement actions, allowing its existing team ghosts to accompany mission data. Classic spawning, reinforcements and damage remain refused. World, Horde, Tutorial, Assault and Annihilation admission stays closed for authored scenarios. Legacy timed triggers keep their existing executor. The implementation follows `shared/scenarios.js:88-170` and the canonical tools at `shared/sim.js:4882-4923`.
+Default, Conquest, Assault, Classic and Annihilation matches admit authored groups, all ordinary condition kinds, match/player/team contexts, once/risingEdge/whileTrue repeats, announcements, objective actions, reinforcement rosters and per-cell damage/destroy actions. Region targets require World and remain refused. World, Horde and Tutorial admission stays closed for authored scenarios. Legacy timed triggers keep their existing executor. The implementation follows `shared/scenarios.js:88-170` and the canonical tools at `shared/sim.js:4882-4923`.
 
 Announcement text may be a string or a localized object with `en`. Objects without `en` and arrays remain refused, preserving main's existing admission boundary. No authored mission ships in this batch and public map rows continue to omit private scenario definitions.
 
@@ -59,3 +59,5 @@ observed enemy building remains as a team ghost while private mission rows
 arrive, survives a checkpoint, updates on rediscovery and reaches the normal
 Classic ending without a snapshot fault. No new recipient field is introduced.
 World delivery remains deferred.
+
+LOGISTICS-3 composes that executor with physical logistics. Initial authored units and reinforcement arrivals initialize reserves through the same canonical publication path, matching `shared/scenarios.js:93-98`, `shared/sim.js:4893-4912,1805` and `shared/logistics.js:22-26`. Scenario option selection uses the authored map actually bound to startup. Only literal `scenario.logistics: true` opts in; the existing mode gate still disables physical logistics in Assault, Horde and Tutorial (`server.js:353-356,380-381`, `shared/sim.js:729`). The new ordinary reinforcement test captures every seat before and after checkpoint restoration; server tests exercise opted-in, opted-out and absent authored switches across all four ordinary public modes. Recipient fields, privacy rules and save schema are unchanged.

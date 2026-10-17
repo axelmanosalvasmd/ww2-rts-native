@@ -14,46 +14,134 @@ use crate::{
 fn scene(data: Value) -> Match {
     scene_sized(data, ArmySize::Standard)
 }
-
 fn scene_sized(data: Value, army: ArmySize) -> Match {
+    ordinary_scene_sized(data, Mode::Conquest, false, army)
+}
+fn ordinary_scene(data: Value, mode: Mode, logistics: bool) -> Match {
+    ordinary_scene_sized(data, mode, logistics, ArmySize::Standard)
+}
+fn ordinary_scene_sized(data: Value, mode: Mode, logistics: bool, army: ArmySize) -> Match {
     let map = AuthoritativeMap::from_json(
         &serde_json::to_vec(&json!({
             "name":"Ordinary authored mission", "w":96, "h":96,
             "rows":vec![".".repeat(96);96],
             "spawns":[{"x":4,"y":4},{"x":90,"y":90},{"x":4,"y":90}],
+            "defend":[0],
             "points":[{"id":"bridgehead","x":32,"y":32}],
             "scenario":data
         }))
         .unwrap(),
     )
     .unwrap();
-    Match::new(
-        &map,
-        MatchOptions {
-            seed: 83085,
-            mode: Mode::Conquest,
-            players: [0, 1, 0]
-                .into_iter()
-                .enumerate()
-                .map(|(slot, team)| PlayerConfig {
-                    name: format!("seat{slot}"),
-                    team,
-                    faction: Faction::Germany,
-                })
-                .collect(),
-            shuffle: false,
-            army,
-            weather: WeatherChoice::Map,
-            weather_seed: Some(1),
-            living_weather: false,
-            map_key: None,
-            tech: false,
-            supply: false,
-            logistics: false,
-            sandbox: false,
-        },
-    )
+    let options = MatchOptions {
+        seed: 83085,
+        mode,
+        players: [0, 1, 0]
+            .into_iter()
+            .enumerate()
+            .map(|(slot, team)| PlayerConfig {
+                name: format!("seat{slot}"),
+                team,
+                faction: Faction::Germany,
+            })
+            .collect(),
+        shuffle: false,
+        army,
+        weather: WeatherChoice::Map,
+        weather_seed: Some(1),
+        living_weather: false,
+        map_key: None,
+        tech: false,
+        supply: false,
+        logistics,
+        sandbox: false,
+    };
+    match mode {
+        Mode::Default | Mode::Conquest => Match::new(&map, options),
+        Mode::Assault => Match::new_assault(&map, options, 0),
+        Mode::Annihilation => Match::new_annihilation(&map, options),
+        Mode::Classic => Match::new_classic(&map, options),
+        _ => unreachable!("ordinary scenario test mode"),
+    }
     .unwrap()
+}
+
+#[test]
+fn ordinary_scenario_setup_and_reinforcements_keep_reserves_snapshots_and_checkpoint() {
+    for mode in [
+        Mode::Default,
+        Mode::Conquest,
+        Mode::Assault,
+        Mode::Annihilation,
+        Mode::Classic,
+    ] {
+        let logistics = mode != Mode::Assault;
+        let data = json!({"version":1,"logistics":logistics,
+            "groups":[{"id":"arrivals","units":[{"id":"first","side":0,"type":"rifle","x":40,"y":20}]}],
+            "objectives":[{"id":"mission","text":"Arrivals"}],
+            "triggers":[{"id":"reinforce","scope":"match",
+                "condition":{"kind":"time","seconds":0.1},
+                "actions":[{"kind":"reinforce","group":"arrivals","side":0,
+                    "at":[44,20],"expires":10,"roster":[{"type":"rifle","count":1}],"order":{"kind":"hold"}},
+                    {"kind":"objectiveComplete","objective":"mission"}]}]});
+        let mut state = ordinary_scene(data, mode, logistics);
+        assert_eq!(ids(&state, "arrivals").len(), 1, "{mode:?} setup");
+        let initial = ids(&state, "arrivals")[0];
+        assert_eq!(
+            state.logistics.get(initial).is_some(),
+            logistics,
+            "{mode:?} setup reserves"
+        );
+        let mut delivery = DeliveryState::new(&state).unwrap();
+        for _ in 0..4 {
+            let (snapshots, _) = tick(&mut state, &mut delivery);
+            assert_eq!(snapshots.len(), state.world.game.players.len());
+            for snapshot in snapshots {
+                assert_eq!(
+                    snapshot.get("logistics").is_some(),
+                    logistics,
+                    "{mode:?} recipient reserves"
+                );
+            }
+        }
+        assert_eq!(count(&state, "reinforce", "match"), 1, "{mode:?}");
+        let arrivals = ids(&state, "arrivals");
+        assert_eq!(arrivals.len(), 2, "{mode:?} reinforcement");
+        for id in &arrivals {
+            assert!(state.world.game.units.contains_key(id));
+            assert!(state.commands.units.contains_key(id));
+            assert_eq!(
+                state.logistics.get(*id).is_some(),
+                logistics,
+                "{mode:?} arrival reserves"
+            );
+        }
+        assert_eq!(
+            state.authored_scenario.as_ref().unwrap().objectives[0].state,
+            "complete"
+        );
+        let reserves = arrivals
+            .iter()
+            .map(|id| state.logistics.get(*id).cloned())
+            .collect::<Vec<_>>();
+        checkpoint(&mut state, &mut delivery);
+        assert_eq!(
+            arrivals
+                .iter()
+                .map(|id| state.logistics.get(*id).cloned())
+                .collect::<Vec<_>>(),
+            reserves
+        );
+        for _ in 0..4 {
+            tick(&mut state, &mut delivery);
+        }
+        assert_eq!(
+            count(&state, "reinforce", "match"),
+            1,
+            "{mode:?} restored once trigger"
+        );
+        assert_eq!(ids(&state, "arrivals"), arrivals);
+    }
 }
 
 fn definition(groups: Value, triggers: Vec<Value>) -> Value {

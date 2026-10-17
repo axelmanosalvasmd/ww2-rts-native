@@ -268,3 +268,7 @@ Merged exact `eeca34057f33cd61aef0136e007e59d156f36489`. Canonical queued comman
 ## Cross-chain #411
 
 Merged exact `ea9aa761636f5a3ed2a983232958633bed9e1e68`. Retained immediate construction, sandbox, arrival and group-placement caller tests alongside all authored runtime/clock tests. The integrated current-pose flight/contact and recipient owners already subsume the incoming older flight adapter. No startup or complete-delivery mode was narrowed. Full validation remains pending.
+
+## Cross-chain #419
+
+Merged exact `e4c0801df68f886c1f019c680f7e6da304d9cffa`. The scenario actuator now initializes physical reserves on its canonical publication path and admits the incoming ordinary modes. Replaced the old Classic recipient-only group refusal with full validated ordinary scenario composition. Preserved old/new scene helper capabilities, all trigger-budget tests, Classic ghost delivery, closed World/Horde/Tutorial authored admission and the broader complete mode projections. Explicit constructor weather seeds are composed into asynchronous generation without synchronous map parsing or duplicate entropy reads. Full validation remains pending.

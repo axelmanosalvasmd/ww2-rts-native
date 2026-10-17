@@ -168,12 +168,12 @@ impl Hub {
             .as_ref()
             .and_then(|editor| editor.raw(&room.map));
         // Preserve asynchronous creation failure: raw map loading belongs to generate.
-        let mut options = room.native_match_options(
+        let options = room.native_match_options(
             trusted.seed.wrapping_add(self.next_epoch),
+            weather_seed()?,
             players,
             raw_map.as_ref().unwrap_or(&Value::Null),
         )?;
-        options.weather_seed = Some(weather_seed()?);
         Ok(StartRequest {
             token: Arc::new(()),
             map: room.map.clone(),

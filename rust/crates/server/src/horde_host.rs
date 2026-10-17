@@ -96,7 +96,7 @@ impl Hub {
         let weather_seed = ww2_core::random::MatchRandom::new(seed)
             .below(ww2_core::random::StreamId::Weather, 1 << 31)
             .map_err(|e| format!("Horde weather seed: {e:?}"))? as u32;
-        let mut options = room.native_match_options(seed, players, map.source())?;
+        let mut options = room.native_match_options(seed, weather_seed, players, map.source())?;
         options.weather_seed = Some(weather_seed);
         let state = room.create_native_match(&map, options)?;
         let prepared = self.prepare_native_room(room, state, now, restart, Some(map.source()))?;

@@ -3,13 +3,20 @@ use super::*;
 #[test]
 fn authored_scenarios_validate_ordinary_sides_and_localization_before_startup() {
     let mut data = json!({"version":1,"objectives":[],"groups":[],"triggers":[]});
-    assert!(validate_definition(&data, 2, Mode::Conquest).is_ok());
-    assert!(validate_definition(&data, 2, Mode::Classic).is_ok());
-    for mode in [Mode::World, Mode::Annihilation, Mode::Horde, Mode::Tutorial] {
+    for mode in [
+        Mode::Default,
+        Mode::Conquest,
+        Mode::Assault,
+        Mode::Annihilation,
+        Mode::Classic,
+    ] {
+        assert!(validate_definition(&data, 2, mode).is_ok());
+    }
+    for mode in [Mode::World, Mode::Horde, Mode::Tutorial] {
         assert!(validate_definition(&data, 2, mode).is_err());
     }
     data["groups"] = json!([{"id":"g","units":[]}]);
-    assert!(validate_definition(&data, 2, Mode::Classic).is_err());
+    assert!(validate_definition(&data, 2, Mode::Classic).is_ok());
     assert!(validate_definition(&data, 2, Mode::Conquest).is_ok());
     data["triggers"] = json!([{"id":"t","scope":"match","condition":{"kind":"time","seconds":0},"actions":[{"kind":"reinforce","group":"g","side":0,"at":[4,4],"expires":10,"roster":[{"type":"rifle","count":1}],"order":{"kind":"hold"}}]}]);
     assert!(validate_definition(&data, 2, Mode::Conquest).is_ok());

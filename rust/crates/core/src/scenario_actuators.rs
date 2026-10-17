@@ -35,8 +35,10 @@ fn center([x, y]: [usize; 2]) -> Point {
 
 impl Match {
     fn scenario_ordinary_mode(&self) -> bool {
-        matches!(self.options.mode, Mode::Default | Mode::Conquest)
-            && self.world.game.mode.is_none()
+        matches!(
+            self.options.mode,
+            Mode::Default | Mode::Conquest | Mode::Assault | Mode::Annihilation | Mode::Classic
+        ) && crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode)
             && self.world.geography().is_none()
             && self.world_runtime.is_none()
     }
@@ -208,7 +210,7 @@ impl Match {
         order: &Value,
     ) -> Result<Option<u32>, String> {
         if !self.scenario_ordinary_mode() {
-            return Err("scenario arrivals require ordinary Default or Conquest".into());
+            return Err("scenario arrivals require an ordinary match".into());
         }
         let game = &self.world.game;
         if !self.scenario_type_allowed(side, name)
@@ -309,7 +311,11 @@ impl Match {
             Some(position),
         )
         .map_err(|error| format!("scenario spawn: {error:?}"))?;
+        let reserves = self.prepare_new_unit_reserves(&draft.unit)?;
         self.publish_starting_unit(draft)?;
+        if let Some(reserves) = reserves {
+            self.logistics.insert(id, reserves);
+        }
         // Source command admission may ignore an order for an away commander.
         // The arrival still exists, and a later group order uses the same owner.
         self.execute_command(side, &command, self.finish.is_some())?;
@@ -324,7 +330,7 @@ impl Match {
         emit: &mut dyn FnMut(Effect),
     ) -> Result<(), String> {
         if !self.scenario_ordinary_mode() {
-            return Err("scenario damage requires ordinary Default or Conquest".into());
+            return Err("scenario damage requires an ordinary match".into());
         }
         let game = &self.world.game;
         let bounds = action["box"]

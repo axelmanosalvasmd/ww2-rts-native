@@ -208,25 +208,12 @@ pub(crate) fn validate_definition(data: &Value, count: usize, mode: Mode) -> Res
                         .is_some_and(|target| target.starts_with("region:")))
         }
     }
-    // Classic can combine its remembered buildings with mission messages. Its
-    // spawn and damage actuators remain outside this recipient-only admission.
-    if mode == Mode::Classic
-        && (!list(data, "groups").is_empty()
-            || list(data, "triggers")
-                .iter()
-                .flat_map(|t| list(t, "actions"))
-                .any(|a| {
-                    !matches!(
-                        a["kind"].as_str(),
-                        Some("say" | "objectiveActivate" | "objectiveComplete")
-                    )
-                }))
-    {
-        return Err("Classic scenarios support objectives and announcements only".into());
-    }
     if !data.is_object()
         || data["version"].as_f64() != Some(1.0)
-        || !matches!(mode, Mode::Default | Mode::Conquest | Mode::Classic)
+        || !matches!(
+            mode,
+            Mode::Default | Mode::Conquest | Mode::Assault | Mode::Annihilation | Mode::Classic
+        )
         || list(data, "objectives")
             .iter()
             .any(|o| !side_exists(o, count) || !supported_localization(&o["text"]))

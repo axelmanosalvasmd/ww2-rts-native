@@ -444,8 +444,17 @@ fn trusted_canonical_map_weather_matrix_records_options_before_publication() {
                     && state.options.supply
                     && state.options.living_weather
             );
+            assert!(
+                state
+                    .options
+                    .weather_seed
+                    .is_some_and(|seed| seed < 1 << 31)
+            );
             assert_eq!(state.options.weather_seed, Some(state.start.weather_seed));
-            assert!(state.start.weather_seed < (1 << 31));
+            assert_eq!(
+                native.receipt.as_ref().unwrap()["options"]["weatherSeed"],
+                state.start.weather_seed
+            );
             assert_eq!(
                 native.receipt.as_ref().unwrap()["derivedWeatherSeed"],
                 state.start.weather_seed

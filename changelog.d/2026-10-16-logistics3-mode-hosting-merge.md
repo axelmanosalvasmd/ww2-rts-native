@@ -1,0 +1,9 @@
+- Combine LOGISTICS-2 physical logistics and loaded option overrides with MODE-HOSTING ordinary mode delivery. World remains deferred.
+- Merge record: parents are LOGISTICS-2 d489fda909cacceb7fb54108f10b2bc918ca71c1 (#408, on #322 and #375) and MODE-HOSTING 1c2bc074fdc52cbb9ad19346cb586dde9cf89fd3 (#414, on #403, #395 and #390). All paths outside the seven files below merged automatically.
+- `match_construction.rs`: use the incoming site/depot comment and retain both logistics and construction-runtime test modules.
+- `recipient_lists.rs`: retain incoming Assault dispatch and canonical Classic node validation; retain LOGISTICS-2 node-cell bounds and finite raw coordinates as well. Consolidate the duplicate node helpers under `classic_snapshot_nodes`, preserving public four-value rows and private depot omission.
+- `recipient_snapshot.rs`: retain both logistics and mode modules, incoming Assault pairing/state guards, and canonical `mode_row` plus public-state node projection. Remove the duplicate economy-field mode/node projection, whose values are supplied by public-state capture.
+- `lobby.rs`: retain incoming ordinary-mode/army/weather/roster guards, use LOGISTICS-2 room option mapping and constructor dispatch, and retain both option and hosting test modules.
+- `lobby_saves.rs`: retain incoming ordinary-mode admission and LOGISTICS-2 logistics-enabled save/load support; keep sandbox, World, AI and spectator guards.
+- `main.rs`: combine help text into ordinary two-human rooms, named armies and mode-selected logistics.
+- `trusted_room_lobby_tests.rs`: retain the complete strict enablement and live logistics tests from LOGISTICS-2 and the complete named-army test from MODE-HOSTING. No test bodies or assertions are dropped.

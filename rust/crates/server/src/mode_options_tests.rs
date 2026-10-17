@@ -1,8 +1,8 @@
-//! MODE-11, LOG-01 and NET-39 switches. World and authored scenario execution stay guarded.
+//! MODE-11, LOG-01 and NET-39 switches, constructor defaults and restart delivery.
 use super::*;
 use ww2_core::map::AuthoritativeMap;
 
-fn peers() -> (
+pub(super) fn peers() -> (
     Hub,
     Connection,
     mpsc::Receiver<Output>,
@@ -35,7 +35,7 @@ fn peers() -> (
     (hub, host.unwrap(), host_rx, guest_rx)
 }
 
-fn players() -> Vec<PlayerConfig> {
+pub(super) fn players() -> Vec<PlayerConfig> {
     vec![
         PlayerConfig {
             name: "Allies".into(),
@@ -50,7 +50,7 @@ fn players() -> Vec<PlayerConfig> {
     ]
 }
 
-fn map() -> AuthoritativeMap {
+pub(super) fn map() -> AuthoritativeMap {
     AuthoritativeMap::from_json(
         &serde_json::to_vec(&json!({
             "name":"Mode switches", "w":100,"h":100,
@@ -65,7 +65,7 @@ fn map() -> AuthoritativeMap {
     .unwrap()
 }
 
-fn tick_every_seat(runtime: &mut RoomRuntime, logistics: bool) {
+pub(super) fn tick_every_seat(runtime: &mut RoomRuntime, logistics: bool) {
     let count = runtime.state().world.game.players.len();
     let seats = (0..count)
         .map(|slot| SelectedSeat {
@@ -120,7 +120,7 @@ fn net39_room_options_map_all_modes_armies_weather_sandbox_and_roster() {
                 for sandbox in [false, true] {
                     room.sandbox = sandbox;
                     let options = room
-                        .native_match_options(701, players(), &json!({}))
+                        .native_match_options(701, 391, players(), &json!({}))
                         .unwrap();
                     assert_eq!(options.mode, mode);
                     assert_eq!(options.army, expected_army);
@@ -129,7 +129,7 @@ fn net39_room_options_map_all_modes_armies_weather_sandbox_and_roster() {
                         WeatherChoice::from_reference(Some(weather))
                     );
                     assert_eq!(options.seed, 701);
-                    assert_eq!(options.weather_seed, None);
+                    assert_eq!(options.weather_seed, Some(391));
                     assert_eq!(options.sandbox, sandbox);
                     assert_eq!(options.map_key.as_deref(), Some("selected-authoring-key"));
                     assert!(
@@ -149,9 +149,20 @@ fn net39_room_options_map_all_modes_armies_weather_sandbox_and_roster() {
             }
         }
     }
+    room.mode = "conquest".into();
+    assert!(
+        room.native_match_options(701, 1 << 31, players(), &json!({}))
+            .is_err()
+    );
+    assert_eq!(
+        room.native_match_options(701, (1 << 31) - 1, players(), &json!({}))
+            .unwrap()
+            .weather_seed,
+        Some((1 << 31) - 1)
+    );
     room.mode = "unknown".into();
     assert!(
-        room.native_match_options(701, players(), &json!({}))
+        room.native_match_options(701, 391, players(), &json!({}))
             .is_err()
     );
 }
@@ -181,7 +192,7 @@ fn log01_scenarios_and_loaded_false_override_mode_selection_before_native_guards
                 json!({"scenario":{"logistics":true}}),
             ] {
                 let mut options = room
-                    .native_match_options(701, players(), &scenario)
+                    .native_match_options(701, 391, players(), &scenario)
                     .unwrap();
                 let server_enabled = loaded != Some(false)
                     && if scenario["scenario"].is_object() {
@@ -208,7 +219,7 @@ fn log01_scenarios_and_loaded_false_override_mode_selection_before_native_guards
 fn mode11_headless_explicit_opt_ins_resolve_the_complete_mode_switch_table() {
     let (hub, _, _host_rx, _guest_rx) = peers();
     let options = hub.rooms["ABC"]
-        .native_match_options(701, players(), &json!({}))
+        .native_match_options(701, 391, players(), &json!({}))
         .unwrap();
     // Expected outputs from sim.js:729,746,799, including an absent headless mode.
     for (mode, logistics, tech, supply) in [
@@ -253,7 +264,7 @@ fn mode11_existing_native_constructors_keep_switches_bases_and_every_seat_frames
         for loaded_tech in [None, Some(false)] {
             room.loaded_tech = loaded_tech;
             let options = room
-                .native_match_options(701, players(), authored.source())
+                .native_match_options(701, 391, players(), authored.source())
                 .unwrap();
             let mut state = room.create_native_match(&authored, options).unwrap();
             assert_eq!(state.options.logistics, logistics, "{name}");
@@ -299,7 +310,7 @@ fn mode11_headless_default_and_conquest_require_explicit_logistics_and_keep_disa
     for mode in [Mode::Default, Mode::Conquest] {
         for logistics in [false, true] {
             let mut options = hub.rooms["ABC"]
-                .native_match_options(701, players(), authored.source())
+                .native_match_options(701, 391, players(), authored.source())
                 .unwrap();
             options.mode = mode;
             options.logistics = logistics;
@@ -323,7 +334,7 @@ fn mode11_horde_switches_and_shared_base_support_healthy_hosted_ticks() {
     room.mode = "horde".into();
     let authored = map();
     let options = room
-        .native_match_options(701, players(), authored.source())
+        .native_match_options(701, 391, players(), authored.source())
         .unwrap();
     let mut state = room.create_native_match(&authored, options).unwrap();
     assert!(!state.options.logistics && !state.options.supply && state.options.tech);
@@ -350,7 +361,7 @@ fn mode11_horde_switches_and_shared_base_support_healthy_hosted_ticks() {
     assert!(runtime.fault().is_none());
     room.mode = "world".into();
     let options = room
-        .native_match_options(701, players(), authored.source())
+        .native_match_options(701, 391, players(), authored.source())
         .unwrap();
     assert!(options.logistics && options.tech);
     assert!(
@@ -382,7 +393,7 @@ fn log01_loaded_switches_survive_restart_and_socket_messages_cannot_toggle_them(
             let authored = crate::authoritative_maps::load("default").unwrap();
             let room = &hub.rooms["ABC"];
             let mut options = room
-                .native_match_options(701, players(), authored.source())
+                .native_match_options(701, 391, players(), authored.source())
                 .unwrap();
             options.logistics = logistics;
             options.tech = tech;
