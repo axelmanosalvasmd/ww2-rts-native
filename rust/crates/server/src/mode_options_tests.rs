@@ -326,7 +326,7 @@ fn mode11_headless_default_and_conquest_require_explicit_logistics_and_keep_disa
 }
 
 #[test]
-fn mode11_horde_switches_and_shared_base_are_constructed_without_admitting_full_runner() {
+fn mode11_horde_switches_and_shared_base_support_healthy_hosted_ticks() {
     let (mut hub, _, _host_rx, _guest_rx) = peers();
     let room = hub.rooms.get_mut("ABC").unwrap();
     room.mode = "horde".into();
@@ -354,7 +354,9 @@ fn mode11_horde_switches_and_shared_base_are_constructed_without_admitting_full_
     }
     state.advance_tick().unwrap();
     assert!(state.tick_state.fault().is_none());
-    assert!(RoomRuntime::new(state, 0).is_err());
+    let mut runtime = RoomRuntime::new(state, 0).unwrap();
+    runtime.advance_tick(&[false; 3]).unwrap();
+    assert!(runtime.fault().is_none());
     room.mode = "world".into();
     let options = room
         .native_match_options(701, players(), authored.source())

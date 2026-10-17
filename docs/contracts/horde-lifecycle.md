@@ -3,7 +3,8 @@
 Baseline: prototype `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`.
 Owner decisions K, N and O authorize prototype Horde behavior and JSON WebSocket
 v0 shapes. This change connects the core runner and recipient adapter. Hosted
-room startup and scripted-seat scheduling remain separate work. World admission
+room startup and scripted-seat scheduling are described by the later
+[hosted Horde extension](hosted-horde.md). World admission
 and the C interface are unchanged. Hermes' exact-head runtime acknowledgement
 is required before merge.
 
@@ -34,10 +35,10 @@ and `{"k":"shell","x":sample.x,"z":sample.z,"pub":true}`
 public effects reach every seat, while shooter and target identifiers are omitted
 when unseen, as in the cached `snapshotFor` path at `sim.js:6079-6088`.
 
-The existing snapshot refusals for retained flights, salvos, grenades and aviation
-events remain. This batch does not admit hosted Horde rooms or claim that every
-Horde combat/support packet is deliverable. Those adapters must compose before
-hosted admission. The lifecycle test uses an injured bunker and a close boss gate
+The later [hosted Horde extension](hosted-horde.md) admits canonical rooms
+through the existing flight, salvo, grenade and aviation validators. The combined
+branch retains its full support and projectile delivery, including per-recipient
+fog and identity filtering. The lifecycle test uses an injured bunker and a close boss gate
 as declared initial conditions, then runs actual Kaiju combat to bunker defeat
 and eight ending ticks, collecting every seat on every tick.
 

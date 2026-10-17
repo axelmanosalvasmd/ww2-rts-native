@@ -1,9 +1,7 @@
 use super::*;
 use crate::{
     match_commands::{Command, Denial},
-    recipient_snapshot::{
-        DeliveryState, SelectedSeat, SnapshotCache, SnapshotCapability, SnapshotError,
-    },
+    recipient_snapshot::{DeliveryState, SelectedSeat, SnapshotCache},
     weather::WeatherChoice,
 };
 use serde_json::{Value as Json, json};
@@ -229,13 +227,7 @@ fn base18_base59_horde_ground_ticks_wave_bunker_defeat_and_every_seat_delivery()
         assert_eq!(state.horde_result().unwrap().unwrap(), result);
         assert!(state.tick_state.fault().is_none());
     }
-    assert_eq!(
-        state.restrict_to_ordinary_snapshots(),
-        Err(SnapshotError::Unsupported {
-            unit: 0,
-            capability: SnapshotCapability::Air
-        })
-    );
+    state.restrict_to_ordinary_snapshots().unwrap();
 }
 
 #[test]
@@ -382,11 +374,5 @@ fn horde_ground_breath_ticks_publish_exact_public_rows_and_redact_retired_identi
         assert!(state.tick_state.fault().is_none());
     }
     assert!(state.aviation.planes.is_empty());
-    assert_eq!(
-        state.restrict_to_ordinary_snapshots(),
-        Err(SnapshotError::Unsupported {
-            unit: 0,
-            capability: SnapshotCapability::Air
-        })
-    );
+    state.restrict_to_ordinary_snapshots().unwrap();
 }

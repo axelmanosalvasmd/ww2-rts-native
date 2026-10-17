@@ -88,7 +88,7 @@ fn net50_ending_a_break_starts_one_wave_on_the_next_horde_phase_only() {
     }
     m.validate_tick_state().unwrap();
     m.preflight_ordinary_snapshot().unwrap();
-    assert!(m.restrict_to_ordinary_snapshots().is_err());
+    m.restrict_to_ordinary_snapshots().unwrap();
 }
 
 #[test]
@@ -1047,7 +1047,7 @@ fn mode54_bunker_death_finishes_once_at_the_fallen_bunker_with_wave_and_defeats(
             "manual component clock leaves the recorded command boundary behind"
         );
         crate::recipient_snapshot::SnapshotCache::new(&m).unwrap();
-        assert!(m.restrict_to_ordinary_snapshots().is_err());
+        m.restrict_to_ordinary_snapshots().unwrap();
     }
 }
 
@@ -1201,7 +1201,7 @@ fn mode52_real_boss_wave_allows_breath_and_retirement_beside_guarded_aircraft() 
         m.validate_tick_state().is_err(),
         "manual component clock leaves the recorded command boundary behind"
     );
-    assert!(m.restrict_to_ordinary_snapshots().is_err());
+    m.restrict_to_ordinary_snapshots().unwrap();
 }
 
 #[test]

@@ -36,6 +36,9 @@ mod operative;
 mod operative_flights;
 #[path = "recipient_snapshot/owners.rs"]
 mod owners;
+#[cfg(test)]
+#[path = "recipient_snapshot/projectiles.rs"]
+mod projectiles;
 #[path = "recipient_snapshot/public_state.rs"]
 mod public_state;
 #[path = "recipient_snapshot/selected.rs"]
@@ -101,7 +104,6 @@ pub struct RecipientProjection {
 }
 
 /// The public Horde mode row excludes seat data and hidden purchase state.
-/// Hosted attachment separately requires complete aviation event delivery.
 pub fn horde_mode_row(state: &Match) -> Result<Value, SnapshotError> {
     let mode = state.horde_projection().map_err(|_| SnapshotError::Rules)?;
     let horde = state.horde.as_ref().ok_or(SnapshotError::Rules)?;
@@ -759,14 +761,6 @@ fn economy_fields(state: &Match, slot: usize) -> Result<Map<String, Value>, Snap
 impl Match {
     /// Bind hosted purchases to the current ordinary snapshot capabilities.
     pub fn restrict_to_ordinary_snapshots(&mut self) -> Result<(), SnapshotError> {
-        // Horde waves create aircraft from wave ten. Hosted attachment stays
-        // held on #369 until every aviation event can survive room delivery.
-        if self.options.mode == Mode::Horde {
-            return Err(SnapshotError::Unsupported {
-                unit: 0,
-                capability: SnapshotCapability::Air,
-            });
-        }
         self.preflight_ordinary_snapshot()?;
         // A queued plane can later emit AntiAir or PlaneDown. Keep hosted
         // training closed until the aviation event adapter is integrated.

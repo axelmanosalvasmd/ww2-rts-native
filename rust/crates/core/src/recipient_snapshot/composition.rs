@@ -210,6 +210,11 @@ pub(super) fn admit_actors(state: &Match, outside_events: &[Effect]) -> Result<(
             return Err(refused(SnapshotCapability::ShotsAndFlights));
         }
     }
+    if !state.firing.grenades.is_empty() {
+        state
+            .validate_firing_grenade_step(0.0)
+            .map_err(|_| refused(SnapshotCapability::ShotsAndFlights))?;
+    }
     // The caller must drain aviation events into the chronological tick batch
     // before delivery, just as it drains firing and support events above.
     if !state.aviation.events.is_empty() {

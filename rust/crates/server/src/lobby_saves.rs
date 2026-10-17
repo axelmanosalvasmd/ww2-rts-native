@@ -94,8 +94,7 @@ impl Hub {
         if !matches!(
             state.options.mode,
             Mode::Default | Mode::Conquest | Mode::Assault | Mode::Annihilation | Mode::Classic
-        )
-            || state.options.sandbox
+        ) || state.options.sandbox
             || state.world_runtime.is_some()
             || room.players.iter().any(|p| p.ai)
             || !room.spectators.is_empty()
@@ -152,8 +151,7 @@ impl Hub {
         if !matches!(
             state.options.mode,
             Mode::Default | Mode::Conquest | Mode::Assault | Mode::Annihilation | Mode::Classic
-        )
-            || state.options.sandbox
+        ) || state.options.sandbox
             || state.world_runtime.is_some()
         {
             return Err("save needs an unavailable room capability".into());

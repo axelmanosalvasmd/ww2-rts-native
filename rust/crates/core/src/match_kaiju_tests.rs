@@ -1,4 +1,4 @@
-//! Horde combat components; hosted attachment still requires aviation delivery.
+//! Horde combat components retain explicit malformed-scene admission checks.
 use super::*;
 use crate::{
     combat::{Impact, WeaponDamage},
@@ -242,7 +242,7 @@ fn horde_breath_hits_whole_line_once_and_overlapping_trench_cells_once() {
         m.restrict_to_ordinary_snapshots(),
         Err(SnapshotError::Unsupported {
             unit: 0,
-            capability: SnapshotCapability::Air
+            capability: SnapshotCapability::ShotsAndFlights
         })
     );
 }

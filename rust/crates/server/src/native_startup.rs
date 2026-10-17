@@ -15,6 +15,7 @@ pub(crate) fn ordinary_mode(name: &str) -> Option<Mode> {
         "assault" => Some(Mode::Assault),
         "annihilation" => Some(Mode::Annihilation),
         "classic" => Some(Mode::Classic),
+        "horde" => Some(Mode::Horde),
         _ => None,
     }
 }
@@ -125,6 +126,7 @@ impl NativeStartup {
             Mode::Default | Mode::Conquest => {
                 StartPlan::prepare(authored, &state.options, &state.rules)?
             }
+            Mode::Horde => StartPlan::prepare_horde(authored, &state.options, &state.rules)?,
             Mode::Classic | Mode::Annihilation => {
                 StartPlan::prepare_elimination(authored, &state.options, &state.rules)?
             }
