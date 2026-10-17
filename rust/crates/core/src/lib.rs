@@ -241,6 +241,7 @@ mod save_state;
 
 pub mod commander_field_policy;
 pub mod commander_world_policy;
-
 #[cfg(test)]
 mod economy_research_tests;
+
+mod numeric_keys;

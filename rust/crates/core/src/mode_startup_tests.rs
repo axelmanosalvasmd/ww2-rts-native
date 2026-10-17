@@ -378,6 +378,10 @@ fn mode01_non_world_mode_rows_match_the_prototype_public_fields() {
     let mut default = create(Mode::Conquest, ArmySize::Standard).unwrap();
     default.options.mode = Mode::Default;
     assert_eq!(mode_row(&default).unwrap(), Json::Null);
+    let cache = SnapshotCache::new(&default).unwrap();
+    for slot in 0..default.start.players.len() {
+        assert!(!cache.recipient(slot).unwrap().fields.contains_key("mode"));
+    }
 }
 
 #[test]
