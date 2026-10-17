@@ -97,6 +97,7 @@ The `state` struct field keys are listed below. These are native component bound
 | `capture_ticks`, `tick_state`, `ordinary_snapshot_only` | Capture clocks, tick phase state and the existing delivery capability restriction. |
 | `story`, `fallen`, `finish`, `timeline`, `next_unit_id` | Match statistics, fall locations, terminal decision, result samples and the canonical actor allocator. |
 | `assault`, `horde`, `tutorial`, `scenario`, `companions`, `rail_runs` | Existing mode and operative owners. Inactive records are retained; their presence does not grant room admission. |
+| `authored_mission` | Optional timed authored mission definition, execution clock, trigger state and ordered objective records. Older v1 checkpoints default to absent; restored records must match canonical execution. See [spectator-missions-v0.md](spectator-missions-v0.md). |
 | `elimination` | Optional Annihilation/Classic owner: `teams`, `bunkers`, `time_left`, `sudden_death`, `nodes`. Each resource node retains `cell`, `at` (`x`, `z`), `depot`, `rate`, `fuel`. |
 | `rules` | Omitted and reconstructed from compiled rules. Saving modified rules is refused. |
 | `world_runtime` | Omitted; saving or loading a World runtime is refused. |
