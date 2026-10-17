@@ -377,15 +377,28 @@ fn net43_ability_autocast_and_waiting_kind_six_survive_room_delivery() {
         let messages = room.step();
         threw |= messages[1].iter().any(|message| {
             message["shots"].as_array().is_some_and(|shots| {
-                shots.iter().any(|shot| shot["k"] == "throw" && shot["f"] == actor)
+                shots
+                    .iter()
+                    .any(|shot| shot["k"] == "throw" && shot["f"] == actor)
             })
         });
-        flew |= room.state().firing.flights.values().any(|flight| flight.shooter == actor);
-        if threw && room.state().firing.flights.is_empty() && room.state().firing.grenades.is_empty() {
+        flew |= room
+            .state()
+            .firing
+            .flights
+            .values()
+            .any(|flight| flight.shooter == actor);
+        if threw
+            && room.state().firing.flights.is_empty()
+            && room.state().firing.grenades.is_empty()
+        {
             break;
         }
     }
-    assert!(threw && flew, "the ordinary aimed approach must launch and deliver its grenade");
+    assert!(
+        threw && flew,
+        "the ordinary aimed approach must launch and deliver its grenade"
+    );
     assert!(room.state().commands.units[&actor].nade.is_none());
     assert!(room.state().abilities.get(actor).unwrap().cooldown > 0.);
     assert!(room.state().firing.flights.is_empty());
