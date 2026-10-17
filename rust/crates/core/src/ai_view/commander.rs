@@ -279,6 +279,7 @@ impl CommanderViewMemory {
                 sight
             },
             horde: mode == Mode::Horde,
+            ground_flights: false,
             ..Context::default()
         };
         if let Some(support) = me["sup"].as_object() {
@@ -436,6 +437,24 @@ impl CommanderViewMemory {
                             number(&u["built"])?
                         },
                         hold_position: own && truth(&u["holdPos"]),
+                        hold_fire: own && truth(&u["holdFire"]),
+                        auto_cast: own && truth(&u["auto"]),
+                        cooldown: if own { number(&u["cd"])? } else { 0.0 },
+                        attack_target: if own {
+                            u32::try_from(integer(&u["attackId"])?)
+                                .map_err(|_| "invalid delivered attack target")?
+                        } else {
+                            0
+                        },
+                        queued_amove: if own {
+                            optional_rows(&u["orders"])?
+                                .iter()
+                                .find(|order| order["kind"] == 2)
+                                .map(at)
+                                .transpose()?
+                        } else {
+                            None
+                        },
                         auto_retreat: own && truth(&u["autoRetreat"]),
                         queued_orders: if own {
                             optional_rows(&u["orders"])?.len()
@@ -619,6 +638,44 @@ mod tests {
             packet: &human.packet,
         };
         assert!(crate::match_human_observation::human_screen_observation(&screen).is_ok());
+    }
+
+    #[test]
+    fn delivered_ability_facts_keep_own_cooldown_attack_and_queue_without_foreign_intent() {
+        let mut snap = snapshot();
+        for index in 0..3 {
+            snap["units"][index][11] = json!(2.5);
+            snap["units"][index][12] = json!(2048 | 16384);
+        }
+        snap["plans"] = json!([[9,4,30,20], [2,4,12,20], [4,4,30,20]]);
+        snap["orders"] = json!([
+            [9,3,1,25,25,2,30,31,2,35,36],
+            [2,1,2,50,50], [4,1,2,60,60]
+        ]);
+        let view = SeatMemory::new(0, map()).unwrap().decode(&snap).unwrap();
+        let mut memory = memory();
+        let human = memory.observe(&view, &snap).unwrap();
+        let runtime = human.packet.input().runtime.as_ref().unwrap();
+        let own = &runtime.units[&9];
+        assert!(own.hold_fire && own.auto_cast);
+        assert_eq!(own.cooldown, 2.5);
+        assert_eq!(own.attack_target, 2);
+        assert_eq!(own.queued_orders, 3);
+        assert_eq!(own.queued_amove, Some(Point { x: 30.0, z: 31.0 }));
+        assert!(!runtime.ground_flights);
+        assert!(!runtime.units.contains_key(&2));
+        let ally = &runtime.units[&4];
+        assert!(!ally.hold_fire && !ally.auto_cast);
+        assert_eq!(ally.cooldown, 0.0);
+        assert_eq!(ally.attack_target, 0);
+        assert_eq!(ally.queued_orders, 0);
+        assert_eq!(ally.queued_amove, None);
+        // A malformed own cooldown must fail rather than grant a ready ability.
+        let mut invalid = view;
+        invalid.units.get_mut(&9).unwrap()["cd"] = json!("bad");
+        let before = memory.clone();
+        assert!(memory.observe(&invalid, &snap).is_err());
+        assert_eq!(memory, before);
     }
 
     #[test]

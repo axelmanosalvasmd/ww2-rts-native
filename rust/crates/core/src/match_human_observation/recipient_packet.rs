@@ -3,7 +3,7 @@ use super::*;
 use crate::{
     ai_view::{PublicMap, SeatMemory, SeatView},
     commander_ai::{PlayerObservation, PointObservation, ResearchObservation, UnitObservation},
-    commander_tactics::{Context, KnownBuilding, UnitFacts},
+    commander_tactics::{Context, KnownBuilding, NodeObservation, UnitFacts},
     economy::{Faction, Mode, TechState, Technology},
     economy_state::ArmySize,
 };
@@ -323,7 +323,19 @@ impl PublicFacts {
                     })
                 })
                 .collect::<Result<_, String>>()?,
-            nodes: view.nodes.iter().map(at).collect::<Result<_, _>>()?,
+            nodes: view
+                .nodes
+                .iter()
+                .map(|node| {
+                    Ok(NodeObservation {
+                        at: at(node)?,
+                        rate: number(&node["rate"])?,
+                        fuel: truth(&node["fuel"]),
+                        visible: false,
+                    })
+                })
+                .collect::<Result<_, String>>()?,
+            claimed_nodes: view.claimed_nodes.clone(),
             site_nodes: view
                 .nodes
                 .iter()
