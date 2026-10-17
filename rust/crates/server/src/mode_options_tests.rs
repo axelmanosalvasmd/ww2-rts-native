@@ -285,19 +285,9 @@ fn mode11_existing_native_constructors_keep_switches_bases_and_every_seat_frames
                 control.hold_fire = true;
                 control.auto_cast = false;
             }
-            // Assault delivery is admitted by this chain; Tutorial remains separate.
-            if name == "tutorial" {
-                for _ in 0..4 {
-                    state.advance_tick().unwrap();
-                }
-                assert!(
-                    RoomRuntime::new(state, 0).is_err(),
-                    "{name} snapshot admission stays guarded"
-                );
-            } else {
-                let mut runtime = RoomRuntime::new(state, 0).unwrap();
-                tick_every_seat(&mut runtime, logistics);
-            }
+            // Both chains now provide complete Tutorial and Assault delivery.
+            let mut runtime = RoomRuntime::new(state, 0).unwrap();
+            tick_every_seat(&mut runtime, logistics);
         }
     }
 }

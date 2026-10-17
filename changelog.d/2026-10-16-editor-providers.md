@@ -1,0 +1,3 @@
+- Share building placement rules between ordinary Build and previews made from delivered recipient state, including weather, aircraft sight, coastal checks and remembered terrain. Replace the older authoritative-state preview witness with real recipient delivery, accepted footprints and denial checks.
+- Keep malformed optional map overrides readable by authenticated editors without preventing server startup; use default catalogue metadata and preserve strict runtime rejection.
+- Match prototype editor World validation and the full save whitelist, and cover all 33 shipped map round trips, the 8 MiB boundary, raw/public HTTP responses and persistent editor passwords. Running World rooms and the placement C export remain deferred.

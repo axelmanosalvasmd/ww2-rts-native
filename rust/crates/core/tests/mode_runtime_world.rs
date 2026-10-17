@@ -86,6 +86,12 @@ fn phase(m: &mut Match, dt: f64) -> ww2_core::match_world_elimination::WorldRegi
     m.apply_world_regions(&order, dt).unwrap()
 }
 
+fn fort_phase(m: &mut Match, dt: f64) -> ww2_core::match_world_elimination::WorldRegionEffects {
+    m.grid.rebuild(&m.world.game.units);
+    let order = m.world.game.units.keys().copied().collect::<Vec<_>>();
+    m.apply_world_regions_with_fort_capture(&order, dt).unwrap()
+}
+
 #[test]
 fn mode71_seeded_core_world_creation_supports_both_sizes_and_one_to_six_players() {
     for size in [WorldSize::Huge, WorldSize::Massive] {
@@ -174,7 +180,7 @@ fn mode74_region_capture_contests_locks_drains_and_transfers_all_four_forts() {
     let at = centre(&m, region);
     let capturer = add(&mut m, "rifle", 0, at);
     // The actual constructor guard base locks the neutral region.
-    assert!(phase(&mut m, 8.0).captures.is_empty());
+    assert!(fort_phase(&mut m, 8.0).captures.is_empty());
     assert_eq!(
         m.world_runtime.as_ref().unwrap().regions[region].locked,
         Some(true)
@@ -197,10 +203,10 @@ fn mode74_region_capture_contests_locks_drains_and_transfers_all_four_forts() {
             z: at.z,
         },
     );
-    phase(&mut m, 0.0);
+    fort_phase(&mut m, 0.0);
     assert!(!m.world_runtime.as_ref().unwrap().regions[region].contested);
     m.world.game.units.get_mut(&rival).unwrap().x = at.x + 8.0;
-    assert!(phase(&mut m, 8.0).captures.is_empty());
+    assert!(fort_phase(&mut m, 8.0).captures.is_empty());
     assert!(m.world_runtime.as_ref().unwrap().regions[region].contested);
     m.world.game.units.get_mut(&rival).unwrap().retreating = true;
     let mut forts = Vec::new();
@@ -254,17 +260,17 @@ fn mode74_region_capture_contests_locks_drains_and_transfers_all_four_forts() {
     m.world_runtime.as_mut().unwrap().regions[region].team = 1;
     m.world_runtime.as_mut().unwrap().regions[region].progress = 1.0;
     let producer = add(&mut m, "barracks", 1, at);
-    assert!(phase(&mut m, 8.0).captures.is_empty());
+    assert!(fort_phase(&mut m, 8.0).captures.is_empty());
     assert_eq!(m.world_runtime.as_ref().unwrap().regions[region].team, 1);
     m.world.game.units.get_mut(&producer).unwrap().hp = 0.0;
-    assert!(phase(&mut m, 8.0).captures.is_empty());
+    assert!(fort_phase(&mut m, 8.0).captures.is_empty());
     assert_eq!(m.world_runtime.as_ref().unwrap().regions[region].team, -1);
     assert_eq!(
         m.world_runtime.as_ref().unwrap().regions[region].progress,
         0.0
     );
     let story = m.story[0].captures;
-    assert!(phase(&mut m, 4.0).captures.is_empty());
+    assert!(fort_phase(&mut m, 4.0).captures.is_empty());
     assert_eq!(
         m.world_runtime.as_ref().unwrap().regions[region].progress,
         0.5
@@ -273,7 +279,10 @@ fn mode74_region_capture_contests_locks_drains_and_transfers_all_four_forts() {
     m.story[0].captures = f64::NAN;
     m.grid.rebuild(&m.world.game.units);
     let order = m.world.game.units.keys().copied().collect::<Vec<_>>();
-    assert!(m.apply_world_regions(&order, 4.0).is_err());
+    assert!(
+        m.apply_world_regions_with_fort_capture(&order, 4.0)
+            .is_err()
+    );
     assert_eq!(
         m.world_runtime.as_ref().unwrap().regions[region].progress,
         0.5
@@ -283,7 +292,7 @@ fn mode74_region_capture_contests_locks_drains_and_transfers_all_four_forts() {
         assert_eq!(m.building_cells[cell].owner, 1);
     }
     m.story[0].captures = story;
-    let report = phase(&mut m, 4.0);
+    let report = fort_phase(&mut m, 4.0);
     assert_eq!(report.captures.len(), 1);
     assert_eq!(
         report.captures[0].owner,
@@ -357,7 +366,7 @@ fn mode74_forts_seized_before_former_owner_elimination_survive_the_same_phase() 
     region.team = -1;
     region.progress = 0.5;
     region.capper = Some(0);
-    let report = phase(&mut m, 4.0);
+    let report = fort_phase(&mut m, 4.0);
     assert_eq!(report.captures.len(), 1);
     assert!(m.start.economy.players[1].out);
     assert_eq!(m.world.game.units[&fort].owner, 0);

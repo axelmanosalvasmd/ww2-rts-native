@@ -96,7 +96,6 @@ impl Hub {
             Mode::Default | Mode::Conquest | Mode::Assault | Mode::Annihilation | Mode::Classic
         ) || state.options.sandbox
             || state.world_runtime.is_some()
-            || !room.spectators.is_empty()
         {
             return Err("save needs an unavailable room capability".into());
         }
@@ -110,7 +109,7 @@ impl Hub {
         let settings = json!({"mode":room.mode,"worldSize":room.world_size,"mapName":room.map,
             "mapSpawns":native.startup.raw_map()["spawns"],"army":room.army,"weather":room.weather,
             "defenderTeam":room.defender,"logistics":state.options.logistics,"tech":state.options.tech});
-        let save = json!({"version":crate::saves::VERSION,"g":native.runtime.save_json()?,"guard":null,
+        let save = json!({"version":crate::saves::version_for(state),"g":native.runtime.save_json()?,"guard":null,
             "map":native.startup.raw_map(),"seats":seats,"settings":settings,"ai":native.runtime.save_ai_memories()});
         room.saves.write(
             code,
@@ -146,6 +145,9 @@ impl Hub {
             return Err("save needs an unavailable room capability".into());
         }
         let state = Match::from_save_json(saved["g"]["state"].clone())?;
+        if state.authored_scenario.is_some() && saved["version"] != crate::saves::AUTHORED_VERSION {
+            return Err("authored scenarios require save version 2".into());
+        }
         if !matches!(
             state.options.mode,
             Mode::Default | Mode::Conquest | Mode::Assault | Mode::Annihilation | Mode::Classic
@@ -168,7 +170,7 @@ impl Hub {
             .iter()
             .map(|seat| {
                 if !seat["ai"].is_boolean() {
-                    return Err("invalid saved seat role".to_owned());
+                    return Err("invalid saved AI flag".to_owned());
                 }
                 if seat["ai"] == true {
                     return Ok(Vec::new());
@@ -217,10 +219,17 @@ impl Hub {
                 used.insert(index);
             }
         }
-        if present.iter().enumerate().any(|(index, p)| {
-            !used.contains(&index) && p.connection.as_ref().is_some_and(Connection::ready)
-        }) {
-            return Err("spectator runtime admission unavailable".into());
+        let mut spectators = present
+            .iter()
+            .enumerate()
+            .filter(|(index, p)| {
+                !used.contains(index) && p.connection.as_ref().is_some_and(Connection::ready)
+            })
+            .map(|(_, p)| (*p).clone())
+            .collect::<Vec<_>>();
+        for person in &mut spectators {
+            person.disconnected = None;
+            person.last_match = None;
         }
         let mut players = Vec::new();
         for (slot, seat) in seats.iter().enumerate() {
@@ -244,18 +253,12 @@ impl Hub {
                     ai: seat["ai"] == true,
                     team,
                     faction,
-                    level: if seat["ai"] == true {
-                        match &seat["level"] {
-                            Value::Null => "normal",
-                            value => match value.as_str() {
-                                Some("normal") => "normal",
-                                Some("easy") => "easy",
-                                Some("hard") => "hard",
-                                _ => return Err("invalid saved AI level".into()),
-                            },
-                        }
-                    } else {
-                        "normal"
+                    level: match seat["level"].as_str() {
+                        None if seat["level"].is_null() => "normal",
+                        Some("easy") => "easy",
+                        Some("normal") => "normal",
+                        Some("hard") => "hard",
+                        _ => return Err("invalid saved AI difficulty".into()),
                     },
                     disconnected: None,
                     denies: Vec::new(),
@@ -301,10 +304,11 @@ impl Hub {
         let mut staged = Room {
             code: room.code.clone(),
             saves: room.saves.clone(),
+            records: room.records.clone(),
             listed: room.listed,
             title: room.title.clone(),
             players,
-            spectators: Vec::new(),
+            spectators,
             operatives: Vec::new(),
             mode: text("mode")?,
             map: text("mapName")?,
@@ -351,16 +355,24 @@ impl Hub {
             .attached
             .runtime
             .restore_saved_events(saved["g"]["pendingEvents"].clone())?;
+        // Host pauses use the person name, including a surplus spectator host.
+        // The slot is consulted only by drop pauses.
         let host = staged
             .players
             .iter()
             .position(|p| p.connection.as_ref().is_some_and(|c| c.id == connection_id))
-            .ok_or("host did not receive a saved seat")?;
+            .unwrap_or(0);
+        let host_name = staged
+            .people()
+            .find(|p| p.connection.as_ref().is_some_and(|c| c.id == connection_id))
+            .ok_or("loading host disappeared")?
+            .name
+            .clone();
         // Replace a missing-seat drop pause with the prototype's indefinite host pause.
         prepared
             .attached
             .runtime
-            .open_loaded_pause(host, &staged.players[host].name, now)?;
+            .open_loaded_pause(host, &host_name, now)?;
         prepared.pause = Some(prepared.attached.runtime.pause_message(now));
         prepared.attached.loaded_save = true;
         // Move membership only after every fallible restoration step succeeds.

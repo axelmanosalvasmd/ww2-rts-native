@@ -119,6 +119,7 @@ impl Drop for Lifetime {
 
 #[derive(Clone)]
 struct Front {
+    map_editor: Option<MapEditor>,
     static_files: Option<static_files::StaticFiles>,
     workers: Vec<Worker>,
     stop: watch::Receiver<bool>,
@@ -141,12 +142,14 @@ pub async fn serve_sharded(
     }
     let (stop, stopped) = watch::channel(false);
     let lifetime = Lifetime { stop: stop.clone() };
+    let map_editor = config.map_editor.clone();
     let static_files = config
         .static_root
         .clone()
         .map(static_files::StaticFiles::new);
     let (workers, mut supervisors) = start_workers(config, trusted, count, stopped.clone());
     let front = Front {
+        map_editor,
         static_files,
         workers,
         stop: stopped,
@@ -206,6 +209,7 @@ async fn serve_front(
         .route("/maps", any(maps::serve))
         .route("/ws", get(front_upgrade))
         .fallback(front_static_or_maps)
+        .layer(axum::Extension(front.map_editor.clone()))
         .with_state(front);
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown)
@@ -217,8 +221,17 @@ async fn front_static_or_maps(
     OriginalUri(uri): OriginalUri,
     method: Method,
     headers: HeaderMap,
+    body: Body,
 ) -> Response<Body> {
-    serve_static_or_maps(front.static_files.as_ref(), uri, method, headers).await
+    serve_static_or_maps(
+        front.static_files.as_ref(),
+        front.map_editor,
+        uri,
+        method,
+        headers,
+        body,
+    )
+    .await
 }
 
 async fn front_directory(
@@ -325,6 +338,8 @@ async fn run_worker(
     hub.configure_trusted_room(trusted);
     hub.configure_saves(config.saves_dir);
     hub.configure_authored_maps(config.authored_maps_dir);
+    hub.configure_maps(config.map_editor);
+    hub.configure_records(config.horde_records);
     if let Err(error) = hub.configure_diagnostics(config.diagnostic_dir, config.tick_log) {
         let _ = started.send(Err(error));
         return Ok(());

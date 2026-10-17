@@ -63,3 +63,47 @@ where AI and logistics independently added files with the same path:
   redundant unreachable inline aircraft path is not duplicated.
 
 These are source-composition results, not a qualification of the combined tree.
+
+## Chain 4: save (composition in progress)
+
+Exact parent: `82f25be388cbbebfd5a773a13e5825906c539924`, qualified at 1,959 enabled
+tests. The additive C ABI revisions, authored scenarios, editor persistence and
+Horde records are retained. Final combined qualification is pending.
+
+The save chain added a third ordinary AI scheduler at the same path as the
+already-integrated hosted Horde adapter. Running both would submit duplicate
+orders. The merged ordinary room therefore keeps the AI chain's actual delivered
+frame owner and codec. The save chain's inactive human helper state remains a
+separate room helper owner, reset on seated takeover and restart. Its core tagged
+AI codec remains available and tested independently. The ordinary room does not
+silently serialize a second inactive planner as if it were the active AI.
+
+The reset/restore tests are adapted to inspect the active runtime AI commander
+and its full delivered-view memory rather than the replaced third scheduler;
+human helper identity, order preservation, atomic failed load, spectator starts,
+strategic memory, fresh attention and restart assertions remain. The existing
+AI-chain codec roundtrip and whole-save clone-failure witnesses remain.
+
+Additional composition:
+- Preserve both independently added engineering suites under separate paths.
+- Combine field-work and retreat snapshot checks with complete-frame arrays and
+  every incoming own-unit, hidden-unit and work-row assertion. The deliberately
+  superseded partial-snapshot missing-capability lists become complete delivery.
+- Resource nodes retain richer position/rate/fuel/visibility rows; the incoming
+  explicit node-worth compatibility field and its finite validation remain.
+  Aircraft readiness uses one common air_at_base field in both implementations.
+- Preserve typed authored-scenario events and reject the decode-only legacy
+  authored-mission event rather than emitting it. Tutorial and Horde event
+  validation remain present.
+- Authored editor maps are captured for async generation; public and trusted
+  startup bind to the same private map source. World admission stays closed.
+
+The four-chain diagnostic `cargo check --locked --workspace --all-targets -j1`
+passed after source composition. This compiles tests but does not run them.
+Final tests, Clippy, FFI linking and three-platform CI remain pending.
+
+Pinned-reference zero-form check: unmodified `shared/sim.js:5249` creates the
+plane-arrival object with `dir: s.dir`; `server.js:195` and the seat snapshot path
+at line 246 use JSON.stringify. Executing that exact emission statement and send
+helper on Node v24.19.0 with controlled +0 and -0 both emits `"dir":0`.
+This is a bounded serialization component check, not a full support simulation.

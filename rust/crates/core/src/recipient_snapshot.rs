@@ -1322,6 +1322,7 @@ mod net52_tests;
 #[cfg(test)]
 #[path = "economy_currency_tests.rs"]
 mod economy_currency_tests;
+#[cfg(test)]
 #[path = "recipient_snapshot/production_state_tests.rs"]
 mod production_state_tests;
 

@@ -104,6 +104,8 @@ pub enum TickEvent {
     Environment(crate::environment::Effect),
     Scenario(crate::legacy_scenario::SayAction),
     Tutorial(crate::match_tutorial::TutorialLine),
+    AuthoredScenario(crate::authored_scenario::ScenarioSay),
+    /// Decode-only legacy checkpoint event. Never emitted by the runtime.
     AuthoredMission(serde_json::Value),
     Horde(crate::match_horde::HordeEvent),
 }
@@ -805,13 +807,8 @@ impl crate::match_runtime::Match {
         }
 
         if self.options.mode != crate::economy::Mode::World && !winner_decided {
-            if let Some(mission) = self.authored_mission.as_mut() {
-                events.extend(
-                    mission
-                        .step(tick as u64, self.world.game.players.len())?
-                        .into_iter()
-                        .map(TickEvent::AuthoredMission),
-                );
+            if self.authored_scenario.is_some() {
+                self.step_authored_scenario(tick as u64, events)?;
             } else {
                 crate::legacy_scenario_runtime::step_legacy_scenario_emitting(
                     self,

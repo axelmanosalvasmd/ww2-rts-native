@@ -950,8 +950,29 @@ impl Match {
 }
 
 impl Match {
-    /// Pay and stamp an admitted site before computing any crew route.
-    /// Classic depots claim their canonical resource node only after site publication.
+    /// Borrow the ordinary mode's canonical resource claims in authored node order.
+    pub(crate) fn construction_nodes(
+        &self,
+    ) -> Result<Vec<crate::building_placement::Node>, String> {
+        if self.options.mode != crate::economy::Mode::Classic {
+            return Ok(Vec::new());
+        }
+        self.validate_elimination_state()?;
+        Ok(self
+            .elimination
+            .as_ref()
+            .unwrap()
+            .nodes
+            .iter()
+            .map(|node| crate::building_placement::Node {
+                cell: node.cell,
+                at: node.at,
+                claimed: node.depot.is_some(),
+            })
+            .collect())
+    }
+
+    /// Pay and stamp an admitted static site before computing any crew route.
     pub fn execute_build(
         &mut self,
         owner: usize,
@@ -1070,23 +1091,7 @@ impl Match {
         if name == "supplycache" && !self.options.logistics {
             return self.construction_denial(&selected, Denial::Blocked);
         }
-        // Use the shared placement kernel with the canonical Classic node list. The
-        // result carries the selected node index, which is claimed only after publication.
-        let nodes = self
-            .elimination
-            .as_ref()
-            .map(|state| {
-                state
-                    .nodes
-                    .iter()
-                    .map(|node| crate::building_placement::Node {
-                        cell: node.cell,
-                        at: node.at,
-                        claimed: node.depot.is_some(),
-                    })
-                    .collect::<Vec<_>>()
-            })
-            .unwrap_or_default();
+        let nodes = self.construction_nodes()?;
         let placement = crate::building_placement::check(
             &crate::building_placement::Context {
                 game: &self.world.game,
@@ -1275,3 +1280,7 @@ mod logistics_intent;
 #[cfg(test)]
 #[path = "base_construction_runtime_tests.rs"]
 mod construction_runtime;
+
+#[cfg(test)]
+#[path = "match_depot_tests.rs"]
+mod depot_tests;

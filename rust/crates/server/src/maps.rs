@@ -7,32 +7,43 @@ use axum::{
 #[path = "map-data.rs"]
 mod data;
 
-/// Sanitize the immutable authoring map before any public delivery.
+/// Sanitize the immutable authoring map for catalogue regression checks.
+#[cfg(test)]
 pub(crate) fn public_map(name: &str) -> Option<serde_json::Value> {
     let map = crate::authoritative_maps::load(name).ok()?;
     ww2_core::map::map_for_client(map.source()).ok()
 }
 
-/// Read-only map delivery. No request can select an authoring file or raw projection.
+/// Public maps are sanitized; only a valid editor password selects raw maps or writes.
 pub(crate) async fn serve(
     OriginalUri(uri): OriginalUri,
+    axum::Extension(editor): axum::Extension<Option<crate::MapEditor>>,
     method: Method,
     headers: HeaderMap,
+    body: Body,
 ) -> Response<Body> {
-    response(uri.path(), &method, headers.contains_key("x-edit-password"))
-}
-
-fn response(path: &str, method: &Method, editor_header: bool) -> Response<Body> {
-    let path = normalized_path(path);
+    let path = normalized_path(uri.path());
+    let credential = headers.get("x-edit-password");
     if path == "/maps" {
-        return Response::builder()
-            .status(StatusCode::OK)
-            .header(header::CONTENT_TYPE, "application/json")
-            .body(Body::from(
-                serde_json::to_vec(&data::MAPS.iter().map(|(name, _)| *name).collect::<Vec<_>>())
-                    .unwrap(),
-            ))
-            .unwrap();
+        let names = editor
+            .as_ref()
+            .map(|editor| {
+                editor
+                    .catalog()
+                    .1
+                    .as_object()
+                    .unwrap()
+                    .keys()
+                    .cloned()
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_else(|| {
+                data::MAPS
+                    .iter()
+                    .map(|(name, _)| (*name).to_owned())
+                    .collect()
+            });
+        return json(StatusCode::OK, serde_json::json!(names));
     }
     let Some(raw_name) = path
         .strip_prefix("/maps/")
@@ -41,32 +52,104 @@ fn response(path: &str, method: &Method, editor_header: bool) -> Response<Body> 
         return text(StatusCode::NOT_FOUND, "not found");
     };
     let name = raw_name.strip_suffix(".json").unwrap_or(raw_name);
-    if !(1..=32).contains(&name.len())
-        || !name
-            .bytes()
-            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
-    {
+    if !crate::map_editor::valid_name(name) {
         return text(StatusCode::BAD_REQUEST, "bad map name");
     }
+    let authorized = editor
+        .as_ref()
+        .is_some_and(|editor| editor.authorized(credential.map_or(b"", |v| v.as_bytes())));
+    if method == Method::POST {
+        if !authorized {
+            return json(
+                StatusCode::FORBIDDEN,
+                serde_json::json!({"error":"wrong password"}),
+            );
+        }
+        let bytes = match axum::body::to_bytes(body, 8 * 1024 * 1024).await {
+            Ok(bytes) => bytes,
+            Err(_) => {
+                return json(
+                    StatusCode::PAYLOAD_TOO_LARGE,
+                    serde_json::json!({"error":"map too large"}),
+                );
+            }
+        };
+        let raw = match serde_json::from_slice::<serde_json::Value>(&bytes) {
+            Ok(raw) => raw,
+            Err(_) => {
+                return json(
+                    StatusCode::BAD_REQUEST,
+                    serde_json::json!({"error":"bad JSON"}),
+                );
+            }
+        };
+        return match editor.unwrap().save(name, &bytes) {
+            Ok(()) => json(StatusCode::OK, serde_json::json!({"ok":true})),
+            Err(crate::map_editor::SaveError::Invalid(error)) => json(
+                StatusCode::BAD_REQUEST,
+                serde_json::json!({"error":crate::editor_errors::message(&error, &raw)}),
+            ),
+            Err(crate::map_editor::SaveError::Io(error)) => {
+                eprintln!("map not saved: {error}");
+                json(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    serde_json::json!({"error":"map not saved"}),
+                )
+            }
+        };
+    }
     if method != Method::GET {
-        // Editor writes are not part of this server slice.
         return text(StatusCode::METHOD_NOT_ALLOWED, "method not allowed");
     }
-    if editor_header {
-        // Editor requests cannot select the private native match catalogue.
+    if credential.is_some() && !authorized {
         return text(StatusCode::FORBIDDEN, "wrong password");
     }
-    match public_map(name) {
-        Some(map) => Response::builder()
+    if editor
+        .as_ref()
+        .is_some_and(|editor| editor.unavailable(name))
+    {
+        return text(StatusCode::NOT_FOUND, "no such map");
+    }
+    if credential.is_some()
+        && let Some(bytes) = editor.as_ref().and_then(|editor| editor.raw_bytes(name))
+    {
+        return Response::builder()
             .status(StatusCode::OK)
             .header(header::CONTENT_TYPE, "application/json")
             .header(header::CACHE_CONTROL, "no-store")
-            .body(Body::from(
-                serde_json::to_vec(&map).expect("public map JSON"),
-            ))
-            .unwrap(),
+            .body(Body::from(bytes))
+            .unwrap();
+    }
+    let raw = editor.as_ref().and_then(|e| e.raw(name)).or_else(|| {
+        crate::authoritative_maps::load(name)
+            .ok()
+            .map(|m| m.source().clone())
+    });
+    let value = raw.and_then(|raw| {
+        if credential.is_some() {
+            Some(raw)
+        } else {
+            ww2_core::map::map_for_client(&raw).ok()
+        }
+    });
+    match value {
+        Some(value) => {
+            let mut response = json(StatusCode::OK, value);
+            response.headers_mut().insert(
+                header::CACHE_CONTROL,
+                header::HeaderValue::from_static("no-store"),
+            );
+            response
+        }
         None => text(StatusCode::NOT_FOUND, "no such map"),
     }
+}
+fn json(status: StatusCode, value: serde_json::Value) -> Response<Body> {
+    Response::builder()
+        .status(status)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(serde_json::to_vec(&value).unwrap()))
+        .unwrap()
 }
 
 fn text(status: StatusCode, body: &'static str) -> Response<Body> {
@@ -112,20 +195,40 @@ mod tests {
             assert_eq!(public_map(key).unwrap(), expected, "{key}");
         }
     }
-    #[test]
-    fn raw_names_and_methods_cannot_reach_authoring_data() {
+    #[tokio::test]
+    async fn raw_names_and_methods_cannot_reach_authoring_data() {
+        async fn response(path: &str, method: &Method, editor: bool) -> Response<Body> {
+            let mut headers = HeaderMap::new();
+            if editor {
+                headers.insert("x-edit-password", "wrong".parse().unwrap());
+            }
+            serve(
+                OriginalUri(path.parse().unwrap()),
+                axum::Extension(None),
+                method.clone(),
+                headers,
+                Body::empty(),
+            )
+            .await
+        }
         for name in ["default", "default.json"] {
             assert_eq!(
-                response(&format!("/maps/{name}"), &Method::GET, false).status(),
+                response(&format!("/maps/{name}"), &Method::GET, false)
+                    .await
+                    .status(),
                 StatusCode::OK
             );
             assert_eq!(
-                response(&format!("/maps/{name}"), &Method::GET, true).status(),
+                response(&format!("/maps/{name}"), &Method::GET, true)
+                    .await
+                    .status(),
                 StatusCode::FORBIDDEN
             );
             assert_eq!(
-                response(&format!("/maps/{name}"), &Method::POST, false).status(),
-                StatusCode::METHOD_NOT_ALLOWED
+                response(&format!("/maps/{name}"), &Method::POST, false)
+                    .await
+                    .status(),
+                StatusCode::FORBIDDEN
             );
         }
         for path in [
@@ -135,7 +238,10 @@ mod tests {
             "/maps/default.json.json",
             "/maps/../../Cargo.toml",
         ] {
-            assert_ne!(response(path, &Method::GET, false).status(), StatusCode::OK);
+            assert_ne!(
+                response(path, &Method::GET, false).await.status(),
+                StatusCode::OK
+            );
         }
         assert_eq!(
             normalized_path("/maps/%2e%2e/maps/default"),

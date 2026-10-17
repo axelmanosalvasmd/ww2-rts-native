@@ -108,6 +108,32 @@ fn collect_classic_complete(state: &mut Match, delivery: &mut DeliveryState) {
             omit: false,
         })
         .collect::<Vec<_>>();
+    let expected_units: Vec<_> = (0..count)
+        .map(|slot| {
+            let own: Vec<_> = state
+                .world
+                .game
+                .units
+                .values()
+                .filter(|unit| unit.owner == slot)
+                .map(|unit| u64::from(unit.id))
+                .collect();
+            let hidden: Vec<_> = state
+                .world
+                .game
+                .units
+                .values()
+                .filter(|unit| {
+                    !state.world.game.reveal
+                        && !state.world.game.allied(unit.owner, slot)
+                        && !state.world.game.players[slot].sees(unit.id)
+                })
+                .map(|unit| u64::from(unit.id))
+                .collect();
+            (own, hidden)
+        })
+        .collect();
+    let jobs = state.field_works.jobs().len();
     let frame = delivery
         .capture_selected_with_tick_events(state, &selected, &[])
         .unwrap()
@@ -116,7 +142,7 @@ fn collect_classic_complete(state: &mut Match, delivery: &mut DeliveryState) {
         frame.slots().collect::<Vec<_>>(),
         (0..count).collect::<Vec<_>>()
     );
-    for slot in 0..count {
+    for (slot, (own, hidden)) in expected_units.iter().enumerate() {
         let snapshot = frame.recipient(slot).unwrap().into_json();
         assert_eq!(snapshot["t"], "s");
         assert_eq!(snapshot["mode"], expected, "Classic seat {slot}");
@@ -133,6 +159,20 @@ fn collect_classic_complete(state: &mut Match, delivery: &mut DeliveryState) {
         ] {
             assert!(snapshot[field].is_array(), "Classic seat {slot}: {field}");
         }
+        let rows = snapshot["units"].as_array().unwrap();
+        for id in own {
+            assert!(rows.iter().any(|row| row[0].as_u64() == Some(*id)));
+        }
+        for id in hidden {
+            assert!(rows.iter().all(|row| row[0].as_u64() != Some(*id)));
+        }
+        assert_eq!(
+            snapshot["works"].as_array().unwrap().len(),
+            if slot == 0 { jobs } else { 0 }
+        );
+        assert!(snapshot["cells"].is_array());
+        assert!(snapshot["units"].is_array());
+        assert!(snapshot["works"].is_array());
     }
 }
 

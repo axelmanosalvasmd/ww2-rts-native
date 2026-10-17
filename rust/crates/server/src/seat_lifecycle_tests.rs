@@ -121,9 +121,9 @@ fn net66_presence_and_ping_survive_scheduled_paused_catchup_and_reconnect_delive
     }
     assert!(hub.native_status("ABC").unwrap().fault.is_none());
 
-    // AI metadata uses the same production projection in a hosted room.
+    // Admitted AI seats keep the same presence and ping projection in real frames.
     let mut lobby = Hub::new(32, String::new());
-    let (client, mut rx) = peer(10);
+    let (client, mut client_rx) = peer(10);
     join(&mut lobby, &client, "human", 0);
     lobby.message("ABC", &client, &mut true, json!({"t":"addAi"}), 1);
     let ai = &mut lobby.rooms.get_mut("ABC").unwrap().players[1];
@@ -133,14 +133,20 @@ fn net66_presence_and_ping_survive_scheduled_paused_catchup_and_reconnect_delive
     lobby
         .attach_native("ABC", native_tests::native_match(), 2)
         .unwrap();
-    drain(&mut lobby, &mut rx, 2);
-    lobby.poll_native(2, 0);
-    lobby.poll_native(52, 50_000_000);
-    let delivered = drain(&mut lobby, &mut rx, 52);
-    let frame = snapshots(&delivered).next().unwrap();
-    assert_eq!(frame["online"], json!([true, true]));
-    assert_eq!(frame["ping"][1].as_f64(), Some(-1.0));
-    assert!(lobby.native_status("ABC").unwrap().fault.is_none());
+    drain(&mut lobby, &mut client_rx, 2);
+    for beat in 0..4 {
+        lobby.poll_native(2 + beat * 50, beat * 50_000_000);
+    }
+    let messages = drain(&mut lobby, &mut client_rx, 152);
+    assert!(snapshots(&messages).next().is_some());
+    for frame in snapshots(&messages) {
+        assert_eq!(frame["online"], json!([true, true]));
+        assert_eq!(frame["ping"], json!([null, -1.0]));
+    }
+    let status = lobby.native_status("ABC").unwrap();
+    assert!(status.tick > 0);
+    assert!(!status.paused);
+    assert!(status.fault.is_none());
 }
 
 #[test]

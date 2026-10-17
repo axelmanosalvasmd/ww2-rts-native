@@ -359,6 +359,13 @@ fn classic_retreat_complete_tick(m: &mut Match, delivery: &mut DeliveryState, id
     let count = m.start.players.len();
     let retreating = m.world.game.units[&id].retreating;
     let selected = seats(m);
+    let hidden: Vec<_> = (0..count)
+        .map(|slot| {
+            !m.world.game.reveal
+                && !m.world.game.allied(0, slot)
+                && !m.world.game.players[slot].sees(id)
+        })
+        .collect();
     let frame = delivery
         .capture_selected_with_tick_events(m, &selected, &report.events)
         .unwrap()
@@ -367,7 +374,7 @@ fn classic_retreat_complete_tick(m: &mut Match, delivery: &mut DeliveryState, id
         frame.slots().collect::<Vec<_>>(),
         (0..count).collect::<Vec<_>>()
     );
-    for slot in 0..count {
+    for (slot, hidden) in hidden.iter().copied().enumerate() {
         let snapshot = frame.recipient(slot).unwrap().into_json();
         assert_eq!(snapshot["t"], "s");
         assert_eq!(snapshot["mode"], expected, "Classic seat {slot}");
@@ -375,6 +382,18 @@ fn classic_retreat_complete_tick(m: &mut Match, delivery: &mut DeliveryState, id
         for field in ["wrecks", "foundMines", "shots", "flights"] {
             assert!(snapshot[field].is_array(), "Classic seat {slot}: {field}");
         }
+        if hidden {
+            assert!(
+                snapshot["units"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .all(|row| row[0].as_u64() != Some(u64::from(id)))
+            );
+        }
+        assert!(snapshot["cells"].is_array());
+        assert_eq!(snapshot["works"], serde_json::json!([]));
+        assert_eq!(snapshot["mode"], expected, "Classic seat {slot}");
     }
     let snapshot = frame.recipient(0).unwrap().into_json();
     let row = snapshot["units"]

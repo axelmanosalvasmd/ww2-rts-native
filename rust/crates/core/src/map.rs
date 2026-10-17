@@ -199,6 +199,12 @@ impl AuthoritativeMap {
         Self::from_value(source)
     }
     pub(crate) fn from_value(source: Value) -> Result<Self> {
+        Self::from_value_mode(source, false)
+    }
+    pub(crate) fn from_editor_value(source: Value) -> Result<Self> {
+        Self::from_value_mode(source, true)
+    }
+    fn from_value_mode(source: Value, editor: bool) -> Result<Self> {
         if !source.is_object() {
             return Err(invalid("document", "expected a map object"));
         }
@@ -222,7 +228,11 @@ impl AuthoritativeMap {
             .transpose()?;
         let layers = normalize_layers(&source, w, h, &chars, true)?;
         let structures = crate::structures::parse(source.get("structures"), w, h, &layers)?;
-        let is_world = source.get("world").is_some();
+        let is_world = if editor {
+            source.get("world").is_some_and(crate::map_save::truthy)
+        } else {
+            source.get("world").is_some()
+        };
         let minimum_spawns = if is_world { 1 } else { 2 };
         let pos = |v: &Value, field: &str| -> Result<(usize, usize)> {
             Ok((
@@ -248,14 +258,18 @@ impl AuthoritativeMap {
                 },
             ));
         }
+        let positions = raw_spawns
+            .iter()
+            .map(|spawn| open_pos(spawn, "spawns"))
+            .collect::<Result<Vec<_>>>()?;
         let spawns = raw_spawns
             .iter()
-            .map(|s| {
-                let (x, y) = open_pos(s, "spawns")?;
+            .zip(positions)
+            .map(|(spawn, (x, y))| {
                 Ok(Spawn {
                     x,
                     y,
-                    assault: optional_bool(s, "assault")?,
+                    assault: optional_bool(spawn, "assault")?,
                 })
             })
             .collect::<Result<Vec<_>>>()?;
@@ -308,53 +322,59 @@ impl AuthoritativeMap {
                 },
             ));
         }
-        let sequence = source
-            .get("pointSequence")
-            .map(|v| integer(v, 0, 1_000_000_000, "pointSequence"))
-            .transpose()?;
-        let points = raw_points
+        // The editor reports all geometry and score failures before point metadata.
+        let mut points = raw_points
             .iter()
-            .enumerate()
-            .map(|(i, p)| {
-                let (x, y) = open_pos(p, "points")?;
-                if let (Some(sequence), Some(id)) = (sequence, p["id"].as_str())
-                    && let Some(digits) = id.strip_prefix("point:")
-                    && !digits.is_empty()
-                    && digits.bytes().all(|c| c.is_ascii_digit())
-                    && digits.parse::<f64>().unwrap_or(f64::INFINITY) >= sequence as f64
-                {
-                    return Err(invalid("pointSequence", "must exceed existing point IDs"));
-                }
-                let kind = p
-                    .get("kind")
-                    .map(|k| {
-                        k.as_str()
-                            .filter(|k| ["radio", "depot"].contains(k))
-                            .map(str::to_owned)
-                            .ok_or_else(|| invalid("points.kind", "unknown point kind"))
-                    })
-                    .transpose()?;
-                let needs = p
-                    .get("needs")
-                    .map(|n| integer(n, 0, raw_points.len() - 1, "points.needs"))
-                    .transpose()?;
-                if needs == Some(i) {
-                    return Err(invalid("points.needs", "cannot depend on itself"));
-                }
-                let score = |key| match p.get(key) {
+            .map(|point| {
+                let (x, y) = open_pos(point, "points")?;
+                let score = |key| match point.get(key) {
                     None | Some(Value::Null) => Ok(1.0),
-                    Some(v) => number(v, 0.0, 5.0, key),
+                    Some(value) => number(value, 0.0, 5.0, key),
                 };
                 Ok(CapturePoint {
                     x,
                     y,
                     vp: score("vp")?,
                     mp: score("mp")?,
-                    kind,
-                    needs,
+                    kind: None,
+                    needs: None,
                 })
             })
             .collect::<Result<Vec<_>>>()?;
+        let sequence = source
+            .get("pointSequence")
+            .map(|value| integer(value, 0, 1_000_000_000, "pointSequence"))
+            .transpose()?;
+        for point in raw_points {
+            if let (Some(sequence), Some(id)) = (sequence, point["id"].as_str())
+                && let Some(digits) = id.strip_prefix("point:")
+                && !digits.is_empty()
+                && digits.bytes().all(|c| c.is_ascii_digit())
+                && digits.parse::<f64>().unwrap_or(f64::INFINITY) >= sequence as f64
+            {
+                return Err(invalid("pointSequence", "must exceed existing point IDs"));
+            }
+        }
+        for (point, raw) in points.iter_mut().zip(raw_points) {
+            point.kind = raw
+                .get("kind")
+                .map(|kind| {
+                    kind.as_str()
+                        .filter(|kind| ["radio", "depot"].contains(kind))
+                        .map(str::to_owned)
+                        .ok_or_else(|| invalid("points.kind", "unknown point kind"))
+                })
+                .transpose()?;
+        }
+        for (i, (point, raw)) in points.iter_mut().zip(raw_points).enumerate() {
+            point.needs = raw
+                .get("needs")
+                .map(|value| integer(value, 0, raw_points.len() - 1, "points.needs"))
+                .transpose()?;
+            if point.needs == Some(i) {
+                return Err(invalid("points.needs", "cannot depend on itself"));
+            }
+        }
         for i in 0..points.len() {
             let mut cursor = i;
             for k in 0..=points.len() + 1 {
@@ -368,8 +388,6 @@ impl AuthoritativeMap {
             }
         }
         let catalog = Catalog::compiled().map_err(|e| MapError::Catalog(e.to_string()))?;
-        crate::scenario_validation::validate_scenario(&source, catalog)
-            .map_err(|e| invalid("scenario", &e.0))?;
         let houses = catalog
             .table("CFG")
             .map_err(|e| MapError::Catalog(e.to_string()))?
@@ -447,6 +465,8 @@ impl AuthoritativeMap {
                 triggers.push(Trigger { at, say, blow });
             }
         }
+        crate::scenario_validation::validate_scenario(&source, catalog)
+            .map_err(|e| invalid("scenario", &e.0))?;
         // Legacy timed triggers migrate to a scenario in the reference. Protect those
         // scenario limits too, without claiming support for authored scenario graphs.
         if !triggers.is_empty() {
@@ -491,10 +511,24 @@ impl AuthoritativeMap {
                 return Err(invalid("triggers", "scenario work exceeds 4096"));
             }
         }
-        let geography = source
-            .get("world")
-            .map(|v| crate::world_map::parse(v, w, h, &chars, height.as_deref(), spawns.len()))
-            .transpose()?;
+        let geography = if editor {
+            if is_world {
+                crate::world_map::validate_editor(
+                    &source["world"],
+                    w,
+                    h,
+                    &chars,
+                    height.as_deref(),
+                    spawns.len(),
+                )?;
+            }
+            None
+        } else {
+            source
+                .get("world")
+                .map(|v| crate::world_map::parse(v, w, h, &chars, height.as_deref(), spawns.len()))
+                .transpose()?
+        };
         Ok(Self {
             source,
             name,
@@ -574,8 +608,13 @@ pub fn map_for_client(source: &Value) -> Result<Value> {
         .ok_or_else(|| invalid("document", "expected a map object"))?;
     object.remove("triggers");
     object.remove("scenario");
-    let map = AuthoritativeMap::from_value(result.clone())?;
-    let w = map.w;
+    // mapForClient projects authored terrain without validating gameplay fields.
+    // An editor save may intentionally omit World geography; that must not turn
+    // readable public terrain into a failed runtime-import attempt.
+    let w = integer(&result["w"], 20, 1024, "w")?;
+    let h = integer(&result["h"], 20, 1024, "h")?;
+    let chars = rows(&result["rows"], w, h, CELLS, "rows")?;
+    let layers = normalize_layers(&result, w, h, &chars, true)?;
     let strings = |cells: &[u8]| -> Value {
         serde_json::json!(
             cells
@@ -586,7 +625,7 @@ pub fn map_for_client(source: &Value) -> Result<Value> {
     };
     if source.get("layers").is_none() {
         result["worldVersion"] = serde_json::json!(2);
-        result["layers"] = serde_json::json!({"ground":strings(&map.layers.ground),"objects":strings(&map.layers.objects)});
+        result["layers"] = serde_json::json!({"ground":strings(&layers.ground),"objects":strings(&layers.objects)});
     }
     let hidden_rows = source
         .get("layers")
@@ -598,23 +637,22 @@ pub fn map_for_client(source: &Value) -> Result<Value> {
         .flat_map(|row| row.as_str().expect("validated row").bytes())
         .map(|ch| ch == b'N')
         .collect();
-    let public: Vec<_> = map
-        .chars
+    let public: Vec<_> = chars
         .iter()
         .enumerate()
         .map(|(cell, &ch)| {
             if ch != b'N' {
                 ch
-            } else if map.layers.objects[cell] != b'.' {
-                map.layers.objects[cell]
+            } else if layers.objects[cell] != b'.' {
+                layers.objects[cell]
             } else {
-                map.layers.ground[cell]
+                layers.ground[cell]
             }
         })
         .collect();
     result["rows"] = strings(&public);
-    result["layers"]["objects"] = strings(&map.layers.objects);
-    result["layers"]["mines"] = serde_json::json!(vec![".".repeat(w); map.h]);
+    result["layers"]["objects"] = strings(&layers.objects);
+    result["layers"]["mines"] = serde_json::json!(vec![".".repeat(w); h]);
     for key in ["materials", "objectMaterials"] {
         if let Some(list) = result["layers"].get_mut(key).and_then(Value::as_array_mut) {
             list.retain(|entry| {

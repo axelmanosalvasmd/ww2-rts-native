@@ -708,3 +708,71 @@ fn intent_log32_retirement_requires_idle_empty_orderless_reachable_source() {
         );
     }
 }
+
+#[test]
+fn if25_match_convoy_retreat_equal_distance_keeps_active_source_insertion_order() {
+    for reverse in [false, true] {
+        let mut m = arena(true);
+        let truck = m.test_supply_truck(0);
+        place(&mut m, truck, Point { x: 81.0, z: 81.0 });
+        let points = [Point { x: 61.0, z: 81.0 }, Point { x: 101.0, z: 81.0 }];
+        source(&mut m, points[0]);
+        let mut other = m.convoys.as_ref().unwrap().stores[0].clone();
+        other.id = StoreId::Source(900);
+        other.at = points[1];
+        m.convoys.as_mut().unwrap().stores.push(other);
+        if reverse {
+            m.convoys.as_mut().unwrap().stores.reverse();
+        }
+        let expected = m.convoys.as_ref().unwrap().stores[0].at;
+        let mut inactive = m.convoys.as_ref().unwrap().stores[0].clone();
+        inactive.id = StoreId::Source(901);
+        inactive.at = Point { x: 81.0, z: 81.0 };
+        inactive.active = false;
+        m.convoys.as_mut().unwrap().stores.insert(0, inactive);
+        assert_eq!(
+            m.execute_command(
+                0,
+                &crate::match_commands::Command::Retreat {
+                    ids: vec![i64::from(truck)],
+                },
+                false
+            )
+            .unwrap(),
+            None
+        );
+        assert_eq!(m.world.game.units[&truck].world_goal, Some(expected));
+        assert!(m.world.game.units[&truck].retreating);
+        let row = &m.convoys.as_ref().unwrap().trucks[&truck];
+        assert!(row.manual && !row.hold);
+    }
+}
+
+#[test]
+fn if25_match_withdrawal_equal_distance_keeps_store_insertion_order() {
+    for reverse in [false, true] {
+        let mut m = arena(true);
+        let id = troop(&m);
+        place(&mut m, id, Point { x: 81.0, z: 81.0 });
+        let points = [Point { x: 61.0, z: 81.0 }, Point { x: 101.0, z: 81.0 }];
+        source(&mut m, points[0]);
+        let mut other = m.convoys.as_ref().unwrap().stores[0].clone();
+        other.id = StoreId::Source(900);
+        other.at = points[1];
+        m.convoys.as_mut().unwrap().stores.push(other);
+        if reverse {
+            m.convoys.as_mut().unwrap().stores.reverse();
+        }
+        let expected = m.convoys.as_ref().unwrap().stores[0].at;
+        m.logistics.get_mut(id).unwrap().forced = true;
+        m.advance_supply_withdrawal(id).unwrap();
+        let expected = Point {
+            x: 81.0 + (expected.x - 81.0) * 0.5,
+            z: 81.0,
+        };
+        assert_eq!(m.world.game.units[&id].world_goal, Some(expected));
+        assert!(m.world.game.units[&id].retreating);
+        assert!(m.commands.units[&id].supply_started);
+        assert!(!m.logistics.get(id).unwrap().stranded);
+    }
+}

@@ -71,17 +71,20 @@ pub struct Context {
     pub support: BTreeMap<String, f64>,
     /// Resource positions and enemy depot memories already delivered to this seat.
     pub nodes: Vec<NodeObservation>,
+    pub node_worth: Vec<f64>,
     pub known_depots: Vec<Point>,
+    pub mines: Vec<Point>,
+    pub bridge_cells: Vec<usize>,
+    pub spoiled_cells: Vec<usize>,
+    pub found_mines: Vec<Point>,
+    pub claimed_nodes: BTreeSet<usize>,
     /// Indices of delivered nodes on owned World ground. Other modes use every node.
     pub owned_nodes: BTreeSet<usize>,
     pub build_reserve: f64,
     pub fort_reserve: f64,
-    pub claimed_nodes: BTreeSet<usize>,
     /// Public start terrain and recipient-delivered mine knowledge only.
     pub initial_chars: Option<Vec<u8>>,
     pub initial_height: Option<Vec<i8>>,
-    pub mines: Vec<Point>,
-    pub found_mines: Vec<Point>,
     /// Caller capability, never inferred from visible actors. Complete live-flight
     /// delivery must be integrated before an ordinary human packet enables it.
     pub ground_flights: bool,
@@ -109,15 +112,18 @@ impl Default for Context {
             sight: 1.0,
             support: BTreeMap::new(),
             nodes: Vec::new(),
+            node_worth: Vec::new(),
             known_depots: Vec::new(),
+            mines: Vec::new(),
+            bridge_cells: Vec::new(),
+            spoiled_cells: Vec::new(),
+            found_mines: Vec::new(),
+            claimed_nodes: BTreeSet::new(),
             owned_nodes: BTreeSet::new(),
             build_reserve: 0.0,
             fort_reserve: 0.0,
-            claimed_nodes: BTreeSet::new(),
             initial_chars: None,
             initial_height: None,
-            mines: Vec::new(),
-            found_mines: Vec::new(),
             ground_flights: false,
             field: None,
             world: None,
@@ -232,6 +238,10 @@ pub struct State {
     #[serde(default)]
     pub node: BTreeMap<u32, usize>,
     pub(crate) fort_steps: BTreeMap<u32, u8>,
+    #[serde(default)]
+    pub(crate) engineering: crate::commander_engineering::State,
+    #[serde(default)]
+    pub(crate) node_assignments: BTreeMap<u32, usize>,
     #[serde(default)]
     pub field: crate::commander_field_policy::State,
     #[serde(default)]
@@ -649,12 +659,17 @@ fn plan_inner(
             (adaptive || skill.memory) && strategic_recent.iter().any(|s| armor(&s.kind)),
             &sight_game,
             sees,
+            &mut state.node_assignments,
         )?
     };
     budget = construction.remaining_mp;
     let build_reserve = if rush { 0.0 } else { construction.reserve };
     mine.retain(|u| !construction.builders.contains(&u.id));
-    available_units.retain(|u| !construction.builders.contains(&u.id));
+    // Source's rush response still sees every available engineer after construction
+    // proposals, so a threatened builder can receive the later escape order.
+    available_units.retain(|u| {
+        !construction.builders.contains(&u.id) || !world_policy && rush && u.kind == "engineer"
+    });
     newly_busy.extend(construction.builders);
     commands.extend(construction.commands);
     let mut fort_reserve = 0.0;
@@ -682,24 +697,37 @@ fn plan_inner(
         newly_busy.extend(fortification.builders);
         commands.extend(fortification.commands);
     }
-    state.field.armor_seen |= !armor_seen.is_empty() || enemies.iter().any(|u| armor(&u.kind));
-    let mut field_input = input.clone();
-    field_input.manpower = budget;
-    let field_observation = Observation::new(field_input).map_err(|e| e.to_string())?;
-    budget = crate::commander_field_policy::field_work(
-        &field_observation,
-        if world_policy {
-            &mut state.world.field
-        } else {
-            &mut state.field
-        },
-        &mut newly_busy,
-        |raw| {
-            let accepted = crate::commander_field_policy::can_submit(&sight_game, &raw, sees);
-            commands.push(raw);
-            accepted
-        },
-    )?;
+    if context.field.is_some() {
+        state.field.armor_seen |= !armor_seen.is_empty() || enemies.iter().any(|u| armor(&u.kind));
+        let mut field_input = input.clone();
+        field_input.manpower = budget;
+        let field_observation = Observation::new(field_input).map_err(|e| e.to_string())?;
+        budget = crate::commander_field_policy::field_work(
+            &field_observation,
+            if world_policy {
+                &mut state.world.field
+            } else {
+                &mut state.field
+            },
+            &mut newly_busy,
+            |raw| {
+                let accepted = crate::commander_field_policy::can_submit(&sight_game, &raw, sees);
+                commands.push(raw);
+                accepted
+            },
+        )?;
+    } else {
+        let engineering = crate::commander_engineering::plan(
+            observation,
+            &mine,
+            &enemies,
+            &newly_busy,
+            &mut state.engineering,
+            sees,
+        )?;
+        newly_busy.extend(engineering.builders);
+        commands.extend(engineering.commands);
+    }
     let count = |kind: &str| mine.iter().filter(|u| u.kind == kind).count();
     let watched = |id| context.horde || state.mind.watched(id, now, skill.notice);
     let mut sit = Situation {
@@ -897,7 +925,7 @@ fn plan_inner(
     let adaptive_available: Vec<_> = available_units
         .iter()
         .copied()
-        .filter(|u| !newly_busy.contains(&u.id))
+        .filter(|u| !newly_busy.contains(&u.id) || !world_policy && rush && u.kind == "engineer")
         .collect();
     let adaptive = crate::commander_classic_rules::plan(
         &tactics_view,
@@ -1099,13 +1127,9 @@ fn plan_inner(
         )
         .collect();
     for at in guarded {
-        let foe_value: f64 = enemies
-            .iter()
-            .filter(|e| {
-                dist(e.at, at) <= 24.0
-                    && !boolean(definition(e), "structure")
-                    && !boolean(definition(e), "air")
-            })
+        let foe_value: f64 = enemies_near(&enemies, at, 24.0)
+            .into_iter()
+            .filter(|e| !boolean(definition(e), "structure") && !boolean(definition(e), "air"))
             .map(|e| worth(e, definition(e)))
             .sum();
         if foe_value <= 0.0 {
@@ -1170,6 +1194,7 @@ fn plan_inner(
         .map_err(|e| e.to_string())?
         .get("aid")
         .ok_or("missing medic aid rules")?;
+    commands.extend(aircraft(observation, context, &mine, &enemies)?);
     let mut world_free = BTreeSet::new();
     for u in &mine {
         let d = definition(u);
@@ -1234,35 +1259,47 @@ fn plan_inner(
                 .min()
                 == Some(u.id);
             if allied(input.points[i].owner) && first {
-                let mut holder_input = input.clone();
-                holder_input.manpower = budget;
-                let holder_observation =
-                    Observation::new(holder_input).map_err(|e| e.to_string())?;
-                crate::commander_field_policy::holder(
-                    &holder_observation,
+                if context.field.is_some() {
+                    let mut holder_input = input.clone();
+                    holder_input.manpower = budget;
+                    let holder_observation =
+                        Observation::new(holder_input).map_err(|e| e.to_string())?;
+                    crate::commander_field_policy::holder(
+                        &holder_observation,
+                        u,
+                        i,
+                        state.field.armor_seen,
+                        |raw| {
+                            let accepted = if raw["t"] == "garrison" {
+                                sees(Point {
+                                    x: raw["x"].as_f64().unwrap_or(0.0),
+                                    z: raw["z"].as_f64().unwrap_or(0.0),
+                                })
+                            } else {
+                                crate::commander_field_policy::can_submit(&sight_game, &raw, sees)
+                            };
+                            if accepted && raw["t"] == "dig" && raw["kind"] == "mines" {
+                                budget -= num(
+                                    catalog.table("FORTS").unwrap().get("mines").unwrap(),
+                                    "cost",
+                                );
+                            }
+                            commands.push(raw);
+                            accepted
+                        },
+                    )?;
+                    busy.insert(u.id);
+                } else if let Some(command) = point_holder::plan(
+                    observation,
+                    context,
                     u,
-                    i,
-                    state.field.armor_seen,
-                    |raw| {
-                        let accepted = if raw["t"] == "garrison" {
-                            sees(Point {
-                                x: raw["x"].as_f64().unwrap_or(0.0),
-                                z: raw["z"].as_f64().unwrap_or(0.0),
-                            })
-                        } else {
-                            crate::commander_field_policy::can_submit(&sight_game, &raw, sees)
-                        };
-                        if accepted && raw["t"] == "dig" && raw["kind"] == "mines" {
-                            budget -= num(
-                                catalog.table("FORTS").unwrap().get("mines").unwrap(),
-                                "cost",
-                            );
-                        }
-                        commands.push(raw);
-                        accepted
-                    },
-                )?;
-                busy.insert(u.id);
+                    &input.points[i],
+                    &enemies,
+                    !armor_seen.is_empty(),
+                    budget,
+                )? {
+                    commands.push(command);
+                }
             }
             if !allied(input.points[i].owner) || first {
                 continue;
@@ -1587,9 +1624,84 @@ mod regression_tests;
 #[path = "if25_tactics_tests.rs"]
 mod if25_tests;
 
+#[path = "commander_point_holder.rs"]
+mod point_holder;
+
+fn aircraft(
+    observation: &Observation,
+    context: &Context,
+    mine: &[&UnitObservation],
+    enemies: &[&UnitObservation],
+) -> Result<Vec<Value>, String> {
+    let input = observation.input();
+    let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
+    let definition = |u: &UnitObservation| catalog.unit(&u.kind).map_err(|e| e.to_string());
+    let army: Vec<_> = mine
+        .iter()
+        .copied()
+        .filter(|u| definition(u).is_ok_and(|d| !boolean(d, "air")))
+        .collect();
+    let front = if army.is_empty() {
+        input.players[input.slot].spawn
+    } else {
+        Point {
+            x: army.iter().map(|u| u.at.x).sum::<f64>() / army.len() as f64,
+            z: army.iter().map(|u| u.at.z).sum::<f64>() / army.len() as f64,
+        }
+    };
+    let mut commands = Vec::new();
+    for u in mine.iter().copied().filter(|u| {
+        definition(u).is_ok_and(|d| boolean(d, "air"))
+            && context.units.get(&u.id).is_some_and(|f| f.air_at_base)
+    }) {
+        if u.kind == "attacker" {
+            let target = crate::sort::first_by(
+                enemies.iter().copied().filter(|e| {
+                    definition(e).is_ok_and(|d| {
+                        !boolean(d, "air")
+                            && !boolean(d, "building")
+                            && (!boolean(d, "infantry")
+                                || matches!(e.kind.as_str(), "at" | "flak" | "mortar" | "howitzer"))
+                    })
+                }),
+                |a, b| dist(a.at, front) - dist(b.at, front),
+            );
+            if let Some(target) = target.filter(|target| dist(target.at, front) < 120.0) {
+                commands.push(json!({"t":"attack","ids":[u.id],"target":target.id}));
+            }
+        } else {
+            let at = crate::sort::first_by(
+                enemies
+                    .iter()
+                    .copied()
+                    .filter(|e| definition(e).is_ok_and(|d| boolean(d, "air"))),
+                |a, b| dist(a.at, front) - dist(b.at, front),
+            )
+            .map_or(front, |e| e.at);
+            commands.push(json!({"t":"move","orders":[[u.id,at.x,at.z]]}));
+        }
+    }
+    Ok(commands)
+}
+
+fn enemies_near<'a>(
+    enemies: &[&'a UnitObservation],
+    at: Point,
+    radius: f64,
+) -> Vec<&'a UnitObservation> {
+    enemies
+        .iter()
+        .copied()
+        .filter(|e| dist(e.at, at) <= radius)
+        .collect()
+}
+
 #[cfg(test)]
 #[path = "commander_field_assault_tests.rs"]
 mod field_assault_tests;
+#[cfg(test)]
+#[path = "if25_ai_lifecycle_tests.rs"]
+mod if25_lifecycle_tests;
 
 #[cfg(test)]
 #[path = "commander_field_policy_tests.rs"]

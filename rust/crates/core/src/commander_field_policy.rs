@@ -26,7 +26,7 @@ struct Sent {
 }
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct State {
-    bridges: BTreeSet<usize>,
+    bridges: Vec<usize>,
     bridge_crew: BTreeMap<u32, Sent>,
     fill_crew: BTreeMap<u32, Sent>,
     demine_crew: BTreeMap<u32, Sent>,
@@ -88,10 +88,8 @@ fn builders<'a>(
         .collect()
 }
 fn nearest<'a>(squads: &[&'a UnitObservation], goal: Point) -> Option<&'a UnitObservation> {
-    squads.iter().copied().min_by(|a, b| {
-        dist(a.at, goal)
-            .total_cmp(&dist(b.at, goal))
-            .then(a.id.cmp(&b.id))
+    crate::sort::first_by(squads.iter().copied(), |a, b| {
+        dist(a.at, goal) - dist(b.at, goal)
     })
 }
 fn move_to(u: &UnitObservation, p: Point) -> Value {
@@ -114,6 +112,20 @@ pub fn field_work(
         return Ok(input.manpower);
     };
     let n = input.chars.len();
+    let mut remembered = BTreeSet::new();
+    if state
+        .bridges
+        .iter()
+        .any(|&cell| cell >= n || !remembered.insert(cell))
+        || [&state.bridge_crew, &state.fill_crew, &state.demine_crew]
+            .iter()
+            .any(|jobs| {
+                jobs.iter()
+                    .any(|(&id, job)| id == 0 || job.tick < 0 || job.tick > input.tick)
+            })
+    {
+        return Err("invalid field policy memory".into());
+    }
     if facts.initial_chars.len() != n
         || facts.ground.len() != n
         || facts.initial_height.as_ref().is_some_and(|h| h.len() != n)
@@ -149,7 +161,13 @@ pub fn field_work(
             .iter()
             .any(|u| u.hp > 0.0 && input.players[u.owner].team != team && dist(u.at, p) < 35.0)
     };
-    state.bridges.extend(&facts.bridges);
+    let mut incoming = facts.bridges.iter().copied().collect::<Vec<_>>();
+    crate::sort::sort_by(&mut incoming, |a, b| a as f64 - b as f64);
+    for cell in incoming {
+        if !state.bridges.contains(&cell) {
+            state.bridges.push(cell);
+        }
+    }
     refresh(&mut state.bridge_crew, &squads, input.tick);
     refresh(&mut state.fill_crew, &squads, input.tick);
     refresh(&mut state.demine_crew, &squads, input.tick);
@@ -160,16 +178,14 @@ pub fn field_work(
             .iter()
             .any(|u| u.dig && state.bridge_crew.contains_key(&u.id))
     {
-        let gap = state
-            .bridges
-            .iter()
-            .copied()
-            .filter(|&c| input.chars[c] == b'W' && quiet(at(input.width, c)))
-            .min_by(|&a, &b| {
-                dist(at(input.width, a), spawn)
-                    .total_cmp(&dist(at(input.width, b), spawn))
-                    .then(a.cmp(&b))
-            });
+        let gap = crate::sort::first_by(
+            state
+                .bridges
+                .iter()
+                .copied()
+                .filter(|&c| input.chars[c] == b'W' && quiet(at(input.width, c))),
+            |a, b| dist(at(input.width, a), spawn) - dist(at(input.width, b), spawn),
+        );
         if let Some(gap) = gap {
             let run = |dx: isize, dz: isize| {
                 let x = (gap % input.width) as isize;
@@ -247,6 +263,7 @@ pub fn field_work(
     }
     if wallet >= cost("fill") + 150.0 && state.fill_crew.is_empty() {
         let radius = observation.point_radius() + 10.0;
+        let mut idle = builders(&squads, busy, catalog);
         let spots = input
             .points
             .iter()
@@ -264,7 +281,8 @@ pub fn field_work(
                     if !spoiled(observation, facts, c) || dist(spot, p) > r || !quiet(spot) {
                         continue;
                     }
-                    let Some(u) = nearest(&builders(&squads, busy, catalog), spot) else {
+                    crate::sort::sort_by(&mut idle, |a, b| dist(a.at, spot) - dist(b.at, spot));
+                    let Some(u) = idle.first().copied() else {
                         break 'spots;
                     };
                     if dist(u.at, spot) > 60.0 {
@@ -289,11 +307,13 @@ pub fn field_work(
         }
     }
     if wallet >= cost("demine") && state.demine_crew.is_empty() {
+        let mut idle = builders(&squads, busy, catalog);
         for &spot in &facts.found_mines {
             if !quiet(spot) {
                 continue;
             }
-            let Some(u) = nearest(&builders(&squads, busy, catalog), spot) else {
+            crate::sort::sort_by(&mut idle, |a, b| dist(a.at, spot) - dist(b.at, spot));
+            let Some(u) = idle.first().copied() else {
                 break;
             };
             let distance = dist(u.at, spot);
@@ -389,18 +409,17 @@ pub fn holder(
     let input = o.input();
     let p = &input.points[index];
     let team = input.players[input.slot].team;
-    let Some(foe) = input
-        .players
-        .iter()
-        .enumerate()
-        .filter(|(_, q)| q.team != team)
-        .min_by(|(ai, a), (bi, b)| {
-            dist(a.spawn, p.at)
-                .total_cmp(&dist(b.spawn, p.at))
-                .then(ai.cmp(bi))
-        })
-        .map(|(_, p)| p.spawn)
-    else {
+    let Some(foe) = crate::sort::first_by(
+        input.players.iter().enumerate().filter(|(seat, q)| {
+            q.team != team
+                && !input
+                    .runtime
+                    .as_ref()
+                    .is_some_and(|context| context.hidden_spawns.contains(seat))
+        }),
+        |(_, a), (_, b)| dist(a.spawn, p.at) - dist(b.spawn, p.at),
+    )
+    .map(|(_, p)| p.spawn) else {
         return Ok(());
     };
     let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
@@ -554,3 +573,7 @@ pub(crate) fn can_submit(
     )
     .unwrap_or(false)
 }
+
+#[cfg(test)]
+#[path = "commander_field_if25_tests.rs"]
+mod if25_tests;

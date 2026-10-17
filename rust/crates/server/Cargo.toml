@@ -7,6 +7,8 @@ publish.workspace = true
 description = "HTTP and WebSocket lobby host for Three Crossroads."
 
 [dependencies]
+sha2 = "=0.11.1"
+subtle = "=2.6.1"
 getrandom = "=0.4.3"
 flate2 = { version = "=1.1.10", default-features = false, features = ["rust_backend"] }
 ww2-core = { path = "../core" }

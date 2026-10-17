@@ -1,3 +1,7 @@
+## Shared authored mission state (2026-10-17)
+
+Use one complete authored v2 checkpoint owner with a required execution clock. Reuse the existing timed evaluator for canonical restoration and preserve public-only spectator projection. Ordinary non-authored saves stay v1; legacy authored owners are explicitly refused. The [state reconciliation](design.d/2026-10-17-scenario-owner-reconciliation.md) records the schema and validation choice.
+
 ## Commander medic and house-shelling chores (2026-10-16)
 
 The detached tactics planner now moves a stationary medic toward the ground army mean when it is more than `CFG.aid.seek * 0.8` away. Ground army members contribute in unit ID order. Shell-capable units without a target or an active FireAt choose the first noticed enemy garrison strictly within 60 metres, also in unit ID order. Both decisions emit existing core commands and add no Match state.
@@ -5196,3 +5200,13 @@ The scripted policy receives detached seat facts and feeds movements through #34
 Kaiju breath reuses #325's firing component. Added checks cover full-range and radius boundaries, one terrain debit per overlapping cell, scar values and seeded ignition predicates. The pinned prototype's unchanged trench check and direct breath component were run from an external temporary copy at `e4e579a`; the read-only submodule remains unchanged.
 
 Full Horde ticks, complete Horde snapshots and hosted rooms stay guarded. Support, aircraft and ability command attempts from the policy do not open their Horde actuation paths. Ordinary-match witnesses retain the new private policy state through actual capture, income and victory, collect every seat's recipient snapshot on every tick, and continue after finish. FFI, headers, wire schemas, contracts, privacy, public ingress, World admission and logistics tick/snapshot guards are unchanged.
+
+## Additive authoring and placement C queries (2026-10-16)
+
+The owner decision `julio-373-merged-decisions-20261016` authorizes additive C queries for IF-04 and IF-12. Keep ABI 2's existing scalar version and every existing function and layout. Introduce minor revision 1 and a separate minor-version query so old consumers keep their version check. New queries use caller-owned JSON buffers with the existing error and panic conventions; variable result shapes need no new fixed-layout structs. This is a cold authoring/preview surface, with no performance claim or new wire format.
+
+Placement reads only the existing recipient handle. Authoring creates detached state from the user's own document. No running World room is admitted. World placement history, team-qualified recipient demine knowledge and complete seeded fairness equivalence remain explicitly bounded in `docs/contracts/abi-queries.md`. This implementation candidate requires exact-signature review before Unreal adoption.
+
+## Additive presentation C queries (2026-10-17)
+
+IF-11 stacks on #418 and uses its caller-owned JSON query convention for movementProfile, isGroundVehicle, bodyRadius, flightAt and velocityAt. Major version 2 and existing declarations/layouts remain intact; minor revision 2 identifies the five additions. Motion queries select a compiled unit definition by name. Flight queries accept explicit finite world-metre coordinates, velocities, gravity, stamp and time, then delegate to the existing deterministic projectile providers. This avoids a new fixed-layout struct or a second flight calculation. No match state, wire field or gameplay rule is added. Exact signatures remain subject to Axel's review before Unreal adoption. The contract and source comparisons are in `docs/contracts/abi-queries.md` and `docs/testing/if11-presentation.md`.

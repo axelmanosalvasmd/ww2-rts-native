@@ -1032,10 +1032,19 @@ impl Match {
     }
 
     pub(crate) fn validate_opening_projection(&self, owner: usize) -> Result<(), String> {
-        if !matches!(self.options.mode, Mode::Default | Mode::Conquest)
+        if !matches!(
+            self.options.mode,
+            Mode::Default | Mode::Conquest | Mode::Classic
+        ) || !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode)
             || self.world.geography().is_some()
+            || self.world_runtime.is_some()
         {
-            return Err("opening commander requires ordinary Conquest".into());
+            return Err(
+                "commander projection requires matching ordinary Conquest or Classic".into(),
+            );
+        }
+        if self.options.mode == Mode::Classic {
+            self.validate_elimination_state()?;
         }
         self.recipient_routing(owner)?; // validates recipient/context before refresh writes
         let g = &self.world.game;
@@ -1087,14 +1096,12 @@ impl Match {
                     || p.needs.is_some_and(|i| i >= self.start.points.len())
             })
             || g.units.values().any(|u| {
+                let aircraft_pose = u.air.is_some()
+                    && self.rules.kinds.get(u.kind).is_some_and(|kind| kind.air)
+                    && u.x.is_finite()
+                    && u.z.is_finite();
                 u.id == 0
-                    || !u.x.is_finite()
-                    || !u.z.is_finite()
-                    || !self
-                        .rules
-                        .kinds
-                        .get(u.kind)
-                        .is_some_and(|kind| kind.air || within(u.at()))
+                    || !(within(u.at()) || aircraft_pose)
                     || u.hp < 0.0
                     || !u.supp.is_finite()
                     || u.supp < 0.0
@@ -1109,6 +1116,9 @@ impl Match {
     /// Snapshot only the fields consumed by this bounded policy, at source public precision.
     /// Includes own research kinds and ready-base facts, but no opponent economy or labs.
     pub fn opening_commander_observation(&mut self, owner: usize) -> Result<Observation, String> {
+        if !matches!(self.options.mode, Mode::Default | Mode::Conquest) {
+            return Err("opening commander requires ordinary Conquest".into());
+        }
         if self.options.logistics {
             return Err("quiet opening commander does not plan logistics".into());
         }
@@ -1323,7 +1333,22 @@ impl Match {
                 caution: crate::weather::WeatherRules::compiled()
                     .map_err(|e| e.to_string())?
                     .ai_caution(Some(&self.start.weather)),
-                known_buildings: vec![],
+                known_buildings: {
+                    let known: Vec<_> = self
+                        .classic_known_buildings
+                        .iter()
+                        .find(|(team, _)| *team == g.players[owner].team)
+                        .into_iter()
+                        .flat_map(|(_, rows)| rows)
+                        .map(|row| crate::commander_tactics::KnownBuilding {
+                            id: row.id,
+                            kind: self.rules.kinds[row.kind].name.clone(),
+                            owner: row.owner,
+                            at: point(row.at),
+                        })
+                        .collect();
+                    known
+                },
                 hidden_spawns: BTreeSet::new(),
                 site_nodes: vec![],
                 horde: false,
@@ -1357,16 +1382,48 @@ impl Match {
                         .collect()
                 },
                 sight: g.sight_mul(&self.rules),
-                nodes: Vec::new(),
+                nodes: self.elimination.as_ref().map_or_else(Vec::new, |state| {
+                    state
+                        .nodes
+                        .iter()
+                        .map(|node| crate::commander_tactics::NodeObservation {
+                            at: node.at,
+                            rate: node.rate,
+                            fuel: node.fuel,
+                            visible: g.reveal
+                                || vision::team_sees(
+                                    g,
+                                    &self.rules,
+                                    &crate::grid::SpatialGrid::new(&g.units, 16.0),
+                                    g.players[owner].team,
+                                    node.at,
+                                ),
+                        })
+                        .collect()
+                }),
+                node_worth: self.elimination.as_ref().map_or_else(Vec::new, |state| {
+                    state
+                        .nodes
+                        .iter()
+                        .map(|node| if node.fuel { 2.5 } else { node.rate })
+                        .collect()
+                }),
+                bridge_cells: initial
+                    .chars
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(cell, &ch)| (ch == b'=').then_some(cell))
+                    .collect(),
+                spoiled_cells: Vec::new(),
+                mines: Vec::new(),
+                found_mines: Vec::new(),
+                claimed_nodes: BTreeSet::new(),
                 known_depots: Vec::new(),
                 owned_nodes: BTreeSet::new(),
                 build_reserve: 0.0,
                 fort_reserve: 0.0,
-                claimed_nodes: std::collections::BTreeSet::new(),
                 initial_chars: Some(self.world.initial().chars.clone()),
                 initial_height: self.world.initial().height.clone(),
-                mines: Vec::new(),
-                found_mines: Vec::new(),
                 ground_flights: false,
                 field: None,
                 world: None,

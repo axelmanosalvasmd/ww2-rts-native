@@ -171,7 +171,7 @@ fn exercise_operatives(hub: &mut Hub, operatives: &[Peer]) {
                 0.
             };
             let forward = if moving { 1. } else { 0. };
-            // Elimination-mode spawns can touch their own steel bunker. Let the
+            // Elimination-mode spawns can touch their own nearby allied collision body. Let the
             // existing movement phase clear it before throwing a live grenade.
             // Keep the grenade, flight, ammunition and every-seat assertions.
             let throw_grenade = sequence > throw_after;

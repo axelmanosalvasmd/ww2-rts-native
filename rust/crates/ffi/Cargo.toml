@@ -13,6 +13,7 @@ crate-type = ["staticlib", "rlib"]
 
 [dependencies]
 ww2-core = { path = "../core" }
+serde_json = { version = "1.0.154", features = ["float_roundtrip"] }
 
 [dev-dependencies]
 # Writes include/ww2_core.h; tests/header.rs fails when the committed header is stale.

@@ -220,6 +220,7 @@ impl Person {
 struct AttachedRuntime {
     epoch: u64,
     ingress: CommanderIngress,
+    ai: crate::room_helpers::RoomHelpers,
     runtime: RoomRuntime,
     startup: crate::native_startup::NativeStartup,
     watch_delivery: SnapshotDelivery,
@@ -234,6 +235,7 @@ struct PreparedNative {
     now: u64,
     attached: AttachedRuntime,
     starts: Vec<(usize, Value)>,
+    watcher_start: Option<Value>,
     resume: Value,
     pause: Option<Value>,
 }
@@ -246,6 +248,7 @@ struct RoomResult {
 struct Room {
     code: String,
     saves: crate::saves::SaveStore,
+    records: crate::HordeRecords,
     listed: bool,
     title: String,
     players: Vec<Person>,
@@ -470,7 +473,34 @@ impl Room {
                     .map_or_else(|| name.clone(), |p| p.name.clone())
             })
             .collect();
-        let report = result_message(result, names)?;
+        let mut report = result_message(result, names)?;
+        let state = native.runtime.state();
+        if let Some(horde) = &state.horde {
+            let run = crate::horde_records::Run {
+                wave: u64::from(horde.wave),
+                kills: state
+                    .story
+                    .iter()
+                    .take(horde.slot)
+                    .map(|row| row.kills as u64)
+                    .sum(),
+                time: ww2_core::math::round(state.world.game.tick as f64 * 0.05) as u64,
+                names: self
+                    .players
+                    .iter()
+                    .map(|person| person.name.clone())
+                    .collect(),
+            };
+            if let Some(record) = self.records.record(
+                &self.map,
+                self.players.len(),
+                &self.army,
+                run,
+                state.options.sandbox,
+            ) {
+                report["horde"] = record;
+            }
+        }
         let status = crate::NativeRoomStatus {
             epoch: native.epoch,
             tick: native.runtime.state().world.game.tick,
@@ -518,7 +548,7 @@ impl Room {
             "t":"lobby", "proto":0, "code": self.code, "state":if self.native.is_some() || self.starting.is_some() { "play" } else { "lobby" },
             "role":"commander", "operatives":[], "spectator":you.is_none(),
             "amHost":self.is_host(id), "spectators":self.spectators.iter().map(|p| &p.name).collect::<Vec<_>>(),
-            "listed":self.listed, "saves":self.saves.lobby_list(&self.code), "hordeBest":null,
+            "listed":self.listed, "saves":self.saves.lobby_list(&self.code), "hordeBest":if self.mode == "horde" { self.records.lookup(&self.map,self.players.len(),&self.army).unwrap_or(Value::Null) } else { Value::Null },
             "you":you.map_or(-1, |i| i as i64), "host":self.host().map_or(-1, |i| i as i64),
             "maps":maps.as_object().unwrap().keys().collect::<Vec<_>>(),
             "mapName":if self.mode == "world" { "world" } else { &self.map },
@@ -1088,6 +1118,8 @@ pub(crate) struct Hub {
     rooms: BTreeMap<String, Room>,
     room_order: Vec<String>,
     maps: Value,
+    map_editor: Option<crate::MapEditor>,
+    map_revision: u64,
     max_rooms: usize,
     public_url: String,
     accounts: BTreeMap<u64, SnapshotAccount>,
@@ -1100,6 +1132,7 @@ pub(crate) struct Hub {
     tick_log: bool,
     saves: crate::saves::SaveStore,
     authored_maps_dir: Option<std::path::PathBuf>,
+    records: crate::HordeRecords,
 }
 impl Hub {
     pub fn new(max_rooms: usize, public_url: String) -> Self {
@@ -1107,6 +1140,8 @@ impl Hub {
             rooms: BTreeMap::new(),
             room_order: Vec::new(),
             maps: serde_json::from_str(include_str!("map-catalog.json")).unwrap(),
+            map_editor: None,
+            map_revision: 0,
             max_rooms,
             public_url,
             accounts: BTreeMap::new(),
@@ -1119,6 +1154,26 @@ impl Hub {
             tick_log: false,
             saves: crate::saves::SaveStore::new("saves".into()),
             authored_maps_dir: None,
+            records: crate::HordeRecords::new("horde-records.json"),
+        }
+    }
+    pub(crate) fn configure_records(&mut self, records: crate::HordeRecords) {
+        self.records = records;
+        for room in self.rooms.values_mut() {
+            room.records = self.records.clone();
+        }
+    }
+    pub(crate) fn configure_maps(&mut self, editor: Option<crate::MapEditor>) {
+        self.map_editor = editor;
+        self.refresh_maps();
+    }
+    fn refresh_maps(&mut self) {
+        if let Some(editor) = &self.map_editor {
+            let (revision, maps) = editor.catalog();
+            if revision != self.map_revision {
+                self.map_revision = revision;
+                self.maps = maps;
+            }
         }
     }
     pub(crate) fn configure_saves(&mut self, dir: std::path::PathBuf) {
@@ -1166,7 +1221,11 @@ impl Hub {
             return Err("server stopped".into());
         }
         let room = self.rooms.get(code).ok_or("room does not exist")?;
-        self.prepare_native_room(room, state, now, replace, None)
+        let raw = self
+            .map_editor
+            .as_ref()
+            .and_then(|editor| editor.raw(&room.map));
+        self.prepare_native_room(room, state, now, replace, raw.as_ref())
     }
     fn prepare_native_room(
         &self,
@@ -1243,6 +1302,21 @@ impl Hub {
             crate::native_startup::NativeStartup::prepare(&state, settings)?
         };
         // Canonical runtime admission completes before changing the room or accounts.
+        let mut levels = room
+            .players
+            .iter()
+            .map(|person| {
+                if person.ai {
+                    ww2_core::commander_ai::Level::from_key(person.level)
+                        .map(Some)
+                        .ok_or("invalid AI difficulty".to_owned())
+                } else {
+                    Ok(None)
+                }
+            })
+            .collect::<Result<Vec<_>, String>>()?;
+        levels.resize(state.start.players.len(), None);
+        let helpers = crate::room_helpers::RoomHelpers::new(&state, &levels)?;
         let mut runtime = RoomRuntime::new(state, now)?;
         let ai = room
             .players
@@ -1281,12 +1355,18 @@ impl Hub {
             })
             .collect::<Vec<_>>();
         let starts = runtime.collect_starts(&slots, &startup, &names, epoch)?;
+        let watcher_start = if room.spectators.is_empty() {
+            None
+        } else {
+            Some(runtime.collect_watcher_start(&startup, &names, epoch)?)
+        };
         let pause = runtime.paused().then(|| runtime.pause_message(now));
         Ok(PreparedNative {
             now,
             attached: AttachedRuntime {
                 epoch,
                 ingress: CommanderIngress::default(),
+                ai: helpers,
                 runtime,
                 startup,
                 watch_delivery: SnapshotDelivery::default(),
@@ -1296,6 +1376,7 @@ impl Hub {
                 diagnostics: crate::diagnostics::RoomDiagnostics::default(),
             },
             starts,
+            watcher_start,
             resume,
             pause,
         })
@@ -1306,6 +1387,7 @@ impl Hub {
             now,
             attached,
             starts,
+            watcher_start,
             resume,
             pause,
         } = prepared;
@@ -1339,31 +1421,14 @@ impl Hub {
                 self.accounts.get_mut(&connection.id).unwrap().full_terrain = false;
             }
         }
-        if !room.spectators.is_empty() {
-            let native = room.native.as_mut().unwrap();
-            let names = room
-                .players
-                .iter()
-                .map(|p| p.name.clone())
-                .collect::<Vec<_>>();
-            match native
-                .runtime
-                .collect_watcher_start(&native.startup, &names, epoch)
-            {
-                Ok(start) => {
-                    if native.watch_started {
-                        native.watch_delivery.request_full();
-                    }
-                    for person in &room.spectators {
-                        if let Some(connection) = &person.connection {
-                            connection.send(start.clone());
-                            if let Some(pause) = &pause {
-                                connection.send(pause.clone());
-                            }
-                        }
+        if let Some(start) = watcher_start {
+            for person in &room.spectators {
+                if let Some(connection) = &person.connection {
+                    connection.send(start.clone());
+                    if let Some(pause) = &pause {
+                        connection.send(pause.clone());
                     }
                 }
-                Err(error) => native.runtime.fault_stop(error),
             }
         }
         for index in 0..room.operatives.len() {
@@ -1736,6 +1801,7 @@ impl Hub {
         Some((build, stringify))
     }
     pub fn poll_native(&mut self, now_ms: u64, now_ns: u64) {
+        self.refresh_maps();
         if self.is_stopped() {
             return;
         }
@@ -2079,7 +2145,24 @@ impl Hub {
             })
             .collect::<Result<Vec<_>, String>>()?;
         // Host entropy is recorded once in MatchOptions; the core only sees the seed.
-        let map = crate::authoritative_maps::load(&room.map).map_err(|e| e.to_string())?;
+        let raw = self
+            .map_editor
+            .as_ref()
+            .and_then(|editor| editor.raw(&room.map));
+        let edited = raw
+            .as_ref()
+            .map(|raw| {
+                ww2_core::map::AuthoritativeMap::from_json(
+                    &serde_json::to_vec(raw).map_err(|e| e.to_string())?,
+                )
+                .map_err(|e| e.to_string())
+            })
+            .transpose()?;
+        let map = if let Some(map) = &edited {
+            map
+        } else {
+            crate::authoritative_maps::load(&room.map).map_err(|e| e.to_string())?
+        };
         let options = MatchOptions {
             seed: self.match_seed.wrapping_add(self.next_epoch),
             mode,
@@ -2147,6 +2230,21 @@ impl Hub {
             {
                 return true;
             }
+            "addAi"
+                if self.rooms.get(code).is_some_and(|room| {
+                    room.native.is_none() && room.players.len() < 2 && room.has_seat(&self.maps)
+                }) =>
+            {
+                return false;
+            }
+            "level"
+                if self.rooms.get(code).is_some_and(|room| {
+                    room.native.is_none() && room.players.iter().any(|p| p.ai)
+                }) =>
+            {
+                return false;
+            }
+            "addAi" | "level" => Err("AI setup needs an available lobby seat".into()),
             _ => return false,
         };
         if let Err(error) = result {
@@ -2221,6 +2319,7 @@ impl Hub {
         msg: Value,
         now: u64,
     ) {
+        self.refresh_maps();
         if self.is_stopped() || !msg.is_object() {
             return;
         }
@@ -2321,11 +2420,13 @@ impl Hub {
         }
         let saves = self.saves.clone();
         let tutorial_created = !self.rooms.contains_key(code) && msg["listing"]["tutorial"] == true;
+        let records = self.records.clone();
         let room = self.rooms.entry(code.into()).or_insert_with(|| {
             let tutorial = msg["listing"]["tutorial"] == true;
             Room {
                 code: code.into(),
                 saves,
+                records,
                 listed: msg["listing"]["public"] == true && !tutorial,
                 title: clean(
                     msg["listing"]["title"].as_str().unwrap_or("Open skirmish"),
@@ -2411,6 +2512,16 @@ impl Hub {
                     return;
                 }
             }
+        }
+        if let Some(slot) = returning
+            && !room.players[slot].ai
+            && let Some(native) = &mut room.native
+            && let Err(error) = native.ai.reset_human(native.runtime.state(), slot)
+        {
+            native.runtime.fault_stop(error);
+            connection.send(json!({"t":"deny","cmd":"join","reason":"blocked"}));
+            connection.close(1008, "native helper reset unavailable");
+            return;
         }
         if let Some(p) = room
             .players
@@ -3098,6 +3209,9 @@ mod async_start_tests;
 #[path = "results2_tests.rs"]
 mod results2_tests;
 
+#[cfg(test)]
+#[path = "scenario_start_tests.rs"]
+mod scenario_start_tests;
 #[cfg(test)]
 #[path = "tutorial_room_tests.rs"]
 mod tutorial_room_tests;

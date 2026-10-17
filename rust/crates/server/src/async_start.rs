@@ -15,17 +15,33 @@ pub(crate) struct StartRequest {
     options: MatchOptions,
     restart: bool,
     defender: i32,
+    raw_map: Option<Value>,
 }
 
 impl StartRequest {
     pub(crate) fn generate(&self) -> Result<Match, String> {
-        let map = crate::authoritative_maps::load(&self.map).map_err(|e| e.to_string())?;
+        let edited = self
+            .raw_map
+            .as_ref()
+            .map(|raw| {
+                ww2_core::map::AuthoritativeMap::from_json(
+                    &serde_json::to_vec(raw).map_err(|e| e.to_string())?,
+                )
+                .map_err(|e| e.to_string())
+            })
+            .transpose()?;
+        let map = if let Some(map) = &edited {
+            map
+        } else {
+            crate::authoritative_maps::load(&self.map).map_err(|e| e.to_string())?
+        };
         let options = self.options.clone();
         match options.mode {
             Mode::Default | Mode::Conquest => Match::new(map, options),
             Mode::Assault => Match::new_assault(map, options, self.defender),
             Mode::Annihilation => Match::new_annihilation(map, options),
             Mode::Classic => Match::new_classic(map, options),
+            Mode::Tutorial => Match::new_tutorial(map, options),
             _ => Err("trusted asynchronous mode is not admitted".into()),
         }
     }
@@ -59,7 +75,7 @@ impl Hub {
         }
         let room = self.rooms.get(code).ok_or("trusted room absent")?;
         if !room.is_host(connection_id)
-            || !room.players.iter().any(|p| {
+            || !room.people().any(|p| {
                 p.connection
                     .as_ref()
                     .is_some_and(|c| c.id == connection_id && c.ready())
@@ -91,7 +107,7 @@ impl Hub {
         if room.listed
             || !matches!(
                 room.mode.as_str(),
-                "conquest" | "assault" | "annihilation" | "classic"
+                "conquest" | "assault" | "annihilation" | "classic" | "tutorial"
             )
         {
             return Err("R1 requires a private represented ordinary mode".into());
@@ -131,7 +147,24 @@ impl Hub {
                 })
             })
             .collect::<Result<Vec<_>, String>>()?;
-        let map = crate::authoritative_maps::load(&room.map).map_err(|e| e.to_string())?;
+        let raw_map = self
+            .map_editor
+            .as_ref()
+            .and_then(|editor| editor.raw(&room.map));
+        let edited = raw_map
+            .as_ref()
+            .map(|raw| {
+                ww2_core::map::AuthoritativeMap::from_json(
+                    &serde_json::to_vec(raw).map_err(|e| e.to_string())?,
+                )
+                .map_err(|e| e.to_string())
+            })
+            .transpose()?;
+        let map = if let Some(map) = &edited {
+            map
+        } else {
+            crate::authoritative_maps::load(&room.map).map_err(|e| e.to_string())?
+        };
         let mut options = room.native_match_options(
             trusted.seed.wrapping_add(self.next_epoch),
             players,
@@ -143,6 +176,7 @@ impl Hub {
             map: room.map.clone(),
             restart,
             defender: room.defender as i32,
+            raw_map,
             options,
         })
     }

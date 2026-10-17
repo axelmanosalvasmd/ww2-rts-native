@@ -305,6 +305,7 @@ impl crate::match_runtime::Match {
         if self.options.mode != crate::economy::Mode::Classic {
             return Ok(None);
         }
+        self.validate_elimination_state()?;
         if self.world.game.mode != Some(ModeKind::Classic) {
             return Err("Classic nodes require Classic Game mode".into());
         }
@@ -333,6 +334,9 @@ impl crate::match_runtime::Match {
 
     pub fn ordinary_snapshot_raw_lists(&self) -> Result<OrdinaryRawLists, String> {
         let game = &self.world.game;
+        if self.world_runtime.is_some() || self.world.geography().is_some() {
+            return Err("global ordinary lists cannot use World state".into());
+        }
         if self.options.mode == crate::economy::Mode::Horde {
             self.validate_actor_mode()?;
             self.validate_horde_economy()?;
@@ -362,34 +366,5 @@ impl crate::match_runtime::Match {
                 .ordinary_snapshot_nodes()?
                 .map(|nodes| json!(nodes.iter().map(|row| row.map(number)).collect::<Vec<_>>())),
         })
-    }
-
-    pub(crate) fn ordinary_snapshot_nodes(&self) -> Result<Option<Vec<[f64; 4]>>, String> {
-        if self.options.mode != crate::economy::Mode::Classic {
-            return Ok(None);
-        }
-        self.validate_elimination_state()?;
-        let nodes = &self
-            .elimination
-            .as_ref()
-            .ok_or("missing Classic nodes")?
-            .nodes;
-        nodes
-            .iter()
-            .map(|n| {
-                let row = [
-                    rounded(n.at.x),
-                    rounded(n.at.z),
-                    n.rate,
-                    f64::from(u8::from(n.fuel)),
-                ];
-                if row.iter().all(|v| v.is_finite()) {
-                    Ok(row)
-                } else {
-                    Err("invalid Classic node display facts".into())
-                }
-            })
-            .collect::<Result<Vec<_>, _>>()
-            .map(Some)
     }
 }

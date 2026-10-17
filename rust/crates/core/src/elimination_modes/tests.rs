@@ -734,5 +734,26 @@ fn if25_elimination_reuses_teammate_sort_order_for_later_equal_distance_transfer
     }
 }
 
+#[test]
+fn if25_classic_node_pairs_keep_enemy_ties_and_first_discovery_order() {
+    let mut m = scene(Mode::Classic, &[0, 1, 2, 3]);
+    for player in &mut m.start.players {
+        player.spawn = Point { x: 100.0, z: 100.0 };
+    }
+    assert_eq!(
+        classic_node_pairs(&m.start.players),
+        vec![(0, 1), (0, 2), (1, 2), (0, 3), (1, 3)]
+    );
+    // Slot 0 has three equally distant enemies. Only the first two qualify.
+    m.start.players[0].config.team = 0;
+    m.start.players[1].config.team = 0;
+    m.start.players[2].config.team = 1;
+    m.start.players[3].config.team = 1;
+    assert_eq!(
+        classic_node_pairs(&m.start.players),
+        vec![(0, 2), (0, 3), (1, 2), (1, 3)]
+    );
+}
+
 #[path = "classic_bases_tests.rs"]
 mod classic_bases_tests;

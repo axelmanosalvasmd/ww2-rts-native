@@ -7,7 +7,7 @@ use crate::{
         Input, Observation, PlayerObservation, PointObservation, ResearchObservation,
         UnitObservation,
     },
-    commander_tactics::{Context, KnownBuilding, Stock, UnitFacts},
+    commander_tactics::{Context, KnownBuilding, NodeObservation, Stock, UnitFacts},
     economy::{Faction, Mode, TechState, Technology},
     game::{Point, Smoke},
     human_commander::{HumanSighting, HumanUnit, HumanView},
@@ -302,6 +302,17 @@ impl CommanderMemory {
                                 Some("out" | "station" | "home")
                             ),
                         wall_work: own && u["dig"]["kind"] == "wall",
+                        air_at_base: own && u["air"]["state"] == "base",
+                        attack_target: if own { unsigned(&u["attackId"])? } else { 0 },
+                        queued_amove: if own {
+                            array(&u["orders"])?
+                                .iter()
+                                .find(|order| order["kind"] == 2)
+                                .map(point)
+                                .transpose()?
+                        } else {
+                            None
+                        },
                     },
                 );
             }
@@ -319,7 +330,18 @@ impl CommanderMemory {
             });
         }
         context.known_buildings.sort_by_key(|b| b.id);
-        context.nodes = view.nodes.iter().map(point).collect::<Result<_>>()?;
+        context.nodes = view
+            .nodes
+            .iter()
+            .map(|node| {
+                Ok(NodeObservation {
+                    at: point(node)?,
+                    rate: number(&node["rate"])?,
+                    fuel: truth(&node["fuel"]),
+                    visible: false,
+                })
+            })
+            .collect::<Result<_>>()?;
         context.known_depots = context
             .known_buildings
             .iter()

@@ -7,10 +7,10 @@ use crate::{
     game::{CELL, Game, LAND, MOVE},
     match_runtime::{find_site, foot_center, footprint},
     math,
-    random::MatchRandom,
+    random::{MatchRandom, StreamId},
 };
 use serde_json::{Value, json};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Plan {
@@ -193,6 +193,7 @@ pub(crate) fn plan_with_classic(
     need_armor: bool,
     terrain: &Game,
     sees: impl Fn(Point) -> bool,
+    node_assignments: &mut BTreeMap<u32, usize>,
 ) -> Result<Plan, String> {
     if !budget.is_finite() {
         return Err("non-finite construction budget".into());
@@ -220,9 +221,19 @@ pub(crate) fn plan_with_classic(
             builders: economy.builders,
         });
     }
-    plan(observation, available, budget, need_armor, terrain, sees)
+    plan_with_nodes(
+        observation,
+        available,
+        budget,
+        need_armor,
+        terrain,
+        sees,
+        random,
+        node_assignments,
+    )
 }
 
+#[cfg(test)]
 pub(crate) fn plan(
     observation: &Observation,
     available: &[&UnitObservation],
@@ -230,6 +241,30 @@ pub(crate) fn plan(
     need_armor: bool,
     terrain: &Game,
     sees: impl Fn(Point) -> bool,
+    random: &mut MatchRandom,
+) -> Result<Plan, String> {
+    plan_with_nodes(
+        observation,
+        available,
+        budget,
+        need_armor,
+        terrain,
+        sees,
+        random,
+        &mut BTreeMap::new(),
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn plan_with_nodes(
+    observation: &Observation,
+    available: &[&UnitObservation],
+    budget: f64,
+    need_armor: bool,
+    terrain: &Game,
+    sees: impl Fn(Point) -> bool,
+    random: &mut MatchRandom,
+    node_assignments: &mut BTreeMap<u32, usize>,
 ) -> Result<Plan, String> {
     if !budget.is_finite() {
         return Err("non-finite construction budget".into());
@@ -345,9 +380,116 @@ pub(crate) fn plan(
     } else {
         cost
     };
-    // Construction-mode actions require their separate mode providers. Shopping still
-    // receives the next non-depot cost from the delivered construction decision inputs.
     if classic {
+        // World construction remains with its detached mode provider. This branch
+        // consumes only ordinary Classic facts already delivered to the seat.
+        if context.mode != Mode::Classic {
+            return Ok(plan);
+        }
+        let engineer_ids: BTreeSet<_> = available
+            .iter()
+            .filter(|u| u.owner == input.slot && u.kind == "engineer")
+            .map(|u| u.id)
+            .collect();
+        node_assignments.retain(|id, _| engineer_ids.contains(id));
+        let mut taken: BTreeSet<_> = node_assignments.values().copied().collect();
+        for worker in available.iter().copied().filter(|u| {
+            u.owner == input.slot
+                && u.kind == "engineer"
+                && u.hp > 0.0
+                && !u.retreating
+                && !u.build
+                && !u.riding
+        }) {
+            let mut repairs = Vec::new();
+            for &u in &own {
+                if built(u) < 1.0 || u.hp < number(rule(&u.kind)?, "hpPer")? * 0.7 {
+                    repairs.push(u);
+                }
+            }
+            let repair = crate::sort::first_by(repairs, |a, b| {
+                distance(worker.at, a.at) - distance(worker.at, b.at)
+            });
+            if let Some(fix) = repair.filter(|u| distance(worker.at, u.at) < 60.0) {
+                plan.commands
+                    .push(json!({"t":"assist","ids":[worker.id],"id":fix.id}));
+                plan.builders.push(worker.id);
+                continue;
+            }
+            if next == Some("depot") {
+                let pick = crate::sort::first_by(
+                    context.nodes.iter().enumerate().filter(|(i, at)| {
+                        free.contains(&at.at)
+                            && (!taken.contains(i) || node_assignments.get(&worker.id) == Some(i))
+                    }),
+                    |(a, at), (b, bt)| {
+                        let worth = |i: usize| {
+                            let node = &context.nodes[i];
+                            context.node_worth.get(i).copied().unwrap_or(if node.fuel {
+                                2.5
+                            } else {
+                                node.rate
+                            })
+                        };
+                        distance(worker.at, at.at)
+                            - worth(a) * 20.0
+                            - (distance(worker.at, bt.at) - worth(b) * 20.0)
+                    },
+                );
+                let Some((index, node)) = pick else { continue };
+                let at = node.at;
+                node_assignments.insert(worker.id, index);
+                taken.insert(index);
+                if budget >= cost && sees(at) {
+                    plan.commands.push(
+                        json!({"t":"build","ids":[worker.id],"kind":"depot","x":at.x,"z":at.z}),
+                    );
+                    plan.builders.push(worker.id);
+                } else if worker.path.is_empty() {
+                    plan.commands
+                        .push(json!({"t":"move","orders":[[worker.id,at.x,at.z]]}));
+                    plan.builders.push(worker.id);
+                }
+                continue;
+            }
+            let Some(kind) = next else {
+                continue;
+            };
+            // The prototype evaluates its flak angle even when indexing another
+            // building's fixed offset. Keep one draw per eligible engineer/look.
+            let flak_angle = (random.next_fraction(StreamId::Ai(input.slot as u32)) - 0.5) * 2.0;
+            let offset = match kind {
+                "barracks" => 0.9,
+                "motorpool" => -0.9,
+                "airfield" => std::f64::consts::PI,
+                "flakpos" => flak_angle,
+                _ => 0.0,
+            };
+            let angle = math::atan2(
+                input.height as f64 * CELL / 2.0 - home.z,
+                input.width as f64 * CELL / 2.0 - home.x,
+            ) + offset;
+            let aim = Point {
+                x: home.x + math::cos(angle) * 16.0,
+                z: home.z + math::sin(angle) * 16.0,
+            };
+            let definition = rule(kind)?;
+            let spot = site(
+                observation,
+                terrain,
+                aim,
+                number(definition, "size")? as usize,
+                flag(definition, "coast"),
+                &sees,
+            )?;
+            if let Some(at) = spot.filter(|_| budget >= cost) {
+                plan.commands
+                    .push(json!({"t":"build","ids":[worker.id],"kind":kind,"x":at.x,"z":at.z}));
+                plan.builders.push(worker.id);
+                // Commands are attempts. Classic proposals all see the delivered
+                // wallet; admission consumes funds later, in emission order.
+            }
+        }
         return Ok(plan);
     }
     let builders = catalog
@@ -444,3 +586,7 @@ pub(crate) fn plan(
 #[cfg(test)]
 #[path = "commander_skirmish_base_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "commander_depot_tests.rs"]
+mod depot_tests;

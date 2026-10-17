@@ -331,6 +331,7 @@ impl Match {
             produced_placer: crate::produced_units::ProducedPlacer::new(),
             scenario: None,
             authored_mission: None,
+            authored_scenario: None,
             logistics: crate::logistics::LogisticsState::default(),
             capture_ticks: Vec::new(),
             story: vec![crate::match_story::PlayerStory::default(); count],

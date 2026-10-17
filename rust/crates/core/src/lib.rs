@@ -43,8 +43,9 @@ pub mod commander_assault;
 mod commander_classic_economy;
 pub mod commander_classic_rules;
 mod commander_construction;
+mod commander_engineering;
 #[cfg(test)]
-mod commander_engineering_tests;
+mod commander_engineering_schedule_tests;
 mod commander_fortification;
 mod commander_forward_hq;
 pub mod commander_mind;
@@ -87,6 +88,7 @@ pub mod recipient_availability;
 #[cfg(test)]
 use crate as core_api;
 pub mod authored_mission;
+pub mod authored_scenario;
 #[cfg(test)]
 #[path = "../tests/support/human_commander_facts.rs"]
 mod human_commander_test_facts;
@@ -96,6 +98,7 @@ pub mod match_companion_effects;
 mod match_companion_status;
 mod match_companion_tick;
 pub mod match_companions;
+mod scenario_actuators;
 pub mod scenario_validation;
 pub mod seat_commander;
 
@@ -155,6 +158,7 @@ pub mod path_requests;
 
 pub mod orders;
 pub mod pathfinding;
+pub mod presentation_queries;
 pub mod produced_units;
 pub mod production;
 pub mod projectiles;
@@ -267,6 +271,7 @@ mod mov_followup_garrison_tests;
 mod save_codec;
 mod save_state;
 
+pub mod authoring_queries;
 pub mod commander_field_policy;
 pub mod commander_world_policy;
 mod match_terrain_orders;
@@ -289,5 +294,6 @@ mod production_lifecycle_intent_tests;
 #[cfg(test)]
 mod results_restart_tests;
 
+pub mod recipient_placement;
 #[cfg(test)]
 mod terrain_fire_tests;

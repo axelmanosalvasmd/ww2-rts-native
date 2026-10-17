@@ -5,7 +5,7 @@ use crate::map::{AuthoritativeMap, MapError};
 
 pub const MAX_SAVE_BYTES: usize = 8 * 1024 * 1024;
 
-fn truthy(value: &Value) -> bool {
+pub(crate) fn truthy(value: &Value) -> bool {
     match value {
         Value::Null => false,
         Value::Bool(v) => *v,
@@ -44,7 +44,11 @@ pub fn prepare_map_save(bytes: &[u8]) -> Result<Vec<u8>, MapError> {
             reason: "editor save exceeds 8 MiB".into(),
         });
     }
-    let map = AuthoritativeMap::from_json(bytes)?;
+    let source: Value = serde_json::from_slice(bytes).map_err(|e| MapError::Invalid {
+        field: "document".into(),
+        reason: e.to_string(),
+    })?;
+    let map = AuthoritativeMap::from_editor_value(source)?;
     let source = map.source();
     let mut clean = fields(source, &["name", "w", "h", "rows"])
         .as_object()
@@ -156,12 +160,18 @@ pub fn prepare_map_save(bytes: &[u8]) -> Result<Vec<u8>, MapError> {
         }
     }
     let clean = Value::Object(clean);
-    // Do not return a projection which cannot be read back as an authoritative map.
-    AuthoritativeMap::from_value(clean.clone())?;
+    // The prototype omits `world` from its whitelist, even for a validated World
+    // document. Validate the input only; do not add a second acceptance rule here.
     serde_json::to_vec(&clean).map_err(|e| MapError::Invalid {
         field: "document".into(),
         reason: e.to_string(),
     })
+}
+
+/// Validate editor input without requiring the runtime's typed World metadata.
+/// This does not admit a World room or construct live World state.
+pub fn validate_editor_map(source: &Value) -> Result<(), MapError> {
+    AuthoritativeMap::from_editor_value(source.clone()).map(|_| ())
 }
 
 #[cfg(test)]

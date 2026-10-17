@@ -2,10 +2,16 @@
 pub mod authoritative_maps;
 mod commander_ingress;
 mod diagnostics;
+mod editor_errors;
 mod lobby;
+mod map_editor;
 mod maps;
+pub use map_editor::MapEditor;
+mod horde_records;
+pub use horde_records::RecordStore as HordeRecords;
 mod native_startup;
 mod room_ai;
+mod room_helpers;
 mod saves;
 mod static_files;
 mod trusted_room;
@@ -60,6 +66,10 @@ pub struct Config {
     pub saves_dir: std::path::PathBuf,
     /// Optional private authoring source, reread for each hosted Horde start/restart.
     pub authored_maps_dir: Option<std::path::PathBuf>,
+    /// Optional authenticated authored-map editor, shared with workers.
+    pub map_editor: Option<MapEditor>,
+    /// Best Horde runs, shared with workers. Hosting admission remains separate.
+    pub horde_records: HordeRecords,
 }
 impl Default for Config {
     fn default() -> Self {
@@ -71,6 +81,8 @@ impl Default for Config {
             tick_log: false,
             saves_dir: "saves".into(),
             authored_maps_dir: None,
+            map_editor: None,
+            horde_records: HordeRecords::new("horde-records.json"),
         }
     }
 }
@@ -215,6 +227,8 @@ async fn serve_inner(
     hub.configure_trusted_room(trusted);
     hub.configure_saves(config.saves_dir);
     hub.configure_authored_maps(config.authored_maps_dir);
+    hub.configure_maps(config.map_editor.clone());
+    hub.configure_records(config.horde_records);
     hub.configure_diagnostics(config.diagnostic_dir, config.tick_log)?;
     // Dropping or aborting this future invalidates the same stopped authority
     // used under the Hub lock, even when graceful shutdown never runs.
@@ -259,6 +273,7 @@ async fn serve_inner(
         .route("/maps", any(maps::serve))
         .route("/ws", get(upgrade))
         .fallback(static_or_maps)
+        .layer(axum::Extension(config.map_editor))
         .with_state((server, stop.subscribe()));
     let result = axum::serve(listener, app)
         .with_graceful_shutdown(async move {
@@ -280,20 +295,39 @@ type App = (Server, watch::Receiver<bool>);
 async fn static_or_maps(
     State((server, _)): State<App>,
     OriginalUri(uri): OriginalUri,
+    axum::Extension(editor): axum::Extension<Option<MapEditor>>,
     method: Method,
     headers: HeaderMap,
+    body: Body,
 ) -> Response<Body> {
-    serve_static_or_maps(server.static_files.as_ref(), uri, method, headers).await
+    serve_static_or_maps(
+        server.static_files.as_ref(),
+        editor,
+        uri,
+        method,
+        headers,
+        body,
+    )
+    .await
 }
 
 async fn serve_static_or_maps(
     files: Option<&static_files::StaticFiles>,
+    editor: Option<MapEditor>,
     uri: axum::http::Uri,
     method: Method,
     headers: HeaderMap,
+    body: Body,
 ) -> Response<Body> {
     if uri.path().starts_with("/maps/") || files.is_none() {
-        return maps::serve(OriginalUri(uri), method, headers).await;
+        return maps::serve(
+            OriginalUri(uri),
+            axum::Extension(editor),
+            method,
+            headers,
+            body,
+        )
+        .await;
     }
     files.unwrap().serve(uri, headers).await
 }
@@ -470,3 +504,6 @@ mod session_batch_socket_tests;
 #[cfg(test)]
 #[path = "net_batch50_http_tests.rs"]
 mod net_batch50_http;
+
+#[cfg(test)]
+mod map_editor_tests;
