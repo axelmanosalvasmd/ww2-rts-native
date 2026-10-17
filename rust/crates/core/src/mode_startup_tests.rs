@@ -393,7 +393,6 @@ fn mode01_non_world_mode_rows_match_the_prototype_public_fields() {
                         SnapshotCapability::WrecksAndFoundMines,
                         SnapshotCapability::ShotsAndFlights,
                         SnapshotCapability::TeamEffects,
-                        SnapshotCapability::Logistics,
                     ]
                 );
             }

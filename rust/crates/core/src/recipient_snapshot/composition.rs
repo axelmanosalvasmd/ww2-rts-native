@@ -185,6 +185,23 @@ pub(super) fn admit_actors(state: &Match, outside_events: &[Effect]) -> Result<(
     {
         return Err(refused(SnapshotCapability::ShotsAndFlights));
     }
+    if !state.firing.flights.is_empty() || !state.firing.salvos.is_empty() {
+        state
+            .validate_firing_tick_state()
+            .map_err(|_| refused(SnapshotCapability::ShotsAndFlights))?;
+        if state.firing.salvos.iter().any(|s| {
+            s.owner >= state.world.game.players.len()
+                || ![s.at.x, s.at.z, s.next, s.every, s.spread]
+                    .iter()
+                    .all(|v| v.is_finite())
+                || s.left == 0
+                || s.left > 4096
+                || s.every <= 0.
+                || s.spread < 0.
+        }) {
+            return Err(refused(SnapshotCapability::ShotsAndFlights));
+        }
+    }
     projectiles::validate(state)?;
     // The caller must drain aviation events into the chronological tick batch
     // before delivery, just as it drains firing and support events above.
@@ -194,10 +211,6 @@ pub(super) fn admit_actors(state: &Match, outside_events: &[Effect]) -> Result<(
     state
         .preflight_legacy_scenario()
         .map_err(|_| refused(SnapshotCapability::Scenario))?;
-    if state.options.logistics || state.logistics.iter().next().is_some() || state.convoys.is_some()
-    {
-        return Err(refused(SnapshotCapability::Logistics));
-    }
     Ok(())
 }
 

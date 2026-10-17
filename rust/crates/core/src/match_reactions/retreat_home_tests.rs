@@ -373,7 +373,6 @@ fn classic_retreat_projection_tick(m: &mut Match, delivery: &mut DeliveryState) 
                 SnapshotCapability::WrecksAndFoundMines,
                 SnapshotCapability::ShotsAndFlights,
                 SnapshotCapability::TeamEffects,
-                SnapshotCapability::Logistics,
             ]
         );
     }

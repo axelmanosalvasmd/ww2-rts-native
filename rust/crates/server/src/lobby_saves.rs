@@ -104,7 +104,6 @@ impl Hub {
         }
         let state = native.runtime.state();
         if !saved_mode_supported(&room.mode, state, room.players.len())
-            || state.options.logistics
             || (state.options.sandbox && state.options.mode != Mode::Horde)
             || state.world_runtime.is_some()
             || !room.spectators.is_empty()
@@ -156,8 +155,7 @@ impl Hub {
             return Err("save needs an unavailable room capability".into());
         }
         let state = Match::from_save_json(saved["g"]["state"].clone())?;
-        if state.options.logistics
-            || (state.options.sandbox && state.options.mode != Mode::Horde)
+        if state.options.sandbox && state.options.mode != Mode::Horde
             || state.world_runtime.is_some()
         {
             return Err("save needs an unavailable room capability".into());
@@ -275,6 +273,7 @@ impl Hub {
                     disconnected: None,
                     denies: Vec::new(),
                     rtt: None,
+                    map_pings: Vec::new(),
                     diagnostics: Default::default(),
                     last_match: None,
                 }

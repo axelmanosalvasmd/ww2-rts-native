@@ -18,7 +18,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "--seed" if seed.is_none() => seed = Some(args.next().ok_or("--seed requires U64")?),
             "--help" | "-h" => {
                 println!(
-                    "ww2-server [--bind HOST:PORT] [--trusted-room CODE --seed U64]\nAddress priority: --bind, WW2_BIND, HOST/PORT, 127.0.0.1:3000. Port 0 selects a free port.\nWW2_SHARDS: 1-64 isolated game threads (default 1).\nHosted Horde: one through five defenders, with recipient-only server AI.\nWW2_AUTHORED_MAPS_DIR: optional private maps reread at Horde Start/Restart.\nTrusted Conquest: one private two-human room, named armies, sandbox off, logistics off (temporary). Seeds/receipts stay host-private."
+                    "ww2-server [--bind HOST:PORT] [--trusted-room CODE --seed U64]\nAddress priority: --bind, WW2_BIND, HOST/PORT, 127.0.0.1:3000. Port 0 selects a free port. MAX_ROOMS defaults to 32 (1-256); WW2_STATIC_ROOT enables browser assets.\nWW2_SHARDS: 1-64 isolated game threads (default 1).\nHosted Horde: one through five defenders, with recipient-only server AI.\nWW2_AUTHORED_MAPS_DIR: optional private maps reread at Horde Start/Restart.\nTrusted mode: one private two-human Conquest room, named armies, sandbox off, logistics on. Seeds/receipts stay host-private."
                 );
                 return Ok(());
             }
@@ -44,6 +44,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             env::var("EDIT_PASSWORD").ok().as_deref(),
             std::path::Path::new(".edit-password"),
         )?),
+        static_root: env::var_os("WW2_STATIC_ROOT")
+            .filter(|p| !p.is_empty())
+            .map(Into::into),
+        max_rooms: room_capacity(env::var("MAX_ROOMS").ok().as_deref()),
         saves_dir: env::var_os("SAVES_DIR")
             .map(Into::into)
             .unwrap_or_else(|| "saves".into()),
@@ -65,6 +69,43 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         serve(listener, config, shutdown).await?;
     }
     Ok(())
+}
+
+fn room_capacity(value: Option<&str>) -> usize {
+    value
+        .and_then(|text| {
+            let text = text
+                .trim_matches(|c: char| (c.is_whitespace() && c != '\u{85}') || c == '\u{feff}');
+            for (prefix, radix) in [
+                ("0x", 16),
+                ("0X", 16),
+                ("0o", 8),
+                ("0O", 8),
+                ("0b", 2),
+                ("0B", 2),
+            ] {
+                if let Some(digits) = text.strip_prefix(prefix) {
+                    if digits.is_empty() {
+                        return None;
+                    }
+                    return digits.chars().try_fold(0.0, |value, digit| {
+                        digit
+                            .to_digit(radix)
+                            .map(|digit| value * f64::from(radix) + f64::from(digit))
+                    });
+                }
+            }
+            if text.to_ascii_lowercase().contains("inf")
+                && !matches!(text, "Infinity" | "+Infinity" | "-Infinity")
+            {
+                return None;
+            }
+            text.parse::<f64>().ok()
+        })
+        .filter(|number| !number.is_nan() && *number != 0.0)
+        .unwrap_or(32.0)
+        .floor()
+        .clamp(1.0, 256.0) as usize
 }
 
 fn bind_address(
@@ -98,6 +139,34 @@ fn bind_address(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn max_rooms_defaults_floors_and_clamps() {
+        for (value, expected) in [
+            (None, 32),
+            (Some(""), 32),
+            (Some("bad"), 32),
+            (Some("NaN"), 32),
+            (Some("0"), 32),
+            (Some("-3"), 1),
+            (Some("0.5"), 1),
+            (Some(" 2.9 "), 2),
+            (Some("\u{feff} 2.9 \u{feff}"), 2),
+            (Some("\u{85}2\u{85}"), 32),
+            (Some("256"), 256),
+            (Some("999"), 256),
+            (Some("Infinity"), 256),
+            (Some("-Infinity"), 1),
+            (Some("inf"), 32),
+            (Some("0x2"), 2),
+            (Some("0O10"), 8),
+            (Some("0b11"), 3),
+            (Some("0x"), 32),
+            (Some("0x0"), 32),
+        ] {
+            assert_eq!(room_capacity(value), expected, "MAX_ROOMS={value:?}");
+        }
+    }
+
     #[test]
     fn bind_precedence_defaults_and_validation_are_environment_independent() {
         assert_eq!(

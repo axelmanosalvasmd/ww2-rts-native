@@ -8,7 +8,7 @@ use crate::{
     match_commands::Command,
     match_runtime::{Match, MatchOptions, PlayerConfig},
     orders::OrderKey,
-    recipient_snapshot::{DeliveryState, SelectedSeat},
+    recipient_snapshot::{DeliveryState, SelectedSeat, SnapshotCache, SnapshotCapability},
     weather::WeatherChoice,
 };
 use serde_json::{Value, json};
@@ -109,6 +109,27 @@ fn tick_and_collect(state: &mut Match, delivery: &mut DeliveryState) {
     for &id in state.world.game.units.keys() {
         state.validate_gate_actor(id).unwrap();
     }
+    let classic_mode = if state.options.mode == Mode::Classic {
+        let mode = state.elimination.as_ref().unwrap();
+        let expected = json!({
+            "kind":"classic",
+            "timeLeft":crate::math::max(0.0, mode.time_left.unwrap().ceil()),
+            "suddenDeath":mode.sudden_death
+        });
+        let cache = SnapshotCache::new(state).unwrap();
+        for slot in 0..state.start.players.len() {
+            let projection = cache.recipient(slot).unwrap();
+            assert_eq!(projection.fields["mode"], expected, "Classic seat {slot}");
+            assert_eq!(projection.missing, vec![
+                SnapshotCapability::WrecksAndFoundMines,
+                SnapshotCapability::ShotsAndFlights,
+                SnapshotCapability::TeamEffects,
+            ]);
+        }
+        Some(expected)
+    } else {
+        None
+    };
     let selected: Vec<_> = (0..state.start.players.len())
         .map(|slot| SelectedSeat {
             slot,
@@ -123,7 +144,11 @@ fn tick_and_collect(state: &mut Match, delivery: &mut DeliveryState) {
     assert_eq!(frame.slots().count(), selected.len());
     for seat in selected {
         let snapshot = frame.recipient(seat.slot).unwrap().into_json();
+        assert_eq!(snapshot["t"], "s");
         assert_eq!(snapshot["tick"], report.tick);
+        if let Some(expected) = &classic_mode {
+            assert_eq!(&snapshot["mode"], expected, "Classic seat {}", seat.slot);
+        }
         assert!(snapshot["units"].is_array());
         assert!(snapshot["works"].is_array());
     }

@@ -110,13 +110,16 @@ impl Hub {
                 })
             })
             .collect::<Result<Vec<_>, String>>()?;
+        let edited_map = self.map_editor.as_ref().and_then(|editor| editor.raw(&room.map));
+        let map = if let Some(raw) = &edited_map {
+            raw.clone()
+        } else {
+            crate::authoritative_maps::load(&room.map).map_err(|error| error.to_string())?.source().clone()
+        };
         Ok(StartRequest {
             token: Arc::new(()),
             map: room.map.clone(),
-            edited_map: self
-                .map_editor
-                .as_ref()
-                .and_then(|editor| editor.raw(&room.map)),
+            edited_map,
             restart,
             options: MatchOptions {
                 // Failed preparations leave next_epoch unchanged, so only a
@@ -132,7 +135,7 @@ impl Hub {
                 map_key: Some(room.map.clone()),
                 tech: true,
                 supply: true,
-                logistics: false,
+                logistics: logistics_enabled_for(&room.mode, &map),
                 sandbox: false,
             },
         })

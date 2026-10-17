@@ -85,6 +85,7 @@ impl Rig {
         }
         let front = Front {
             map_editor,
+            static_files: None,
             workers,
             stop: stopped.clone(),
         };

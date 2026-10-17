@@ -55,6 +55,8 @@ mod fps_runtime;
 mod ground_orders;
 #[path = "../ground_support_tick.rs"]
 mod ground_support_tick;
+#[path = "../if24_storage.rs"]
+mod if24_storage;
 #[path = "../legacy_scenario_tick.rs"]
 mod legacy_scenario_tick;
 #[path = "../map_height_queries.rs"]

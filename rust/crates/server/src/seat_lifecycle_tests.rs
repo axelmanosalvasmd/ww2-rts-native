@@ -144,6 +144,73 @@ fn net66_presence_and_ping_survive_scheduled_paused_catchup_and_reconnect_delive
 }
 
 #[test]
+fn only_host_pause_and_resume_change_pause_without_advancing_state() {
+    for paused in [false, true] {
+        for host_control in [false, true] {
+            for command in ["pause", "resume"] {
+                let (mut hub, host, mut host_rx, guest, mut guest_rx) = setup();
+                if paused {
+                    hub.rooms
+                        .get_mut("ABC")
+                        .unwrap()
+                        .native
+                        .as_mut()
+                        .unwrap()
+                        .runtime
+                        .pause(0, "host", crate::room_runtime::PauseReason::Host, 1)
+                        .unwrap();
+                }
+                assert!(UNAVAILABLE.contains(&command));
+                let runtime = &hub.rooms["ABC"].native.as_ref().unwrap().runtime;
+                let tick = runtime.state().world.game.tick;
+                let random = runtime.state().start.random.snapshot();
+                let pending = runtime.state().commands.pending_commands();
+                let pause = runtime.pause_message(2);
+                let client = if host_control { &host } else { &guest };
+                hub.message("ABC", client, &mut true, json!({"t":command}), 2);
+                let host_messages = drain(&mut hub, &mut host_rx, 2);
+                let guest_messages = drain(&mut hub, &mut guest_rx, 2);
+                let expected_paused = if host_control {
+                    command == "pause"
+                } else {
+                    paused
+                };
+                let runtime = &hub.rooms["ABC"].native.as_ref().unwrap().runtime;
+                if host_control {
+                    let message = if command == "pause" {
+                        json!({"t":"pause","paused":true,"by":"host","reason":"host","left":0})
+                    } else {
+                        json!({"t":"pause","paused":false,"by":"","reason":"host","left":0})
+                    };
+                    let expected = if paused && command == "pause" {
+                        vec![]
+                    } else {
+                        vec![message.clone()]
+                    };
+                    assert_eq!(host_messages, expected);
+                    assert_eq!(guest_messages, expected);
+                    assert_eq!(runtime.pause_message(2), message);
+                } else {
+                    let expected = if paused {
+                        vec![]
+                    } else {
+                        vec![json!({"t":"deny","cmd":command,"reason":"blocked"})]
+                    };
+                    assert_eq!(guest_messages, expected);
+                    assert!(host_messages.is_empty());
+                    assert_eq!(runtime.pause_message(2), pause);
+                }
+                assert_eq!(runtime.paused(), expected_paused);
+                assert_eq!(runtime.state().world.game.tick, tick);
+                assert_eq!(runtime.state().start.random.snapshot(), random);
+                assert_eq!(runtime.state().commands.pending_commands(), pending);
+                assert!(runtime.fault().is_none());
+            }
+        }
+    }
+}
+
+#[test]
 fn net80_human_drop_expiry_reconnect_host_release_and_fresh_match_allowance() {
     let (mut hub, _host, mut host_rx, guest, mut guest_rx) = setup();
     hub.disconnected("ABC", guest.id, 10);
