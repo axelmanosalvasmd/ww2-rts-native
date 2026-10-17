@@ -35,7 +35,7 @@ impl Match {
     }
 
     /// Call after this live unit's reserves advance and before its movement turn.
-    /// Field work has one detailed owner; construction/project metadata is not yet represented.
+    /// Construction, digging and projects cancel through their canonical owners.
     pub fn advance_supply_withdrawal(&mut self, id: u32) -> Result<(), String> {
         let mut unit = self
             .world
@@ -94,8 +94,10 @@ impl Match {
             return Err("invalid withdrawal metadata".into());
         }
         crate::match_construction::validate_build_activity(&unit, control)?;
-        if unit.dig != self.field_works.is_active(id) {
-            return Err("inconsistent withdrawal field-work activity".into());
+        if unit.dig != self.field_works.is_active(id)
+            || unit.entrench != self.field_works.membership(id).is_some()
+        {
+            return Err("inconsistent withdrawal work state".into());
         }
         let stores = self.convoys.as_ref().map(|c| &c.stores);
         if stores.is_some_and(|stores| {

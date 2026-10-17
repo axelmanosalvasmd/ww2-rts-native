@@ -1,0 +1,1 @@
+- Update `garrison_retreat_ticks_and_unsupported_reaction_actors_reject_before_writes` to expect the initialized-convoy-state refusal for mismatched logistics options and convoy state. Keep every no-write assertion now that complete ordinary logistics is supported.

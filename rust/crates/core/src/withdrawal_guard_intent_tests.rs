@@ -1,4 +1,4 @@
-//! LOG-14 guards over canonical reserves and ordinary physical logistics ticks.
+//! LOG-14 guards over canonical reserves and ordinary logistics delivery. World stays guarded.
 use crate::{
     catalog::Catalog,
     economy::{Faction, Mode},
@@ -187,6 +187,7 @@ fn log14_forced_progress_survives_ordinary_ticks_and_each_seat_snapshot() {
                 assert!(!projection.missing.contains(&SnapshotCapability::Logistics));
             }
         }
+        let reserves_before_delivery = m.logistics.get(id).unwrap().clone();
         let frame = delivery
             .capture_selected_with_tick_events(&mut m, &selected, &report.events)
             .unwrap()
@@ -211,6 +212,7 @@ fn log14_forced_progress_survives_ordinary_ticks_and_each_seat_snapshot() {
                 assert!(own.is_none(), "nonowners never receive the forced reserve");
             }
         }
+        assert_eq!(m.logistics.get(id).unwrap(), &reserves_before_delivery);
     }
     assert!(m.world.game.units[&id].x > before);
     // A mismatched option remains a read-only refusal after supported ticks.

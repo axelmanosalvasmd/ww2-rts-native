@@ -1,4 +1,4 @@
-//! Manual convoy adapters and their owner snapshots; full ticks have separate witnesses.
+//! Manual convoy adapters remain valid through ordinary ticks and recipient delivery.
 use super::runtime_tests::{arena, arena_with_barrier, place, troop};
 use super::*;
 use crate::{
@@ -35,17 +35,35 @@ fn move_to(truck: u32, at: Point, queue: bool) -> Command {
         face: None,
     }
 }
-fn assert_supported_snapshot(m: &mut Match) {
+fn assert_delivery(m: &mut Match) {
     let before = format!("{:?}", (&m.world.game.units, &m.convoys, &m.commands.units));
     let tick = m.world.game.tick;
     m.validate_logistics_runtime().unwrap();
     m.preflight_ordinary_snapshot().unwrap();
     assert_eq!(m.world.game.tick, tick);
-    assert!(m.tick_state.fault().is_none());
     assert_eq!(
         format!("{:?}", (&m.world.game.units, &m.convoys, &m.commands.units)),
         before
     );
+    assert!(m.tick_state.fault().is_none());
+    let mut delivery = DeliveryState::new(m).unwrap();
+    let selected = (0..m.start.players.len())
+        .map(|slot| SelectedSeat {
+            slot,
+            full: true,
+            omit: false,
+        })
+        .collect::<Vec<_>>();
+    let frame = delivery
+        .capture_selected_with_tick_events(m, &selected, &[])
+        .unwrap()
+        .unwrap();
+    for slot in 0..selected.len() {
+        assert_eq!(
+            frame.recipient(slot).unwrap().into_json()["logistics"]["enabled"],
+            true
+        );
+    }
 }
 
 #[test]
@@ -132,7 +150,7 @@ fn intent_log39_match_supply_hold_resume_queued_moves_and_nearest_source_retreat
     assert_eq!(retreat.state, TruckState::Manual);
     assert!(retreat.manual && !retreat.hold && retreat.target.is_none());
     assert_eq!(retreat.cargo, stock);
-    assert_supported_snapshot(&mut m);
+    assert_delivery(&mut m);
 }
 
 #[test]
@@ -187,7 +205,7 @@ fn intent_log39_match_refuses_missing_source_and_malformed_orders_atomically() {
             Err(Denial::Blocked)
         ));
     }
-    assert_supported_snapshot(&mut m);
+    assert_delivery(&mut m);
 }
 
 #[test]
@@ -238,7 +256,7 @@ fn intent_log39_match_unreachable_existing_source_refuses_before_route_publicati
         ),
         before
     );
-    assert_supported_snapshot(&mut m);
+    assert_delivery(&mut m);
 }
 
 #[test]
@@ -274,7 +292,7 @@ fn intent_log43_match_scheduler_owner_alerts_support_owner_snapshots() {
     let events = m.convoys.as_ref().unwrap().events.clone();
     m.step_supply_convoys(false).unwrap();
     assert_eq!(m.convoys.as_ref().unwrap().events, events);
-    assert_supported_snapshot(&mut m);
+    assert_delivery(&mut m);
 }
 
 #[test]

@@ -1,0 +1,3 @@
+- Preserve the bounded Classic and Annihilation logistics refusal when merging their new runners. Keep convoy service before the mode-specific victory phase and test that those modes cannot initialize Conquest logistics.
+- Let ordinary logistics matches use the versioned save/load path. Restore an active convoy and unfinished cache during the full-match test, and run the server save/load checks with logistics enabled. Loaded-false restart override parity remains held.
+- Complete the merged Match serialization derives for elimination state and its resource nodes so the combined mode and checkpoint code compiles. World and Classic checkpoint admission stays guarded.

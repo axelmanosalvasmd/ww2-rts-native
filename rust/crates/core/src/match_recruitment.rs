@@ -131,6 +131,7 @@ fn admission_facts<'a>(
         || game.tick < 0
         || (!crate::match_actor::ordinary_ground_mode(game, options.mode) && !horde)
         || options.mode.is_construction()
+        || (horde && options.logistics)
     {
         return Err(RecruitError::InvalidState("Conquest recruitment state"));
     }
@@ -580,6 +581,7 @@ impl RecruitParts<'_> {
             || self.firing.get(*self.next_unit_id).is_some()
             || self.abilities.get(*self.next_unit_id).is_some()
             || self.recovery.get(*self.next_unit_id).is_some()
+            || self.logistics.get(*self.next_unit_id).is_some()
         {
             return Err(RecruitError::InvalidState(
                 "recruit metadata ID already exists",
@@ -635,6 +637,12 @@ impl RecruitParts<'_> {
         };
         let request = prepared.request().clone();
         drop(prepared);
+        let reserves = crate::match_logistics::initial_unit_reserves(
+            self.options.logistics,
+            &placed.unit,
+            self.rules,
+        )
+        .map_err(RecruitError::Routing)?;
         // Preflight canonical unit/allocator/control publication before reading routing.
         let control = crate::match_commands::UnitControl::new(&placed.unit, self.rules)
             .map_err(|_| RecruitError::InvalidState("unit control metadata"))?;
@@ -660,26 +668,6 @@ impl RecruitParts<'_> {
         if self.logistics.get(placed.unit.id).is_some() {
             return Err(RecruitError::InvalidState("occupied recruit reserves"));
         }
-        let definition = crate::logistics::Definition::from_catalog(kind)
-            .map_err(|e| RecruitError::Admission(e.into()))?;
-        let mut reserves = crate::logistics::LogisticsState::default();
-        reserves.initialize_unit(
-            crate::logistics::Context {
-                enabled_override: Some(self.options.logistics),
-                scenario: false,
-                mode: crate::logistics::Mode::Conquest,
-            },
-            crate::logistics::UnitFacts {
-                id: placed.unit.id,
-                kind,
-                owner: Some(slot),
-                owner_exists: slot < count,
-                guard_home: false,
-                riding: placed.unit.riding,
-            },
-            Some(&definition),
-        );
-        let reserves = reserves.remove(placed.unit.id);
         Ok(StagedRecruit {
             slot,
             kind: kind.into(),

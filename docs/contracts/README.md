@@ -14,6 +14,10 @@ These files reserve contract topics; no protocol or ABI is approved by their cre
 | [combat-recipient-filtering.md](combat-recipient-filtering.md) | Julio | Axel | Existing prototype unit and ghost shapes; cached-path privacy mask under confirmed owner decision P; no World or Classic room admission |
 | rust-unreal-abi.md | Julio | Axel | Six ABI 2 recipient-view calls authoritative through PR #16, merged at `d88ef6d`; broader v0 contract remains draft; approved header unchanged; consumer source published in draft PR #201 at `9551d3976e9145c81030cf5a81ec7f0764b04d12`, explicitly not for merge, neither merged nor adopted on main; fresh live and complete decoder adoption pending |
 
+The [R1 ingress note](r1-ingress.md) records prototype command shapes and the
+bounded #296/#366 overlap under owner decisions F and M. Exact-head runtime
+review remains required.
+
 [PR #201](https://github.com/axelmanosalvasmd/ww2-rts-native/pull/201) records Axel-reported Linux build/automation on Rust `92fb7fe`, separate from the earlier live/package results on `03a49ac`. These owner reports are not independently validated here. Rust unit rows are the draft's default, but C++ fallback, row tails, cells, fog and independent row parsing remain. Windows/macOS client and input checks, physical mouse/keyboard tests and broader rules-query integration are still pending. Native proof and integration are recorded in [DESIGN.md](../../DESIGN.md); they do not establish Unreal adoption.
 
 Contract PRs must state native/reference baseline, version/status, fields and semantics, ownership/privacy, error/recovery behavior, compatibility transition, fixtures and verification evidence. Both owners must explicitly approve breaking changes before adoption. Mark a contract agreed only after approvals and merge. Do not put credentials or private sessions in fixtures.

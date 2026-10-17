@@ -192,12 +192,10 @@ fn ordinary_binary_two_seats_move_stop_takeover_and_restart_with_private_seed() 
         let options = &receipt["options"];
         assert_eq!(options["seed"].as_u64(), Some(u64::MAX));
         assert_eq!(options["weatherSeed"], Value::Null);
-        for key in ["shuffle", "tech", "supply", "livingWeather"] {
+        for key in ["shuffle", "tech", "supply", "livingWeather", "logistics"] {
             assert_eq!(options[key], true);
         }
-        for key in ["logistics", "sandbox"] {
-            assert_eq!(options[key], false);
-        }
+        assert_eq!(options["sandbox"], false);
         assert_eq!(options.as_object().unwrap().len(), 13);
     }
     assert_eq!(server.directory(), json!({"rooms":[]}));

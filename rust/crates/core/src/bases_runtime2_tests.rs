@@ -446,6 +446,13 @@ fn base45_paid_cache_requires_logistics_and_serves_only_when_finished() {
     assert_eq!(m.start.economy, wallets);
     m.validate_logistics_runtime().unwrap();
     m.preflight_ordinary_snapshot().unwrap();
+    // An idle empty truck at its source is retired by a real convoy tick.
+    // Hold this selected truck until the component-built cache can accept it.
+    assert_eq!(dispatch(&mut m, 0, json!({"t":"stop","ids":[truck]})), None);
+    m.advance_tick().unwrap();
+    assert!(m.world.game.units.contains_key(&truck));
+    assert!(m.tick_state.fault().is_none());
+    let after_tick_mp = m.start.economy.players[0].mp;
     for _ in 0..241 {
         m.world.game.tick += 1;
         let mut frame = m.begin_construction_tick().unwrap();
@@ -466,7 +473,7 @@ fn base45_paid_cache_requires_logistics_and_serves_only_when_finished() {
             .any(|s| s.entity == Some(cache))
     );
     assert!(m.supply_convoys(0, &[truck], cache).unwrap());
-    assert_eq!(m.start.economy.players[0].mp, mp - 60.);
+    assert_eq!(m.start.economy.players[0].mp, after_tick_mp);
 }
 
 fn research_context<'a>(units: &'a [UnitView<'static>], mode: Mode) -> Context<'a> {

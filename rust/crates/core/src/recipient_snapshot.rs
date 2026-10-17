@@ -1,4 +1,4 @@
-//! Recipient projections for admitted ordinary matches.
+//! Recipient projections for admitted ordinary matches and a quiet seat envelope.
 //! Unsupported canonical actors remain explicit. No transport contract is added.
 //! Projectile and aviation fields follow the pinned prototype recipient rules.
 use crate::{
