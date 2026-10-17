@@ -1,3 +1,7 @@
+## Shared authored mission state (2026-10-17)
+
+Use one complete authored v2 checkpoint owner with a required execution clock. Reuse the existing timed evaluator for canonical restoration and preserve public-only spectator projection. Ordinary non-authored saves stay v1; legacy authored owners are explicitly refused. The [state reconciliation](design.d/2026-10-17-scenario-owner-reconciliation.md) records the schema and validation choice.
+
 ## Commander medic and house-shelling chores (2026-10-16)
 
 The detached tactics planner now moves a stationary medic toward the ground army mean when it is more than `CFG.aid.seek * 0.8` away. Ground army members contribute in unit ID order. Shell-capable units without a target or an active FireAt choose the first noticed enemy garrison strictly within 60 metres, also in unit ID order. Both decisions emit existing core commands and add no Match state.

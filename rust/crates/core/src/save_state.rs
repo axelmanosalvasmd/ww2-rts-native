@@ -45,7 +45,14 @@ impl Match {
     pub fn events_from_save_json(
         value: Value,
     ) -> Result<Vec<crate::match_tick::TickEvent>, String> {
-        crate::save_codec::from_value(value)
+        let events: Vec<crate::match_tick::TickEvent> = crate::save_codec::from_value(value)?;
+        if events
+            .iter()
+            .any(|event| matches!(event, crate::match_tick::TickEvent::AuthoredMission(_)))
+        {
+            return Err("legacy authored mission checkpoint events are unsupported".into());
+        }
+        Ok(events)
     }
 
     /// Save every canonical ordinary-match owner, including queues and RNG state.

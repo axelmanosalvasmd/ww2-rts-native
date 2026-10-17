@@ -702,8 +702,11 @@ pub struct Match {
     pub recruit_metadata: BTreeMap<u32, RecruitMetadata>,
     pub(crate) produced_placer: crate::produced_units::ProducedPlacer,
     pub scenario: Option<crate::legacy_scenario::LegacyScenario>,
-    #[serde(default)]
+    // Decode-only legacy checkpoint owner. Live matches use authored_scenario.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub authored_mission: Option<crate::authored_mission::AuthoredMission>,
+    #[serde(default)]
+    pub authored_scenario: Option<crate::authored_scenario::AuthoredScenario>,
     pub logistics: crate::logistics::LogisticsState,
     pub convoys: Option<crate::supply_convoys::ConvoyState>,
     pub supply_net: crate::supply_network::GroundSupplyNetwork,
@@ -899,7 +902,13 @@ impl Match {
             recruit_metadata: BTreeMap::new(),
             produced_placer: crate::produced_units::ProducedPlacer::new(),
             scenario,
-            authored_mission: crate::authored_mission::AuthoredMission::from_map(map)?,
+            authored_mission: None,
+            authored_scenario: map
+                .source()
+                .get("scenario")
+                .filter(|value| !value.is_null())
+                .cloned()
+                .map(crate::authored_scenario::AuthoredScenario::new),
             logistics: crate::logistics::LogisticsState::default(),
             convoys: None,
             supply_net: crate::supply_network::GroundSupplyNetwork::default(),
@@ -942,6 +951,7 @@ impl Match {
             self.initialize_recipient_routing()?;
             self.initialize_logistics()?;
         }
+        self.setup_authored_scenario()?;
         Ok(())
     }
 

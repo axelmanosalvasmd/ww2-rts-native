@@ -249,7 +249,15 @@ async fn static_or_maps(
     headers: HeaderMap,
     body: Body,
 ) -> Response<Body> {
-    serve_static_or_maps(server.static_files.as_ref(), editor, uri, method, headers, body).await
+    serve_static_or_maps(
+        server.static_files.as_ref(),
+        editor,
+        uri,
+        method,
+        headers,
+        body,
+    )
+    .await
 }
 
 async fn serve_static_or_maps(
@@ -261,7 +269,14 @@ async fn serve_static_or_maps(
     body: Body,
 ) -> Response<Body> {
     if uri.path().starts_with("/maps/") || files.is_none() {
-        return maps::serve(OriginalUri(uri), axum::Extension(editor), method, headers, body).await;
+        return maps::serve(
+            OriginalUri(uri),
+            axum::Extension(editor),
+            method,
+            headers,
+            body,
+        )
+        .await;
     }
     files.unwrap().serve(uri, headers).await
 }

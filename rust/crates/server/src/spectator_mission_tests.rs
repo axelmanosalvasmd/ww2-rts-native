@@ -222,7 +222,7 @@ fn intent_net77_authored_objectives_and_private_messages_filter_spectators_throu
         }
         if tick == 3 {
             let loaded = Match::from_save_json(runtime.state().save_json().unwrap()).unwrap();
-            assert_eq!(loaded.authored_mission, runtime.state().authored_mission);
+            assert_eq!(loaded.authored_scenario, runtime.state().authored_scenario);
             restored = Some(RoomRuntime::new(loaded, 150).unwrap());
         }
     }
@@ -242,7 +242,7 @@ fn authored_mission_admission_refuses_unimplemented_actions_and_changed_map_bind
     legacy["triggers"] = json!([{"at":0,"say":"Legacy public"}]);
     let legacy = state(&legacy);
     assert!(legacy.scenario.is_some());
-    assert!(legacy.authored_mission.is_none());
+    assert!(legacy.authored_scenario.is_none());
     let mut unsupported = raw.clone();
     unsupported["scenario"]["triggers"][0]["actions"] =
         json!([{"kind":"destroy","box":[10,10,11,11]}]);

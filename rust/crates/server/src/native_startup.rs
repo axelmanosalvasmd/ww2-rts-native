@@ -100,7 +100,7 @@ impl NativeStartup {
         }
         let expected_mission = ww2_core::authored_mission::AuthoredMission::from_map(authored)?;
         if state
-            .authored_mission
+            .authored_scenario
             .as_ref()
             .map(|mission| mission.definition())
             != expected_mission

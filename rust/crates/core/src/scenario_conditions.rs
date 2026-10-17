@@ -4,7 +4,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{game::CELL, grid::UnitId, match_runtime::Match};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
 pub enum Scope {
     Match,
     Player(usize),
@@ -66,7 +68,7 @@ pub enum Kind {
     Any(Vec<Condition>),
 }
 /// Durable facts owned by the future scenario runtime. Unit and owner facts stay in Match.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ConditionState {
     pub groups: BTreeMap<String, Vec<UnitId>>,
     pub authored_units: BTreeMap<String, UnitId>,

@@ -102,6 +102,8 @@ pub enum TickEvent {
     Aviation(crate::match_aviation::AviationEvent),
     Environment(crate::environment::Effect),
     Scenario(crate::legacy_scenario::SayAction),
+    AuthoredScenario(crate::authored_scenario::ScenarioSay),
+    /// Decode-only legacy checkpoint event. Never emitted by the runtime.
     AuthoredMission(serde_json::Value),
 }
 
@@ -787,12 +789,11 @@ impl crate::match_runtime::Match {
         }
 
         if self.options.mode != crate::economy::Mode::World && !winner_decided {
-            if let Some(mission) = self.authored_mission.as_mut() {
+            if self.authored_scenario.is_some() {
                 events.extend(
-                    mission
-                        .step(tick as u64, self.world.game.players.len())?
+                    self.step_authored_scenario(tick as u64)?
                         .into_iter()
-                        .map(TickEvent::AuthoredMission),
+                        .map(TickEvent::AuthoredScenario),
                 );
             } else {
                 crate::legacy_scenario_runtime::step_legacy_scenario_emitting(

@@ -42,14 +42,15 @@ keep their existing visibility and identity rules. Other spectator privacy,
 unit flags, cooldowns, full-map delivery and starts remain as documented in
 `spectators-v0.md` (`server.js:201-204,247-265,455-466`).
 
-The private checkpoint adds the optional `authored_mission` owner to native save
-v1. Older checkpoints default this field to absent. New checkpoints retain the
-original definition, last executed tick, execution counter, trigger records and
-ordered objective records. Loading reconstructs the admitted deterministic state
-and refuses inconsistent records. This is native checkpoint state, not an extra
-prototype network field or a new wire version. Pending authored Say events use
-the existing private tick-event checkpoint codec. The room's raw-map binding
-also checks the mission definition before attachment or load.
+The private checkpoint uses the complete `authored_scenario` v2 owner described in
+[save-format.md](save-format.md). It retains the definition, required execution
+clock, contextual trigger records, ordered objectives, condition facts, target
+owners and deferred arrivals. Main's bounded timed evaluator reconstructs the
+canonical state and refuses inconsistent records. The old `authored_mission`
+field remains decode-only and a present value is refused. Ordinary non-authored
+saves remain v1; authored saves require v2, and v3 is unsupported. Pending authored
+Say events use the private tick-event checkpoint codec. The room's raw-map binding
+checks the mission definition before attachment or load.
 
 `intent_net77_authored_objectives_and_private_messages_filter_spectators_through_ticks_and_restore`
 checks exact objective and Say objects for an owner, an ally, an enemy and a

@@ -772,6 +772,84 @@ fn save_between_frames_restores_unsent_events_once_without_consuming_live_terrai
 }
 
 #[test]
+fn authored_objectives_save_v2_rejects_downgrade_and_restores_mission_and_pending_say() {
+    let dir = TestDir::new();
+    let (mut hub, host, mut ra, _guest, mut rb) = setup(&dir);
+    let native = hub.rooms["ABC"].native.as_ref().unwrap();
+    let options = native.runtime.state().options.clone();
+    let mut raw = native.startup.raw_map().clone();
+    raw["scenario"] = json!({"version":1,"objectives":[{"id":"hold","text":"Hold"}],
+        "triggers":[{"id":"intro","scope":"match","condition":{"kind":"time","seconds":0.05},
+        "actions":[{"kind":"objectiveActivate","objective":"hold"},{"kind":"say","text":"Hold"}]}]});
+    let map =
+        ww2_core::map::AuthoritativeMap::from_json(&serde_json::to_vec(&raw).unwrap()).unwrap();
+    let state = Match::new(&map, options).unwrap();
+    let prepared = hub
+        .prepare_native_room(&hub.rooms["ABC"], state, 0, true, Some(&raw))
+        .unwrap();
+    hub.publish_native("ABC", prepared);
+    let runtime = &mut hub
+        .rooms
+        .get_mut("ABC")
+        .unwrap()
+        .native
+        .as_mut()
+        .unwrap()
+        .runtime;
+    runtime.advance_tick(&[false; 2]).unwrap();
+    let mission = runtime.state().authored_scenario.clone();
+    let id = hub.save_room("ABC", host.id).unwrap();
+    let mut saved = hub.saves.read("ABC", &id).unwrap();
+    assert_eq!(saved["version"], 2);
+    hub.rooms.get_mut("ABC").unwrap().native = None;
+    saved["version"] = json!(1);
+    let downgraded = hub
+        .saves
+        .write("ABC", "manual", &saved, json!({}), 1_800_000_000_001)
+        .unwrap();
+    let epoch = hub.next_epoch;
+    assert_eq!(
+        hub.load_room("ABC", host.id, &downgraded, 2).unwrap_err(),
+        "authored scenarios require save version 2"
+    );
+    assert_eq!(hub.next_epoch, epoch);
+    assert!(hub.rooms["ABC"].native.is_none());
+    messages(&mut hub, &mut ra);
+    messages(&mut hub, &mut rb);
+    hub.load_room("ABC", host.id, &id, 3).unwrap();
+    let runtime = &mut hub
+        .rooms
+        .get_mut("ABC")
+        .unwrap()
+        .native
+        .as_mut()
+        .unwrap()
+        .runtime;
+    assert_eq!(runtime.state().authored_scenario, mission);
+    assert_eq!(runtime.state().world.game.tick, 1);
+    let rows = runtime
+        .collect_frame(
+            &[SelectedSeat {
+                slot: 0,
+                full: true,
+                omit: false,
+            }],
+            FrameKind::Scheduled,
+        )
+        .unwrap();
+    assert_eq!(
+        rows[0].message["scenario"]["objectives"][0]["state"],
+        "active"
+    );
+    assert_eq!(
+        rows[0].message["shots"],
+        json!([{"k":"say","text":"Hold","localized":"Hold",
+        "scenarioRecipients":"public","scenarioSide":0,"pub":true,"execution":"scenario:1","atTick":1}])
+    );
+    assert!(runtime.fault().is_none());
+}
+
+#[test]
 fn mode55_lobby_record_uses_current_map_defender_count_and_army_after_reload() {
     let dir = TestDir::new();
     std::fs::create_dir_all(&dir.0).unwrap();

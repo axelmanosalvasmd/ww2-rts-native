@@ -1929,9 +1929,22 @@ impl Hub {
                 })
             })
             .collect::<Result<Vec<_>, String>>()?;
-        let map = self.map_editor.as_ref().and_then(|editor| editor.raw(&room.map))
-            .map(|raw| ww2_core::map::AuthoritativeMap::from_json(&serde_json::to_vec(&raw).map_err(|e| e.to_string())?).map_err(|e| e.to_string()))
-            .unwrap_or_else(|| crate::authoritative_maps::load(&room.map).map_err(|e| e.to_string()))?;
+        let edited_map = self
+            .map_editor
+            .as_ref()
+            .and_then(|editor| editor.raw(&room.map))
+            .map(|raw| {
+                ww2_core::map::AuthoritativeMap::from_json(
+                    &serde_json::to_vec(&raw).map_err(|e| e.to_string())?,
+                )
+                .map_err(|e| e.to_string())
+            })
+            .transpose()?;
+        let map = if let Some(map) = edited_map.as_ref() {
+            map
+        } else {
+            crate::authoritative_maps::load(&room.map).map_err(|e| e.to_string())?
+        };
         let options = MatchOptions {
             seed: trusted.seed,
             mode: Mode::Conquest,
@@ -1947,16 +1960,8 @@ impl Hub {
             logistics: logistics_enabled_for(&room.mode, map.source()),
             sandbox: false,
         };
-        let state = if let Some(raw) = self
-            .map_editor
-            .as_ref()
-            .and_then(|editor| editor.raw(&room.map))
-        {
-            let map = ww2_core::map::AuthoritativeMap::from_json(
-                &serde_json::to_vec(&raw).map_err(|e| e.to_string())?,
-            )
-            .map_err(|e| e.to_string())?;
-            Match::new(&map, options)?
+        let state = if edited_map.is_some() {
+            Match::new(map, options)?
         } else {
             crate::authoritative_maps::create_match(&room.map, options)
                 .map_err(|e| e.to_string())?

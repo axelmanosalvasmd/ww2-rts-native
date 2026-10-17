@@ -21,7 +21,7 @@ pub enum ShotRef<'a> {
     Support(&'a SupportEvent),
     Environment(&'a Effect),
     Scenario(&'a SayAction),
-    AuthoredMission(&'a Value),
+    AuthoredScenario(&'a crate::authored_scenario::ScenarioSay),
 }
 
 impl<'a> TryFrom<&'a TickEvent> for ShotRef<'a> {
@@ -33,7 +33,8 @@ impl<'a> TryFrom<&'a TickEvent> for ShotRef<'a> {
             TickEvent::Support(value) => Ok(Self::Support(value)),
             TickEvent::Environment(value) => Ok(Self::Environment(value)),
             TickEvent::Scenario(value) => Ok(Self::Scenario(value)),
-            TickEvent::AuthoredMission(value) => Ok(Self::AuthoredMission(value)),
+            TickEvent::AuthoredScenario(value) => Ok(Self::AuthoredScenario(value)),
+            TickEvent::AuthoredMission(_) => Err(SnapshotError::Rules),
             TickEvent::Aviation(value) => Ok(Self::Aviation(value)),
         }
     }
@@ -206,19 +207,9 @@ fn event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
 
 fn raw_event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
     match shot {
-        ShotRef::AuthoredMission(value) => {
-            let mission = state
-                .authored_mission
-                .as_ref()
-                .ok_or(SnapshotError::Rules)?;
-            if !mission.accepts_shot(value)
-                || value["atTick"]
-                    .as_i64()
-                    .is_none_or(|tick| tick > state.world.game.tick)
-            {
-                return Err(SnapshotError::Rules);
-            }
-            Ok(value.clone())
+        ShotRef::AuthoredScenario(value) => {
+            value.validate(state).map_err(|_| SnapshotError::Rules)?;
+            Ok(value.shot_json())
         }
         ShotRef::Scenario(value) => {
             validate_public_say(value).map_err(|_| SnapshotError::Rules)?;
@@ -530,7 +521,7 @@ pub(super) fn project_shots_perspective(
         .map(|shot| {
             event(state, shot).map(|row| {
                 (
-                    matches!(shot, ShotRef::Scenario(_) | ShotRef::AuthoredMission(_)),
+                    matches!(shot, ShotRef::Scenario(_) | ShotRef::AuthoredScenario(_)),
                     row,
                 )
             })

@@ -176,12 +176,12 @@ fn map15_map_loading_uses_the_existing_complete_scenario_validator() {
     valid["scenario"]["groups"] = json!([]);
     let timed = AuthoritativeMap::from_value(valid).unwrap();
     let mut state = Match::new(&timed, options()).unwrap();
-    assert!(state.authored_mission.is_some());
+    assert!(state.authored_scenario.is_some());
     let report = state.advance_tick().unwrap();
     assert!(report.events.iter().any(|event| matches!(
         event,
-        crate::match_tick::TickEvent::AuthoredMission(shot)
-            if shot["k"] == "say" && shot["text"] == "Ready" && shot["pub"] == true
+        crate::match_tick::TickEvent::AuthoredScenario(shot)
+            if shot.shot_json()["k"] == "say" && shot.shot_json()["text"] == "Ready" && shot.shot_json()["pub"] == true
     )));
     let cache = SnapshotCache::new(&state).unwrap();
     for slot in 0..2 {

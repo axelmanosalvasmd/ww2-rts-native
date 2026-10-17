@@ -200,6 +200,37 @@ fn validate_definition(definition: &Value, player_count: usize) -> Result<(), St
 }
 
 impl AuthoredMission {
+    /// Canonical timed execution used by the single persisted scenario owner.
+    pub(crate) fn canonical_checkpoint(
+        definition: &Value,
+        last_tick: Option<u64>,
+        player_count: usize,
+    ) -> Result<(Value, Vec<Value>), String> {
+        validate_definition(definition, player_count)?;
+        if last_tick == Some(0) {
+            return Err(fail("ordinary mission execution begins at tick one"));
+        }
+        let initial = Self::initial(definition.clone());
+        let (canonical, shots) = initial.reconstruct(last_tick.map(|_| 1), last_tick)?;
+        let mut executions = serde_json::Map::new();
+        for trigger in &canonical.triggers {
+            executions.insert(
+                format!("{}@match", trigger.id),
+                json!({
+                    "count":u32::from(trigger.execution.is_some()),
+                    "next":trigger.at_tick.map_or(0.0, |tick| tick as f64 * TICK_SECONDS),
+                    "previous":trigger.previous,
+                    "execution":trigger.execution.map(|id| format!("scenario:{id}"))
+                }),
+            );
+        }
+        Ok((
+            json!({"executions":executions,"objectives":canonical.objectives,
+            "next_execution":canonical.next_execution}),
+            shots,
+        ))
+    }
+
     /// Legacy map triggers retain their existing owner. A present authored
     /// scenario is admitted completely or refused before match publication.
     pub fn from_map(map: &AuthoritativeMap) -> Result<Option<Self>, String> {
