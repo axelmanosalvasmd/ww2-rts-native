@@ -27,7 +27,9 @@ pub enum ScheduleError {
     DuplicateSeat,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Host-private replay input. Record the beat selected by the host, then feed
+/// that same value back during replay rather than measuring host load again.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Beat {
     pub tick: i64,
     pub sent: bool,
@@ -108,3 +110,6 @@ impl Schedule {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod replay_tests;

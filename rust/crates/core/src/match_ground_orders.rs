@@ -134,6 +134,109 @@ impl Match {
         PreparedGroundExit::prepare(&self.world.game, &self.rules, id)
             .map(PreparedGroundExit::into_unit)
     }
+    pub(crate) fn ground_fire_at_command(
+        &mut self,
+        owner: usize,
+        ids: &[i64],
+        at: Point,
+        queue: bool,
+    ) -> Result<Option<crate::match_commands::Denial>, String> {
+        use crate::match_commands::Denial;
+        // World tactical routing and aircraft mission projection are separate adapters.
+        if self.ground_orders_open().is_err() {
+            return Ok(Some(Denial::Blocked));
+        }
+        let g = &self.world.game;
+        let Some(cell) = g.cell_of(
+            crate::math::max(0., crate::math::min(g.w as f64 * crate::game::CELL, at.x)),
+            crate::math::max(0., crate::math::min(g.h as f64 * crate::game::CELL, at.z)),
+        ) else {
+            return Ok(Some(Denial::Blocked));
+        };
+        let at = self.fire_at_center(cell)?;
+        let solid = g.cell_hp[cell] > 0.;
+        let command = Command::FireAt {
+            ids: ids.to_vec(),
+            at,
+            queue,
+        };
+        let selected = self.ground_order_rows(owner, ids, &command)?;
+        let mut candidates = Vec::new();
+        for &id in &selected {
+            self.ground_order_identity(id)?;
+            if self.accepts_fire_at(id, solid)? {
+                candidates.push(id);
+            }
+        }
+        let denial = if !solid && candidates.is_empty() {
+            Denial::Blocked
+        } else {
+            Denial::Needs
+        };
+        if candidates.is_empty() {
+            for id in selected {
+                self.commands.units.get_mut(&id).unwrap().follow = 0;
+            }
+            return Ok(Some(
+                if crate::vision::team_sees(g, &self.rules, &self.grid, g.players[owner].team, at) {
+                    denial
+                } else {
+                    Denial::NotVisible
+                },
+            ));
+        }
+        if candidates
+            .iter()
+            .any(|id| self.is_aircraft_command_unit(*id))
+        {
+            return Ok(Some(Denial::Blocked));
+        }
+        if candidates
+            .iter()
+            .any(|id| self.commands.units[id].nade.is_some())
+        {
+            return Ok(Some(Denial::Blocked));
+        }
+        self.ground_order_capacity(&candidates)?;
+        for id in selected {
+            self.commands.units.get_mut(&id).unwrap().follow = 0;
+        }
+        let mut ordered = false;
+        for id in candidates {
+            if queue {
+                let c = self.commands.units.get_mut(&id).unwrap();
+                if c.orders.len() < 8 {
+                    c.orders.push_back(Command::FireAt {
+                        ids: vec![i64::from(id)],
+                        at,
+                        queue: false,
+                    });
+                    ordered = true;
+                }
+                continue;
+            }
+            let u = self.world.game.units.get_mut(&id).unwrap();
+            crate::match_runtime::cancel_field_work_state(&mut self.field_works, u)?;
+            u.traffic = None;
+            u.traffic_wait = 0.;
+            u.world_goal = None;
+            u.amove = None;
+            u.retreating = false;
+            u.attack = false;
+            u.repath = 0.;
+            u.path.clear();
+            u.path_gen += 1;
+            let c = self.commands.units.get_mut(&id).unwrap();
+            c.orders.clear();
+            c.face = None;
+            c.fire_at = Some(cell);
+            c.attack_id = 0;
+            c.outcome = Some(MoveOutcome::Interrupted);
+            c.outcome_tick = Some(self.world.game.tick);
+            ordered = true;
+        }
+        Ok((!ordered).then_some(Denial::QueueFull))
+    }
     pub(crate) fn ground_attack_command(
         &mut self,
         owner: usize,

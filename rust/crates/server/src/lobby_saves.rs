@@ -35,6 +35,18 @@ impl Hub {
         let Some(command @ ("save" | "loadSave")) = message["t"].as_str() else {
             return false;
         };
+        // Non-host spectators fall through silently in the prototype callback.
+        if let Some(room) = self.rooms.get(code)
+            && !room.is_host(connection_id)
+            && room.spectators.iter().any(|person| {
+                person
+                    .connection
+                    .as_ref()
+                    .is_some_and(|c| c.id == connection_id)
+            })
+        {
+            return true;
+        }
         let result = if command == "save" {
             self.save_room(code, connection_id).map(|id| {
                 if let Some(room) = self.rooms.get(code) {
@@ -80,7 +92,6 @@ impl Hub {
         }
         let state = native.runtime.state();
         if !matches!(state.options.mode, Mode::Default | Mode::Conquest)
-            || state.options.logistics
             || state.options.sandbox
             || state.world_runtime.is_some()
             || room.players.iter().any(|p| p.ai)
@@ -133,7 +144,6 @@ impl Hub {
         }
         let state = Match::from_save_json(saved["g"]["state"].clone())?;
         if !matches!(state.options.mode, Mode::Default | Mode::Conquest)
-            || state.options.logistics
             || state.options.sandbox
             || state.world_runtime.is_some()
         {
@@ -224,6 +234,7 @@ impl Hub {
                     disconnected: None,
                     denies: Vec::new(),
                     rtt: None,
+                    map_pings: Vec::new(),
                     diagnostics: Default::default(),
                     last_match: None,
                 }

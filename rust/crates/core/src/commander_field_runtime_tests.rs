@@ -9,7 +9,7 @@ use crate::{
     match_runtime::{Match, MatchOptions, PlayerConfig},
     orders::OrderKey,
     recipient_snapshot::{
-        DeliveryState, SelectedSeat, SnapshotCache, SnapshotCapability, SnapshotError, mode_row,
+        DeliveryState, SelectedSeat, SnapshotCache, SnapshotCapability, SnapshotError,
     },
     weather::WeatherChoice,
 };
@@ -99,26 +99,37 @@ fn enqueue(state: &mut Match, sequence: u64, command: Value) {
         )
         .unwrap();
 }
-fn assert_mode_recipient_scope(state: &Match) {
-    if state.options.mode == Mode::Classic {
-        let cache = SnapshotCache::new(state).unwrap();
-        let expected = mode_row(state).unwrap();
-        for slot in 0..state.world.game.players.len() {
-            let projection = cache.recipient(slot).unwrap();
-            assert_eq!(projection.fields["mode"], expected);
-            assert!(
-                projection
-                    .missing
-                    .contains(&SnapshotCapability::ShotsAndFlights)
-            );
-        }
-    } else {
-        assert!(matches!(
-            SnapshotCache::new(state),
-            Err(SnapshotError::UnsupportedMode)
-        ));
+fn collect_classic_partial(state: &mut Match, delivery: &mut DeliveryState) {
+    let mode = state.elimination.as_ref().unwrap();
+    let expected = json!({
+        "kind":"classic",
+        "timeLeft":crate::math::max(0.0, mode.time_left.unwrap().ceil()),
+        "suddenDeath":mode.sudden_death
+    });
+    let count = state.start.players.len();
+    let frame = delivery
+        .capture(state, &vec![false; count], &vec![false; count])
+        .unwrap();
+    assert_eq!(
+        frame.slots().collect::<Vec<_>>(),
+        (0..count).collect::<Vec<_>>()
+    );
+    for slot in 0..count {
+        let projection = frame.recipient(slot).unwrap();
+        assert_eq!(projection.fields["mode"], expected, "Classic seat {slot}");
+        assert!(projection.fields["units"].is_array());
+        assert!(projection.fields["works"].is_array());
+        assert_eq!(
+            projection.missing,
+            vec![
+                SnapshotCapability::WrecksAndFoundMines,
+                SnapshotCapability::ShotsAndFlights,
+                SnapshotCapability::TeamEffects,
+            ]
+        );
     }
 }
+
 fn tick_and_collect(state: &mut Match, delivery: Option<&mut DeliveryState>) {
     let report = state.advance_tick().unwrap();
     assert!(
@@ -132,10 +143,17 @@ fn tick_and_collect(state: &mut Match, delivery: Option<&mut DeliveryState>) {
         state.validate_gate_actor(id).unwrap();
     }
     let Some(delivery) = delivery else {
-        // Classic checks only its recipient component here.
-        assert_mode_recipient_scope(state);
+        // These existing mode snapshot bounds are independent of Gate admission.
+        assert!(matches!(
+            SnapshotCache::new(state),
+            Err(SnapshotError::UnsupportedMode)
+        ));
         return;
     };
+    if state.options.mode == Mode::Classic {
+        collect_classic_partial(state, delivery);
+        return;
+    }
     let selected: Vec<_> = (0..state.start.players.len())
         .map(|slot| SelectedSeat {
             slot,
@@ -184,12 +202,18 @@ fn intent_ai50_gate_order_completes_in_each_real_ordinary_mode_with_supported_se
             json!({"t":"dig","kind":"gate","ids":[builder],
             "x":80.0,"z":45.0,"dir":0.0}),
         );
-        let mut delivery = if matches!(mode, Mode::Default | Mode::Conquest) {
+        let mut delivery = if matches!(mode, Mode::Default | Mode::Conquest | Mode::Classic) {
             Some(DeliveryState::new(&state).unwrap())
         } else {
-            assert_mode_recipient_scope(&state);
+            assert!(matches!(
+                SnapshotCache::new(&state),
+                Err(SnapshotError::UnsupportedMode)
+            ));
             None
         };
+        if mode == Mode::Classic {
+            collect_classic_partial(&mut state, delivery.as_mut().unwrap());
+        }
         tick_and_collect(&mut state, delivery.as_mut());
         let job = state.field_works.jobs().get(&builder).unwrap();
         assert_eq!(job.kind, FortKind::Gate);

@@ -530,7 +530,10 @@ fn attached_match_blocks_lobby_mutations_and_preserves_command_window_on_rejoin(
     let budget = hub.rooms["ABC"].players[1].denies.clone();
     for index in 0..8 {
         guest.send(&mut hub, "ABC", json!({"t":"ping","c":index}), 2006 + index);
-        assert_eq!(guest.messages(), vec![json!({"t":"pong","c":index})]);
+        assert_eq!(
+            guest.messages(),
+            vec![json!({"t":"pong","c":index,"srv":[0.0,2]})]
+        );
     }
     assert_eq!(hub.rooms["ABC"].players[1].denies, budget);
     let id = hub.rooms["ABC"]

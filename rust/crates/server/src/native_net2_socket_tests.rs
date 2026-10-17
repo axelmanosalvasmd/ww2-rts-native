@@ -10,6 +10,9 @@ struct Rig {
     hub: Arc<Mutex<Hub>>,
     address: SocketAddr,
     next_ns: u64,
+    now_ms: Arc<std::sync::atomic::AtomicU64>,
+    capture_each_tick: bool,
+    captured_seats: u64,
 }
 impl Rig {
     fn change<T>(&self, change: impl FnOnce(&mut Hub) -> T) -> T {
@@ -28,7 +31,25 @@ impl Rig {
     fn step(&mut self) {
         // Clock deadlines stay explicit. Meter inputs in the cadence test use
         // their separate, future host timestamps and cannot change mid-burst.
-        self.poll(0, self.next_ns);
+        self.poll(
+            self.now_ms.load(std::sync::atomic::Ordering::SeqCst),
+            self.next_ns,
+        );
+        if self.capture_each_tick {
+            self.captured_seats += self.change(|hub| {
+                let Some(native) = &hub.rooms["ABC"].native else {
+                    return 0;
+                };
+                let state = native.runtime.state();
+                state.preflight_ordinary_snapshot().unwrap();
+                let cache = ww2_core::recipient_snapshot::SnapshotCache::new(state).unwrap();
+                for slot in 0..state.world.game.players.len() {
+                    let frame = cache.recipient(slot).unwrap();
+                    assert_eq!(frame.fields["tick"], state.world.game.tick);
+                }
+                state.world.game.players.len() as u64
+            });
+        }
         self.next_ns += 50_000_000;
     }
     fn calls(&self) -> u64 {
@@ -99,11 +120,13 @@ async fn sockets(check: impl FnOnce(&mut Rig, [Receiver; 2]) + Send + 'static) {
     let address = listener.local_addr().unwrap();
     let mut hub = Hub::new(32, String::new());
     hub.configure_trusted_room(Some(crate::TrustedRoomConfig::new("ABC", 3936341).unwrap()));
+    let now_ms = Arc::new(std::sync::atomic::AtomicU64::new(0));
     let server = crate::Server {
         hub: Arc::new(Mutex::new(hub)),
         next: Arc::new(std::sync::atomic::AtomicU64::new(1)),
         clock: std::time::Instant::now(),
-        test_now_ms: None,
+        static_files: None,
+        test_now_ms: Some(now_ms.clone()),
     };
     let (stop, stopped) = watch::channel(false);
     let (finish, finished) = oneshot::channel();
@@ -132,6 +155,9 @@ async fn sockets(check: impl FnOnce(&mut Rig, [Receiver; 2]) + Send + 'static) {
             hub,
             address,
             next_ns: 0,
+            now_ms,
+            capture_each_tick: false,
+            captured_seats: 0,
         };
         check(&mut rig, clients);
     })
@@ -538,3 +564,6 @@ async fn r1_backpressure_preserves_skipped_history_and_drains_one_catchup() {
     })
     .await;
 }
+
+#[path = "r1_ingress_socket_tests.rs"]
+mod r1_ingress;

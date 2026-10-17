@@ -114,6 +114,82 @@ fn coastal_match(naval: bool, tech: bool) -> Match {
 }
 
 #[test]
+fn base27_preview_reasons_match_real_build_denials_without_payment_or_tick_faults() {
+    use crate::building_placement::{Context as PlacementContext, Reason};
+    use crate::game::Point;
+    use crate::recipient_snapshot::SnapshotCache;
+    for (naval, kind, at, expected, denial) in [
+        (
+            false,
+            "shipyard",
+            Point { x: 44.0, z: 28.0 },
+            Reason::Blocked,
+            "blocked",
+        ),
+        (
+            true,
+            "shipyard",
+            Point { x: 30.0, z: 36.0 },
+            Reason::Coast,
+            "coast",
+        ),
+        (
+            true,
+            "barracks",
+            Point { x: 220.0, z: 220.0 },
+            Reason::NotVisible,
+            "notVisible",
+        ),
+    ] {
+        let mut m = coastal_match(naval, false);
+        let worker = own(&m, 0, "rifle");
+        let preview = crate::building_placement::check(
+            &PlacementContext {
+                game: &m.world.game,
+                rules: &m.rules,
+                mode: m.options.mode,
+                logistics: m.options.logistics,
+                nodes: &[],
+                owned_cells: None,
+                rail_yard: None,
+            },
+            kind,
+            at,
+            |center| m.recipient_sees(0, center),
+        )
+        .unwrap();
+        assert_eq!(preview.reason, Some(expected));
+        let before = (
+            m.start.economy.clone(),
+            m.next_unit_id,
+            m.world.game.units.len(),
+        );
+        denied(
+            &mut m,
+            0,
+            json!({"t":"build","kind":kind,"ids":[worker],"x":at.x,"z":at.z}),
+            denial,
+        );
+        assert_eq!(
+            (
+                m.start.economy.clone(),
+                m.next_unit_id,
+                m.world.game.units.len()
+            ),
+            before
+        );
+        for _ in 0..4 {
+            m.advance_tick().unwrap();
+            let cache = SnapshotCache::new(&m).unwrap();
+            for slot in 0..m.start.players.len() {
+                cache.recipient(slot).unwrap();
+            }
+        }
+        assert!(m.tick_state.fault().is_none());
+    }
+}
+
+#[test]
 fn base39_coastal_shipyard_builds_and_launches_its_boats() {
     for (field, value) in [
         ("cost", 150.),
@@ -368,10 +444,13 @@ fn base45_paid_cache_requires_logistics_and_serves_only_when_finished() {
     assert_eq!(m.world.game.units[&truck].path, unit.path);
     assert_eq!(m.world.game.units[&truck].world_goal, unit.world_goal);
     assert_eq!(m.start.economy, wallets);
-    assert_eq!(
-        m.advance_tick().unwrap_err().reason,
-        "reserve and convoy tick phases are not connected"
-    );
+    // An idle empty truck at its source is retired by a real convoy tick.
+    // Hold this selected truck until the component-built cache can accept it.
+    assert_eq!(dispatch(&mut m, 0, json!({"t":"stop","ids":[truck]})), None);
+    m.advance_tick().unwrap();
+    assert!(m.world.game.units.contains_key(&truck));
+    assert!(m.tick_state.fault().is_none());
+    let after_tick_mp = m.start.economy.players[0].mp;
     for _ in 0..241 {
         m.world.game.tick += 1;
         let mut frame = m.begin_construction_tick().unwrap();
@@ -392,7 +471,7 @@ fn base45_paid_cache_requires_logistics_and_serves_only_when_finished() {
             .any(|s| s.entity == Some(cache))
     );
     assert!(m.supply_convoys(0, &[truck], cache).unwrap());
-    assert_eq!(m.start.economy.players[0].mp, mp - 60.);
+    assert_eq!(m.start.economy.players[0].mp, after_tick_mp);
 }
 
 fn research_context<'a>(units: &'a [UnitView<'static>], mode: Mode) -> Context<'a> {
