@@ -50,6 +50,104 @@ fn room() -> (Hub, Peer, Peer) {
     (hub, a, b)
 }
 
+fn assert_ordinary_frames(hub: &mut Hub, peers: &mut [&mut Peer], base_ms: u64) {
+    let initial_tick = hub.native_status("ABC").unwrap().tick;
+    let mut frames = vec![0; peers.len()];
+    for beat in 0..6 {
+        let now = base_ms + beat * 50;
+        hub.poll_native(now, beat * 50_000_000);
+        let status = hub.native_status("ABC").unwrap();
+        assert!(status.fault.is_none(), "{:?}", status.fault);
+        assert!(!status.paused);
+        assert_eq!(status.tick, initial_tick + beat as i64 + 1);
+        for (index, peer) in peers.iter_mut().enumerate() {
+            for message in peer.drain(hub, now) {
+                if message["t"] == "s" {
+                    assert_eq!(message["tick"], status.tick);
+                    frames[index] += 1;
+                }
+            }
+        }
+    }
+    assert!(
+        frames.iter().all(|count| *count >= 2),
+        "frames per recipient: {frames:?}"
+    );
+}
+
+#[test]
+fn intent_net82_spectator_close_removes_identity_without_creating_or_releasing_drop_pause() {
+    let (mut hub, mut a, mut b) = room();
+    let mut watcher = Peer::new(3);
+    watcher.hello(&mut hub, true, 0);
+    hub.attach_native("ABC", native_tests::native_match(), 0)
+        .unwrap();
+    for peer in [&mut a, &mut b, &mut watcher] {
+        peer.drain(&mut hub, 0);
+    }
+    hub.disconnected("ABC", watcher.c.id, 1);
+    assert!(hub.rooms["ABC"].spectators.is_empty());
+    assert_eq!(hub.rooms["ABC"].players.len(), 2);
+    assert!(!hub.native_status("ABC").unwrap().paused);
+    for peer in [&mut a, &mut b] {
+        let messages = peer.drain(&mut hub, 1);
+        assert_eq!(messages.len(), 1);
+        assert_eq!(messages[0]["t"], "lobby");
+        assert_eq!(messages[0]["spectators"], json!([]));
+    }
+    // The same watcher token has no retained identity and joins afresh.
+    let mut returned = Peer::new(4);
+    returned.send(
+        &mut hub,
+        json!({"t":"hello","token":"p3","name":"Fresh"}),
+        2,
+    );
+    assert_eq!(returned.drain(&mut hub, 2)[0]["t"], "start");
+    assert_eq!(hub.rooms["ABC"].spectators.len(), 1);
+    assert_eq!(hub.rooms["ABC"].spectators[0].name, "Fresh");
+    a.drain(&mut hub, 2);
+    b.drain(&mut hub, 2);
+
+    hub.disconnected("ABC", b.c.id, 3);
+    let pause = hub.rooms["ABC"]
+        .native
+        .as_ref()
+        .unwrap()
+        .runtime
+        .pause_message(3);
+    assert_eq!(
+        pause,
+        json!({"t":"pause","paused":true,"by":"P2","reason":"drop","left":30})
+    );
+    a.drain(&mut hub, 3);
+    returned.drain(&mut hub, 3);
+    hub.disconnected("ABC", returned.c.id, 4);
+    assert!(hub.rooms["ABC"].spectators.is_empty());
+    assert_eq!(
+        hub.rooms["ABC"]
+            .native
+            .as_ref()
+            .unwrap()
+            .runtime
+            .pause_message(4),
+        pause
+    );
+    let messages = a.drain(&mut hub, 4);
+    assert_eq!(messages.len(), 1);
+    assert_eq!(messages[0]["t"], "lobby");
+    assert!(hub.rooms["ABC"].players[1].connection.is_none());
+    assert_eq!(
+        hub.rooms["ABC"].players[1].token,
+        "p2".encode_utf16().collect::<Vec<_>>()
+    );
+
+    let mut replacement = Peer::new(5);
+    replacement.send(&mut hub, json!({"t":"hello","token":"p2","name":"P2"}), 5);
+    replacement.drain(&mut hub, 5);
+    a.drain(&mut hub, 5);
+    assert_ordinary_frames(&mut hub, &mut [&mut a, &mut replacement], 5);
+}
+
 #[test]
 fn intent_net57_seated_fog_starts_deltas_and_reconnect_leave_watchers_unmasked() {
     // Decode the prototype's URL-safe base-32 varints independently of the
@@ -330,10 +428,32 @@ fn intent_net21_spectator_admission_and_full_reasons_follow_room_state() {
 #[test]
 fn intent_net26_spectator_start_precedes_lobby_and_pause_without_changing_seat_memory() {
     let (mut hub, mut a, mut b) = room();
+    let mut lobby_watcher = Peer::new(5);
+    lobby_watcher.hello(&mut hub, true, 0);
+    lobby_watcher.drain(&mut hub, 0);
     hub.attach_native("ABC", native_tests::native_match(), 0)
         .unwrap();
-    a.drain(&mut hub, 0);
-    b.drain(&mut hub, 0);
+    let lobby_messages = lobby_watcher.drain(&mut hub, 0);
+    assert_eq!(
+        lobby_messages
+            .iter()
+            .map(|m| m["t"].as_str().unwrap())
+            .collect::<Vec<_>>(),
+        ["pause", "lobby", "start"]
+    );
+    let lobby_start = lobby_messages[2].clone();
+    let seat_messages = [a.drain(&mut hub, 0), b.drain(&mut hub, 0)];
+    for (slot, messages) in seat_messages.iter().enumerate() {
+        let start = messages.iter().find(|m| m["t"] == "start").unwrap();
+        assert_eq!(start["you"], slot);
+        assert!(start["fog"].is_object());
+        for key in [
+            "map", "matchId", "spawns", "names", "teams", "factions", "weather", "sandbox",
+        ] {
+            assert_eq!(start[key], lobby_start[key], "startup {key} seat {slot}");
+        }
+        assert_eq!(start["spawn"], lobby_start["spawns"][slot]);
+    }
     hub.rooms
         .get_mut("ABC")
         .unwrap()
@@ -365,6 +485,11 @@ fn intent_net26_spectator_start_precedes_lobby_and_pause_without_changing_seat_m
         ["start", "pause", "lobby"]
     );
     let start = &messages[0];
+    assert_eq!(
+        *start, lobby_start,
+        "lobby and live watchers get the same seat-zero start"
+    );
+    assert_eq!(start["spawn"], start["spawns"][0]);
     let expected_keys = [
         "cells", "factions", "map", "matchId", "names", "sandbox", "spawn", "spawns", "t", "teams",
         "weather", "you",
@@ -414,12 +539,32 @@ fn intent_net26_spectator_start_precedes_lobby_and_pause_without_changing_seat_m
     assert!(matches!(watcher.rx.try_recv(), Ok(Output::Close(1000, ""))));
     hub.disconnected("ABC", 3, 3);
     assert_eq!(
-        hub.rooms["ABC"].spectators[0]
+        hub.rooms["ABC"]
+            .spectators
+            .iter()
+            .find(|person| person.token == "p3".encode_utf16().collect::<Vec<_>>())
+            .unwrap()
             .connection
             .as_ref()
             .unwrap()
             .id,
         4
+    );
+    for peer in [&mut a, &mut b, &mut lobby_watcher, &mut replacement] {
+        peer.drain(&mut hub, 3);
+    }
+    hub.rooms
+        .get_mut("ABC")
+        .unwrap()
+        .native
+        .as_mut()
+        .unwrap()
+        .runtime
+        .resume(4);
+    assert_ordinary_frames(
+        &mut hub,
+        &mut [&mut a, &mut b, &mut lobby_watcher, &mut replacement],
+        4,
     );
 }
 
@@ -436,20 +581,35 @@ fn intent_net46_spectator_army_commands_are_silent_and_never_queued() {
     let state = hub.rooms["ABC"].native.as_ref().unwrap().runtime.state();
     let before = format!("{:?}", state.commands.units);
     assert_eq!(state.commands.pending_tick(1).count(), 0);
-    let actor = *state.world.game.units.keys().next().unwrap();
-    for t in [
-        "move", "amove", "stop", "stance", "attack", "recruit", "dig", "build", "support", "pause",
-        "resume", "restart",
-    ] {
-        watcher.send(
-            &mut hub,
-            json!({"t":t,"ids":[actor],"x":12,"z":12,"kind":"rifle","v":1}),
-            0,
-        );
-        assert!(
-            watcher.rx.try_recv().is_err(),
-            "spectator got a reply to {t}"
-        );
+    let actor = state
+        .world
+        .game
+        .units
+        .values()
+        .find(|unit| unit.owner == 0 && !state.rules.kinds[unit.kind].structure)
+        .unwrap()
+        .id;
+    for message in [
+        json!({"t":"move","orders":[[actor,12,12]]}),
+        json!({"t":"amove","orders":[[actor,12,12]]}),
+        json!({"t":"stop","ids":[actor]}),
+        json!({"t":"stance","ids":[actor],"key":"holdFire","on":true}),
+    ]
+    .into_iter()
+    .chain(
+        UNAVAILABLE
+            .iter()
+            .map(|t| json!({"t":t,"ids":[actor],"x":12,"z":12,"kind":"rifle","v":1})),
+    ) {
+        let t = message["t"].as_str().unwrap().to_owned();
+        watcher.send(&mut hub, message, 0);
+        for peer in [&mut a, &mut b, &mut watcher] {
+            assert!(
+                peer.rx.try_recv().is_err(),
+                "connection {} got a reply to spectator {t}",
+                peer.c.id
+            );
+        }
     }
     assert_eq!(
         before,
@@ -484,6 +644,21 @@ fn intent_net46_spectator_army_commands_are_silent_and_never_queued() {
     );
     assert!(a.drain(&mut hub, 0).is_empty());
     assert!(b.drain(&mut hub, 0).is_empty());
+    // The same valid order enters the queue from the owning seated connection.
+    a.send(&mut hub, json!({"t":"move","orders":[[actor,12,12]]}), 0);
+    assert_eq!(
+        hub.rooms["ABC"]
+            .native
+            .as_ref()
+            .unwrap()
+            .runtime
+            .state()
+            .commands
+            .pending_tick(1)
+            .count(),
+        1
+    );
+    assert_ordinary_frames(&mut hub, &mut [&mut a, &mut b, &mut watcher], 0);
 }
 
 #[test]

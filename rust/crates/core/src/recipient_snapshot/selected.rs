@@ -26,8 +26,8 @@ impl DeliveryState {
         if selected.is_empty() {
             return Ok(None);
         }
-        self.preflight_selected(state, selected)?;
-        Ok(Some(self.capture_admitted(state, selected)?))
+        let rows = self.preflight_selected(state, selected)?;
+        Ok(Some(self.capture_admitted(state, selected, rows)?))
     }
     /// Prepare only selected ordinary recipients. Every selected terrain and
     /// list producer admits before the sole remembered-list publication.
@@ -41,7 +41,16 @@ impl DeliveryState {
         if selected.is_empty() {
             return Ok(None);
         }
-        self.preflight_selected(state, selected)?;
+        let rows = self.preflight_selected(state, selected)?;
+        self.capture_selected_with_lists_admitted(state, selected, outside_events, rows)
+    }
+    pub(super) fn capture_selected_with_lists_admitted<'a>(
+        &mut self,
+        state: &'a mut Match,
+        selected: &[SelectedSeat],
+        outside_events: &'a [Effect],
+        rows: SnapshotRows,
+    ) -> Result<Option<SelectedGroundListFrame<'a>>, SnapshotError> {
         composition::admit_actors(state, outside_events)?;
         let owners = selected.iter().map(|seat| seat.slot).collect::<Vec<_>>();
         let prepared = state
@@ -68,7 +77,7 @@ impl DeliveryState {
             .map_err(|_| SnapshotError::Rules)?;
         commit.commit();
         Ok(Some(SelectedGroundListFrame {
-            frame: self.capture_admitted(state, selected)?,
+            frame: self.capture_admitted(state, selected, rows)?,
             lists,
             _outside_events: outside_events,
         }))
