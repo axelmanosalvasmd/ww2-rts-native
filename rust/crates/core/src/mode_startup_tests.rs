@@ -327,7 +327,7 @@ fn mode01_non_world_mode_rows_match_the_prototype_public_fields() {
     use crate::recipient_snapshot::{SnapshotCache, SnapshotError, mode_row};
 
     // Prototype sim.js:5895-5898; Tutorial's initial goal is tutorial.js:11.
-    // The component row does not admit the other modes to whole-frame delivery.
+    // Check each public row independently of that mode's complete snapshot admission.
     for mode in MODES {
         let m = create(mode, ArmySize::Standard).unwrap();
         let expected = match mode {
@@ -355,8 +355,13 @@ fn mode01_non_world_mode_rows_match_the_prototype_public_fields() {
             _ => unreachable!(),
         };
         assert_eq!(mode_row(&m).unwrap(), expected, "{mode:?}");
-        if mode == Mode::Conquest {
-            assert!(SnapshotCache::new(&m).is_ok());
+        if matches!(mode, Mode::Conquest | Mode::Classic) {
+            let cache = SnapshotCache::new(&m).unwrap();
+            for slot in 0..m.start.players.len() {
+                let snapshot = cache.recipient(slot).unwrap();
+                assert_eq!(snapshot.fields["mode"], expected);
+                assert!(snapshot.fields["units"].is_array());
+            }
         } else {
             assert!(matches!(
                 SnapshotCache::new(&m),
