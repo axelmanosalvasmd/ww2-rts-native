@@ -4,7 +4,9 @@ use crate::{
     game::PlaneState,
     match_commands::{Command, MoveOutcome, UnitControl},
     misc_retreat_support_tests::{delivered_tick, publish_rifle, scene, seats},
-    recipient_snapshot::{DeliveryState, SnapshotCache, SnapshotError},
+    recipient_snapshot::{
+        DeliveryState, SnapshotCache, SnapshotCapability, SnapshotError, mode_row,
+    },
     supply_convoys::{ConvoyState, Store, StoreId, Truck, TruckState},
 };
 
@@ -348,6 +350,36 @@ fn mov48_manual_retreat_exits_house_moves_home_and_delivers_every_seat() {
     assert!(m.tick_state.fault().is_none());
 }
 
+fn assert_classic_retreat_projection(m: &Match, id: u32) {
+    let projection = SnapshotCache::new(m).unwrap().recipient(0).unwrap();
+    assert_eq!(projection.fields["mode"], mode_row(m).unwrap());
+    assert!(
+        projection
+            .missing
+            .contains(&SnapshotCapability::ShotsAndFlights)
+    );
+    let row = projection.fields["units"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|row| row[0] == serde_json::json!(id))
+        .unwrap()
+        .as_array()
+        .unwrap();
+    assert_eq!(
+        &row[..3],
+        &[
+            serde_json::json!(id),
+            serde_json::json!("rifle"),
+            serde_json::json!(0),
+        ]
+    );
+    assert_eq!(
+        row[12].as_u64().unwrap() & 1,
+        u64::from(m.world.game.units[&id].retreating)
+    );
+}
+
 fn retreat_through_legs(mode: Mode) {
     let mut m = long_route_scene(mode);
     let at = Point { x: 281., z: 41. };
@@ -382,11 +414,7 @@ fn retreat_through_legs(mode: Mode) {
             delivered_tick(&mut m, delivery, &selected);
         } else {
             m.advance_tick().unwrap();
-            // Classic core ticks are supported; complete recipient delivery remains guarded.
-            assert!(matches!(
-                SnapshotCache::new(&m),
-                Err(SnapshotError::UnsupportedMode)
-            ));
+            assert_classic_retreat_projection(&m, id);
         }
         let u = &m.world.game.units[&id];
         if let Some(end) = u.path.last() {
@@ -413,10 +441,7 @@ fn retreat_through_legs(mode: Mode) {
             delivered_tick(&mut m, delivery, &selected);
         } else {
             m.advance_tick().unwrap();
-            assert!(matches!(
-                SnapshotCache::new(&m),
-                Err(SnapshotError::UnsupportedMode)
-            ));
+            assert_classic_retreat_projection(&m, id);
         }
     }
     assert!(m.tick_state.fault().is_none());
@@ -430,7 +455,7 @@ fn mov48_ordinary_retreat_traverses_multiple_legs_and_delivers_every_seat() {
 }
 
 #[test]
-fn mov48_classic_retreat_traverses_multiple_legs_with_delivery_guard_retained() {
+fn mov48_classic_retreat_traverses_multiple_legs_with_recipient_projections() {
     retreat_through_legs(Mode::Classic);
 }
 
