@@ -90,6 +90,10 @@ impl HumanObservationMemory {
         }
         Ok(())
     }
+    /// Delivered stationary history, with no canonical enemy timer exposed.
+    pub(crate) fn stationary_times(&self) -> BTreeMap<u32, f64> {
+        self.still.iter().map(|row| (row.id, row.since)).collect()
+    }
 }
 
 /// A borrowed event projection from the caller's complete, ordered shot frame.

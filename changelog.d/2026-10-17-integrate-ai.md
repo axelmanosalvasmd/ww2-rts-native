@@ -1,1 +1,2 @@
 - Integrate the AI chain while preserving the frozen baseline's Classic partial-delivery checks. For #342, retain both conflicting Classic retreat test hunks and the mode-startup checks from the baseline, including exact missing-capability lists; keep the matching retreat evidence note. No test assertions are weakened.
+- Resolve #318 in `match_human_observation.rs` by retaining save-binding validation and adding the delivered stationary-history accessor. Both behaviors remain available.
