@@ -46,7 +46,7 @@ pub struct EndingAction {
     pub complete: bool,
 }
 
-/// Host control over an existing Horde clock. This does not admit Horde rooms.
+/// Host control over an existing Horde break clock.
 pub(crate) fn end_horde_break(state: &mut Match, host: bool, paused: bool) -> Result<bool, String> {
     if !host || paused {
         return Ok(false);
@@ -56,11 +56,11 @@ pub(crate) fn end_horde_break(state: &mut Match, host: bool, paused: bool) -> Re
 
 /// A caller-owned output batch retains real tick effects until a scheduled send.
 /// It is not another simulation state or producer event authority.
-#[path = "room_ai.rs"]
+#[path = "room_delivered_ai.rs"]
 mod ai;
 
 pub struct RoomRuntime {
-    ai: ai::RoomAi,
+    delivered_ai: ai::RoomAi,
     state: Match,
     delivery: DeliveryState,
     watchers: ww2_core::recipient_snapshot::SpectatorDelivery,
@@ -69,12 +69,14 @@ pub struct RoomRuntime {
     batch: u64,
     last_versions: Option<(u64, ListVersions)>,
     pending_events: Vec<TickEvent>,
+    event_generation: u64,
     tick_failure: Option<TickFailure>,
     fault: Option<String>,
     pause: Option<Pause>,
     pause_sent_at: u64,
     auto_paused: BTreeSet<usize>,
     held: u16,
+    pub(crate) ai: Option<crate::room_ai::RoomAi>,
     #[cfg(test)]
     snapshot_production_calls: u64,
 }
@@ -108,7 +110,7 @@ impl RoomRuntime {
                 .recipient(slot)
                 .map_err(|e| format!("AI start recipient: {e:?}"))?
                 .into_json();
-            self.ai.observe(slot, &snapshot)?;
+            self.delivered_ai.observe(slot, &snapshot)?;
             messages.push((slot, envelope.message(slot, snapshot)));
         }
         Ok(messages)
@@ -147,7 +149,7 @@ impl RoomRuntime {
         let meter = TickMeter::new(now_ms).map_err(|e| e.to_string())?;
         Ok(Self {
             state,
-            ai: ai::RoomAi::default(),
+            delivered_ai: ai::RoomAi::default(),
             delivery,
             watchers: Default::default(),
             lists: RoomListCache::default(),
@@ -155,12 +157,14 @@ impl RoomRuntime {
             batch: 0,
             last_versions: None,
             pending_events: Vec::new(),
+            event_generation: 0,
             tick_failure: None,
             fault: None,
             pause: None,
             pause_sent_at: now_ms,
             auto_paused: BTreeSet::new(),
             held: 0,
+            ai: None,
             #[cfg(test)]
             snapshot_production_calls: 0,
         })
@@ -170,7 +174,7 @@ impl RoomRuntime {
         &self,
         slot: usize,
     ) -> Option<&ww2_core::human_commander::HumanView<ww2_core::commander_ai::Observation>> {
-        self.ai.delivered_view(slot)
+        self.delivered_ai.delivered_view(slot)
     }
     pub(crate) fn activate_ai(
         &mut self,
@@ -178,7 +182,10 @@ impl RoomRuntime {
         slot: usize,
         level: &str,
     ) -> Result<(), String> {
-        self.ai.activate(
+        if self.ai.is_some() {
+            return Err("hosted AI owner is already configured".into());
+        }
+        self.delivered_ai.activate(
             &self.state,
             map,
             slot,
@@ -186,36 +193,72 @@ impl RoomRuntime {
         )
     }
     pub(crate) fn reset_ai(&mut self, slot: usize) {
-        self.ai.reset(slot);
+        self.delivered_ai.reset(slot);
+        if let Some(ai) = &mut self.ai {
+            ai.reset(slot);
+        }
     }
     pub(crate) fn ai_selected(&self) -> Vec<SelectedSeat> {
         if self.state.finish.is_some() {
             Vec::new()
         } else {
-            self.ai.selected(self.state.world.game.tick)
+            self.delivered_ai.selected(self.state.world.game.tick)
         }
     }
     pub(crate) fn tick_ai(&mut self, sent: bool) -> Result<(), String> {
         self.running()?;
-        self.ai.tick(&mut self.state, sent)
+        self.delivered_ai.tick(&mut self.state, sent)
     }
     #[cfg(test)]
     pub(crate) fn ai_commander(
         &self,
         slot: usize,
     ) -> Option<&ww2_core::seat_commander::SeatCommander> {
-        self.ai.commander(slot)
+        self.delivered_ai.commander(slot)
     }
     #[cfg(test)]
     pub(crate) fn ai_clone_failure(&self) -> Value {
-        self.ai.clone_failure(self.state.start.players.len())
+        self.delivered_ai
+            .clone_failure(self.state.start.players.len())
     }
     pub(crate) fn save_ai_memories(&self) -> Value {
-        self.ai.save_memories(self.state.start.players.len())
+        self.delivered_ai
+            .save_memories(self.state.start.players.len())
     }
     pub(crate) fn restore_ai_memories(&mut self, saved: &Value) -> Result<(), String> {
-        self.ai
+        self.delivered_ai
             .restore_memories(saved, self.state.start.players.len())
+    }
+    pub(crate) fn configure_ai(
+        &mut self,
+        seats: &[(usize, ww2_core::commander_ai::Level)],
+    ) -> Result<(), String> {
+        if !self
+            .delivered_ai
+            .selected(self.state.world.game.tick)
+            .is_empty()
+        {
+            return Err("delivered AI owner is already configured".into());
+        }
+        self.ai = Some(crate::room_ai::RoomAi::new(
+            &mut self.state,
+            &mut self.delivery,
+            seats,
+        )?);
+        Ok(())
+    }
+    pub(crate) fn think(&mut self, sent: bool) -> Result<(), String> {
+        self.running()?;
+        if let Some(ai) = &mut self.ai {
+            ai.tick(
+                &mut self.state,
+                &mut self.delivery,
+                sent,
+                self.event_generation,
+                &self.pending_events,
+            )?;
+        }
+        Ok(())
     }
     pub(crate) fn save_json(&self) -> Result<Value, String> {
         self.running()?;
@@ -337,9 +380,14 @@ impl RoomRuntime {
         kind: FrameKind,
     ) -> Result<Vec<CapturedSeat>, String> {
         self.running()?;
+        let next_event_generation = self
+            .event_generation
+            .checked_add(u64::from(kind == FrameKind::Scheduled))
+            .ok_or("AI frame generation exhausted")?;
         if selected.is_empty() {
             if kind == FrameKind::Scheduled {
                 self.pending_events.clear();
+                self.event_generation = next_event_generation;
             }
             return Ok(Vec::new());
         }
@@ -372,7 +420,7 @@ impl RoomRuntime {
                 .recipient(seat.slot)
                 .map_err(|e| format!("native recipient: {e:?}"))?
                 .into_json();
-            self.ai.observe(seat.slot, &message)?;
+            self.delivered_ai.observe(seat.slot, &message)?;
             captured.push(CapturedSeat {
                 slot: seat.slot,
                 batch,
@@ -386,6 +434,7 @@ impl RoomRuntime {
         self.last_versions = Some((batch, versions));
         if kind == FrameKind::Scheduled {
             self.pending_events.clear();
+            self.event_generation = next_event_generation;
         }
         Ok(captured)
     }
@@ -584,6 +633,10 @@ impl RoomRuntime {
 #[cfg(test)]
 #[path = "room_runtime_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "construction_production_tests.rs"]
+mod construction_production_tests;
 
 #[cfg(test)]
 #[path = "spectator_mission_tests.rs"]

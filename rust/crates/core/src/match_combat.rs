@@ -1606,6 +1606,7 @@ impl crate::match_runtime::Match {
             self.aviation.remove(u.id);
             self.logistics.remove(u.id);
             self.production.remove_building(u.id);
+            self.release_depot_claim(u.id);
             self.building_rallies.remove(&u.id);
             // Source buildingCells retains historical ruin ownership/position after retirement.
 

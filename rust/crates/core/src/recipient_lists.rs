@@ -159,7 +159,7 @@ impl WreckSourceFrame {
 pub struct RecipientLists {
     pub wrecks: Vec<WreckRow>,
     pub found_mines: Vec<usize>,
-    /// Absent in ordinary Conquest. World rows use the canonical ResourceNode owner.
+    /// Absent in Conquest and Annihilation. Classic nodes are public; World nodes are remembered.
     pub nodes: Option<Vec<[f64; 4]>>,
 }
 
@@ -300,9 +300,43 @@ pub struct OrdinaryRawLists {
     pub nodes: Option<Value>,
 }
 impl crate::match_runtime::Match {
+    /// Prototype sim.js:5932,6019: Classic's canonical nodes are public in every seat frame.
+    pub(crate) fn ordinary_snapshot_nodes(&self) -> Result<Option<Vec<[f64; 4]>>, String> {
+        if self.options.mode != crate::economy::Mode::Classic {
+            return Ok(None);
+        }
+        if self.world.game.mode != Some(ModeKind::Classic) {
+            return Err("Classic nodes require Classic Game mode".into());
+        }
+        let state = self
+            .elimination
+            .as_ref()
+            .ok_or("missing Classic node owner")?;
+        let mut rows = Vec::with_capacity(state.nodes.len());
+        for node in &state.nodes {
+            let row = [
+                rounded(node.at.x),
+                rounded(node.at.z),
+                node.rate,
+                f64::from(u8::from(node.fuel)),
+            ];
+            if node.cell >= self.world.game.chars.len()
+                || ![node.at.x, node.at.z].iter().all(|n| n.is_finite())
+                || !row.iter().all(|n| n.is_finite())
+            {
+                return Err("invalid Classic node display facts".into());
+            }
+            rows.push(row);
+        }
+        Ok(Some(rows))
+    }
+
     pub fn ordinary_snapshot_raw_lists(&self) -> Result<OrdinaryRawLists, String> {
         let game = &self.world.game;
-        if !crate::match_actor::ordinary_ground_mode(game, self.options.mode) {
+        if self.options.mode == crate::economy::Mode::Horde {
+            self.validate_actor_mode()?;
+            self.validate_horde_economy()?;
+        } else if !crate::match_actor::ordinary_ground_mode(game, self.options.mode) {
             return Err("global ordinary lists require represented ordinary mode".into());
         }
         let mut ids = std::collections::BTreeSet::new();

@@ -5,6 +5,7 @@ mod diagnostics;
 mod lobby;
 mod maps;
 mod native_startup;
+mod room_ai;
 mod saves;
 mod static_files;
 mod trusted_room;
@@ -57,6 +58,8 @@ pub struct Config {
     pub tick_log: bool,
     /// Private match files, shared by game workers.
     pub saves_dir: std::path::PathBuf,
+    /// Optional private authoring source, reread for each hosted Horde start/restart.
+    pub authored_maps_dir: Option<std::path::PathBuf>,
 }
 impl Default for Config {
     fn default() -> Self {
@@ -67,6 +70,7 @@ impl Default for Config {
             diagnostic_dir: None,
             tick_log: false,
             saves_dir: "saves".into(),
+            authored_maps_dir: None,
         }
     }
 }
@@ -210,6 +214,7 @@ async fn serve_inner(
     let mut hub = Hub::new(config.max_rooms.clamp(1, 256), config.public_url);
     hub.configure_trusted_room(trusted);
     hub.configure_saves(config.saves_dir);
+    hub.configure_authored_maps(config.authored_maps_dir);
     hub.configure_diagnostics(config.diagnostic_dir, config.tick_log)?;
     // Dropping or aborting this future invalidates the same stopped authority
     // used under the Hub lock, even when graceful shutdown never runs.

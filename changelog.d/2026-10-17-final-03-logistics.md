@@ -1,0 +1,3 @@
+- Combine the qualified logistics chain with AI and rooms, preserving both delivered-commander implementations and all tests under distinct module paths, with exclusive runtime ownership and handover cleanup.
+- Compose ordinary asynchronous startup, Horde startup, Tutorial internal slots, recipient guards and canonical production publication without reopening World admission.
+- Retain the malformed-Horde supply test's common UnsupportedMode refusal and all atomicity assertions after composing actor and finish guards; no test is removed.

@@ -1,0 +1,1 @@
+- Carry Classic and Annihilation through complete ordinary recipient snapshots. Classic sends private currencies, public resource nodes and remembered buildings; Annihilation sends its public bunker counts. Preserve the prototype's omissions and logistics privacy. World, Assault, Horde and Tutorial snapshot admission remains closed.

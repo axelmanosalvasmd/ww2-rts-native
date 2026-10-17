@@ -8,7 +8,7 @@ use crate::{
     match_human_observation::{HumanObservationMemory, HumanShot},
     match_runtime::{MatchOptions, PlayerConfig},
     orders::OrderKey,
-    recipient_snapshot::{DeliveryState, SelectedSeat, SnapshotCache, SnapshotError},
+    recipient_snapshot::{DeliveryState, SelectedSeat, SnapshotCache},
     seat_commander::{Advance, Brain, Delivered},
     unit_publication::StagedUnit,
     weather::WeatherChoice,
@@ -351,11 +351,18 @@ fn intent_ai16_real_dispatch_uses_human_seats_and_scripted_horde() {
     };
     assert!(state.pending() > 0);
     assert_eq!(state.policy_facts.as_ref().unwrap().tick, 26);
-    assert!(m.validate_tick_state().is_err());
-    assert!(matches!(
-        SnapshotCache::new(&m),
-        Err(SnapshotError::UnsupportedMode)
-    ));
+    assert_eq!(
+        m.validate_tick_state(),
+        Err("command tick is not the next queued tick".into())
+    );
+    let expected_mode = crate::recipient_snapshot::mode_row(&m).unwrap();
+    let cache = SnapshotCache::new(&m).unwrap();
+    for recipient in 0..m.world.game.players.len() {
+        let projection = cache.recipient(recipient).unwrap();
+        assert_eq!(projection.fields["mode"], expected_mode);
+    }
+    drop(cache);
+    m.restrict_to_ordinary_snapshots().unwrap();
     assert!(m.opening_commander_observation(slot).is_err());
     for mutation in 0..3 {
         let mut stale = director.clone();

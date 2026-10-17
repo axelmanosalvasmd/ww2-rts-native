@@ -36,6 +36,7 @@ fn fixture(rows: Vec<Unit>) -> (View, Facts) {
                         "structure",
                     ),
                     plan: OwnPlan {
+                        delivered: None,
                         path_generation: 0,
                         goal: None,
                         route_end: None,

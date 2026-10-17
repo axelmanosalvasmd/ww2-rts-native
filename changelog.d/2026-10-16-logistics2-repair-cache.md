@@ -1,0 +1,2 @@
+- Enable requested physical logistics in Classic and Annihilation startup. Replace the test that required those modes to refuse logistics with initialization coverage.
+- Cover allied building repair, ordered provisions payment, supported section restoration and the Classic Sudden Death repair cap through normal match ticks and snapshots for every seat. Cover Classic cache placement, completion and delivery as a supply store.

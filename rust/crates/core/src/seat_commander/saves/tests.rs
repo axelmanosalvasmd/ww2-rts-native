@@ -222,6 +222,7 @@ fn if27_horde_pending_memory_round_trips_order_budget_and_supersession() {
     use crate::game::Point;
     use crate::horde_commander::{HordeCommander, Live, OwnPlan, OwnUnit, View, Wave};
     let plan = OwnPlan {
+        delivered: None,
         path_generation: 2,
         goal: None,
         route_end: None,

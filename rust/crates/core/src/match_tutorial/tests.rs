@@ -442,6 +442,7 @@ fn mode68_tutorial_house_garrisons_and_artillery_cooldown_advances() {
         m.world.game.units[&ids[1]].garrison
     );
     assert_eq!(m.tutorial_state().unwrap().step(), TutorialStep::Artillery);
+    crate::unit_placement::tests::assert_current(&m.world.game, &m.grid);
     m.world.game.reveal = true;
     command(
         &mut m,

@@ -1,0 +1,5 @@
+- Connect Horde ground recruitment, recipient routing, shared defender producer queues and ordinary wave/terminal ticks. Keep paid identities and wallets private to their owner; keep hosted Horde and aircraft training held on #369's aviation event delivery.
+- Enable Classic logistics initialization and training with ammunition, provisions and vehicle fuel published atomically with completed units. Exercise FIFO jobs, exact recipient fields and every-seat room delivery through training and terminal ticks. Replace the old Classic logistics refusal test; retain Annihilation's separate startup refusal.
+- Found and left for the recovery stream: Horde reinforcement still selects an owned HQ instead of accepting an allied HQ.
+- Deliver Kaiju ground breath and boss announcements in the prototype shapes through the ordinary recipient filter. Replace obsolete Horde and Classic snapshot-mode refusal assertions with the remaining hosted aviation guard.
+- Keep simtest event consumers exhaustive for the new Horde event family while retaining the original fixture family refusals.

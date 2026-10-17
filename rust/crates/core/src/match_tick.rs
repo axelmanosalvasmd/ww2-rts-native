@@ -54,6 +54,7 @@ pub enum TickPhase {
     Convoys,
     Victory,
     Tutorial,
+    Horde,
 }
 
 /// Persistent simulation state, never wall-clock state. A phase failure poisons
@@ -104,6 +105,7 @@ pub enum TickEvent {
     Scenario(crate::legacy_scenario::SayAction),
     Tutorial(crate::match_tutorial::TutorialLine),
     AuthoredMission(serde_json::Value),
+    Horde(crate::match_horde::HordeEvent),
 }
 
 /// A failed phase keeps the effects already emitted at their original boundaries.
@@ -303,6 +305,9 @@ impl crate::match_runtime::Match {
         if self.options.mode == crate::economy::Mode::Tutorial {
             self.validate_tutorial_state()?;
         }
+        if self.options.mode == crate::economy::Mode::Horde {
+            self.validate_horde_economy()?;
+        }
         if world && (self.options.logistics || self.convoys.is_some()) {
             return Err("World logistics tick phases are not connected".into());
         }
@@ -357,9 +362,12 @@ impl crate::match_runtime::Match {
             self.validate_production_phases(self.rules.movement.tick)
                 .map_err(|error| format!("production admission: {error:?}"))?;
             self.validate_carrier_tick()?;
-            self.validate_construction_tick()?;
+            if self.construction_tick_needed() {
+                self.validate_construction_tick()?;
+            }
             self.validate_gate_tick()?;
             self.validate_ground_attacks()?;
+            self.validate_terrain_fire_orders()?;
             self.validate_reaction_tick_actors()?;
             self.validate_field_project_tick(&current_order)?;
         }
@@ -448,6 +456,7 @@ impl crate::match_runtime::Match {
                 .map_err(|error| format!("aircraft published state: {error}"))?;
             self.validate_carrier_tick()?;
             self.validate_ground_attacks()?;
+            self.validate_terrain_fire_orders()?;
             self.validate_reaction_tick_actors()?;
             let current_order = self.world.game.units.keys().copied().collect::<Vec<_>>();
             self.validate_support_metadata()
@@ -455,7 +464,9 @@ impl crate::match_runtime::Match {
             self.validate_support_tick_phases(&current_order, dt, boundary)
                 .map_err(|error| format!("support published state: {error}"))?;
             self.validate_field_project_tick(&current_order)?;
-            self.validate_construction_tick()?;
+            if self.construction_tick_needed() {
+                self.validate_construction_tick()?;
+            }
             self.validate_production_phases(dt)
                 .map_err(|error| format!("production published state: {error:?}"))?;
         }
@@ -491,6 +502,8 @@ impl crate::match_runtime::Match {
         if tick % 4 == 1 {
             if self.options.mode == crate::economy::Mode::World {
                 self.refresh_world_visibility()?;
+            } else if self.options.mode == crate::economy::Mode::Horde {
+                self.refresh_horde_visibility()?;
             } else {
                 vision::update_vision(&mut self.world.game, &self.rules, &self.grid);
                 if self.options.mode == crate::economy::Mode::Classic {
@@ -516,10 +529,10 @@ impl crate::match_runtime::Match {
         phases.push(TickPhase::Paths);
         let claim_order = self.world.game.units.keys().copied().collect::<Vec<_>>();
         self.begin_firing_tick(&claim_order)?;
-        let mut construction = if self.options.mode == crate::economy::Mode::World {
-            None
-        } else {
+        let mut construction = if self.construction_tick_needed() {
             Some(self.begin_construction_tick()?)
+        } else {
+            None
         };
         let mut moved = Vec::new();
         let mut last_id = None;
@@ -581,6 +594,7 @@ impl crate::match_runtime::Match {
                 }
             }
             let unit = &self.world.game.units[&id];
+            let terrain_suppression = unit.supp;
             let factor = movement::supp_speed(unit.supp);
             if self.options.logistics {
                 self.advance_unit_reserves(id)?;
@@ -711,7 +725,8 @@ impl crate::match_runtime::Match {
             let moving = !unit.path.is_empty()
                 || crate::math::hypot(unit.x - before.x, unit.z - before.z) > 0.001;
             self.sync_supply_withdrawal_progress(id);
-            let result = self.apply_unit_firing(id, moving, dt);
+            let result =
+                self.apply_unit_firing_with_suppression(id, moving, dt, terrain_suppression);
             self.take_firing_tick_events(events);
             result?;
         }
@@ -903,6 +918,10 @@ impl crate::match_runtime::Match {
                 phases.push(TickPhase::Convoys);
             }
             match self.options.mode {
+                crate::economy::Mode::Horde => {
+                    events.extend(self.step_horde(dt)?.into_iter().map(TickEvent::Horde));
+                    phases.push(TickPhase::Horde);
+                }
                 crate::economy::Mode::Assault => {
                     self.apply_assault_victory(dt)?;
                 }

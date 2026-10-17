@@ -91,8 +91,10 @@ impl Hub {
             return Err("faulted match".into());
         }
         let state = native.runtime.state();
-        if !matches!(state.options.mode, Mode::Default | Mode::Conquest)
-            || state.options.sandbox
+        if !matches!(
+            state.options.mode,
+            Mode::Default | Mode::Conquest | Mode::Assault | Mode::Annihilation | Mode::Classic
+        ) || state.options.sandbox
             || state.world_runtime.is_some()
             || !room.spectators.is_empty()
         {
@@ -135,12 +137,19 @@ impl Hub {
         }
         let saved = room.saves.read(code, id)?;
         // Closed room capabilities remain closed even when a file is valid JSON.
-        if saved["settings"]["mode"] != "conquest" || !saved["guard"].is_null() {
+        if saved["settings"]["mode"]
+            .as_str()
+            .and_then(crate::native_startup::ordinary_mode)
+            .is_none()
+            || !saved["guard"].is_null()
+        {
             return Err("save needs an unavailable room capability".into());
         }
         let state = Match::from_save_json(saved["g"]["state"].clone())?;
-        if !matches!(state.options.mode, Mode::Default | Mode::Conquest)
-            || state.options.sandbox
+        if !matches!(
+            state.options.mode,
+            Mode::Default | Mode::Conquest | Mode::Assault | Mode::Annihilation | Mode::Classic
+        ) || state.options.sandbox
             || state.world_runtime.is_some()
         {
             return Err("save needs an unavailable room capability".into());
@@ -300,6 +309,8 @@ impl Hub {
             mode: text("mode")?,
             map: text("mapName")?,
             loaded_spawns: Some(settings["mapSpawns"].clone()),
+            loaded_logistics: settings["logistics"].as_bool(),
+            loaded_tech: settings["tech"].as_bool(),
             world_size: text("worldSize")?,
             army: text("army")?,
             weather: text("weather")?,

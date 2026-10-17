@@ -8,6 +8,19 @@ use ww2_core::{
     world::World,
 };
 
+/// Public lobby names remain the prototype whitelist; Default is an internal Conquest alias.
+pub(crate) fn ordinary_mode(name: &str) -> Option<Mode> {
+    match name {
+        "conquest" => Some(Mode::Conquest),
+        "assault" => Some(Mode::Assault),
+        "annihilation" => Some(Mode::Annihilation),
+        "classic" => Some(Mode::Classic),
+        "horde" => Some(Mode::Horde),
+        "tutorial" => Some(Mode::Tutorial),
+        _ => None,
+    }
+}
+
 pub(crate) const MAX_MATCH_ID: u64 = 9_007_199_254_740_991;
 #[cfg(test)]
 #[path = "native_map_batch3_tests.rs"]
@@ -62,31 +75,10 @@ impl NativeStartup {
         settings: StartupSettings<'_>,
         authored: &ww2_core::map::AuthoritativeMap,
     ) -> Result<Self, String> {
-        let mode_matches = matches!(
-            (settings.mode, state.options.mode, state.world.game.mode),
-            ("conquest", Mode::Default | Mode::Conquest, None)
-                | (
-                    "tutorial",
-                    Mode::Tutorial,
-                    Some(ww2_core::game::ModeKind::Tutorial)
-                )
-                | (
-                    "assault",
-                    Mode::Assault,
-                    Some(ww2_core::game::ModeKind::Assault)
-                )
-                | (
-                    "annihilation",
-                    Mode::Annihilation,
-                    Some(ww2_core::game::ModeKind::Annihilation)
-                )
-                | (
-                    "classic",
-                    Mode::Classic,
-                    Some(ww2_core::game::ModeKind::Classic)
-                )
-        );
-        if !mode_matches
+        let expected = ordinary_mode(settings.mode);
+        if expected.is_none()
+            || !(expected == Some(state.options.mode)
+                || expected == Some(Mode::Conquest) && state.options.mode == Mode::Default)
             || state.options.map_key.as_deref() != Some(settings.map)
             || state.options.weather != WeatherChoice::from_reference(Some(settings.weather))
             || state.options.sandbox != settings.sandbox
@@ -136,6 +128,13 @@ impl NativeStartup {
         }
         let plan = match state.options.mode {
             Mode::Tutorial => StartPlan::prepare_tutorial(authored, &state.options, &state.rules)?,
+            Mode::Default | Mode::Conquest => {
+                StartPlan::prepare(authored, &state.options, &state.rules)?
+            }
+            Mode::Horde => StartPlan::prepare_horde(authored, &state.options, &state.rules)?,
+            Mode::Classic | Mode::Annihilation => {
+                StartPlan::prepare_elimination(authored, &state.options, &state.rules)?
+            }
             Mode::Assault => StartPlan::prepare_assault(
                 authored,
                 &state.options,
@@ -145,11 +144,11 @@ impl NativeStartup {
                     .ok_or("missing Assault startup state")?
                     .defender_team,
             )?,
-            Mode::Classic | Mode::Annihilation => {
-                StartPlan::prepare_elimination(authored, &state.options, &state.rules)?
-            }
-            _ => StartPlan::prepare(authored, &state.options, &state.rules)?,
+            _ => return Err("native startup requires a represented ordinary mode".into()),
         };
+        // Validate the canonical mode pair even when this API is used before RoomRuntime.
+        ww2_core::recipient_snapshot::mode_row(state)
+            .map_err(|e| format!("native startup mode: {e:?}"))?;
         if plan.players.len() != state.start.players.len()
             || plan
                 .players

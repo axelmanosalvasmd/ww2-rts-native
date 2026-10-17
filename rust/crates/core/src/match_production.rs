@@ -78,8 +78,8 @@ fn context<'a>(
     Context {
         mode: ModeContext {
             kind: options.mode,
+            defender_team: (options.mode == Mode::Horde).then_some(0),
             income_excluded_slot,
-            ..Default::default()
         },
         army: options.army,
         tech_enabled: options.tech,
@@ -102,14 +102,6 @@ fn validate_training_birth(
     let kind = rules.kind(name).ok_or(ProductionStepError::InvalidState(
         "unknown queued birth kind",
     ))?;
-    if rules.kinds[kind].air {
-        if mode == Mode::Classic {
-            return Ok(());
-        }
-        return Err(ProductionStepError::Placement(
-            crate::produced_units::Error::UnsupportedAir,
-        ));
-    }
     if rules.kinds[kind].rail {
         return Err(ProductionStepError::InvalidState(
             "queued railway birth is unsupported",
@@ -204,10 +196,7 @@ impl Match {
                         "nonempty skirmish training queue",
                     ));
                 }
-                if self.options.logistics
-                    || unit.owner >= count
-                    || !self.building_rallies.contains_key(&id)
-                {
+                if unit.owner >= count || !self.building_rallies.contains_key(&id) {
                     return Err(ProductionStepError::InvalidState(
                         "training publication context",
                     ));
@@ -220,6 +209,16 @@ impl Match {
                     return Err(ProductionStepError::InvalidState("training rally position"));
                 }
                 for job in row.jobs() {
+                    if self.ordinary_snapshot_only
+                        && self
+                            .rules
+                            .kind(&job.kind)
+                            .is_some_and(|kind| self.rules.kinds[kind].air)
+                    {
+                        return Err(ProductionStepError::Placement(
+                            crate::produced_units::Error::UnsupportedAir,
+                        ));
+                    }
                     validate_training_birth(self.options.mode, &self.rules, &job.kind)?;
                 }
             }
@@ -283,6 +282,16 @@ impl Match {
             from,
         )?;
         validate_training_birth(self.options.mode, &self.rules, kind)?;
+        if self.ordinary_snapshot_only
+            && self
+                .rules
+                .kind(kind)
+                .is_some_and(|index| self.rules.kinds[index].air)
+        {
+            return Err(ProductionStepError::Placement(
+                crate::produced_units::Error::UnsupportedAir,
+            ));
+        }
         let building = prepared.building();
         if !registered.contains(&building) {
             return Err(ProductionStepError::InvalidState(
@@ -458,17 +467,22 @@ impl Match {
             .building(building)
             .is_some_and(|b| !b.jobs().is_empty())
         {
-            if self.options.logistics {
-                return Err(ProductionStepError::InvalidState(
-                    "training reserves initialization unsupported",
-                ));
-            }
             if !self.building_rallies.contains_key(&building) {
                 return Err(ProductionStepError::InvalidState(
                     "canonical training rally missing",
                 ));
             }
             for job in self.production.building(building).unwrap().jobs() {
+                if self.ordinary_snapshot_only
+                    && self
+                        .rules
+                        .kind(&job.kind)
+                        .is_some_and(|kind| self.rules.kinds[kind].air)
+                {
+                    return Err(ProductionStepError::Placement(
+                        crate::produced_units::Error::UnsupportedAir,
+                    ));
+                }
                 validate_training_birth(self.options.mode, &self.rules, &job.kind)?;
             }
         }
@@ -537,11 +551,12 @@ impl Match {
             obstruction: self.world.versions.obstruction,
             knowledge: 0,
         };
+        let catalog = Catalog::compiled().map_err(|e| ProductionStepError::Production(e.into()))?;
         let mut placed = self
             .produced_placer
             .produce(
                 &self.rules,
-                Catalog::compiled().map_err(|e| ProductionStepError::Production(e.into()))?,
+                catalog,
                 view,
                 &game.units,
                 ProduceInput {
@@ -623,6 +638,12 @@ impl Match {
         control.aim = placed.aim;
         control.rally_drift = placed.rally.is_some();
         control.route_end = route_end;
+        let mut reserves = crate::match_logistics::initial_unit_reserves(
+            self.options.logistics,
+            &placed.unit,
+            &self.rules,
+        )
+        .map_err(ProductionStepError::Control)?;
         let units = units(&self.world.game, &self.rules, count)?;
         let context = context(
             &self.options,
@@ -659,6 +680,9 @@ impl Match {
             self.firing.initialize(unit.id);
             self.abilities.initialize(unit.id);
             self.recovery.initialize(unit.id);
+            if let Some(reserves) = reserves.take() {
+                self.logistics.insert(unit.id, reserves);
+            }
         });
         Ok(Some(CompletedTrainingUnit {
             unit: id,
@@ -705,6 +729,7 @@ impl Match {
             &units,
             None,
             self.elimination_sudden_death(),
+            self.horde.as_ref().map(|state| state.slot),
         );
         let prepared =
             self.production

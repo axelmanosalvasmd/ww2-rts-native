@@ -23,6 +23,7 @@ pub enum ShotRef<'a> {
     Scenario(&'a SayAction),
     Tutorial(&'a crate::match_tutorial::TutorialLine),
     AuthoredMission(&'a Value),
+    Horde(&'a crate::match_horde::HordeEvent),
 }
 
 impl<'a> TryFrom<&'a TickEvent> for ShotRef<'a> {
@@ -36,6 +37,7 @@ impl<'a> TryFrom<&'a TickEvent> for ShotRef<'a> {
             TickEvent::Scenario(value) => Ok(Self::Scenario(value)),
             TickEvent::Tutorial(value) => Ok(Self::Tutorial(value)),
             TickEvent::AuthoredMission(value) => Ok(Self::AuthoredMission(value)),
+            TickEvent::Horde(value) => Ok(Self::Horde(value)),
             TickEvent::Aviation(value) => Ok(Self::Aviation(value)),
         }
     }
@@ -213,6 +215,13 @@ fn raw_event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
                 return Err(SnapshotError::Rules);
             }
             numbers(&[value.at.x, value.at.z])?;
+        }
+        ShotRef::Horde(value) => {
+            state
+                .validate_horde_phase(0.0)
+                .map_err(|_| SnapshotError::Rules)?;
+            let crate::match_horde::HordeEvent::BossSurfaced { at } = value;
+            finite(&[at.x, at.z])?;
             Ok(value.shot_json())
         }
         ShotRef::AuthoredMission(value) => {
@@ -410,6 +419,28 @@ fn raw_event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
                         identity(u64::from(hit.target))?;
                         owner(state, hit.owner)?;
                     }
+                }
+                LaunchEvent::Breath {
+                    shooter,
+                    target,
+                    owner: seat,
+                    target_owner,
+                    at,
+                } => {
+                    if state.options.mode != Mode::Horde {
+                        return Err(refused());
+                    }
+                    identity(u64::from(*shooter))?;
+                    identity(u64::from(*target))?;
+                    owner(state, *seat)?;
+                    owner(state, *target_owner)?;
+                    numbers(&[at.x, at.z])?;
+                }
+                LaunchEvent::BreathShell { at } => {
+                    if state.options.mode != Mode::Horde {
+                        return Err(refused());
+                    }
+                    numbers(&[at.x, at.z])?;
                 }
                 LaunchEvent::Contact(value) => {
                     kind(state, value.kind)?;

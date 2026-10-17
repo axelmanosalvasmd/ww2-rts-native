@@ -103,6 +103,9 @@ pub(super) fn complete(
     lists: Option<&RecipientLists>,
 ) -> SupportedSeatSnapshot {
     projection.fields.insert("t".into(), json!("s"));
+    if let Some(nodes) = lists.and_then(|lists| lists.nodes.as_ref()) {
+        projection.fields.insert("nodes".into(), json!(nodes));
+    }
     // Admission inspected each actual canonical actor/list owner. Their
     // absent output is a represented source result for this bounded frame.
     projection.fields.insert("shots".into(), json!([]));
@@ -182,6 +185,14 @@ pub(super) fn admit_actors(state: &Match, outside_events: &[Effect]) -> Result<(
     {
         return Err(refused(SnapshotCapability::ShotsAndFlights));
     }
+    if state
+        .firing
+        .flights
+        .values()
+        .any(|flight| flight.launched < 0.0)
+    {
+        return Err(refused(SnapshotCapability::ShotsAndFlights));
+    }
     if !state.firing.flights.is_empty() || !state.firing.salvos.is_empty() {
         state
             .validate_firing_tick_state()
@@ -198,6 +209,11 @@ pub(super) fn admit_actors(state: &Match, outside_events: &[Effect]) -> Result<(
         }) {
             return Err(refused(SnapshotCapability::ShotsAndFlights));
         }
+    }
+    if !state.firing.grenades.is_empty() {
+        state
+            .validate_firing_grenade_step(0.0)
+            .map_err(|_| refused(SnapshotCapability::ShotsAndFlights))?;
     }
     // The caller must drain aviation events into the chronological tick batch
     // before delivery, just as it drains firing and support events above.

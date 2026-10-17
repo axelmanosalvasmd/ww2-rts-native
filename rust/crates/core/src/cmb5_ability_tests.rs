@@ -270,6 +270,11 @@ fn cmb112_classic_and_world_charge_on_use_and_aimed_arrival() {
             ));
         }
         if mode == Mode::Classic {
+            let cache = SnapshotCache::new(&m).unwrap();
+            for recipient in 0..m.world.game.players.len() {
+                cache.recipient(recipient).unwrap();
+            }
+            drop(cache);
             m.firing.take_events();
             m.validate_tick_state().unwrap();
             for _ in 0..4 {
@@ -280,6 +285,11 @@ fn cmb112_classic_and_world_charge_on_use_and_aimed_arrival() {
                     cache.recipient(slot).unwrap();
                 }
             }
+        } else {
+            assert!(matches!(
+                SnapshotCache::new(&m),
+                Err(SnapshotError::UnsupportedMode)
+            ));
         }
     }
 }

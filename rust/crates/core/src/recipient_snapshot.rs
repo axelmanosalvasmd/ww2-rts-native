@@ -17,6 +17,9 @@ mod aircraft;
 mod composition;
 #[path = "recipient_snapshot/delivery.rs"]
 mod delivery;
+#[cfg(test)]
+#[path = "recipient_snapshot/elimination_tests.rs"]
+mod elimination_tests;
 #[path = "recipient_snapshot/engineering.rs"]
 mod engineering;
 #[path = "recipient_snapshot/falling.rs"]
@@ -33,6 +36,9 @@ mod operative;
 mod operative_flights;
 #[path = "recipient_snapshot/owners.rs"]
 mod owners;
+#[cfg(test)]
+#[path = "recipient_snapshot/projectiles.rs"]
+mod projectiles;
 #[path = "recipient_snapshot/public_state.rs"]
 mod public_state;
 #[path = "recipient_snapshot/selected.rs"]
@@ -97,9 +103,7 @@ pub struct RecipientProjection {
     pub missing: Vec<SnapshotCapability>,
 }
 
-/// The public Horde mode component, separate from complete recipient admission.
-/// No seat data or hidden purchase state enters this row. The complete Horde
-/// snapshot and host remain guarded by their existing mode checks.
+/// The public Horde mode row excludes seat data and hidden purchase state.
 pub fn horde_mode_row(state: &Match) -> Result<Value, SnapshotError> {
     let mode = state.horde_projection().map_err(|_| SnapshotError::Rules)?;
     let horde = state.horde.as_ref().ok_or(SnapshotError::Rules)?;
@@ -213,9 +217,10 @@ fn validate_snapshot(state: &Match) -> Result<(), SnapshotError> {
             | Mode::Annihilation
             | Mode::Classic
             | Mode::Tutorial
+            | Mode::Horde
     ) || !crate::match_actor::ordinary_ground_mode(&state.world.game, state.options.mode)
         || state.world.geography().is_some()
-        || (state.options.mode != Mode::Assault && state.assault.is_some())
+        || ((state.options.mode == Mode::Assault) != state.assault.is_some())
         || state.world_runtime.is_some()
         || state.world.game.mode.is_some() && state.validate_ordinary_finish_state().is_err()
         || matches!(state.options.mode, Mode::Annihilation | Mode::Classic)
@@ -237,6 +242,19 @@ fn validate_snapshot(state: &Match) -> Result<(), SnapshotError> {
         state
             .validate_elimination_state()
             .map_err(|_| SnapshotError::Rules)?;
+    }
+    if state.options.mode == Mode::Horde {
+        state
+            .validate_horde_economy()
+            .map_err(|_| SnapshotError::Rules)?;
+    }
+    if let Some(assault) = state.assault
+        && (!(0..6).contains(&assault.defender_team)
+            || !(-1..6).contains(&assault.attacker_team)
+            || assault.defender_team == assault.attacker_team
+            || !assault.time_left.is_finite())
+    {
+        return Err(SnapshotError::Rules);
     }
     let g = &state.world.game;
     let cells = g.w.checked_mul(g.h).ok_or(SnapshotError::Rules)?;
@@ -748,6 +766,20 @@ impl Match {
     /// Bind hosted purchases to the current ordinary snapshot capabilities.
     pub fn restrict_to_ordinary_snapshots(&mut self) -> Result<(), SnapshotError> {
         self.preflight_ordinary_snapshot()?;
+        // A queued plane can later emit AntiAir or PlaneDown. Keep hosted
+        // training closed until the aviation event adapter is integrated.
+        for (id, building) in self.production.buildings() {
+            if building.jobs().iter().any(|job| {
+                self.rules
+                    .kind(&job.kind)
+                    .is_some_and(|kind| self.rules.kinds[kind].air)
+            }) {
+                return Err(SnapshotError::Unsupported {
+                    unit: id,
+                    capability: SnapshotCapability::Air,
+                });
+            }
+        }
         self.ordinary_snapshot_only = true;
         Ok(())
     }
@@ -1290,6 +1322,8 @@ mod net52_tests;
 #[cfg(test)]
 #[path = "economy_currency_tests.rs"]
 mod economy_currency_tests;
+#[path = "recipient_snapshot/production_state_tests.rs"]
+mod production_state_tests;
 
 #[cfg(test)]
 #[path = "recipient_snapshot/combat_filter_tests.rs"]

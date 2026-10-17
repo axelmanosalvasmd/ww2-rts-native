@@ -254,6 +254,8 @@ struct Room {
     mode: String,
     map: String,
     loaded_spawns: Option<Value>,
+    loaded_logistics: Option<bool>,
+    loaded_tech: Option<bool>,
     world_size: String,
     army: String,
     weather: String,
@@ -451,8 +453,7 @@ impl Room {
             return Err("native result precedes final hold callback".into());
         }
         let result = native.runtime.finished_result()?;
-        let count =
-            self.players.len() + usize::from(native.runtime.state().tutorial_state().is_some());
+        let count = native.runtime.state().start.players.len();
         if result.teams.len() != count || result.names.len() != count || result.story.len() != count
         {
             return Err("native result seat rows disagree with the stable roster".into());
@@ -1098,6 +1099,7 @@ pub(crate) struct Hub {
     diagnostics: Option<crate::diagnostics::Recorder>,
     tick_log: bool,
     saves: crate::saves::SaveStore,
+    authored_maps_dir: Option<std::path::PathBuf>,
 }
 impl Hub {
     pub fn new(max_rooms: usize, public_url: String) -> Self {
@@ -1116,6 +1118,7 @@ impl Hub {
             diagnostics: None,
             tick_log: false,
             saves: crate::saves::SaveStore::new("saves".into()),
+            authored_maps_dir: None,
         }
     }
     pub(crate) fn configure_saves(&mut self, dir: std::path::PathBuf) {
@@ -1182,7 +1185,11 @@ impl Hub {
         let tutorial = state
             .tutorial_state()
             .is_some_and(|t| t.enemy() == room.players.len());
-        let count = room.players.len() + usize::from(tutorial);
+        let horde = room.mode == "horde" && state.options.mode == Mode::Horde;
+        let count = room.players.len() + usize::from(tutorial || horde);
+        if horde && !room.spectators.is_empty() {
+            return Err("Horde attachment does not admit spectators".into());
+        }
         if state.start.players.len() != count
             || state.options.players.len() != count
             || state.world.game.players.len() != count
@@ -1190,7 +1197,7 @@ impl Hub {
                 let start = &state.start.players[slot].config;
                 let config = &state.options.players[slot];
                 let live = &state.world.game.players[slot];
-                let team = if tutorial {
+                let team = if tutorial || horde {
                     0
                 } else if let Some(assault) = state.assault {
                     if person.team as i32 == assault.defender_team {
@@ -1237,23 +1244,41 @@ impl Hub {
         };
         // Canonical runtime admission completes before changing the room or accounts.
         let mut runtime = RoomRuntime::new(state, now)?;
+        let ai = room
+            .players
+            .iter()
+            .enumerate()
+            .filter(|(_, p)| p.ai)
+            .map(|(slot, p)| {
+                (
+                    slot,
+                    ww2_core::commander_ai::Level::from_key(p.level).unwrap(),
+                )
+            })
+            .collect::<Vec<_>>();
+        if horde {
+            runtime.configure_ai(&ai)?;
+        }
         let resume = runtime.resume(now);
         for (slot, person) in room.players.iter().enumerate() {
-            if person.ai {
+            if person.ai && !horde {
                 runtime.activate_ai(startup.public_map(), slot, person.level)?;
-            } else if person
-                .connection
-                .as_ref()
-                .is_none_or(|connection| !connection.ready())
-            {
+            } else if !person.online() {
                 runtime.auto_pause(slot, &person.name, now)?;
             }
         }
         let slots = (0..room.players.len()).collect::<Vec<_>>();
-        let names = room
+        let names = runtime
+            .state()
+            .start
             .players
             .iter()
-            .map(|p| p.name.clone())
+            .enumerate()
+            .map(|(slot, p)| {
+                room.players
+                    .get(slot)
+                    .map_or_else(|| p.config.name.clone(), |p| p.name.clone())
+            })
             .collect::<Vec<_>>();
         let starts = runtime.collect_starts(&slots, &startup, &names, epoch)?;
         let pause = runtime.paused().then(|| runtime.pause_message(now));
@@ -1752,9 +1777,7 @@ impl Hub {
                     continue;
                 }
                 let mut connected = room.players.iter().map(Person::online).collect::<Vec<_>>();
-                if native.runtime.state().tutorial_state().is_some() {
-                    connected.push(true);
-                }
+                connected.resize(native.runtime.state().world.game.players.len(), true);
                 let pause = match native.runtime.poll_pause(&connected, now_ms) {
                     Ok(pause) => pause,
                     Err(error) => {
@@ -1791,10 +1814,19 @@ impl Hub {
                     .iter()
                     .map(|person| person.connection.is_none() && !person.ai)
                     .collect::<Vec<_>>();
+                away.resize(
+                    room.native
+                        .as_ref()
+                        .unwrap()
+                        .runtime
+                        .state()
+                        .world
+                        .game
+                        .players
+                        .len(),
+                    false,
+                );
                 let native = room.native.as_mut().unwrap();
-                if native.runtime.state().tutorial_state().is_some() {
-                    away.push(false);
-                }
                 if let Err(error) = native.runtime.set_away(&away) {
                     native.runtime.fault_stop(error);
                     continue;
@@ -1864,6 +1896,12 @@ impl Hub {
                     }
                 }
                 let sent = native.runtime.should_snapshot(report.tick);
+                let think_at = Instant::now();
+                if let Err(error) = native.runtime.think(sent) {
+                    native.runtime.fault_stop(format!("AI scheduling: {error}"));
+                    continue;
+                }
+                let think = think_at.elapsed().as_secs_f64() * 1000.0;
                 let snapshot_at = Instant::now();
                 let mut costs = (0.0, 0.0);
                 if sent {
@@ -1895,7 +1933,7 @@ impl Hub {
                         .fault_stop(format!("room AI: {error}"));
                     continue;
                 }
-                let think = think_at.elapsed().as_secs_f64() * 1000.0;
+                let think = think + think_at.elapsed().as_secs_f64() * 1000.0;
                 let sample = TickSample {
                     sent,
                     durations: [
@@ -2018,6 +2056,8 @@ impl Hub {
             "conquest" => Mode::Conquest,
             "tutorial" => Mode::Tutorial,
             "assault" => Mode::Assault,
+            "classic" => Mode::Classic,
+            "annihilation" => Mode::Annihilation,
             _ => return Err("room mode is not admitted".into()),
         };
         let army = match room.army.as_str() {
@@ -2050,14 +2090,17 @@ impl Hub {
             weather_seed: Some(fresh_weather_seed()?),
             living_weather: true,
             map_key: Some(room.map.clone()),
-            tech: true,
+            tech: room.loaded_tech != Some(false),
             supply: true,
-            logistics: logistics_enabled_for(&room.mode, map.source()),
+            logistics: room.loaded_logistics != Some(false)
+                && logistics_enabled_for(&room.mode, map.source()),
             sandbox: room.sandbox,
         };
         let state = match mode {
             Mode::Tutorial => Match::new_tutorial(map, options)?,
             Mode::Assault => Match::new_assault(map, options, room.defender as i32)?,
+            Mode::Classic => Match::new_classic(map, options)?,
+            Mode::Annihilation => Match::new_annihilation(map, options)?,
             _ => Match::new(map, options)?,
         };
         let prepared = self.prepare_native(code, state, now, false)?;
@@ -2164,7 +2207,7 @@ impl Hub {
             && room.native.is_none()
             && msg["spectate"] != true
             && !room.people().any(|p| p.token == token)
-            && room.players.len() >= 2
+            && room.players.len() >= if room.mode == "horde" { 5 } else { 2 }
         {
             return Err("trusted commander roster is fixed");
         }
@@ -2201,6 +2244,9 @@ impl Hub {
                 .is_some_and(|room| room.starting.is_some())
                 && matches!(msg["t"].as_str(), Some("save" | "loadSave" | "resume"))
             {
+                return;
+            }
+            if self.horde_command(code, connection.id, &msg, now) {
                 return;
             }
             if self.save_command(code, connection.id, &msg, now) {
@@ -2293,6 +2339,8 @@ impl Hub {
                 mode: if tutorial { "tutorial" } else { "conquest" }.into(),
                 map: if tutorial { "tutorial" } else { "default" }.into(),
                 loaded_spawns: None,
+                loaded_logistics: None,
+                loaded_tech: None,
                 world_size: "huge".into(),
                 army: "standard".into(),
                 weather: "map".into(),
@@ -2328,10 +2376,18 @@ impl Hub {
             && let Some(native) = &mut room.native
         {
             native.runtime.reset_ai(slot);
-            let mut names = room
+            let mut names = native
+                .runtime
+                .state()
+                .start
                 .players
                 .iter()
-                .map(|p| p.name.clone())
+                .enumerate()
+                .map(|(slot, p)| {
+                    room.players
+                        .get(slot)
+                        .map_or_else(|| p.config.name.clone(), |p| p.name.clone())
+                })
                 .collect::<Vec<_>>();
             names[slot] = name.clone();
             match native
@@ -2559,16 +2615,16 @@ fn result_number(value: f64) -> Value {
     if value == 0.0 { json!(0) } else { json!(value) }
 }
 fn result_message(result: MatchResult, names: Vec<String>) -> Result<Value, String> {
-    if !matches!(
-        result.mode,
-        "conquest" | "assault" | "annihilation" | "classic" | "tutorial"
-    ) {
+    if crate::native_startup::ordinary_mode(result.mode).is_none() {
         return Err("result serializer requires represented ordinary mode".into());
     }
+    let conquest = result.mode == "conquest";
     let timeline = result.timeline.into_iter().map(|sample| match sample {
-        MatchSample::Conquest { t, vp } if result.mode == "conquest" => Ok(json!({"t":result_number(t), "vp":vp.into_iter().map(result_number).collect::<Vec<_>>()})),
-        MatchSample::Territories { t, points, structures } if result.mode != "conquest" => Ok(json!({"t":result_number(t), "points":points.into_iter().map(result_number).collect::<Vec<_>>(), "structures":structures.into_iter().map(result_number).collect::<Vec<_>>()})),
-        _ => Err("result timeline disagrees with its mode".to_owned()),
+        MatchSample::Conquest { t, vp } if conquest => Ok(json!({"t":result_number(t), "vp":vp.into_iter().map(result_number).collect::<Vec<_>>()})),
+        MatchSample::Territories { t, points, structures } if !conquest => Ok(json!({"t":result_number(t),
+            "points":points.into_iter().map(result_number).collect::<Vec<_>>(),
+            "structures":structures.into_iter().map(result_number).collect::<Vec<_>>()})),
+        _ => Err("ordinary result timeline disagrees with its mode".to_owned()),
     }).collect::<Result<Vec<_>, _>>()?;
     let story = result
         .story
@@ -3006,7 +3062,7 @@ mod operative_tests;
 mod spectator_tests;
 
 #[cfg(test)]
-#[path = "room_ai_tests.rs"]
+#[path = "room_delivered_ai_tests.rs"]
 mod room_ai_tests;
 
 #[cfg(test)]
@@ -3016,6 +3072,16 @@ mod save_load_tests;
 #[path = "lobby_saves.rs"]
 mod save_runtime;
 
+#[path = "horde_host.rs"]
+mod horde_host;
+#[path = "lobby_options.rs"]
+mod lobby_options;
+#[cfg(test)]
+#[path = "mode_hosting_tests.rs"]
+mod mode_hosting_tests;
+#[cfg(test)]
+#[path = "mode_options_tests.rs"]
+mod mode_options_tests;
 #[cfg(test)]
 #[path = "room_command_ingress_tests.rs"]
 mod room_command_ingress_tests;

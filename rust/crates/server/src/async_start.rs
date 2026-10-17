@@ -14,22 +14,20 @@ pub(crate) struct StartRequest {
     map: String,
     options: MatchOptions,
     restart: bool,
+    defender: i32,
 }
 
 impl StartRequest {
     pub(crate) fn generate(&self) -> Result<Match, String> {
         let map = crate::authoritative_maps::load(&self.map).map_err(|e| e.to_string())?;
-        let mut options = self.options.clone();
-        let mode = match options.mode {
-            Mode::Default | Mode::Conquest => "conquest",
-            Mode::Classic => "classic",
-            Mode::Annihilation => "annihilation",
-            Mode::World => "world",
-            _ => "",
-        };
-        options.logistics = logistics_enabled_for(mode, map.source());
-        crate::authoritative_maps::create_match(&self.map, options)
-            .map_err(|error| error.to_string())
+        let options = self.options.clone();
+        match options.mode {
+            Mode::Default | Mode::Conquest => Match::new(map, options),
+            Mode::Assault => Match::new_assault(map, options, self.defender),
+            Mode::Annihilation => Match::new_annihilation(map, options),
+            Mode::Classic => Match::new_classic(map, options),
+            _ => Err("trusted asynchronous mode is not admitted".into()),
+        }
     }
 }
 
@@ -90,8 +88,13 @@ impl Hub {
                 "start requires one through capacity players and both Assault sides".into(),
             );
         }
-        if room.listed || room.mode != "conquest" {
-            return Err("R1 requires private Conquest".into());
+        if room.listed
+            || !matches!(
+                room.mode.as_str(),
+                "conquest" | "assault" | "annihilation" | "classic"
+            )
+        {
+            return Err("R1 requires a private represented ordinary mode".into());
         }
         if !matches!(
             room.army.as_str(),
@@ -128,27 +131,19 @@ impl Hub {
                 })
             })
             .collect::<Result<Vec<_>, String>>()?;
+        let map = crate::authoritative_maps::load(&room.map).map_err(|e| e.to_string())?;
+        let mut options = room.native_match_options(
+            trusted.seed.wrapping_add(self.next_epoch),
+            players,
+            map.source(),
+        )?;
+        options.weather_seed = Some(weather_seed()?);
         Ok(StartRequest {
             token: Arc::new(()),
             map: room.map.clone(),
             restart,
-            options: MatchOptions {
-                // Failed preparations leave next_epoch unchanged, so only a
-                // published match advances the deterministic seed sequence.
-                seed: trusted.seed.wrapping_add(self.next_epoch),
-                mode: Mode::Conquest,
-                players,
-                shuffle: true,
-                army: ArmySize::from_key(&room.army),
-                weather: WeatherChoice::from_reference(Some(&room.weather)),
-                weather_seed: Some(weather_seed()?),
-                living_weather: true,
-                map_key: Some(room.map.clone()),
-                tech: true,
-                supply: true,
-                logistics: false,
-                sandbox: room.sandbox,
-            },
+            defender: room.defender as i32,
+            options,
         })
     }
 
@@ -278,7 +273,7 @@ impl Hub {
                         }
                     }
                     for (slot, person) in room.players.iter().enumerate() {
-                        let message = if person.connection.as_ref().is_some_and(Connection::ready) {
+                        let message = if person.online() {
                             native.runtime.resume_drop(slot, now)
                         } else {
                             native.runtime.auto_pause(slot, &person.name, now)
@@ -364,6 +359,7 @@ impl Hub {
         self.trusted
             .as_ref()
             .is_some_and(|trusted| trusted.code == code)
+            && self.rooms.get(code).is_none_or(|room| room.mode != "horde")
     }
 
     pub(super) fn pending_start_command(

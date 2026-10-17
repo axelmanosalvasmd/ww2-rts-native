@@ -4,7 +4,7 @@ use crate::{
     game::PlaneState,
     match_commands::{Command, MoveOutcome, UnitControl},
     misc_retreat_support_tests::{delivered_tick, publish_rifle, scene, seats},
-    recipient_snapshot::{DeliveryState, SnapshotCache, SnapshotCapability, SnapshotError},
+    recipient_snapshot::{DeliveryState, SnapshotCache, SnapshotError},
     supply_convoys::{ConvoyState, Store, StoreId, Truck, TruckState},
 };
 
@@ -348,8 +348,8 @@ fn mov48_manual_retreat_exits_house_moves_home_and_delivers_every_seat() {
     assert!(m.tick_state.fault().is_none());
 }
 
-fn classic_retreat_projection_tick(m: &mut Match, delivery: &mut DeliveryState, id: u32) {
-    m.advance_tick().unwrap();
+fn classic_retreat_complete_tick(m: &mut Match, delivery: &mut DeliveryState, id: u32) {
+    let report = m.advance_tick().unwrap();
     let mode = m.elimination.as_ref().unwrap();
     let expected = serde_json::json!({
         "kind":"classic",
@@ -358,27 +358,26 @@ fn classic_retreat_projection_tick(m: &mut Match, delivery: &mut DeliveryState, 
     });
     let count = m.start.players.len();
     let retreating = m.world.game.units[&id].retreating;
+    let selected = seats(m);
     let frame = delivery
-        .capture(m, &vec![false; count], &vec![false; count])
+        .capture_selected_with_tick_events(m, &selected, &report.events)
+        .unwrap()
         .unwrap();
     assert_eq!(
         frame.slots().collect::<Vec<_>>(),
         (0..count).collect::<Vec<_>>()
     );
     for slot in 0..count {
-        let projection = frame.recipient(slot).unwrap();
-        assert_eq!(projection.fields["mode"], expected, "Classic seat {slot}");
-        assert_eq!(
-            projection.missing,
-            vec![
-                SnapshotCapability::WrecksAndFoundMines,
-                SnapshotCapability::ShotsAndFlights,
-                SnapshotCapability::TeamEffects,
-            ]
-        );
+        let snapshot = frame.recipient(slot).unwrap().into_json();
+        assert_eq!(snapshot["t"], "s");
+        assert_eq!(snapshot["mode"], expected, "Classic seat {slot}");
+        assert!(snapshot.get("missing").is_none());
+        for field in ["wrecks", "foundMines", "shots", "flights"] {
+            assert!(snapshot[field].is_array(), "Classic seat {slot}: {field}");
+        }
     }
-    let projection = frame.recipient(0).unwrap();
-    let row = projection.fields["units"]
+    let snapshot = frame.recipient(0).unwrap().into_json();
+    let row = snapshot["units"]
         .as_array()
         .unwrap()
         .iter()
@@ -430,7 +429,7 @@ fn retreat_through_legs(mode: Mode) {
     let mut leg_ends = BTreeSet::new();
     for _ in 0..2500 {
         if mode == Mode::Classic {
-            classic_retreat_projection_tick(&mut m, &mut delivery, id);
+            classic_retreat_complete_tick(&mut m, &mut delivery, id);
         } else {
             delivered_tick(&mut m, &mut delivery, &selected);
         }
@@ -456,7 +455,7 @@ fn retreat_through_legs(mode: Mode) {
     assert!(m.tick_state.fault().is_none());
     for _ in 0..3 {
         if mode == Mode::Classic {
-            classic_retreat_projection_tick(&mut m, &mut delivery, id);
+            classic_retreat_complete_tick(&mut m, &mut delivery, id);
         } else {
             delivered_tick(&mut m, &mut delivery, &selected);
         }
@@ -472,7 +471,7 @@ fn mov48_ordinary_retreat_traverses_multiple_legs_and_delivers_every_seat() {
 }
 
 #[test]
-fn mov48_classic_retreat_traverses_multiple_legs_with_every_seat_partial_delivery() {
+fn mov48_classic_retreat_traverses_multiple_legs_with_every_seat_complete_delivery() {
     retreat_through_legs(Mode::Classic);
 }
 

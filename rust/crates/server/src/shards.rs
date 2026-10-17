@@ -324,6 +324,7 @@ async fn run_worker(
     let mut hub = Hub::new(config.max_rooms.clamp(1, 256), config.public_url);
     hub.configure_trusted_room(trusted);
     hub.configure_saves(config.saves_dir);
+    hub.configure_authored_maps(config.authored_maps_dir);
     if let Err(error) = hub.configure_diagnostics(config.diagnostic_dir, config.tick_log) {
         let _ = started.send(Err(error));
         return Ok(());

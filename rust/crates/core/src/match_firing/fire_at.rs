@@ -108,7 +108,11 @@ impl Match {
         }
         Ok(())
     }
-    pub(super) fn fire_at_weapon(&mut self, id: UnitId) -> Result<(), String> {
+    pub(super) fn fire_at_weapon(
+        &mut self,
+        id: UnitId,
+        terrain_suppression: f64,
+    ) -> Result<(), String> {
         let u = &self.world.game.units[&id];
         let w = self.weapon(u)?.ok_or("unarmed terrain order")?;
         self.firing.initialize(id).target_id = 0;
@@ -135,9 +139,9 @@ impl Match {
                 self.firing.initialize(id).cooldown = interval * self.logistics.shortage_rate(id);
             }
         } else if self.world.game.cell_hp[cell] > 0. && self.can_shell_cell(id, cell)? {
-            let suppression = if u.supp >= 90. {
+            let suppression = if terrain_suppression >= 90. {
                 3.
-            } else if u.supp >= 50. {
+            } else if terrain_suppression >= 50. {
                 1.5
             } else {
                 1.

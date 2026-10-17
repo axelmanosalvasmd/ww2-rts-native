@@ -257,7 +257,7 @@ fn cmb130_classic_remembers_last_seen_buildings_until_an_airborne_observer_revis
         assert!(remembered(&m, 0).is_empty());
     }
     let cache = SnapshotCache::new(&m).unwrap();
-    for slot in 0..m.world.game.players.len() {
+    for slot in 0..m.start.players.len() {
         let projection = cache.recipient(slot).unwrap();
         assert_eq!(projection.fields["ghosts"], json!([]));
         assert!(
@@ -344,17 +344,27 @@ fn cmb127_horde_reveals_only_active_final_ground_enemies_and_bosses_to_defenders
         }
         assert!(!m.world.game.players[slot].sees(enemy));
     }
-    assert!(
-        m.advance_tick()
-            .unwrap_err()
-            .reason
-            .contains("requires represented ordinary or World mode")
+    // This visibility fixture creates the physical aircraft without the sortie
+    // owner. Complete ticking and snapshots must still reject that missing state.
+    let tick = m.world.game.tick;
+    let units = crate::save_codec::to_value(&m.world.game.units).unwrap();
+    let horde = m.horde.clone();
+    assert_eq!(
+        m.advance_tick().unwrap_err().reason,
+        "aircraft admission: query aircraft has no sortie runtime metadata"
     );
+    assert_eq!(m.world.game.tick, tick);
+    assert_eq!(
+        crate::save_codec::to_value(&m.world.game.units).unwrap(),
+        units
+    );
+    assert_eq!(m.horde, horde);
     assert!(m.tick_state.fault().is_none());
-    assert!(matches!(
-        SnapshotCache::new(&m),
-        Err(SnapshotError::UnsupportedMode)
-    ));
+    assert!(matches!(SnapshotCache::new(&m), Err(SnapshotError::Rules)));
+    assert_eq!(
+        m.restrict_to_ordinary_snapshots(),
+        Err(SnapshotError::Rules)
+    );
 }
 
 #[test]

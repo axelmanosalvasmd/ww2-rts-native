@@ -3,7 +3,9 @@
 Native baseline: `58986df2`. Prototype: `e4e579a`.
 
 This implements the existing prototype `snapshotFor(...).logistics` object for
-ordinary Default and Conquest recipient delivery. It introduces no new field or
+ordinary Default, Conquest, Classic and Annihilation recipient delivery. The
+Classic and Annihilation fields are documented in
+[classic-annihilation-snapshots.md](classic-annihilation-snapshots.md). It introduces no new field or
 meaning. Both owners opened full logistics with prototype visibility on issue
 #5, comment 6217590741. Runtime acceptance still requires an exact-head review.
 World and spectator admission remain closed in this change. LOG-44 therefore

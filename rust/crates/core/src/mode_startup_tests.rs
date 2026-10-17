@@ -325,7 +325,7 @@ fn base52_first_fitting_site_moves_away_from_a_nearby_income_point() {
 #[test]
 fn mode01_non_world_mode_rows_match_the_prototype_public_fields() {
     use crate::recipient_snapshot::{
-        DeliveryState, SnapshotCache, SnapshotCapability, SnapshotError, mode_row,
+        DeliveryState, SelectedSeat, SnapshotCache, SnapshotError, mode_row,
     };
 
     // Prototype sim.js:5895-5898; Tutorial's initial goal is tutorial.js:11.
@@ -364,28 +364,42 @@ fn mode01_non_world_mode_rows_match_the_prototype_public_fields() {
                 assert!(!snapshot.fields.contains_key("mode"));
                 assert!(snapshot.fields["units"].is_array());
             }
-        } else if mode == Mode::Classic {
+        } else if matches!(
+            mode,
+            Mode::Classic | Mode::Annihilation | Mode::Horde | Mode::Assault
+        ) {
             let count = m.start.players.len();
             let mut delivery = DeliveryState::new(&m).unwrap();
+            let selected = (0..count)
+                .map(|slot| SelectedSeat {
+                    slot,
+                    full: true,
+                    omit: false,
+                })
+                .collect::<Vec<_>>();
             let frame = delivery
-                .capture(&mut m, &vec![true; count], &vec![false; count])
+                .capture_selected_with_tick_events(&mut m, &selected, &[])
+                .unwrap()
                 .unwrap();
             assert_eq!(
                 frame.slots().collect::<Vec<_>>(),
                 (0..count).collect::<Vec<_>>()
             );
             for slot in 0..count {
-                let projection = frame.recipient(slot).unwrap();
-                assert_eq!(projection.fields["mode"], expected, "Classic seat {slot}");
-                assert_eq!(projection.fields["ghosts"], json!([]));
-                assert_eq!(
-                    projection.missing,
-                    vec![
-                        SnapshotCapability::WrecksAndFoundMines,
-                        SnapshotCapability::ShotsAndFlights,
-                        SnapshotCapability::TeamEffects,
-                    ]
-                );
+                let snapshot = frame.recipient(slot).unwrap().into_json();
+                assert_eq!(snapshot["t"], "s");
+                assert_eq!(snapshot["mode"], expected, "{mode:?} seat {slot}");
+                assert!(snapshot.get("missing").is_none());
+                for field in ["wrecks", "foundMines", "shots", "flights"] {
+                    assert!(snapshot[field].is_array(), "{mode:?} seat {slot}: {field}");
+                }
+                if mode == Mode::Classic {
+                    assert!(snapshot["nodes"].is_array());
+                    assert_eq!(snapshot["ghosts"], json!([]));
+                } else {
+                    assert!(snapshot.get("nodes").is_none());
+                    assert!(snapshot.get("ghosts").is_none());
+                }
             }
         } else if matches!(mode, Mode::Assault | Mode::Annihilation | Mode::Tutorial) {
             let cache = SnapshotCache::new(&m).unwrap();
@@ -406,6 +420,10 @@ fn mode01_non_world_mode_rows_match_the_prototype_public_fields() {
     let mut default = create(Mode::Conquest, ArmySize::Standard).unwrap();
     default.options.mode = Mode::Default;
     assert_eq!(mode_row(&default).unwrap(), Json::Null);
+    let cache = SnapshotCache::new(&default).unwrap();
+    for slot in 0..default.start.players.len() {
+        assert!(!cache.recipient(slot).unwrap().fields.contains_key("mode"));
+    }
 }
 
 #[test]
