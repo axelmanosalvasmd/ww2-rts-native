@@ -337,3 +337,114 @@ fn base27_query_keeps_mode_logistics_and_nonfinite_coordinate_rules() {
     assert_eq!(rounded.cell, Some(0));
     assert_eq!(rounded.at, Point { x: 3.0, z: 3.0 });
 }
+
+#[test]
+fn base27_recipient_uses_delivered_weather_aircraft_and_remembered_terrain_only() {
+    use crate::client_view::ClientView;
+    let view = |kind: &str, weather: &str, flags: u32, cells: serde_json::Value| {
+        let mut view = ClientView::new();
+        view.apply(
+            &json!({"t":"start", "you":0,"teams":[0,1],"map":{
+            "w":40,"h":40,"rows":vec![".".repeat(40);40]},"cells":cells})
+            .to_string(),
+        )
+        .unwrap();
+        view.apply(
+            &json!({"t":"s", "all":true,"weather":[weather],"wx":[0,0,0,0],
+            "units":[[1,kind,0,5,5,0,0,100,0,0,0,0,flags,0,1]]})
+            .to_string(),
+        )
+        .unwrap();
+        view
+    };
+    let rules = Rules::compiled().unwrap();
+    let rifle = &rules.kinds[rules.kind("rifle").unwrap()];
+    let fog = rules.weather[rules.weather_kind("fog").unwrap()].sight;
+    let x = 5.0 + ((rifle.vision * (1.0 + fog) / 2.0) / 2.0).floor() * 2.0;
+    let spot = Point { x, z: 5.0 };
+    assert_eq!(
+        check_recipient(&view("rifle", "clear", 0, json!([])), "barracks", spot)
+            .unwrap()
+            .reason,
+        None
+    );
+    assert_eq!(
+        check_recipient(&view("rifle", "fog", 0, json!([])), "barracks", spot)
+            .unwrap()
+            .reason,
+        Some(Reason::NotVisible)
+    );
+    // A wall lies between the recipient's observer and the proposed footprint.
+    let wall = json!(
+        (0..40)
+            .map(|z| json!([z * 40 + 8, "K", 0, 0]))
+            .collect::<Vec<_>>()
+    );
+    let spot = Point { x: 23.0, z: 5.0 };
+    assert_eq!(
+        check_recipient(&view("rifle", "clear", 0, wall.clone()), "barracks", spot)
+            .unwrap()
+            .reason,
+        Some(Reason::NotVisible)
+    );
+    assert_eq!(
+        check_recipient(&view("fighter", "fog", 0, wall.clone()), "barracks", spot)
+            .unwrap()
+            .reason,
+        None
+    );
+    assert_eq!(
+        check_recipient(&view("fighter", "clear", 512, wall), "barracks", spot)
+            .unwrap()
+            .reason,
+        Some(Reason::NotVisible)
+    );
+    // Remembered occupancy is used without an authoritative terrain fallback.
+    let changed = json!([[2 * 40 + 11, "K", 0, 0]]);
+    assert_eq!(
+        check_recipient(&view("fighter", "clear", 0, changed), "barracks", spot)
+            .unwrap()
+            .reason,
+        Some(Reason::Blocked)
+    );
+}
+
+#[test]
+fn base27_recipient_nodes_snap_reserve_and_claim_only_delivered_depots() {
+    use crate::client_view::ClientView;
+    let mut view = ClientView::new();
+    view.apply(
+        &json!({"t":"start", "you":0,"teams":[0,1],"map":{
+        "w":40,"h":40,"rows":vec![".".repeat(40);40]}})
+        .to_string(),
+    )
+    .unwrap();
+    let observer = json!([1, "fighter", 0, 5, 5, 0, 0, 100, 0, 0, 0, 0, 0, 0, 1]);
+    let mut snapshot =
+        json!({"t":"s","all":true,"units":[observer],"nodes":[[20,20,1,0],[24,20,1,0]]});
+    view.apply(&snapshot.to_string()).unwrap();
+    let at = Point { x: 21.0, z: 20.0 };
+    let place = check_recipient(&view, "depot", at).unwrap();
+    assert_eq!(place.reason, None);
+    assert_eq!(place.at, Point { x: 20.0, z: 20.0 });
+    assert_eq!(place.node, Some(0));
+    assert_eq!(place.cells, Some(vec![369, 370, 409, 410]));
+    assert_eq!(
+        check_recipient(&view, "barracks", at).unwrap().reason,
+        Some(Reason::Blocked)
+    );
+    snapshot["units"].as_array_mut().unwrap().push(json!([
+        2, "depot", 1, 20, 20, 0, 0, 100, 0, 0, 0, 0, 0, 0, 1
+    ]));
+    view.apply(&snapshot.to_string()).unwrap();
+    let next = check_recipient(&view, "depot", at).unwrap();
+    assert_eq!(next.reason, None);
+    assert_eq!(next.node, Some(1));
+    assert_eq!(next.at, Point { x: 24.0, z: 20.0 });
+    snapshot["nodes"] = json!([[20, 20, 1, 0]]);
+    view.apply(&snapshot.to_string()).unwrap();
+    assert_eq!(
+        check_recipient(&view, "depot", at).unwrap().reason,
+        Some(Reason::Blocked)
+    );
+}

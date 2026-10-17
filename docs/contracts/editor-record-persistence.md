@@ -18,7 +18,7 @@ Paths, names and responses follow `server.js:95-129,146-164`:
 | Invalid map | 400, JSON `{ "error": <validation error> }`, using the prototype's validation messages. |
 | Valid authenticated POST | Writes validated fields to `<name>.json`, refreshes the shared catalogue, then returns 200, JSON `{ "ok": true }`. |
 | GET without the header | Public `mapForClient` projection, 200, JSON and `Cache-Control: no-store`. Private mines, triggers and scenarios are omitted. |
-| GET with a correct header | Full raw authored JSON, 200 and `Cache-Control: no-store`. |
+| GET with a correct header | Exact raw file bytes, 200 and `Cache-Control: no-store`. |
 | GET with an incorrect header | 403, text `wrong password`. |
 | Missing map | 404, text `no such map`. |
 | Other methods for a named map | 405, text `method not allowed`. |
@@ -27,9 +27,11 @@ The field whitelist is `core::map_save::prepare_map_save`, already checked again
 
 The front and game workers share one locked catalogue. A successful write publishes a new revision only after disk I/O succeeds. Before the next message or maintenance callback, each worker refreshes its spawn counts and Horde map list. This replaces the prototype's private `maps` process notification (`server.js:127`), with the same effect on subsequent lobby messages. Existing running matches retain their original map. A saved match retains that raw map even if an editor later replaces the current file.
 
-NET-12 is not claimed as a complete row. Ordinary editor writes and raw-map save/load are covered, but the existing typed World validator additionally requires ordered, bounded region bounds and typed metadata. The prototype checks only the bounds array's length (`shared/sim.js:1139-1150`). Keeping that stricter validation is a differs candidate for the owners; this batch leaves it in place and does not open World rooms.
+Editor World validation follows `shared/sim.js:1139-1164`: it checks region counts, cell membership, integer unique IDs, open objective positions, four-element bounds, unique valid homes and connected ground routes. It does not require numeric ordered bounds, typed optional metadata or signed 32-bit region IDs. Runtime construction retains those stronger typed checks. This editor path constructs no live World state and opens no World rooms.
 
-Library hosts can select a persistence directory. Persisted overrides are validated at startup; a malformed override is reported as a startup error. This does not claim the separate corrupted-map fallback behavior. An I/O failure during POST returns 500 with `{ "error": "map not saved" }` and publishes no catalogue revision. That is recovery behavior outside the prototype's listed successful-write and validation responses.
+The prototype's save whitelist omits `world`, even when that field selected World validation. Native POST preserves that exact omission (`server.js:106-126`). A validated World document with zero capture points can therefore be accepted and saved, then fail subsequent map validation after losing its geography. The server retains that file for authenticated raw GET, uses default-map catalogue metadata and refuses strict runtime construction. This is the prototype's editor behavior, not a new World save format. Ordinary shipped maps still validate after a save round trip.
+
+Library hosts can select a persistence directory. A malformed or unreadable optional override no longer stops startup. The server retains readable file bytes for authenticated raw GET. Unreadable files return 404; public GET also returns 404 for malformed JSON. Public projection parses terrain independently of runtime map admission, so a readable World document or zero-point editor result can still be delivered without constructing a match. Invalid map catalogue metadata falls back to the frozen embedded default, following non-strict `loadMap` (`server.js:53-63`); strict native match loading still rejects the invalid override. Saving a replacement refreshes both the raw document and catalogue revision. Embedded default and tutorial assets remain compiled and validated independently. An I/O failure during POST returns 500 with `{ "error": "map not saved" }` and publishes no catalogue revision. That is recovery behavior outside the prototype's listed successful-write and validation responses.
 
 ## Horde record file
 
