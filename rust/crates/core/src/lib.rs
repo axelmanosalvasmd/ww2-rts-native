@@ -242,4 +242,5 @@ mod save_state;
 pub mod authoring_queries;
 pub mod commander_field_policy;
 pub mod commander_world_policy;
+mod numeric_keys;
 pub mod recipient_placement;
