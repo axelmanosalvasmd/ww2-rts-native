@@ -33,6 +33,7 @@ impl Peer {
                     rows.push(serde_json::from_str(&write.json).unwrap());
                     hub.complete_snapshot(&write, true, 0);
                 }
+                Output::Watcher(_) => panic!("unexpected spectator output for commander"),
                 Output::Close(_, reason) => panic!("unexpected close: {reason}"),
             }
         }

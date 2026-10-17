@@ -1,4 +1,4 @@
-//! Bounded retreat and support checks. Classic/World price queries do not admit matches.
+//! Bounded retreat and support checks, including an explicit Classic core constructor.
 use crate::{
     catalog::{Catalog, Value},
     economy::{self, Currency, Faction, Mode},
@@ -14,7 +14,7 @@ use crate::{
 };
 use serde_json::json;
 
-fn scene(mode: Mode) -> Match {
+pub(crate) fn scene(mode: Mode) -> Match {
     let map = AuthoritativeMap::from_json(
         &serde_json::to_vec(&json!({
             "name":"Retreat and support", "w":128,"h":128,"rows":vec![".".repeat(128);128],
@@ -25,7 +25,12 @@ fn scene(mode: Mode) -> Match {
         .unwrap(),
     )
     .unwrap();
-    Match::new(
+    let constructor = if mode == Mode::Classic {
+        Match::new_classic
+    } else {
+        Match::new
+    };
+    constructor(
         &map,
         MatchOptions {
             seed: 701,
@@ -51,7 +56,7 @@ fn scene(mode: Mode) -> Match {
     )
     .unwrap()
 }
-fn publish_rifle(state: &mut Match, at: Point) -> u32 {
+pub(crate) fn publish_rifle(state: &mut Match, at: Point) -> u32 {
     let id = state.next_unit_id;
     let staged = StagedUnit::ordinary(
         &state.world.game,
@@ -85,7 +90,7 @@ fn publish_rifle(state: &mut Match, at: Point) -> u32 {
     });
     id
 }
-fn seats(state: &Match) -> Vec<SelectedSeat> {
+pub(crate) fn seats(state: &Match) -> Vec<SelectedSeat> {
     (0..state.world.game.players.len())
         .map(|slot| SelectedSeat {
             slot,
@@ -94,7 +99,11 @@ fn seats(state: &Match) -> Vec<SelectedSeat> {
         })
         .collect()
 }
-fn delivered_tick(state: &mut Match, delivery: &mut DeliveryState, selected: &[SelectedSeat]) {
+pub(crate) fn delivered_tick(
+    state: &mut Match,
+    delivery: &mut DeliveryState,
+    selected: &[SelectedSeat],
+) {
     let report = state.advance_tick().unwrap();
     let frame = delivery
         .capture_selected_with_tick_events(state, selected, &report.events)

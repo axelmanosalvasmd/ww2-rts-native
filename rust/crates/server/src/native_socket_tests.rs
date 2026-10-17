@@ -196,3 +196,68 @@ async fn aborted_serve_invalidates_retained_control_on_the_same_hub() {
         "server stopped"
     );
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn spectator_real_socket_joins_play_and_receives_full_map_without_private_fields() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let (stop, stopped) = oneshot::channel();
+    let (ready, control) = oneshot::channel();
+    let server = tokio::spawn(serve_with_native_control(
+        listener,
+        Config::default(),
+        async move {
+            let _ = stopped.await;
+        },
+        Some(ready),
+    ));
+    let control = control.await.unwrap();
+    let runtime = tokio::runtime::Handle::current();
+    tokio::task::spawn_blocking(move || {
+        let mut a = Client::open(address, "a");
+        let mut b = Client::open(address, "b");
+        runtime
+            .block_on(control.attach("ABC", lobby::native_tests::native_match()))
+            .unwrap();
+        a.until("s");
+        b.until("s");
+        let mut spectator = Client::open(address, "watcher");
+        let snapshot = spectator.until("s");
+        assert!(snapshot["tick"].as_i64().unwrap() > 0);
+        assert!(
+            snapshot["units"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|row| row[2] == 0)
+        );
+        assert!(
+            snapshot["units"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|row| row[2] == 1)
+        );
+        assert!(snapshot.get("fog").is_none());
+        for field in ["orders", "plans", "mp", "logistics", "productionJobs"] {
+            assert!(snapshot.get(field).is_none());
+        }
+        assert_eq!(
+            snapshot["held"][0],
+            snapshot["units"].as_array().unwrap().len()
+        );
+        spectator.send(json!({"t":"ping","c":91}));
+        assert_eq!(spectator.until("pong")["c"], 91);
+        assert!(
+            runtime
+                .block_on(control.inspect("ABC"))
+                .unwrap()
+                .fault
+                .is_none()
+        );
+    })
+    .await
+    .unwrap();
+    let _ = stop.send(());
+    server.await.unwrap().unwrap();
+}

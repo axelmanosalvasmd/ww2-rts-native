@@ -38,6 +38,152 @@ mod tests {
     fn instance(seed: u64) -> Match {
         configured_instance(seed, Faction::Usa, false)
     }
+
+    #[test]
+    fn mode09_human_handover_resets_to_normal_and_applies_orders_after_accepted_input() {
+        let mut m = instance(803);
+        let mut previous = OpeningCommander::new(0, Level::Hard);
+        m.tick_opening_commander(&mut previous).unwrap();
+        assert!(previous.delivered().is_some());
+        assert_ne!(*previous.memory(), SourceState::default());
+        let id = m
+            .world
+            .game
+            .units
+            .values()
+            .find(|u| u.owner == 0 && !m.rules.kinds[u.kind].structure)
+            .unwrap()
+            .id;
+        let accepted = OrderKey {
+            tick: 1,
+            issuer: 0,
+            sequence: 90,
+        };
+        m.commands
+            .queue
+            .enqueue(
+                accepted,
+                Command::Stop {
+                    ids: vec![i64::from(id)],
+                },
+            )
+            .unwrap();
+        m.commands
+            .queue
+            .enqueue(
+                OrderKey {
+                    tick: 2,
+                    issuer: 0,
+                    sequence: 180,
+                },
+                Command::Stop {
+                    ids: vec![i64::from(id)],
+                },
+            )
+            .unwrap();
+        // A different seat's high sequence must not exhaust this seat's allocator.
+        m.commands
+            .queue
+            .enqueue(
+                OrderKey {
+                    tick: 2,
+                    issuer: 1,
+                    sequence: u64::MAX,
+                },
+                Command::Stop { ids: vec![] },
+            )
+            .unwrap();
+        let pending = m.commands.queue.snapshot();
+        let random = m.start.random.snapshot();
+        previous = m.handover_to_normal_ai(0).unwrap();
+        assert_eq!(previous.owner(), 0);
+        assert_eq!(previous.level(), Level::Normal);
+        assert_eq!(*previous.memory(), SourceState::default());
+        assert!(previous.delivered().is_none());
+        assert_eq!(m.commands.queue.snapshot(), pending);
+        assert_eq!(m.start.random.snapshot(), random);
+        let OpeningTick::Queued(keys) = m.tick_opening_commander(&mut previous).unwrap() else {
+            panic!("Normal AI must issue opening orders")
+        };
+        assert!(!keys.is_empty());
+        assert!(
+            keys.iter()
+                .all(|key| key.tick == 1 && key.issuer == 0 && key.sequence > 180)
+        );
+        let mut delivery = crate::recipient_snapshot::DeliveryState::new(&m).unwrap();
+        let report = m.advance_tick().unwrap();
+        assert!(report.commands.iter().any(|result| result.key == accepted));
+        for key in keys {
+            let result = report
+                .commands
+                .iter()
+                .find(|result| result.key == key)
+                .unwrap();
+            assert_eq!(result.denial, None);
+        }
+        assert!(
+            m.world
+                .game
+                .units
+                .values()
+                .any(|u| u.owner == 0 && !u.path.is_empty())
+        );
+        assert_eq!(m.commands.queue.snapshot().pending.len(), 2);
+        let mut report = report;
+        for tick in 1..=8 {
+            assert_eq!(report.tick, tick);
+            assert!(m.tick_state.fault().is_none());
+            let effects = report.environment().cloned().collect::<Vec<_>>();
+            let frame = delivery
+                .capture_with_lists(&mut m, &[true; 2], &[false; 2], &effects)
+                .unwrap();
+            for slot in 0..2 {
+                assert_eq!(frame.recipient(slot).unwrap().into_json()["t"], "s");
+            }
+            if tick < 8 {
+                m.tick_opening_commander(&mut previous).unwrap();
+                report = m.advance_tick().unwrap();
+            }
+        }
+        assert_eq!(previous.level(), Level::Normal);
+        assert!(previous.delivered().is_some());
+    }
+
+    #[test]
+    fn mode09_handover_rejects_invalid_out_finished_and_exhausted_seats_without_mutation() {
+        let mut m = instance(803);
+        assert!(m.handover_to_normal_ai(2).is_err());
+        m.start.economy.players[0].out = true;
+        assert!(m.handover_to_normal_ai(0).is_err());
+        m.start.economy.players[0].out = false;
+        m.commands
+            .queue
+            .enqueue(
+                OrderKey {
+                    tick: 1,
+                    issuer: 0,
+                    sequence: u64::MAX,
+                },
+                Command::Stop { ids: vec![] },
+            )
+            .unwrap();
+        let queue = m.commands.queue.snapshot();
+        let random = m.start.random.snapshot();
+        assert_eq!(
+            m.handover_to_normal_ai(0).unwrap_err(),
+            "AI handover sequence exhausted"
+        );
+        assert_eq!(m.commands.queue.snapshot(), queue);
+        assert_eq!(m.start.random.snapshot(), random);
+        let mut finished = instance(803);
+        finished
+            .initialize_tick_scene_finish(-1, crate::match_end::EndReason::Draw, None)
+            .unwrap();
+        assert_eq!(
+            finished.handover_to_normal_ai(0).unwrap_err(),
+            "AI handover requires a live unfinished seat"
+        );
+    }
     fn configured_instance(seed: u64, faction: Faction, tech: bool) -> Match {
         let map = AuthoritativeMap::from_json(
             &serde_json::to_vec(&json!({
@@ -829,6 +975,9 @@ impl OpeningCommander {
     pub fn owner(&self) -> usize {
         self.owner
     }
+    pub fn level(&self) -> Level {
+        self.level
+    }
     pub fn memory(&self) -> &SourceState {
         &self.memory
     }
@@ -845,6 +994,43 @@ pub enum OpeningTick {
 }
 
 impl Match {
+    /// Start the core's bounded AI policy after a human gives up a seat.
+    /// The host still owns seat assignment, human-camera state and AI scheduling.
+    /// Accepted human orders remain queued; the new policy starts with fresh memory.
+    pub fn handover_to_normal_ai(&self, owner: usize) -> Result<OpeningCommander, String> {
+        self.validate_opening_projection(owner)?;
+        if self.finish.is_some() || self.start.economy.players[owner].out {
+            return Err("AI handover requires a live unfinished seat".into());
+        }
+        let next = self
+            .world
+            .game
+            .tick
+            .checked_add(1)
+            .ok_or("AI handover clock exhausted")? as u64;
+        self.validate_command_tick(next)?;
+        let mut seat = OpeningCommander::new(owner, Level::Normal);
+        // A human may already have accepted input at a future boundary. Starting
+        // above every pending sequence avoids replacing or colliding with it.
+        seat.sequence = self
+            .commands
+            .queue
+            .snapshot()
+            .pending
+            .iter()
+            .filter(|order| order.key.issuer as usize == owner)
+            .map(|order| order.key.sequence)
+            .max()
+            .map(|sequence| {
+                sequence
+                    .checked_add(1)
+                    .ok_or("AI handover sequence exhausted")
+            })
+            .transpose()?
+            .unwrap_or(0);
+        Ok(seat)
+    }
+
     pub(crate) fn validate_opening_projection(&self, owner: usize) -> Result<(), String> {
         if !matches!(self.options.mode, Mode::Default | Mode::Conquest)
             || self.world.geography().is_some()
@@ -1170,6 +1356,8 @@ impl Match {
                 owned_nodes: BTreeSet::new(),
                 build_reserve: 0.0,
                 fort_reserve: 0.0,
+                field: None,
+                world: None,
                 support: self.start.players[owner]
                     .support
                     .iter()
