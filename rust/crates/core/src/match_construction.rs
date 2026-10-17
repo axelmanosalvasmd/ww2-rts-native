@@ -47,6 +47,16 @@ fn number(value: &Value, key: &str) -> Result<f64, String> {
 }
 
 impl Match {
+    fn validate_construction_mode(&self) -> Result<(), String> {
+        if self.options.mode == crate::economy::Mode::Horde {
+            self.validate_horde_economy()
+        } else if crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode) {
+            self.validate_actor_mode()
+        } else {
+            Err("construction phases require ordinary ground or canonical Horde".into())
+        }
+    }
+
     /// Claims belong to the canonical mode node owner and only to this exact depot.
     pub(crate) fn release_depot_claim(&mut self, id: UnitId) {
         if let Some(state) = self.elimination.as_mut() {
@@ -62,16 +72,6 @@ impl Match {
                     node.depot = None;
                 }
             }
-        }
-    }
-
-    fn validate_construction_mode(&self) -> Result<(), String> {
-        if self.options.mode == crate::economy::Mode::Horde {
-            self.validate_horde_economy()
-        } else if crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode) {
-            self.validate_actor_mode()
-        } else {
-            Err("construction phases require ordinary ground or canonical Horde".into())
         }
     }
 

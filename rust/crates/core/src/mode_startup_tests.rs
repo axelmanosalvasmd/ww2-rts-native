@@ -48,12 +48,7 @@ fn base02_mode06_non_world_constructors_scale_wallets_and_population() {
         (ArmySize::Endless, 20.0, 5.0),
     ] {
         for mode in MODES {
-            let result = create(mode, army);
-            if mode == Mode::Horde && army == ArmySize::Endless {
-                assert!(result.err().unwrap().contains("Endless"));
-                continue;
-            }
-            let mut m = result.unwrap();
+            let mut m = create(mode, army).unwrap();
             let expected = match mode {
                 Mode::Conquest => vec![150.0, 150.0],
                 Mode::Assault => vec![320.0, 250.0],
@@ -97,9 +92,9 @@ fn base02_mode06_non_world_constructors_scale_wallets_and_population() {
                     "{mode:?} {army:?} seat {slot}"
                 );
             }
-            // Horde's full tick remains guarded. Other constructors use the ordinary tick.
-            if mode != Mode::Horde {
+            for _ in 0..3 {
                 m.advance_tick().unwrap();
+                assert!(m.tick_state.fault().is_none());
                 assert!(
                     m.start
                         .economy
@@ -107,6 +102,12 @@ fn base02_mode06_non_world_constructors_scale_wallets_and_population() {
                         .iter()
                         .all(|p| p.mp.is_finite() && p.inc.is_finite())
                 );
+                if mode != Mode::Tutorial {
+                    let cache = crate::recipient_snapshot::SnapshotCache::new(&m).unwrap();
+                    for slot in 0..m.start.players.len() {
+                        cache.recipient(slot).unwrap();
+                    }
+                }
             }
         }
     }

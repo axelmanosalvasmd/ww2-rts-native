@@ -162,8 +162,9 @@ fn options(value: &Value, source: &AuthoritativeMap, shuffle: bool) -> Result<Ma
                 .filter(|spawn| mode == Mode::Assault || !spawn.assault)
                 .count() as u64,
         );
-    if !(2..=6).contains(&count) {
-        return Err("players must be 2-6".into());
+    let minimum = if mode == Mode::Horde { 1 } else { 2 };
+    if !(minimum..=6).contains(&count) {
+        return Err("players must be 2-6, or 1-6 for Horde".into());
     }
     let defenders = source
         .defend()
@@ -262,10 +263,10 @@ fn options(value: &Value, source: &AuthoritativeMap, shuffle: bool) -> Result<Ma
                     .ok_or("invalid weatherSeed")
             })
             .transpose()?,
-        living_weather: flag("livingWeather", false)?,
+        living_weather: flag("livingWeather", true)?,
         map_key: None,
         tech: flag("tech", false)?,
-        supply: flag("supply", false)?,
+        supply: flag("supply", true)?,
         logistics: flag("logistics", false)?,
         sandbox: flag("sandbox", false)?,
     })
@@ -276,7 +277,14 @@ fn construct(value: &Value, shuffle: bool) -> Result<Match> {
     if source.geography().is_some() {
         return Err("World authoring runtime is unavailable".into());
     }
-    let opts = options(value, &source, shuffle)?;
+    let mut opts = options(value, &source, shuffle)?;
+    // createGame treats an unavailable Horde selection as ordinary Conquest.
+    if opts.mode == Mode::Horde
+        && (source.defend().is_none_or(<[usize]>::is_empty) || opts.players.len() == 6)
+    {
+        opts.mode = Mode::Conquest;
+        opts.logistics = false;
+    }
     match opts.mode {
         Mode::Default | Mode::Conquest => Match::new(&source, opts),
         Mode::Classic => Match::new_classic(&source, opts),
@@ -335,11 +343,27 @@ pub fn create_preview(value: &Value) -> Result<Value> {
     shown["rows"] = json!(rows(&display_chars));
     shown["layers"] = json!({"ground":g.ground.as_deref().map(rows),"objects":display_objects.as_deref().map(rows),"mines":rows(&mines),"groundMaterials":materials(&state.world.base_materials),"objectMaterials":materials(&state.world.object_materials),"mineMaterials":materials(&state.world.mine_materials)});
     shown["points"]=json!(state.start.points.iter().map(|p|json!({"x":(p.at.x/crate::game::CELL).floor(),"y":(p.at.z/crate::game::CELL).floor(),"vp":p.vp,"mp":p.mp})).collect::<Vec<_>>());
+    let nodes = state
+        .elimination
+        .as_ref()
+        .map(|mode| {
+            mode.nodes
+                .iter()
+                .map(|node| json!({"x":node.at.x,"z":node.at.z,"fuel":node.fuel}))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let horde = state.horde.as_ref().map(|mode| {
+        json!({
+            "slot":mode.slot,"defenders":mode.defenders,"bunker":mode.bunker,
+            "gates":mode.gates,"wave":mode.wave,"active":mode.active,"timeLeft":mode.time_left
+        })
+    });
     let units = g.units.values().map(|u| json!({"id":u.id,"type":state.rules.kinds[u.kind].name,"owner":u.owner,"x":u.x,"z":u.z})).collect::<Vec<_>>();
     Ok(
         json!({"map":shown,"w":g.w,"h":g.h,"rows":rows(&g.chars),"ground":g.ground.as_deref().map(rows),"objects":g.objects.as_deref().map(rows),
         "players":state.start.players.iter().map(|p|json!({"name":p.config.name,"team":p.config.team,"spawn":{"x":p.spawn.x,"z":p.spawn.z}})).collect::<Vec<_>>(),
-        "points":state.start.points,"winVp":state.start.win_vp,"units":units,"assault":state.assault,"elimination":state.elimination}),
+        "points":state.start.points,"winVp":state.start.win_vp,"units":units,"assault":state.assault,"elimination":state.elimination,"horde":horde,"nodes":nodes}),
     )
 }
 
@@ -444,12 +468,16 @@ pub fn find_path(value: &Value) -> Result<Value> {
     ))
 }
 
-/// Runs the existing bounded commander and ordinary tick runner. This is native outcome evidence.
+/// Runs detached AI matches on the ordinary simulation and human commander schedule.
 pub fn play_match(value: &Value) -> Result<Value> {
     use crate::{
+        ai_view::{SeatView, commander::CommanderMemory},
         commander_ai::Level,
-        match_commander::{OpeningCommander, OpeningTick},
+        match_commands::Command,
+        match_human_observation::HumanShot,
+        orders::OrderKey,
         recipient_snapshot::{DeliveryState, SelectedSeat},
+        seat_commander::{Advance, Delivered},
     };
     value
         .get("seed")
@@ -460,77 +488,128 @@ pub fn play_match(value: &Value) -> Result<Value> {
         .filter(|n| *n <= 36_000)
         .ok_or("max_ticks must be an integer from 0 to 36000")?;
     let mut state = construct(value, true)?;
-    if !matches!(state.options.mode, Mode::Default | Mode::Conquest) || state.options.logistics {
-        return Err("fairness AI supports ordinary Conquest without logistics".into());
-    }
+    let horde_slot = state.horde.as_ref().map(|mode| mode.slot);
     let mut seats = (0..state.start.players.len())
-        .map(|i| OpeningCommander::new(i, Level::Normal))
-        .collect::<Vec<_>>();
+        .map(|i| state.create_seat_commander(i, Level::Normal))
+        .collect::<Result<Vec<_>>>()?;
+    let mut memories = (0..seats.len())
+        .map(|slot| state.ordinary_ai_view_memory(slot))
+        .collect::<Result<Vec<_>>>()?;
+    let mut human = (0..seats.len())
+        .map(|slot| CommanderMemory::new(slot, state.world.game.w, state.world.game.h))
+        .collect::<Result<Vec<_>>>()?;
+    let mut sequences = vec![0; seats.len()];
+    let packet = |slot: usize, view: &SeatView, human: &mut CommanderMemory| -> Result<Delivered> {
+        if horde_slot == Some(slot) {
+            let (view, facts) = view.horde_packet(slot)?;
+            Ok(Delivered::HordePolicy {
+                view,
+                facts: Box::new(facts),
+            })
+        } else {
+            Ok(Delivered::Human(Box::new(human.observe(view)?)))
+        }
+    };
     let mut delivery = DeliveryState::new(&state).map_err(|e| format!("snapshot: {e:?}"))?;
-    let selected = (0..seats.len())
+    let mut selected = (0..seats.len())
         .map(|slot| SelectedSeat {
             slot,
             full: true,
             omit: false,
         })
         .collect::<Vec<_>>();
+    // Observe every seat through its complete recipient at creation, before any action.
+    let initial = delivery
+        .capture_selected_with_tick_events(&mut state, &selected, &[])
+        .map_err(|e| format!("snapshot: {e:?}"))?
+        .ok_or("no initial fairness delivery frame")?;
+    let mut observed = Vec::with_capacity(seats.len());
+    for slot in 0..seats.len() {
+        let view = memories[slot].observe(
+            initial
+                .recipient(slot)
+                .map_err(|e| format!("snapshot: {e:?}"))?,
+        )?;
+        observed.push(Some(packet(slot, &view, &mut human[slot])?));
+    }
+    drop(initial);
+    for seat in &mut selected {
+        seat.full = false;
+    }
     let mut pending_events = Vec::new();
+    let mut generation = 0;
     while state.finish.is_none() && (state.world.game.tick as u64) < max_ticks {
-        // Match::advance_tick guards active unsupported state. Its unavailable list also
-        // names dormant phases (construction training, World rail and disabled logistics),
-        // so it is capability metadata rather than a per-tick failure. The live host uses
-        // the same runner. Keep this query bounded to that native ordinary-mode behavior.
+        // Canonical tick and recipient owners enforce their mode and capability admission.
         let mut report = state.advance_tick().map_err(|e| e.to_string())?;
-        use crate::match_tick::TickPhase;
-        if report.unavailable.iter().any(|phase| {
-            !matches!(
-                phase,
-                TickPhase::UnitReserves
-                    | TickPhase::Production
-                    | TickPhase::Rail
-                    | TickPhase::GroundEffects
-                    | TickPhase::SupplyNetwork
-                    | TickPhase::Convoys
-            )
-        }) || state.convoys.is_some()
-            || state.logistics.iter().next().is_some()
-            || !state.rail_runs.is_empty()
-            || state
-                .world
-                .game
-                .units
-                .values()
-                .any(|u| state.rules.kinds[u.kind].rail)
-            || state
-                .production
-                .buildings()
-                .any(|(_, building)| !building.jobs().is_empty())
-        {
-            return Err("unsupported active fairness phase".into());
-        }
         pending_events.append(&mut report.events);
-        if state.world.game.tick % 2 == 0 || state.finish.is_some() {
+        let now = state.world.game.tick;
+        let finished = state.finish.is_some();
+        let sent = now % 2 == 0 || finished;
+        if sent {
             let frame = delivery
                 .capture_selected_with_tick_events(&mut state, &selected, &pending_events)
                 .map_err(|e| format!("snapshot: {e:?}"))?
                 .ok_or("no fairness delivery frame")?;
             for slot in 0..seats.len() {
-                let _ = frame
+                let snapshot = frame
                     .recipient(slot)
-                    .map_err(|e| format!("snapshot: {e:?}"))?
-                    .into_json();
+                    .map_err(|e| format!("snapshot: {e:?}"))?;
+                let view = memories[slot].observe(snapshot)?;
+                if !finished && seats[slot].wants_view(now, sent) {
+                    observed[slot] = Some(packet(slot, &view, &mut human[slot])?);
+                }
             }
             drop(frame);
-            pending_events.clear();
         }
-        if state.finish.is_none() {
-            for seat in &mut seats {
-                if let OpeningTick::Deferred(e) = state.tick_opening_commander(seat)? {
-                    return Err(format!("unavailable commander policy: {e:?}"));
+        if !finished {
+            // Every requested packet is detached before any brain can enqueue an order.
+            let shots = pending_events
+                .iter()
+                .map(HumanShot::tick)
+                .collect::<Vec<_>>();
+            for (slot, seat) in seats.iter_mut().enumerate() {
+                let commands = match state.advance_seat_commander(
+                    seat,
+                    observed[slot].take(),
+                    generation,
+                    &shots,
+                )? {
+                    Advance::Human(advance) => advance
+                        .input
+                        .and_then(|input| input.command)
+                        .map(|raw| {
+                            Command::from_json(&raw)
+                                .map_err(|e| format!("commander command: {e:?}"))
+                        })
+                        .transpose()?
+                        .into_iter()
+                        .collect::<Vec<_>>(),
+                    Advance::Horde(commands) => commands,
+                };
+                for command in commands {
+                    state
+                        .enqueue_command(
+                            OrderKey {
+                                tick: now as u64 + 1,
+                                issuer: slot as u32,
+                                sequence: sequences[slot],
+                            },
+                            command,
+                        )
+                        .map_err(|e| format!("commander queue: {e:?}"))?;
+                    sequences[slot] += 1;
                 }
             }
         }
+        if sent {
+            pending_events.clear();
+            generation += 1;
+        }
     }
+    let horde = state
+        .horde
+        .as_ref()
+        .map(|mode| json!({"wave":mode.wave,"active":mode.active,"timeLeft":mode.time_left}));
     let winning_team = state.finish.map(|f| f.winner);
     let winner = winning_team.and_then(|team| {
         state
@@ -540,7 +619,7 @@ pub fn play_match(value: &Value) -> Result<Value> {
             .position(|p| p.config.team == team)
     });
     Ok(
-        json!({"ticks":state.world.game.tick,"player_vp":state.start.economy.players.iter().map(|p|p.vp).collect::<Vec<_>>(),"winner":winner,"winning_team":winning_team,"timedOut":state.finish.is_none(),"seed":state.options.seed,
+        json!({"ticks":state.world.game.tick,"player_vp":state.start.economy.players.iter().map(|p|p.vp).collect::<Vec<_>>(),"winner":winner,"winning_team":winning_team,"timedOut":state.finish.is_none(),"seed":state.options.seed,"horde":horde,
         "players":state.start.players.iter().enumerate().map(|(i,p)|json!({"team":p.config.team,"spawn":{"x":p.spawn.x,"z":p.spawn.z},"vp":state.start.economy.players[i].vp})).collect::<Vec<_>>()}),
     )
 }

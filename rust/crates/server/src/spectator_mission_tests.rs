@@ -232,10 +232,15 @@ fn intent_net77_authored_objectives_and_private_messages_filter_spectators_throu
 fn authored_mission_admission_runs_engine_actions_and_refuses_changed_map_bindings() {
     let raw = authored_map();
     let original = state(&raw);
-    // Reject a valid mission history attached to a later unfinished match clock.
+    // The reconciled authored-v2 owner must match its required clock.
     let mut stale = state(&raw);
     stale.world.game.tick = 1;
     assert!(stale.save_json().is_err());
+    let map = AuthoritativeMap::from_json(&serde_json::to_vec(&raw).unwrap()).unwrap();
+    let mut timed = state(&raw);
+    timed.authored_scenario = None;
+    timed.authored_mission = ww2_core::authored_mission::AuthoredMission::from_map(&map).unwrap();
+    assert!(timed.save_json().is_err());
     // A null authored definition retains migrated legacy timed triggers.
     let mut legacy = raw.clone();
     legacy["scenario"] = Value::Null;
@@ -272,4 +277,27 @@ fn authored_mission_admission_runs_engine_actions_and_refuses_changed_map_bindin
         crate::native_startup::NativeStartup::prepare_loaded(&original, settings, &different)
             .is_err()
     );
+
+    let mut ordered = raw.clone();
+    ordered["scenario"]["triggers"][0]["actions"][1]["text"] =
+        serde_json::from_str(r#"{"es":"Primero","fr":"Deuxieme"}"#).unwrap();
+    let ordered_state = state(&ordered);
+    let mut reordered = ordered.clone();
+    reordered["scenario"]["triggers"][0]["actions"][1]["text"] =
+        serde_json::from_str(r#"{"fr":"Deuxieme","es":"Primero"}"#).unwrap();
+    let bind = |map: &Value| {
+        crate::native_startup::NativeStartup::prepare_loaded(
+            &ordered_state,
+            crate::native_startup::StartupSettings {
+                map: "river-pass",
+                mode: "conquest",
+                army: "standard",
+                weather: "map",
+                sandbox: false,
+            },
+            map,
+        )
+    };
+    assert!(bind(&ordered).is_ok());
+    assert!(bind(&reordered).is_err());
 }

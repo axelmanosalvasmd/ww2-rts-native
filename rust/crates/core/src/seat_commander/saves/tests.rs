@@ -488,6 +488,10 @@ fn if27_field_and_world_policy_memory_round_trip_and_legacy_defaults() {
         "rail_at":{"7":23}, "fort_steps":{"8":3},
         "field": encoded["tactics"]["field"].clone()
     });
+    encoded["tactics"]["engineering"] = serde_json::json!({
+        "bridges":[17], "bridge_crew":{"2":{"time":3.0,"dug":true}}, "fill_crew":{}, "demine_crew":{}
+    });
+
     **policy = serde_json::from_value(encoded.clone()).unwrap();
     let expected = policy.clone();
     let memory = HumanObservationMemory::new(0);
@@ -531,6 +535,7 @@ fn if27_field_and_world_policy_memory_round_trip_and_legacy_defaults() {
     tactics.remove("field");
     tactics.remove("world");
     tactics.remove("node");
+    tactics.remove("engineering");
     let legacy: HumanPolicy = serde_json::from_value(encoded).unwrap();
     let legacy = serde_json::to_value(legacy).unwrap();
     assert_eq!(legacy["tactics"]["node"], serde_json::json!({}));
@@ -541,5 +546,9 @@ fn if27_field_and_world_policy_memory_round_trip_and_legacy_defaults() {
     assert_eq!(
         legacy["tactics"]["world"],
         serde_json::to_value(crate::commander_world_policy::State::default()).unwrap()
+    );
+    assert_eq!(
+        legacy["tactics"]["engineering"],
+        serde_json::to_value(crate::commander_engineering::State::default()).unwrap()
     );
 }

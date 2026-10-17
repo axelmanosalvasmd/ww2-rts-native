@@ -596,7 +596,8 @@ impl CommanderViewMemory {
             research,
             runtime: Some(context),
         };
-        if view.initial_chars.len() != self.chars.len()
+        if view.ground.len() != self.chars.len()
+            || view.initial_chars.len() != self.chars.len()
             || view
                 .initial_height
                 .as_ref()
@@ -609,6 +610,13 @@ impl CommanderViewMemory {
             &view.initial_chars,
             view.initial_height.as_deref(),
         );
+        if let Some(field) = input
+            .runtime
+            .as_mut()
+            .and_then(|context| context.field.as_mut())
+        {
+            field.ground.clone_from(&view.ground);
+        }
         let packet = Observation::new(input).map_err(|e| e.to_string())?;
         self.tick = Some(view.tick);
         Ok(HumanView {

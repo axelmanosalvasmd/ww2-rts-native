@@ -37,7 +37,12 @@ impl Match {
     fn scenario_ordinary_mode(&self) -> bool {
         matches!(
             self.options.mode,
-            Mode::Default | Mode::Conquest | Mode::Assault | Mode::Annihilation | Mode::Classic
+            Mode::Default
+                | Mode::Conquest
+                | Mode::Assault
+                | Mode::Annihilation
+                | Mode::Classic
+                | Mode::Horde
         ) && crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode)
             && self.world.geography().is_none()
             && self.world_runtime.is_none()
@@ -77,6 +82,7 @@ impl Match {
     ) -> bool {
         let game = &self.world.game;
         self.scenario_ordinary_mode()
+            && self.horde.as_ref().is_none_or(|mode| mode.slot != side)
             && side < game.players.len()
             && self.scenario_type_allowed(side, name)
             && at[0] < game.w
@@ -105,7 +111,9 @@ impl Match {
             return true;
         }
         let game = &self.world.game;
-        if side >= game.players.len() || self.start.economy.players.get(side).is_none_or(|p| p.out)
+        if self.horde.as_ref().is_some_and(|mode| mode.slot == side)
+            || side >= game.players.len()
+            || self.start.economy.players.get(side).is_none_or(|p| p.out)
         {
             return false;
         }
@@ -213,7 +221,8 @@ impl Match {
             return Err("scenario arrivals require an ordinary match".into());
         }
         let game = &self.world.game;
-        if !self.scenario_type_allowed(side, name)
+        if self.horde.as_ref().is_some_and(|mode| mode.slot == side)
+            || !self.scenario_type_allowed(side, name)
             || side >= game.players.len()
             || self.start.economy.players.get(side).is_none_or(|p| p.out)
             || at[0] >= game.w

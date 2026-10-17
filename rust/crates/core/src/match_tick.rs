@@ -827,6 +827,7 @@ impl crate::match_runtime::Match {
                     },
                 )
                 .map_err(|error| format!("legacy scenario: {error}"))?;
+                self.step_authored_scenario(tick as u64, events)?;
             }
             phases.push(TickPhase::Scenario);
         }

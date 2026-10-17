@@ -232,7 +232,7 @@ impl StartPlan {
         }
         let world_mode = matches!(&profile, StartupProfile::World(_));
         let tutorial = matches!(&profile, StartupProfile::Tutorial);
-        if let Some(data) = map.source().get("scenario").filter(|data| !data.is_null()) {
+        if let Some(data) = crate::scenario_validation::explicit_scenario(map.source()) {
             crate::authored_scenario::validate_definition(
                 data,
                 options.players.len(),
@@ -874,12 +874,10 @@ impl Match {
             .collect::<Result<Vec<_>, String>>()?;
         let production =
             crate::production::ProductionState::new(initial_research).map_err(|e| e.to_string())?;
-        let scenario = if map
-            .source()
-            .get("scenario")
-            .is_some_and(|value| !value.is_null())
-            || map.triggers().is_empty()
-        {
+        let authored_scenario = crate::scenario_validation::explicit_scenario(map.source())
+            .cloned()
+            .map(crate::authored_scenario::AuthoredScenario::new);
+        let scenario = if authored_scenario.is_some() || map.triggers().is_empty() {
             None
         } else {
             let owners = start
@@ -928,13 +926,8 @@ impl Match {
             recruit_metadata: BTreeMap::new(),
             produced_placer: crate::produced_units::ProducedPlacer::new(),
             scenario,
+            authored_scenario,
             authored_mission: None,
-            authored_scenario: map
-                .source()
-                .get("scenario")
-                .filter(|value| !value.is_null())
-                .cloned()
-                .map(crate::authored_scenario::AuthoredScenario::new),
             logistics: crate::logistics::LogisticsState::default(),
             convoys: None,
             supply_net: crate::supply_network::GroundSupplyNetwork::default(),

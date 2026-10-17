@@ -139,6 +139,9 @@ fn if25_ai_fill_repeated_sort_keeps_the_earlier_far_cell_order_on_a_later_tie() 
         assert_eq!(planned.commands[0]["x"], 121.0);
         assert_eq!(planned.commands[0]["z"], 123.0);
         assert_eq!(planned.commands[0]["ids"][0], 1);
+        let saved = crate::save_codec::to_value(&state).unwrap();
+        let restored: State = crate::save_codec::from_value(saved).unwrap();
+        assert_eq!(state, restored);
     }
 }
 
@@ -154,6 +157,9 @@ fn if25_ai_demine_repeated_sort_keeps_earlier_mine_order_on_a_later_tie() {
         assert_eq!(planned.commands[0]["kind"], "demine");
         assert_eq!(planned.commands[0]["x"], 121.0);
         assert_eq!(planned.commands[0]["ids"][0], 1);
+        let saved = crate::save_codec::to_value(&state).unwrap();
+        let restored: State = crate::save_codec::from_value(saved).unwrap();
+        assert_eq!(state, restored);
     }
 }
 

@@ -1034,6 +1034,8 @@ fn intent_ai33_fortification_state_survives_full_match_and_every_seat_snapshot()
     assert_eq!(m.tick_state.fault(), None);
 }
 
+#[path = "commander_field_live_tests.rs"]
+mod field_live_tests;
 #[test]
 fn intent_ai12_refused_garrison_still_keeps_the_squad_busy_for_that_look() {
     use crate::{

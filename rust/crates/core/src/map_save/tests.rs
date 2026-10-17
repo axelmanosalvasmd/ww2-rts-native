@@ -174,8 +174,19 @@ fn map15_map_loading_uses_the_existing_complete_scenario_validator() {
             .values()
             .any(|u| u.owner == 0 && u.x == 19.0 && u.z == 19.0)
     );
-    for _ in 0..3 {
-        state.advance_tick().unwrap();
+    assert!(state.authored_scenario.is_some());
+    assert!(state.authored_mission.is_none());
+    for tick in 1..=3 {
+        let report = state.advance_tick().unwrap();
+        if tick == 1 {
+            assert!(report.events.iter().any(|event| matches!(
+                event,
+                crate::match_tick::TickEvent::AuthoredScenario(shot)
+                    if shot.shot_json()["k"] == "say"
+                        && shot.shot_json()["text"] == "Ready"
+                        && shot.shot_json()["pub"] == true
+            )));
+        }
         let cache = SnapshotCache::new(&state).unwrap();
         for slot in 0..2 {
             cache.recipient(slot).unwrap();

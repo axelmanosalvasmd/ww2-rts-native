@@ -14,6 +14,7 @@ fn outputs(hub: &mut Hub, rx: &mut mpsc::Receiver<Output>, now: u64) -> Vec<Valu
     let mut result = Vec::new();
     while let Ok(output) = rx.try_recv() {
         match output {
+            Output::Watcher(_) => panic!("watcher output on seated connection"),
             Output::Json(value) => result.push(value),
             Output::Watcher(json) => result.push(serde_json::from_str(&json).unwrap()),
             Output::Snapshot(frame) => {

@@ -115,17 +115,7 @@ impl NativeStartup {
         {
             return Err("native startup authoring map binding changed".into());
         }
-        if state
-            .authored_scenario
-            .as_ref()
-            .map(|mission| mission.definition())
-            != authored
-                .source()
-                .get("scenario")
-                .filter(|data| !data.is_null())
-        {
-            return Err("native startup mission definition disagrees with the bound map".into());
-        }
+        state.validate_authored_map_binding(authored)?;
         let plan = match state.options.mode {
             Mode::Tutorial => StartPlan::prepare_tutorial(authored, &state.options, &state.rules)?,
             Mode::Default | Mode::Conquest => {

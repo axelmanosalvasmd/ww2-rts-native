@@ -140,6 +140,9 @@ impl CommanderMemory {
                 })
             })
             .collect::<Result<Vec<_>>>()?;
+        if view.ground.len() != self.width * self.height {
+            return Err("invalid delivered commander ground dimensions".into());
+        }
         let team = players[self.slot].team;
         let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
         let standard = catalog
@@ -400,6 +403,23 @@ impl CommanderMemory {
             .filter(|b| b.kind == "depot")
             .map(|b| b.at)
             .collect();
+        context.field = Some(crate::commander_field_policy::Facts {
+            initial_chars: view.initial_chars.clone(),
+            initial_height: view.initial_height.clone(),
+            ground: view.ground.clone(),
+            bridges: view
+                .initial_chars
+                .iter()
+                .zip(&view.chars)
+                .enumerate()
+                .filter_map(|(cell, (initial, current))| {
+                    (*initial == b'=' || *current == b'=').then_some(cell)
+                })
+                .collect(),
+            mines: context.mines.clone(),
+            found_mines: context.found_mines.clone(),
+            free_nodes: context.site_nodes.clone(),
+        });
         context.smokes = view
             .smokes
             .iter()
@@ -741,6 +761,60 @@ mod tests {
                     .is_err()
             );
         }
+    }
+
+    #[test]
+    fn delivered_field_facts_keep_road_ground_and_crossings_across_detached_views() {
+        let (mut delivery, mut snap) = delivery();
+        let mut start = vec![b'.'; 1600];
+        start[6] = b'=';
+        delivery = delivery.with_terrain(start, None, false).unwrap();
+        snap["cells"] = json!([[5,"R",0,0,{"ground":"D","object":"R"}]]);
+        let first = delivery.decode(&snap).unwrap();
+        let mut commander = CommanderMemory::new(0, 40, 40).unwrap();
+        let packet = commander.observe(&first).unwrap();
+        let field = packet
+            .packet
+            .input()
+            .runtime
+            .as_ref()
+            .unwrap()
+            .field
+            .as_ref()
+            .unwrap();
+        assert_eq!(field.ground[5], b'D');
+        assert_eq!(field.ground[6], b'W');
+        assert_eq!(field.initial_chars[6], b'=');
+        assert!(field.bridges.contains(&6));
+        snap["tick"] = json!(22);
+        snap["cells"] = json!([[5,"F",0,0,{"ground":"F","object":"."}]]);
+        let flooded = delivery.decode(&snap).unwrap();
+        let packet = commander.observe(&flooded).unwrap();
+        assert_eq!(
+            packet
+                .packet
+                .input()
+                .runtime
+                .as_ref()
+                .unwrap()
+                .field
+                .as_ref()
+                .unwrap()
+                .ground[5],
+            b'F'
+        );
+        assert_eq!(
+            first.ground[5], b'D',
+            "later delivery preserves the old detached ground"
+        );
+        let before = delivery.clone();
+        snap["tick"] = json!(24);
+        snap["cells"] = json!([[5,"R",0,0,{"ground":"DD","object":"R"}]]);
+        assert!(delivery.decode(&snap).is_err());
+        assert_eq!(
+            delivery, before,
+            "invalid delivered layers do not publish terrain"
+        );
     }
 
     #[test]

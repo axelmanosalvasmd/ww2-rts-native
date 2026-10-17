@@ -1184,6 +1184,7 @@ impl Hub {
             saves: crate::saves::SaveStore::new("saves".into()),
             authored_maps_dir: None,
             records: crate::HordeRecords::new("horde-records.json"),
+            authored_maps_dir: None,
         }
     }
     pub(crate) fn configure_records(&mut self, records: crate::HordeRecords) {

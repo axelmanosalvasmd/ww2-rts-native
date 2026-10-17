@@ -1260,13 +1260,17 @@ fn plan_inner(
                 == Some(u.id);
             if allied(input.points[i].owner) && first {
                 if context.field.is_some() {
-                    let mut holder_input = input.clone();
+                    let mut holder_input = mirrored(observation, &commands)?.input().clone();
                     holder_input.manpower = budget;
                     let holder_observation =
                         Observation::new(holder_input).map_err(|e| e.to_string())?;
                     crate::commander_field_policy::holder(
                         &holder_observation,
-                        u,
+                        &holder_observation.input().units[holder_observation
+                            .input()
+                            .units
+                            .binary_search_by_key(&u.id, |unit| unit.id)
+                            .unwrap()],
                         i,
                         state.field.armor_seen,
                         |raw| {

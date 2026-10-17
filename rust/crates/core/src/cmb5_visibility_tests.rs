@@ -6,7 +6,7 @@ use crate::{
     map::AuthoritativeMap,
     match_commands::{MatchCommands, UnitControl},
     match_runtime::{Match, MatchOptions, PlayerConfig},
-    recipient_snapshot::{SnapshotCache, SnapshotError},
+    recipient_snapshot::{DeliveryState, SelectedSeat, SnapshotCache, SnapshotError},
     unit_spawn::{initial_aircraft, initial_unit},
     weather::WeatherChoice,
     world::World,
@@ -365,6 +365,35 @@ fn cmb127_horde_reveals_only_active_final_ground_enemies_and_bosses_to_defenders
         m.restrict_to_ordinary_snapshots(),
         Err(SnapshotError::Rules)
     );
+
+    // Canonical Horde state is admitted through the wave and every-seat delivery.
+    let mut opts = options(&[0, 1]);
+    opts.mode = Mode::Horde;
+    let mut m = Match::new_horde(&map(), opts).unwrap();
+    m.restrict_to_ordinary_snapshots().unwrap();
+    let mut delivery = DeliveryState::new(&m).unwrap();
+    let seats = (0..m.world.game.players.len())
+        .map(|slot| SelectedSeat {
+            slot,
+            full: true,
+            omit: false,
+        })
+        .collect::<Vec<_>>();
+    assert!(m.end_horde_break().unwrap());
+    for _ in 0..16 {
+        let report = m.advance_tick().unwrap();
+        assert!(m.tick_state.fault().is_none());
+        assert!(m.horde.as_ref().unwrap().active);
+        let frame = delivery
+            .capture_selected_with_tick_events(&mut m, &seats, &report.events)
+            .unwrap()
+            .unwrap();
+        for seat in &seats {
+            let snapshot = frame.recipient(seat.slot).unwrap().into_json();
+            assert_eq!(snapshot["tick"], report.tick);
+            assert_eq!(snapshot["mode"]["kind"], "horde");
+        }
+    }
 }
 
 #[test]

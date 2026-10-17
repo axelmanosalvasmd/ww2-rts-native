@@ -181,6 +181,33 @@ fn emit_destroy(
 }
 
 impl Match {
+    /// Bind a saved authored owner to the exact private definition of its source map.
+    pub fn validate_authored_map_binding(
+        &self,
+        map: &crate::map::AuthoritativeMap,
+    ) -> Result<(), String> {
+        if self.authored_mission.is_some() {
+            return Err("legacy authored mission checkpoints are unsupported".into());
+        }
+        let owners = usize::from(self.scenario.is_some())
+            + usize::from(self.authored_scenario.is_some())
+            + usize::from(self.authored_mission.is_some());
+        if owners > 1 {
+            return Err("authored and legacy scenario owners cannot coexist".into());
+        }
+        let matches = if let Some(scenario) = &self.authored_scenario {
+            scenario.matches_map(map)
+        } else if let Some(mission) = &self.authored_mission {
+            mission.matches_map(map)
+        } else {
+            crate::scenario_validation::explicit_scenario(map.source()).is_none()
+        };
+        if !matches {
+            return Err("authored scenario definition disagrees with source map".into());
+        }
+        Ok(())
+    }
+
     /// Validate admitted mission owners before ticks, snapshots and checkpoint restoration.
     pub fn preflight_legacy_scenario(&self) -> Result<(), String> {
         if self.authored_mission.is_some() {

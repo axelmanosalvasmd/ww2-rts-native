@@ -272,3 +272,7 @@ Merged exact `ea9aa761636f5a3ed2a983232958633bed9e1e68`. Retained immediate cons
 ## Cross-chain #419
 
 Merged exact `e4c0801df68f886c1f019c680f7e6da304d9cffa`. The scenario actuator now initializes physical reserves on its canonical publication path and admits the incoming ordinary modes. Replaced the old Classic recipient-only group refusal with full validated ordinary scenario composition. Preserved old/new scene helper capabilities, all trigger-budget tests, Classic ghost delivery, closed World/Horde/Tutorial authored admission and the broader complete mode projections. Explicit constructor weather seeds are composed into asynchronous generation without synchronous map parsing or duplicate entropy reads. Full validation remains pending.
+
+## Cross-chain #442
+
+Merged exact `6a9621eff16002c29366bf9fdece3b7370d02ddc`. The complete authoring query implementation and C-entry witnesses are composed with additive ABI 2.2, all admitted room modes, one production delivered-AI owner and the reconciled required-clock authored-v2 schema. Reintroduced older experimental authored-mission compatibility was rejected in favor of the recorded save-owner decision, retaining its explicit refusal tests and the new ordered translation binding tests. Canonical engineering job memory is preserved and round-trip witnesses use its actual schema; the older competing scheduler was not restored. Incoming detached terrain ground is also forwarded into the production delivered-view field facts. Full combined qualification remains pending.

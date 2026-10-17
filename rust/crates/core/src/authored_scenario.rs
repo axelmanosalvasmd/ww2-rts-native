@@ -163,16 +163,26 @@ where
     <Option<T> as serde::Deserialize>::deserialize(deserializer)
 }
 fn supported_localization(text: &Value) -> bool {
-    text.is_string()
-        || text
-            .as_object()
-            .is_some_and(|m| m.get("en").is_some_and(Value::is_string))
+    localized_text(text).is_some()
 }
 fn localized_text(text: &Value) -> Option<String> {
     text.as_str().map(str::to_owned).or_else(|| {
         text.get("en")
             .and_then(Value::as_str)
-            .or_else(|| text.as_object()?.values().next()?.as_str())
+            .or_else(|| {
+                let object = text.as_object()?;
+                // JavaScript enumerates canonical array-index keys before other keys.
+                object
+                    .iter()
+                    .filter_map(|(key, value)| {
+                        let index = key.parse::<u32>().ok()?;
+                        (index < u32::MAX && key == &index.to_string()).then_some((index, value))
+                    })
+                    .min_by_key(|(index, _)| *index)
+                    .map(|(_, value)| value)
+                    .or_else(|| object.values().next())?
+                    .as_str()
+            })
             .or_else(|| text.as_array()?.first()?.as_str())
             .map(str::to_owned)
     })
@@ -212,7 +222,12 @@ pub(crate) fn validate_definition(data: &Value, count: usize, mode: Mode) -> Res
         || data["version"].as_f64() != Some(1.0)
         || !matches!(
             mode,
-            Mode::Default | Mode::Conquest | Mode::Assault | Mode::Annihilation | Mode::Classic
+            Mode::Default
+                | Mode::Conquest
+                | Mode::Assault
+                | Mode::Annihilation
+                | Mode::Classic
+                | Mode::Horde
         )
         || list(data, "objectives")
             .iter()
@@ -226,14 +241,9 @@ pub(crate) fn validate_definition(data: &Value, count: usize, mode: Mode) -> Res
                 || !condition_sides_exist(&t["condition"], count)
                 || list(t, "actions").iter().any(|a| !side_exists(a, count))
         })
-        || list(data, "triggers")
-            .iter()
-            .flat_map(|t| list(t, "actions"))
-            .any(|a| a["kind"] == "say" && !supported_localization(&a["text"]))
     {
         return Err(
-            "authored scenarios require ordinary rooms, present sides, ordinary targets and supported localized text"
-                .into(),
+            "authored scenarios require non-World rooms, present sides and ordinary targets".into(),
         );
     }
     Ok(())
@@ -334,9 +344,17 @@ impl AuthoredScenario {
     pub fn definition(&self) -> &Value {
         &self.data
     }
-    pub fn matches_map(&self, map: &crate::map::AuthoritativeMap) -> bool {
-        map.source().get("scenario") == Some(&self.data)
+    pub(crate) fn matches_map(&self, map: &crate::map::AuthoritativeMap) -> bool {
+        let Some(expected) = crate::scenario_validation::explicit_scenario(map.source()) else {
+            return false;
+        };
+        // Localization fallback observes object order; Value equality ignores it.
+        match (serde_json::to_vec(&self.data), serde_json::to_vec(expected)) {
+            (Ok(actual), Ok(expected)) => actual == expected,
+            _ => false,
+        }
     }
+
     pub(crate) fn recipient(&self, state: &Match, slot: usize, full_map: bool) -> Value {
         json!({"version":1,"objectives":self.objectives.iter()
             .filter(|o| o.recipients == "public" || (!full_map && permitted(state,&o.recipients,o.side,slot)))

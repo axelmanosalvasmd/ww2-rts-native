@@ -696,3 +696,100 @@ fn unrestricted_recorded_recon_retains_independent_component_admission() {
     assert_eq!(state.story[0].support_calls, calls + 1.0);
     assert_eq!(state.world.game.strikes.len(), 1);
 }
+
+#[test]
+fn hosted_recorded_plane_support_pays_once_and_delivers_every_seat() {
+    for kind in ["recon", "strafe", "bombing", "dive"] {
+        let mut state = scene();
+        state.restrict_to_ordinary_snapshots().unwrap();
+        state
+            .initialize_tick_scene(0, TickPathConfig::default())
+            .unwrap();
+        let mut baseline = scene();
+        baseline.restrict_to_ordinary_snapshots().unwrap();
+        baseline
+            .initialize_tick_scene(0, TickPathConfig::default())
+            .unwrap();
+        baseline.advance_tick().unwrap();
+        let price = economy::sup_cost(Mode::Conquest, kind).unwrap();
+        let calls = state.story[0].support_calls;
+        record(&mut state, kind);
+        let selected = (0..2)
+            .map(|slot| SelectedSeat {
+                slot,
+                full: false,
+                omit: false,
+            })
+            .collect::<Vec<_>>();
+        let mut delivery = DeliveryState::new(&state).unwrap();
+        for tick in 1..=8 {
+            let report = state.advance_tick().unwrap();
+            if tick == 1 {
+                assert_eq!(report.commands.len(), 1);
+                assert_eq!(report.commands[0].denial, None, "{kind}");
+                let mut expected = baseline.start.economy.players[0].clone();
+                match price.currency {
+                    economy::Currency::Manpower => expected.mp -= price.cost,
+                    economy::Currency::Munitions => expected.mun -= price.cost,
+                }
+                assert_eq!(state.start.economy.players[0], expected, "{kind}");
+                assert_eq!(state.story[0].support_calls, calls + 1.0);
+                assert_eq!(state.world.game.strikes.len(), 1);
+            }
+            let frame = delivery
+                .capture_selected_with_tick_events(&mut state, &selected, &report.events)
+                .unwrap()
+                .unwrap();
+            for slot in 0..2 {
+                assert_eq!(frame.recipient(slot).unwrap().into_json()["t"], "s");
+            }
+        }
+        assert_eq!(state.story[0].support_calls, calls + 1.0);
+        assert_eq!(state.commands.pending_commands(), 0);
+    }
+}
+
+#[test]
+fn hosted_recorded_support_refuses_unseen_drops_and_unknown_kinds_without_publication() {
+    for (kind, denial) in [("para", Denial::Unseen), ("unknown", Denial::Unsupported)] {
+        let mut state = scene();
+        state.restrict_to_ordinary_snapshots().unwrap();
+        record(&mut state, kind);
+        let before = (
+            state.start.economy.clone(),
+            state.start.players[0].support.clone(),
+            state.world.game.strikes.clone(),
+            state.support.clone(),
+            state.story.clone(),
+            state.start.random.clone(),
+            state.next_unit_id,
+        );
+        let results = state.apply_commands(1, false).unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].denial, Some(denial), "{kind}");
+        assert_eq!(
+            (
+                state.start.economy.clone(),
+                state.start.players[0].support.clone(),
+                state.world.game.strikes.clone(),
+                state.support.clone(),
+                state.story.clone(),
+                state.start.random.clone(),
+                state.next_unit_id,
+            ),
+            before,
+            "rejection must leave paid and published state unchanged: {kind}"
+        );
+        assert_eq!(state.commands.pending_commands(), 0);
+        state.preflight_ordinary_snapshot().unwrap();
+    }
+
+    let mut state = scene();
+    // The unbound component API retains ordinary recon admission.
+    record(&mut state, "recon");
+    assert_eq!(state.apply_commands(1, false).unwrap()[0].denial, None);
+    assert_eq!(
+        state.world.game.strikes[0].runtime.as_ref().unwrap().kind,
+        crate::match_support::SupportKind::Recon
+    );
+}
