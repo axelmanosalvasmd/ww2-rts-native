@@ -262,8 +262,12 @@ fn actual_tick_owns_complete_original_chronological_outputs() {
                     TickEvent::Support(_) => 1,
                     TickEvent::Aviation(_) => 2,
                     TickEvent::Environment(_) => 3,
-                    TickEvent::Horde(_) | TickEvent::Scenario(_) | TickEvent::AuthoredMission(_) => {
-                        panic!("the original four-family fixture has no Scenario, Horde or authored-mission output")
+                    TickEvent::Horde(_)
+                    | TickEvent::Scenario(_)
+                    | TickEvent::AuthoredMission(_) => {
+                        panic!(
+                            "the original four-family fixture has no Scenario, Horde or authored-mission output"
+                        )
                     }
                 }] = true;
             }
