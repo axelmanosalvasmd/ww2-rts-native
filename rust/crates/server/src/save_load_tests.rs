@@ -31,6 +31,17 @@ fn assert_same_json(a: &Value, b: &Value) {
     assert!(a == b, "{}", difference(a, b, "$").unwrap_or_default());
 }
 
+fn sorted_keys(value: &Value) -> Vec<&str> {
+    let mut keys = value
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect::<Vec<_>>();
+    keys.sort_unstable();
+    keys
+}
+
 struct TestDir(PathBuf);
 impl TestDir {
     fn new() -> Self {
@@ -324,21 +335,11 @@ fn net89_manual_save_requires_running_host_and_replies_before_lobby() {
         .read("ABC", received[0]["id"].as_str().unwrap())
         .unwrap();
     assert_eq!(
-        saved
-            .as_object()
-            .unwrap()
-            .keys()
-            .map(String::as_str)
-            .collect::<Vec<_>>(),
+        sorted_keys(&saved),
         vec!["ai", "g", "guard", "map", "seats", "settings", "version"]
     );
     assert_eq!(
-        saved["settings"]
-            .as_object()
-            .unwrap()
-            .keys()
-            .map(String::as_str)
-            .collect::<Vec<_>>(),
+        sorted_keys(&saved["settings"]),
         vec![
             "army",
             "defenderTeam",
@@ -407,12 +408,7 @@ fn net12_saved_editor_map_restores_exact_state_and_every_seat_through_victory() 
     assert_eq!(saved["version"], 1);
     assert_eq!(saved["map"], raw);
     assert_eq!(
-        saved
-            .as_object()
-            .unwrap()
-            .keys()
-            .map(String::as_str)
-            .collect::<Vec<_>>(),
+        sorted_keys(&saved),
         ["ai", "g", "guard", "map", "seats", "settings", "version"]
     );
     // Loading binds the saved raw map even after the editor replaces its file.
@@ -901,13 +897,21 @@ fn mode55_lobby_record_uses_current_map_defender_count_and_army_after_reload() {
     assert_eq!(room.lobby(host.id, &hub.maps, "")["hordeBest"], Value::Null);
     room.mode = "conquest".into();
     assert_eq!(room.lobby(host.id, &hub.maps, "")["hordeBest"], Value::Null);
-    // Persistence does not enable public Horde start.
+    // Record lookup remains valid when the admitted Horde room starts.
     room.mode = "horde".into();
     hub.message("ABC", &host, &mut true, json!({"t":"start"}), 1);
     assert!(
         messages(&mut hub, &mut rx)
             .iter()
-            .any(|m| m["t"] == "deny" && m["cmd"] == "start")
+            .all(|m| m["t"] != "deny")
     );
-    assert!(hub.rooms["ABC"].native.is_none());
+    let runtime = &mut hub
+        .rooms
+        .get_mut("ABC")
+        .unwrap()
+        .native
+        .as_mut()
+        .unwrap()
+        .runtime;
+    super::mode_options_tests::tick_every_seat(runtime, false);
 }
