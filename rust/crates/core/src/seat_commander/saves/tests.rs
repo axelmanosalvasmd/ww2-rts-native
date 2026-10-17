@@ -222,6 +222,7 @@ fn if27_horde_pending_memory_round_trips_order_budget_and_supersession() {
     use crate::game::Point;
     use crate::horde_commander::{HordeCommander, Live, OwnPlan, OwnUnit, View, Wave};
     let plan = OwnPlan {
+        delivered: None,
         path_generation: 2,
         goal: None,
         route_end: None,
@@ -477,6 +478,10 @@ fn if27_field_and_world_policy_memory_round_trip_and_legacy_defaults() {
         "rail_at":{"7":23}, "fort_steps":{"8":3},
         "field": encoded["tactics"]["field"].clone()
     });
+    encoded["tactics"]["engineering"] = serde_json::json!({
+        "bridges":[17], "start_seen":true, "crew":{}
+    });
+    encoded["tactics"]["armor_ever_seen"] = serde_json::json!(true);
     **policy = serde_json::from_value(encoded.clone()).unwrap();
     let expected = policy.clone();
     let memory = HumanObservationMemory::new(0);
@@ -492,6 +497,8 @@ fn if27_field_and_world_policy_memory_round_trip_and_legacy_defaults() {
     let tactics = encoded["tactics"].as_object_mut().unwrap();
     tactics.remove("field");
     tactics.remove("world");
+    tactics.remove("engineering");
+    tactics.remove("armor_ever_seen");
     let legacy: HumanPolicy = serde_json::from_value(encoded).unwrap();
     let legacy = serde_json::to_value(legacy).unwrap();
     assert_eq!(
@@ -502,4 +509,9 @@ fn if27_field_and_world_policy_memory_round_trip_and_legacy_defaults() {
         legacy["tactics"]["world"],
         serde_json::to_value(crate::commander_world_policy::State::default()).unwrap()
     );
+    assert_eq!(
+        legacy["tactics"]["engineering"],
+        serde_json::to_value(crate::commander_engineering::State::default()).unwrap()
+    );
+    assert_eq!(legacy["tactics"]["armor_ever_seen"], false);
 }

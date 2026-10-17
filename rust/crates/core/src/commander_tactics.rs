@@ -223,7 +223,9 @@ pub struct State {
     pub field: crate::commander_field_policy::State,
     #[serde(default)]
     pub world: crate::commander_world_policy::State,
+    #[serde(default)]
     pub(crate) engineering: crate::commander_engineering::State,
+    #[serde(default)]
     pub(crate) armor_ever_seen: bool,
 }
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
