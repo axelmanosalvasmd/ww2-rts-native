@@ -249,13 +249,9 @@ impl Match {
                 .enumerate()
                 .filter(|(_, p)| p.config.team != player.config.team)
                 .collect::<Vec<_>>();
-            enemies.sort_by(|(a, p), (b, q)| {
+            crate::sort::sort_by(&mut enemies, |(_, p), (_, q)| {
                 math::hypot(p.spawn.x - player.spawn.x, p.spawn.z - player.spawn.z)
-                    .total_cmp(&math::hypot(
-                        q.spawn.x - player.spawn.x,
-                        q.spawn.z - player.spawn.z,
-                    ))
-                    .then(a.cmp(b))
+                    - math::hypot(q.spawn.x - player.spawn.x, q.spawn.z - player.spawn.z)
             });
             for (other, _) in enemies.into_iter().take(2) {
                 let pair = (slot.min(other), slot.max(other));
@@ -595,7 +591,7 @@ impl Match {
             }
             wallets.players[slot].out = true;
             let team = wallets.players[slot].team;
-            let mates = wallets
+            let mut mates = wallets
                 .players
                 .iter()
                 .enumerate()
@@ -625,16 +621,13 @@ impl Match {
                     {
                         return Err("transfer cargo, riders and field work are unsupported".into());
                     }
-                    let to = *mates
-                        .iter()
-                        .min_by(|&&a, &&b| {
-                            let a_at = self.start.players[a].spawn;
-                            let b_at = self.start.players[b].spawn;
-                            math::hypot(a_at.x - unit.x, a_at.z - unit.z)
-                                .total_cmp(&math::hypot(b_at.x - unit.x, b_at.z - unit.z))
-                                .then(a.cmp(&b))
-                        })
-                        .unwrap();
+                    crate::sort::sort_by(&mut mates, |a, b| {
+                        let a_at = self.start.players[a].spawn;
+                        let b_at = self.start.players[b].spawn;
+                        math::hypot(a_at.x - unit.x, a_at.z - unit.z)
+                            - math::hypot(b_at.x - unit.x, b_at.z - unit.z)
+                    });
+                    let to = mates[0];
                     let unit = draft.transaction.world.game.units.get_mut(&id).unwrap();
                     if unit.path_gen == u64::MAX {
                         return Err("transferred route identity exhausted".into());

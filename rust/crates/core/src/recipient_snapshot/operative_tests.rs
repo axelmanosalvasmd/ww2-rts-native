@@ -164,7 +164,9 @@ fn operative_rows_use_cached_masks_and_reject_unbacked_runtime_state() {
     state.world.game.reveal = true;
     let cache = SnapshotCache::new(&state).unwrap();
     for slot in 0..3 {
-        let fields = cache.recipient(slot).unwrap().fields;
+        let projection = cache.recipient(slot).unwrap();
+        assert_eq!(projection, recipient_uncached(&state, slot).unwrap());
+        let fields = projection.fields;
         let row = fields["units"]
             .as_array()
             .unwrap()
@@ -182,6 +184,13 @@ fn operative_rows_use_cached_masks_and_reject_unbacked_runtime_state() {
         );
     }
     state.companions.soldiers.remove(&id);
+    assert!(matches!(
+        recipient_uncached(&state, 0),
+        Err(SnapshotError::Unsupported {
+            capability: SnapshotCapability::Operatives,
+            ..
+        })
+    ));
     assert!(matches!(
         SnapshotCache::new(&state),
         Err(SnapshotError::Unsupported {
@@ -308,6 +317,13 @@ fn operative_grenade_flight_and_launch_rows_match_literal_shapes_and_fog_rules()
     });
     state.firing.events.clear();
     state.world.game.reveal = true;
+    let cache = SnapshotCache::new(&state).unwrap();
+    for slot in 0..3 {
+        assert_eq!(
+            cache.recipient(slot).unwrap(),
+            recipient_uncached(&state, slot).unwrap()
+        );
+    }
     let mut delivery = DeliveryState::new(&state).unwrap();
     let frame = delivery
         .capture_selected_with_tick_events(
