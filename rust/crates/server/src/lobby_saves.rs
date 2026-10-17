@@ -35,6 +35,18 @@ impl Hub {
         let Some(command @ ("save" | "loadSave")) = message["t"].as_str() else {
             return false;
         };
+        // Non-host spectators fall through silently in the prototype callback.
+        if let Some(room) = self.rooms.get(code)
+            && !room.is_host(connection_id)
+            && room.spectators.iter().any(|person| {
+                person
+                    .connection
+                    .as_ref()
+                    .is_some_and(|c| c.id == connection_id)
+            })
+        {
+            return true;
+        }
         let result = if command == "save" {
             self.save_room(code, connection_id).map(|id| {
                 if let Some(room) = self.rooms.get(code) {

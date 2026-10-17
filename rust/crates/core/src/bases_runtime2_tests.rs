@@ -114,6 +114,82 @@ fn coastal_match(naval: bool, tech: bool) -> Match {
 }
 
 #[test]
+fn base27_preview_reasons_match_real_build_denials_without_payment_or_tick_faults() {
+    use crate::building_placement::{Context as PlacementContext, Reason};
+    use crate::game::Point;
+    use crate::recipient_snapshot::SnapshotCache;
+    for (naval, kind, at, expected, denial) in [
+        (
+            false,
+            "shipyard",
+            Point { x: 44.0, z: 28.0 },
+            Reason::Blocked,
+            "blocked",
+        ),
+        (
+            true,
+            "shipyard",
+            Point { x: 30.0, z: 36.0 },
+            Reason::Coast,
+            "coast",
+        ),
+        (
+            true,
+            "barracks",
+            Point { x: 220.0, z: 220.0 },
+            Reason::NotVisible,
+            "notVisible",
+        ),
+    ] {
+        let mut m = coastal_match(naval, false);
+        let worker = own(&m, 0, "rifle");
+        let preview = crate::building_placement::check(
+            &PlacementContext {
+                game: &m.world.game,
+                rules: &m.rules,
+                mode: m.options.mode,
+                logistics: m.options.logistics,
+                nodes: &[],
+                owned_cells: None,
+                rail_yard: None,
+            },
+            kind,
+            at,
+            |center| m.recipient_sees(0, center),
+        )
+        .unwrap();
+        assert_eq!(preview.reason, Some(expected));
+        let before = (
+            m.start.economy.clone(),
+            m.next_unit_id,
+            m.world.game.units.len(),
+        );
+        denied(
+            &mut m,
+            0,
+            json!({"t":"build","kind":kind,"ids":[worker],"x":at.x,"z":at.z}),
+            denial,
+        );
+        assert_eq!(
+            (
+                m.start.economy.clone(),
+                m.next_unit_id,
+                m.world.game.units.len()
+            ),
+            before
+        );
+        for _ in 0..4 {
+            m.advance_tick().unwrap();
+            let cache = SnapshotCache::new(&m).unwrap();
+            for slot in 0..m.start.players.len() {
+                cache.recipient(slot).unwrap();
+            }
+        }
+        assert!(m.tick_state.fault().is_none());
+    }
+}
+
+#[test]
 fn base39_coastal_shipyard_builds_and_launches_its_boats() {
     for (field, value) in [
         ("cost", 150.),

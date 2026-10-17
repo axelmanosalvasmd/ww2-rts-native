@@ -356,10 +356,8 @@ pub(crate) fn plan(
         .get("fortBuilders")
         .and_then(Rule::array)
         .ok_or("missing construction builders")?;
-    let worker = available
-        .iter()
-        .copied()
-        .filter(|u| {
+    let worker = crate::sort::first_by(
+        available.iter().copied().filter(|u| {
             u.owner == input.slot
                 && u.hp > 0.0
                 && !u.retreating
@@ -370,12 +368,12 @@ pub(crate) fn plan(
                 && !u.entrench
                 && !u.garrison
                 && builders.iter().any(|k| k.string() == Some(u.kind.as_str()))
-        })
-        .min_by(|a, b| {
+        }),
+        |a, b| {
             distance(a.at, input.players[input.slot].spawn)
-                .total_cmp(&distance(b.at, input.players[input.slot].spawn))
-                .then(a.id.cmp(&b.id))
-        });
+                - distance(b.at, input.players[input.slot].spawn)
+        },
+    );
     let Some(worker) = worker else {
         return Ok(plan);
     };
@@ -388,11 +386,11 @@ pub(crate) fn plan(
             repairs.push(u);
         }
     }
-    if let Some(fix) = repairs.into_iter().min_by(|a, b| {
-        (built(a) >= 1.0)
-            .cmp(&(built(b) >= 1.0))
-            .then(distance(worker.at, a.at).total_cmp(&distance(worker.at, b.at)))
-            .then(a.id.cmp(&b.id))
+    if let Some(fix) = crate::sort::first_by(repairs, |a, b| {
+        crate::sort::then(
+            f64::from(u8::from(built(a) >= 1.0)) - f64::from(u8::from(built(b) >= 1.0)),
+            distance(worker.at, a.at) - distance(worker.at, b.at),
+        )
     }) {
         plan.commands
             .push(json!({"t":"assist","ids":[worker.id],"id":fix.id}));

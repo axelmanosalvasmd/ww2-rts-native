@@ -460,11 +460,7 @@ pub fn plan(
                     })
             })
             .collect();
-        candidates.sort_by(|a, b| {
-            dist(a.at, at)
-                .total_cmp(&dist(b.at, at))
-                .then(a.id.cmp(&b.id))
-        });
+        crate::sort::sort_by(&mut candidates, |a, b| dist(a.at, at) - dist(b.at, at));
         let line: Vec<_> = candidates
             .iter()
             .copied()
