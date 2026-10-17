@@ -194,10 +194,6 @@ pub(super) fn admit_actors(state: &Match, outside_events: &[Effect]) -> Result<(
     state
         .preflight_legacy_scenario()
         .map_err(|_| refused(SnapshotCapability::Scenario))?;
-    if state.options.logistics || state.logistics.iter().next().is_some() || state.convoys.is_some()
-    {
-        return Err(refused(SnapshotCapability::Logistics));
-    }
     Ok(())
 }
 

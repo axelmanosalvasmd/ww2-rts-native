@@ -1,0 +1,3 @@
+- Prepare ordinary Conquest reserve, mandatory withdrawal, supply-network and convoy phases behind the closed full-tick logistics guard. Withdrawal cancels canonical construction and shared field work, and forced troops accept stance controls through the Match adapter.
+- Include held points as Annihilation supply-network sources, while retaining depot-only point sources in other modes.
+- Add component and Match-adapter checks for support provision costs, mandatory withdrawal and player control, network sources and depot recovery. Logistics-off matches run ordinary ticks with complete snapshots; logistics-enabled ticks and complete snapshot composition remain refused. LOG-14 and LOG-20 remain incomplete.

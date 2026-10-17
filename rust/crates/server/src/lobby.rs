@@ -906,6 +906,14 @@ const UNAVAILABLE: &[&str] = &[
     "logisticsResume",
 ];
 
+// Prototype server.js:353-356. This selects an option, not mode admission.
+fn logistics_enabled_for(mode: &str, map: &Value) -> bool {
+    if truthy(&map["scenario"]) {
+        return map["scenario"]["logistics"] == Value::Bool(true);
+    }
+    matches!(mode, "conquest" | "classic" | "annihilation" | "world")
+}
+
 fn truthy(v: &Value) -> bool {
     match v {
         Value::Null => false,
@@ -1829,6 +1837,7 @@ impl Hub {
                 })
             })
             .collect::<Result<Vec<_>, String>>()?;
+        let map = crate::authoritative_maps::load(&room.map).map_err(|e| e.to_string())?;
         let state = crate::authoritative_maps::create_match(
             &room.map,
             MatchOptions {
@@ -1843,7 +1852,7 @@ impl Hub {
                 map_key: Some(room.map.clone()),
                 tech: true,
                 supply: true,
-                logistics: false,
+                logistics: logistics_enabled_for(&room.mode, map.source()),
                 sandbox: false,
             },
         )

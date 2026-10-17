@@ -22,6 +22,8 @@ mod engineering;
 mod falling;
 #[path = "recipient_snapshot/modes.rs"]
 mod modes;
+#[path = "recipient_snapshot/logistics.rs"]
+mod logistics;
 #[path = "recipient_snapshot/owners.rs"]
 mod owners;
 #[path = "recipient_snapshot/public_state.rs"]
@@ -306,6 +308,9 @@ fn project_recipient(
     fields.extend(owners);
     fields.extend(public);
     fields.insert("falling".into(), falling::project(state, slot)?);
+    if let Some(logistics) = logistics::project(state, slot)? {
+        fields.insert("logistics".into(), logistics);
+    }
     Ok(RecipientProjection {
         fields,
         missing: vec![
@@ -314,7 +319,6 @@ fn project_recipient(
             SnapshotCapability::Fog,
             SnapshotCapability::ShotsAndFlights,
             SnapshotCapability::TeamEffects,
-            SnapshotCapability::Logistics,
         ],
     })
 }
