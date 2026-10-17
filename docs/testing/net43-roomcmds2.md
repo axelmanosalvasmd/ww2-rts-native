@@ -85,3 +85,27 @@ requiring the real throw, retained grenade flight, cooldown and flight/ticket
 expiry. Every callback still checks room fault state and snapshots for both
 seats; this agent ran no Cargo, Source or Node commands, and post-repair
 execution belongs to the parent run.
+
+## Broad regression repairs
+
+The parent run at `036d5abb` passed all 70 focused tests. The subsequent broad
+run selected 575 tests and reported 570 passes and five failures in
+`/tmp/roomcmds2-broad.log`.
+
+`socket_controls_use_owned_slot_and_survive_same_token_takeover` expected an
+Attack `blocked` denial but received `unseen`. Attack now reaches the canonical
+visibility check for its hidden enemy target (`shared/sim.js:3499-3501`), so the
+repair changes only that literal denial reason. The test keeps its original
+ownership, malformed-input, movement, stance, decode and socket takeover checks.
+
+`absent_and_unready_connections_are_distinct_and_expiry_precedes_callbacks`
+still reached tick 2, but its retained connections were incorrectly marked
+away after their send receivers closed. This was a runtime regression:
+`Person::online` checks send readiness, while the prototype sets simulation
+away from socket absence and the AI flag (`server.js:784`). The repair changes
+only that away predicate to `connection.is_none() && !ai`; delivery eligibility,
+pause connectivity and online metadata retain their existing readiness checks.
+The absence/unready/expiry test remains unchanged, preserving every assertion.
+
+The parent owns the other three broad failures and post-repair validation.
+This agent ran no Cargo, Source or Node commands and made no commit.

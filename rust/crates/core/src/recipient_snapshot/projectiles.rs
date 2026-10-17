@@ -10,17 +10,8 @@ pub(super) fn validate(state: &Match) -> Result<(), SnapshotError> {
         state
             .validate_firing_tick_state()
             .map_err(|_| SnapshotError::Rules)?;
-        if state
-            .firing
-            .flights
-            .values()
-            .any(|p| state.rules.kinds[p.source_kind].air)
-        {
-            return Err(SnapshotError::Unsupported {
-                unit: 0,
-                capability: SnapshotCapability::Air,
-            });
-        }
+        // Canonical firing validation includes the aviation sortie owner.
+        // Aircraft rounds use the same prototype flight row as ground rounds.
     }
     if !state.firing.grenades.is_empty() {
         state

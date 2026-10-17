@@ -112,3 +112,9 @@ Incoming main `3c33cd040b8fcaa71d2795b3b3030c749b522706` adds #400 spectator mis
 - This record documents the merge. No other path is manually changed in this merge.
 
 The automatic authored-mission field initializers, validation, spectator filtering and tests remain. No prototype, C ABI or parity-status file is edited by this reconciliation.
+
+## Broader qualification repairs
+
+At `036d5abb4723c06a010229d86eb956d82849181d`, all 70 focused tests pass. The broader affected-package run executes 575 tests: 570 pass and five fail. The existing aircraft/artillery full-match test exposes a retained Horde-only projectile guard rejecting an actual aircraft round as `Unsupported { unit: 0, capability: Air }`. Remove that obsolete source-kind exclusion, preserving canonical firing validation (including the aviation sortie owner), all generic trajectory/grenade/salvo checks, and operative validation. Both aircraft and ground rounds use the same already documented flight projector. The original full-match test and all its assertions remain unchanged.
+
+The other four failures concern obsolete support and mode admission expectations, the newly canonical Attack denial, and connection-readiness fixture semantics. Their test reconciliations and reasons are recorded separately. Passing focused tests at `036d5abb` are historical evidence, not a claim that a later repair head has executed.

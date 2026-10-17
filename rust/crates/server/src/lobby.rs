@@ -1665,7 +1665,7 @@ impl Hub {
                 let mut away = room
                     .players
                     .iter()
-                    .map(|person| !person.online())
+                    .map(|person| person.connection.is_none() && !person.ai)
                     .collect::<Vec<_>>();
                 away.resize(
                     room.native

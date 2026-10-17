@@ -86,3 +86,9 @@ Pending aimed abilities retain the ordinary movement and weapon lifecycle:
 the unit walks into ability range and still receives its normal targeting and
 firing turn (`shared/sim.js:5416-5430,5557-5580`). A pending aimed point is
 supported state, including while it persists across ticks before the throw.
+
+Simulation `away` follows socket presence rather than send readiness:
+a human is away only after its retained connection is absent, while AI seats
+remain present (`server.js:784`). Frame delivery and `online` metadata keep
+their existing readiness rules, so a present connection with an unready sender
+can skip output without changing army authority or simulation presence.
