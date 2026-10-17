@@ -70,8 +70,8 @@ The in-process recorder does not exercise WebSocket framing, close codes, subpro
 1. **JSON over WebSocket** works in the Unreal client on Linux. Keep the reference wire shapes for this phase.
 2. **`proto` and `client`:** the Unreal client will send `proto: 0` and a client identifier in its next integration follow-up; the build running on 2026-10-12 does not send them yet.
 
-## Still open (product and security decisions)
+## Product and security decisions (2026-10-16)
 
 1. Spectators (correction 2): resolved to reference behavior by owner clarification J, 2026-10-16.
 2. Flag bits for allies (correction 3): resolved to the cached prototype mask by owner clarification, 2026-10-16.
-3. The companion's hit direction (correction 1): the proposed point 20 m along the bearing.
+3. The companion's hit direction (correction 1): resolved to the exact rounded attacker position through `tick - hitAt <= 10` by owner decision P. The proposed point 20 m along the bearing is not adopted. See the [owner confirmation](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6218552386).

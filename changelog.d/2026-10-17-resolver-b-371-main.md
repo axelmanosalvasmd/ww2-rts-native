@@ -1,2 +1,3 @@
 - Resolve the operative follow-up merge with main in docs/contracts/README.md, docs/contracts/protocol.md and server/operative_server_tests.rs. Retain both lifecycle and room-protocol test modules.
 - Combine the confirmed exact operative hit position, cached nonowner mask and undelayed full-map ordinary spectator decisions. Retain main's R1 contract entry and all existing behavior assertions; no tests are rewritten or removed.
+- Mark the protocol decision summary resolved for operative hit positions too, removing its stale open proposal for a point 20 m along the bearing.
