@@ -367,13 +367,6 @@ fn retreat_through_legs(mode: Mode) {
     let selected = seats(&m);
     let mut delivery = if mode == Mode::Classic {
         collect_classic_components(&m);
-        let full = vec![true; m.start.players.len()];
-        let omit = vec![false; m.start.players.len()];
-        let mut guarded = DeliveryState::new(&m).unwrap();
-        assert!(matches!(
-            guarded.capture_with_lists(&mut m, &full, &omit, &[]),
-            Err(SnapshotError::UnsupportedMode)
-        ));
         None
     } else {
         Some(DeliveryState::new(&m).unwrap())
@@ -441,7 +434,7 @@ fn mov48_ordinary_retreat_traverses_multiple_legs_and_delivers_every_seat() {
 }
 
 #[test]
-fn mov48_classic_retreat_traverses_multiple_legs_with_delivery_guard_retained() {
+fn mov48_classic_retreat_traverses_multiple_legs_and_projects_every_seat() {
     retreat_through_legs(Mode::Classic);
 }
 

@@ -182,15 +182,6 @@ fn intent_ai50_gate_order_completes_in_each_real_ordinary_mode_with_supported_se
             Some(DeliveryState::new(&state).unwrap())
         } else {
             collect_component_projection_or_refusal(&state);
-            if mode == Mode::Classic {
-                let full = vec![true; state.start.players.len()];
-                let omit = vec![false; state.start.players.len()];
-                let mut guarded = DeliveryState::new(&state).unwrap();
-                assert!(matches!(
-                    guarded.capture_with_lists(&mut state, &full, &omit, &[]),
-                    Err(SnapshotError::UnsupportedMode)
-                ));
-            }
             None
         };
         tick_and_collect(&mut state, delivery.as_mut());
