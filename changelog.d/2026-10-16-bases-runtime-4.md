@@ -1,0 +1,5 @@
+- Preserve main's World fort-capture and tick refusals, including atomic income, region, elimination and finish behavior. Withdraw the uncounted fort-owner transfer actuator and its four positive transfer tests; retain the constructor-rank and damaged-fort atomic-refusal checks.
+- Restore main's World capture and finish oracle expectations. Keep the late-fort epilogue refusal and split-versus-combined income atomicity tests unchanged.
+- Leave convoy retreat routing for an owner decision: an obstructed source can leave its route endpoint 4 m from the centre and refuse the return.
+- Share the borrowed building-placement query with ordinary Build admission. Preserve footprint rounding, sight-first refusal order, node snapping and exclusion, World territory and rail checks, coastal distance, slope and living-ground occupancy.
+- Cover tech-enabled and disabled purchases, construction and every-seat delivery, plus Horde starting tiers. Depot claim/release, construction-mode support and owner production transport remain outside this batch.
