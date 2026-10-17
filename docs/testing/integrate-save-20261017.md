@@ -26,3 +26,5 @@ Ordinary saves remain v1 and authored saves remain v2 under `docs/contracts/save
 The first checkpoint at `9fd2f291` compiled and ran 28 tests: 26 passed and two engine startup tests failed because the old timed validator rejected areas/groups. Independent source review identified the same gate. The repair uses the full ordinary engine validator while retaining the English-fallback restriction. Rerun pending.
 
 The next checkpoint at `6110d917` ran 1,522 tests: 1,521 passed and one room-preparation test failed on the separate timed-only map-binding validator. The repair compares the full saved definition directly with the raw map and preserves null-scenario legacy triggers.
+
+At `c6f4f680`, both repaired scenario startup and spectator action tests passed. The run reached 1,641 passes, one catalog-refusal assertion and four signal-aborted tests before the 6 GiB scope reported OOM. Map lookup now precedes readiness so a missing map retains its specific refusal; subsequent three-package runs use the authorized `-j2` setting.

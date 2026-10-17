@@ -1888,6 +1888,22 @@ impl Hub {
         } else if room.native.is_some() {
             return Err("start requires lobby state".into());
         }
+        let edited_map = self
+            .map_editor
+            .as_ref()
+            .and_then(|editor| editor.raw(&room.map))
+            .map(|raw| {
+                ww2_core::map::AuthoritativeMap::from_json(
+                    &serde_json::to_vec(&raw).map_err(|e| e.to_string())?,
+                )
+                .map_err(|e| e.to_string())
+            })
+            .transpose()?;
+        let map = if let Some(map) = edited_map.as_ref() {
+            map
+        } else {
+            crate::authoritative_maps::load(&room.map).map_err(|e| e.to_string())?
+        };
         if !room.start_ready(&self.maps) {
             return Err(
                 "start requires one through capacity players and both Assault sides".into(),
@@ -1929,22 +1945,6 @@ impl Hub {
                 })
             })
             .collect::<Result<Vec<_>, String>>()?;
-        let edited_map = self
-            .map_editor
-            .as_ref()
-            .and_then(|editor| editor.raw(&room.map))
-            .map(|raw| {
-                ww2_core::map::AuthoritativeMap::from_json(
-                    &serde_json::to_vec(&raw).map_err(|e| e.to_string())?,
-                )
-                .map_err(|e| e.to_string())
-            })
-            .transpose()?;
-        let map = if let Some(map) = edited_map.as_ref() {
-            map
-        } else {
-            crate::authoritative_maps::load(&room.map).map_err(|e| e.to_string())?
-        };
         let options = MatchOptions {
             seed: trusted.seed,
             mode: Mode::Conquest,
