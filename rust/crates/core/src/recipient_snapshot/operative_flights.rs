@@ -75,7 +75,9 @@ pub(super) fn validate(state: &Match) -> Result<(), SnapshotError> {
                 .flights
                 .get(&ticket.flight)
                 .is_none_or(|f| {
-                    f.owner != ticket.owner || shooter(state, f.shooter, f.owner).is_err()
+                    f.owner != ticket.owner
+                        || state.commands.units.get(&f.shooter).is_some_and(|c| c.operative)
+                            && shooter(state, f.shooter, f.owner).is_err()
                 })
         {
             return Err(refused());
