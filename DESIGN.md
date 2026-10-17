@@ -5115,3 +5115,58 @@ The scripted policy receives detached seat facts and feeds movements through #34
 Kaiju breath reuses #325's firing component. Added checks cover full-range and radius boundaries, one terrain debit per overlapping cell, scar values and seeded ignition predicates. The pinned prototype's unchanged trench check and direct breath component were run from an external temporary copy at `e4e579a`; the read-only submodule remains unchanged.
 
 Full Horde ticks, complete Horde snapshots and hosted rooms stay guarded. Support, aircraft and ability command attempts from the policy do not open their Horde actuation paths. Ordinary-match witnesses retain the new private policy state through actual capture, income and victory, collect every seat's recipient snapshot on every tick, and continue after finish. FFI, headers, wire schemas, contracts, privacy, public ingress, World admission and logistics tick/snapshot guards are unchanged.
+## MAC-AI seat scheduling and detached Classic economy (2026-10-16)
+
+The AI schedule delivers all requested observations before any seat acts and
+retains the last delivered view between snapshot beats. Player and terrain
+memory use public starting facts and only that seat's recipient rows. World
+metadata and remembered-terrain decoding remain detached components; the live
+adapter admits only ordinary Conquest. AI refreshes preserve browser terrain
+updates, including a handover after the browser has consumed its latest delta.
+
+Classic economy decisions now run inside the detached tactics planner before
+shopping: repair/help, depot allocation, production facilities, nearby-plane
+flak defense and budget reserves. Node assignments live in a per-seat BTreeMap.
+Node positions, rates, visibility and claims must come from delivered facts.
+The existing Classic admission and recipient guards stay closed, and the
+strategy is inactive in ordinary Conquest and World. Stable IDs break engineer
+and building distance ties; node indices break equal node scores. Site searches
+reuse core footprint rules over remembered terrain and delivered occupancy.
+Every idle engineer attempting a non-depot site consumes one Ai-purpose draw,
+including non-flak, unaffordable and unavailable sites, as in the prototype's
+object-literal evaluation. Existing native purpose-separated streams are kept;
+this change does not replace them with the prototype's global Math.random.
+
+The simtest seeded runner delivers opening observations, steps the real Match,
+completes each observation pass before acting, admits physical commander inputs
+through the canonical dispatcher and collects every seat's recipient snapshot.
+It retains native random streams and logs [slot, tick, kind, cmd, accepted].
+The source default map is copied verbatim from e4e579a, with no Source recorder.
+This is bounded native reproducibility infrastructure, not complete AI-65 proof:
+the attempted seed-7 Easy default-map 3,600-tick run first failed at tick 310
+with the existing ShotsAndFlights recipient refusal. The regression retains
+that failure, rather than clearing actors or weakening admission. Short-prefix
+reproducibility is separate from full-match and JavaScript-aligned evidence.
+AI-64 also remains blocked by missing Classic/Assault/Horde recipient producers.
+Those rows need a separately authorized recipient/runtime stream; no parity
+status, privacy rule, wire format, FFI or World admission changes here.
+
+## PR 342 integration with consolidated construction (2026-10-16)
+
+The tactics caller runs one construction pass before fortification and shopping.
+`commander_construction` delegates Classic to its detached economy planner and
+keeps the existing skirmish and World reserve paths. It returns the remaining
+wallet, next-building reserve and assigned crew IDs once. Build, Assist and
+node-travel crews are removed before fortification and adaptive rush orders;
+mounted crews and crews already working cannot start a second job. Engineers
+within the existing rush escape radius are reserved for defense before the
+construction pass. Defense and construction share the same delivered rush
+centroid and strict age, match-time and distance checks. The Classic
+site-draw order and per-engineer node memory remain unchanged.
+
+Node facts retain position, rate, resource kind and delivered visibility. Both
+Classic planning and shopping treat explicit claims, delivered live depots and
+remembered enemy depots as claims, with the existing strict eight-metre limit.
+Geometry reads the same node positions. Seat scheduling and delivery keep their
+existing implementation. Classic, World and field-work admission guards stay
+closed; this integration changes no public interface or parity status.

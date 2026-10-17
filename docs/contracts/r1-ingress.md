@@ -87,6 +87,20 @@ host-end portions of MODE-90; other modes and Horde results remain unqualified.
 
 ## Held dependencies
 
+Sandbox, attack, fireat, ability, autocast, build, board, unload,
+escort, rail and grouped orders retain their existing public refusal. Tutorial
+auto-start, convoy commands and recovery are also deferred. The prototype's
+research message is named `tech`; no `research` message is added.
+
+Broader ingress cannot safely open against this base: persistent firing flights,
+salvos and grenades are refused by
+`rust/crates/core/src/recipient_snapshot/composition.rs` in `admit_actors`, while
+`match_firing.rs` can create those actors after an accepted attack or aimed
+ability. Plane-backed support similarly exceeds the adapter's
+`SUPPORTED_SUPPORT_KINDS`. The flights/events stream must carry those complete
+lifecycles before these command families or unrestricted sandbox births open.
+Queued ability and fireat rows also need their prototype owner-only order
+encodings before their waiting state can be delivered.
 
 ## PR 296 integration
 

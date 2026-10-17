@@ -1358,6 +1358,7 @@ impl Match {
                 fort_reserve: 0.0,
                 field: None,
                 world: None,
+                claimed_nodes: std::collections::BTreeSet::new(),
                 support: self.start.players[owner]
                     .support
                     .iter()

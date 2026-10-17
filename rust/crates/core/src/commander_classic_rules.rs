@@ -33,6 +33,44 @@ fn flag(d: &Rule, key: &str) -> bool {
 fn number(d: &Rule, key: &str) -> f64 {
     d.get(key).and_then(Rule::number).unwrap_or(0.0)
 }
+/// The delivered rush centroid used by construction eligibility and adaptive defense.
+pub(crate) fn rush_at(
+    observation: &Observation,
+    recent: &[&Sighting],
+    skill: Skill,
+) -> Result<Option<Point>, String> {
+    let input = observation.input();
+    if !input
+        .runtime
+        .as_ref()
+        .is_some_and(|c| c.mode.is_construction())
+        || !skill.adaptive
+    {
+        return Ok(None);
+    }
+    let now = input.tick as f64 / 20.0;
+    let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
+    let definition = |u: &UnitObservation| catalog.unit(&u.kind).map_err(|e| e.to_string());
+    let own: Vec<_> = input
+        .units
+        .iter()
+        .filter(|u| {
+            u.owner == input.slot && u.hp > 0.0 && definition(u).is_ok_and(|d| flag(d, "building"))
+        })
+        .collect();
+    let rush: Vec<_> = recent
+        .iter()
+        .copied()
+        .filter(|s| {
+            now < 240.0 && now - s.time < 5.0 && own.iter().any(|b| distance(b.at, s.at) < 35.0)
+        })
+        .collect();
+    Ok((!rush.is_empty()).then(|| Point {
+        x: rush.iter().map(|s| s.at.x).sum::<f64>() / rush.len() as f64,
+        z: rush.iter().map(|s| s.at.z).sum::<f64>() / rush.len() as f64,
+    }))
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn plan(
     observation: &Observation,
@@ -52,26 +90,9 @@ pub(crate) fn plan(
     let now = input.tick as f64 / 20.0;
     let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
     let definition = |u: &UnitObservation| catalog.unit(&u.kind).map_err(|e| e.to_string());
-    let own: Vec<_> = input
-        .units
-        .iter()
-        .filter(|u| {
-            u.owner == input.slot && u.hp > 0.0 && definition(u).is_ok_and(|d| flag(d, "building"))
-        })
-        .collect();
-    let rush: Vec<_> = recent
-        .iter()
-        .copied()
-        .filter(|s| {
-            now < 240.0 && now - s.time < 5.0 && own.iter().any(|b| distance(b.at, s.at) < 35.0)
-        })
-        .collect();
-    result.rush = !rush.is_empty();
-    let destination = if result.rush {
-        let at = Point {
-            x: rush.iter().map(|s| s.at.x).sum::<f64>() / rush.len() as f64,
-            z: rush.iter().map(|s| s.at.z).sum::<f64>() / rush.len() as f64,
-        };
+    let rush = rush_at(observation, recent, skill)?;
+    result.rush = rush.is_some();
+    let destination = if let Some(at) = rush {
         for u in available
             .iter()
             .filter(|u| u.kind == "engineer" && distance(u.at, at) < 25.0)

@@ -3,6 +3,7 @@
 //! separation call by call (`harness/movement-trace.mjs`), and the Rust side of the frozen workload's timings
 //! (`harness/sim-workload.mjs`). Kept out of `ww2-core`, which reads no files.
 
+pub mod ai_match;
 pub mod check;
 pub mod codec;
 pub mod load;

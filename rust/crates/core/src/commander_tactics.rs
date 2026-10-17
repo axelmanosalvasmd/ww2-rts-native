@@ -40,6 +40,13 @@ pub struct KnownBuilding {
     pub at: Point,
 }
 #[derive(Clone, Debug, PartialEq)]
+pub struct NodeObservation {
+    pub at: Point,
+    pub rate: f64,
+    pub fuel: bool,
+    pub visible: bool,
+}
+#[derive(Clone, Debug, PartialEq)]
 pub struct Context {
     pub mode: Mode,
     pub naval: bool,
@@ -59,7 +66,7 @@ pub struct Context {
     pub sight: f64,
     pub support: BTreeMap<String, f64>,
     /// Resource positions and enemy depot memories already delivered to this seat.
-    pub nodes: Vec<Point>,
+    pub nodes: Vec<NodeObservation>,
     pub known_depots: Vec<Point>,
     /// Indices of delivered nodes on owned World ground. Other modes use every node.
     pub owned_nodes: BTreeSet<usize>,
@@ -67,6 +74,7 @@ pub struct Context {
     pub fort_reserve: f64,
     pub field: Option<crate::commander_field_policy::Facts>,
     pub world: Option<crate::commander_world_policy::Facts>,
+    pub claimed_nodes: BTreeSet<usize>,
 }
 impl Default for Context {
     fn default() -> Self {
@@ -95,6 +103,7 @@ impl Default for Context {
             fort_reserve: 0.0,
             field: None,
             world: None,
+            claimed_nodes: BTreeSet::new(),
         }
     }
 }
@@ -203,6 +212,8 @@ pub struct State {
     pub decision: Option<Decision>,
     pub called: Option<f64>,
     pub cleared_sightings: BTreeMap<u32, f64>,
+    #[serde(default)]
+    pub node: BTreeMap<u32, usize>,
     pub(crate) fort_steps: BTreeMap<u32, u8>,
     #[serde(default)]
     pub field: crate::commander_field_policy::State,
@@ -618,7 +629,7 @@ fn plan_inner(
         .iter()
         .copied()
         .filter(|u| {
-            !(world_policy
+            !((world_policy || context.mode == Mode::Classic)
                 && u.kind == "engineer"
                 && rush_at.is_some_and(|at| dist(u.at, at) < 25.0))
         })
@@ -631,10 +642,14 @@ fn plan_inner(
             budget,
         )?
     } else {
-        crate::commander_construction::plan(
+        crate::commander_construction::plan_with_classic(
             &construction_view,
-            &mirrored_units(&construction_view, &available_units),
+            &mirrored_units(&construction_view, &construction_crew),
             budget,
+            strategic_recent,
+            &mut state.node,
+            level,
+            random,
             (adaptive || skill.memory) && strategic_recent.iter().any(|s| armor(&s.kind)),
             &sight_game,
             sees,
