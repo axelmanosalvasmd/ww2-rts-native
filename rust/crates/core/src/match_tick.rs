@@ -705,6 +705,7 @@ impl crate::match_runtime::Match {
             }
             let moving = !unit.path.is_empty()
                 || crate::math::hypot(unit.x - before.x, unit.z - before.z) > 0.001;
+            self.sync_supply_withdrawal_progress(id);
             let result = self.apply_unit_firing(id, moving, dt);
             self.take_firing_tick_events(events);
             result?;

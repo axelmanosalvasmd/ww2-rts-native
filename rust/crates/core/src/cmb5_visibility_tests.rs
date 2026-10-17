@@ -273,17 +273,23 @@ fn cmb127_horde_reveals_only_active_final_ground_enemies_and_bosses_to_defenders
         }
         assert!(!m.world.game.players[slot].sees(enemy));
     }
+    let tick = m.world.game.tick;
+    let units = crate::save_codec::to_value(&m.world.game.units).unwrap();
+    let horde = m.horde.clone();
     assert!(
         m.advance_tick()
             .unwrap_err()
             .reason
-            .contains("requires represented ordinary or World mode")
+            .contains("aircraft admission: query aircraft has no sortie runtime metadata")
     );
+    assert_eq!(m.world.game.tick, tick);
+    assert_eq!(
+        crate::save_codec::to_value(&m.world.game.units).unwrap(),
+        units
+    );
+    assert_eq!(m.horde, horde);
     assert!(m.tick_state.fault().is_none());
-    assert!(matches!(
-        SnapshotCache::new(&m),
-        Err(SnapshotError::UnsupportedMode)
-    ));
+    assert!(matches!(SnapshotCache::new(&m), Err(SnapshotError::Rules)));
 }
 
 #[test]
