@@ -110,13 +110,15 @@ fn tick_and_collect(state: &mut Match, delivery: Option<&mut DeliveryState>) {
         state.validate_gate_actor(id).unwrap();
     }
     let Some(delivery) = delivery else {
-        // These existing mode snapshot bounds are independent of Gate admission.
+        // Unsupported mode snapshot bounds remain independent of Gate admission.
         assert!(matches!(
             SnapshotCache::new(state),
             Err(SnapshotError::UnsupportedMode)
         ));
         return;
     };
+    let expected_mode = (!matches!(state.options.mode, Mode::Default | Mode::Conquest))
+        .then(|| crate::recipient_snapshot::mode_row(state).unwrap());
     let selected: Vec<_> = (0..state.start.players.len())
         .map(|slot| SelectedSeat {
             slot,
@@ -132,6 +134,9 @@ fn tick_and_collect(state: &mut Match, delivery: Option<&mut DeliveryState>) {
         let snapshot = frame.recipient(seat.slot).unwrap().into_json();
         assert!(snapshot["units"].is_array());
         assert!(snapshot["works"].is_array());
+        if let Some(expected) = &expected_mode {
+            assert_eq!(snapshot.get("mode"), Some(expected));
+        }
     }
 }
 fn count(state: &Match, kind: &str) -> usize {
@@ -156,6 +161,12 @@ fn intent_ai50_gate_order_completes_in_each_real_ordinary_mode_with_supported_se
         Mode::Classic,
     ] {
         let (mut state, builder) = scene(mode);
+        if mode == Mode::Classic {
+            assert_eq!(
+                crate::recipient_snapshot::mode_row(&state).unwrap(),
+                json!({"kind":"classic","timeLeft":1500.0,"suddenDeath":false})
+            );
+        }
         let before = count(&state, "gate");
         let first_gate = state.next_unit_id;
         let spent = state.story[0].mp_spent;
@@ -165,7 +176,10 @@ fn intent_ai50_gate_order_completes_in_each_real_ordinary_mode_with_supported_se
             json!({"t":"dig","kind":"gate","ids":[builder],
             "x":80.0,"z":45.0,"dir":0.0}),
         );
-        let mut delivery = if matches!(mode, Mode::Default | Mode::Conquest) {
+        let mut delivery = if matches!(
+            mode,
+            Mode::Default | Mode::Conquest | Mode::Classic | Mode::Assault
+        ) {
             Some(DeliveryState::new(&state).unwrap())
         } else {
             assert!(matches!(

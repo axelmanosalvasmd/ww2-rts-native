@@ -110,6 +110,17 @@ impl NativeStartup {
         {
             return Err("native startup authoring map binding changed".into());
         }
+        let expected_mission = ww2_core::authored_mission::AuthoredMission::from_map(authored)?;
+        if state
+            .authored_mission
+            .as_ref()
+            .map(|mission| mission.definition())
+            != expected_mission
+                .as_ref()
+                .map(|mission| mission.definition())
+        {
+            return Err("native startup mission definition disagrees with the bound map".into());
+        }
         let plan = match state.options.mode {
             Mode::Tutorial => StartPlan::prepare_tutorial(authored, &state.options, &state.rules)?,
             Mode::Assault => StartPlan::prepare_assault(

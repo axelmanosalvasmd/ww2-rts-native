@@ -20,6 +20,7 @@ pub enum ShotRef<'a> {
     Environment(&'a Effect),
     Scenario(&'a SayAction),
     Tutorial(&'a crate::match_tutorial::TutorialLine),
+    AuthoredMission(&'a Value),
 }
 
 impl<'a> TryFrom<&'a TickEvent> for ShotRef<'a> {
@@ -32,6 +33,7 @@ impl<'a> TryFrom<&'a TickEvent> for ShotRef<'a> {
             TickEvent::Environment(value) => Ok(Self::Environment(value)),
             TickEvent::Scenario(value) => Ok(Self::Scenario(value)),
             TickEvent::Tutorial(value) => Ok(Self::Tutorial(value)),
+            TickEvent::AuthoredMission(value) => Ok(Self::AuthoredMission(value)),
             TickEvent::Aviation(_) => Err(SnapshotError::Unsupported {
                 unit: 0,
                 capability: SnapshotCapability::Air,
@@ -210,6 +212,20 @@ fn raw_event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
             }
             numbers(&[value.at.x, value.at.z])?;
             Ok(value.shot_json())
+        }
+        ShotRef::AuthoredMission(value) => {
+            let mission = state
+                .authored_mission
+                .as_ref()
+                .ok_or(SnapshotError::Rules)?;
+            if !mission.accepts_shot(value)
+                || value["atTick"]
+                    .as_i64()
+                    .is_none_or(|tick| tick > state.world.game.tick)
+            {
+                return Err(SnapshotError::Rules);
+            }
+            Ok(value.clone())
         }
         ShotRef::Scenario(value) => {
             validate_public_say(value).map_err(|_| SnapshotError::Rules)?;
@@ -480,7 +496,7 @@ pub(super) fn project_shots_perspective(
         .map(|shot| {
             event(state, shot).map(|row| {
                 (
-                    matches!(shot, ShotRef::Scenario(_) | ShotRef::Tutorial(_)),
+                    matches!(shot, ShotRef::Scenario(_) | ShotRef::AuthoredMission(_)),
                     row,
                 )
             })
@@ -500,10 +516,25 @@ pub(super) fn project_shots_perspective(
         let visible = &fog.team(g, &state.rules, g.players[seat.slot].team).vis;
         let mut rows = Vec::new();
         for (public_say, event) in &events {
-            // Migrated legacy Say is public to each selected commander seat.
-            // It has no geometry and bypasses ordinary identity redaction.
+            // Mission messages have recipient policies instead of ground geometry.
             if *public_say {
-                rows.push(event.clone());
+                let policy = event["scenarioRecipients"]
+                    .as_str()
+                    .ok_or(SnapshotError::Rules)?;
+                let side = event["scenarioSide"].as_u64().ok_or(SnapshotError::Rules)? as usize;
+                let allowed = policy == "public"
+                    || (!full_map
+                        && match policy {
+                            "side" => side == seat.slot,
+                            "team" => g
+                                .players
+                                .get(side)
+                                .is_some_and(|p| p.team == g.players[seat.slot].team),
+                            _ => false,
+                        });
+                if allowed {
+                    rows.push(event.clone());
+                }
                 continue;
             }
             let at = Point {
