@@ -228,3 +228,13 @@ Independent source reviews accepted both the core privacy/event resolutions and 
 The fresh source build found both `UnitFacts` initializers in `ai_view/commander.rs` missing incoming `hold_fire`, `auto_cast` and `cooldown` fields. Both now read those values from the detached delivered unit JSON, gated by ownership. The existing delivered-packet test feeds both adapters the same decoded packet and checks fractional owner cooldown, owner flags, allied redaction and excluded enemy units. No server API changes were needed.
 
 The same attempt reported missing public core APIs that are present in this checkout, identifying stale shared-target core artifacts. Qualification now removes this project's core/server/simtest profile artifacts under the exclusive slot lock before rebuilding. The automatic formatter only wrapped the preserved event-family match union in `simtest/tests/match_tick_events.rs`.
+
+## Final main integration: 41e5092442ddccd58683fc8f302193c652620ae3
+
+Merged main after the final fetch brought in building placement (#336), R1 commander ingress (#366) and parity documentation. The prior qualification was canceled while waiting on S1; no Cargo ran. Automatic merge tree: `5b1af19bf627755a60350cd761b596e8181eb40f`. Only `server/src/lobby.rs` conflicted, with three hunks:
+
+1. Original merge-buffer line 543: use incoming `story.is_array()` result eligibility. This retains the Tutorial host-End fix and additionally refuses malformed nonarray story values when projecting `you`.
+2. Original merge-buffer line 683: preserve the pending-start and spectator guards; retain incoming host pause/resume, fault/readiness checks, broadcast and paused-gameplay suppression. Move the existing canonical `end_native` host-End block before paused-gameplay suppression, so End still works during pause. It retains the hosted/Tutorial result cleanup instead of the incoming duplicate inline release implementation. Remove the now-duplicate incoming spectator gate.
+3. Original merge-buffer line 788: use incoming unknown attached-command denial. The existing End block is preserved earlier as described above.
+
+No additional manual source edits were made outside these conflict resolutions. The automatic core construction merge and all incoming test registrations are retained. Focused qualification also includes placement, fort, construction and garrison tests for the newly inherited runtime.

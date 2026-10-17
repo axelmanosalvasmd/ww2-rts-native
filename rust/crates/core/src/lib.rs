@@ -29,6 +29,7 @@ pub mod ai_schedule;
 pub mod ai_seat_view;
 pub mod ai_view;
 pub mod assault_runtime;
+pub mod building_placement;
 pub mod catalog;
 pub mod client_view;
 pub mod combat;
