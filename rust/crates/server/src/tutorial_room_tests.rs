@@ -147,6 +147,14 @@ fn exercise_operatives(hub: &mut Hub, operatives: &[Peer]) {
         .map(|id| runtime(hub).state().world.game.units[id].at())
         .collect::<Vec<_>>();
     let tutorial = runtime(hub).state().tutorial_state().is_some();
+    let throw_after = if matches!(
+        runtime(hub).state().options.mode,
+        ww2_core::economy::Mode::Annihilation | ww2_core::economy::Mode::Classic
+    ) {
+        8
+    } else {
+        0
+    };
     let mut fired = vec![false; ids.len()];
     let mut threw = fired.clone();
     let mut flew = false;
@@ -163,16 +171,34 @@ fn exercise_operatives(hub: &mut Hub, operatives: &[Peer]) {
                 0.
             };
             let forward = if moving { 1. } else { 0. };
+            // Elimination-mode spawns can touch their own steel bunker. Let the
+            // existing movement phase clear it before throwing a live grenade.
+            // Keep the grenade, flight, ammunition and every-seat assertions.
+            let throw_grenade = sequence > throw_after;
             hub.message(
                 "TUT",
                 &peer.connection,
                 &mut true,
                 json!({"t":"fps", "seq":sequence, "forward":forward, "strafe":0,
-                    "yaw":yaw, "pitch":0, "fire":sequence < 6, "nade":if sequence > 0 { 1 } else { 0 }}),
+                    "yaw":yaw, "pitch":0, "fire":sequence < 6, "nade":if throw_grenade { 1 } else { 0 }}),
                 20 + sequence as u64 * 50,
             );
         }
+        let positions = ids
+            .iter()
+            .map(|id| runtime(hub).state().world.game.units[id].at())
+            .collect::<Vec<_>>();
         let frames = tick_all(hub);
+        for id in &ids {
+            assert!(
+                runtime(hub).state().world.game.units.contains_key(id),
+                "lost operative {id} after sequence {sequence}, positions {positions:?}, shots {:?}",
+                frames
+                    .iter()
+                    .map(|frame| &frame["shots"])
+                    .collect::<Vec<_>>()
+            );
+        }
         for (index, id) in ids.iter().enumerate() {
             for frame in &frames {
                 for event in frame["shots"].as_array().unwrap() {
@@ -230,7 +256,9 @@ fn ending_hold(hub: &mut Hub, peers: &mut [Peer], operatives: &mut [Peer]) {
     for callback in 0..120 {
         // Include unattended game seats in the ordinary ending snapshots.
         capture_all(hub);
-        let now = (callback + 1) * 50;
+        // The host clock is due at zero. Starting at 50 would execute two
+        // callbacks on the first poll and finish before the final inspection.
+        let now = callback * 50;
         hub.poll_native(now, now * 1_000_000);
         for (index, peer) in peers.iter_mut().enumerate() {
             commander_frames[index] += peer.drain(hub).iter().filter(|row| row["t"] == "s").count();
@@ -261,7 +289,10 @@ fn ending_hold(hub: &mut Hub, peers: &mut [Peer], operatives: &mut [Peer]) {
                 }
             }
         }
-        assert_eq!(hub.native_status("TUT").unwrap().fault, None);
+        let status = hub.native_status("TUT").unwrap();
+        assert_eq!(status.fault, None);
+        assert_eq!(status.held, callback as u16 + 1);
+        assert_eq!(hub.rooms["TUT"].native.is_some(), callback < 119);
     }
     let status = hub.native_status("TUT").unwrap();
     assert!(status.ending_complete);
