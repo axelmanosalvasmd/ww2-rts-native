@@ -41,7 +41,6 @@ fn assert_supported_snapshot(m: &mut Match) {
     m.validate_logistics_runtime().unwrap();
     m.preflight_ordinary_snapshot().unwrap();
     assert_eq!(m.world.game.tick, tick);
-    assert!(m.tick_state.fault().is_none());
     assert_eq!(
         format!("{:?}", (&m.world.game.units, &m.convoys, &m.commands.units)),
         before

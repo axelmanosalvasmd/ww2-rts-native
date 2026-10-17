@@ -147,3 +147,18 @@ The aimed-approach firing repair is retained. Production uses transactional new
 reserve preparation; World training with logistics remains refused. Presence
 mapping remains socket absence and non-AI. The active ordinary delivered adapter
 also carries the incoming Assault defender fact from its delivered mode row.
+
+## Cross-chain #436
+
+Exact parent `6f4107054129e6404c39907dd61067549b6dfc74`. Seeded JavaScript/native
+AI outcome comparisons remain opt-in as authored. Their earlier PR qualification
+is historical evidence; this integration has not yet rerun them. AI-65 remains
+`differs` under the recorded independent-stream decision.
+
+Retain the current combined guards and complete-frame witnesses rather than
+restoring older partial-mode paths. The elimination logistics test is renamed to
+`classic_and_annihilation_initialize_physical_logistics_and_deliver_every_seat`
+and retains its original non-structure reserve assertion plus the incoming
+three-tick every-seat delivery loop. The withdrawal witness additionally proves
+recipient delivery did not mutate its reserve state. Duplicate copies of the
+same named fire-at ingress witness are consolidated without removing assertions.

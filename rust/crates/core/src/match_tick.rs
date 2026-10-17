@@ -713,13 +713,6 @@ impl crate::match_runtime::Match {
             if let Some(result) = self.move_unit_with_command_routes(id, factor)? {
                 moved.push(result);
             }
-            if let Some(reserves) = self.logistics.get_mut(id).filter(|r| r.forced) {
-                let unit = self.world.game.units.get_mut(&id).expect("current unit");
-                if !unit.path.is_empty() && !self.commands.units[&id].supply_hold {
-                    reserves.stranded = unit.stuck > 1.0;
-                    unit.retreating = !reserves.stranded;
-                }
-            }
             self.apply_moved_ground_contact_emitting(id, before, before_dust, &mut |effect| {
                 events.push(TickEvent::Environment(effect));
             })?;
@@ -734,9 +727,6 @@ impl crate::match_runtime::Match {
                 self.apply_unit_firing_with_suppression(id, moving, dt, terrain_suppression);
             self.take_firing_tick_events(events);
             result?;
-        }
-        if self.options.logistics {
-            phases.push(TickPhase::UnitReserves);
         }
         phases.extend([TickPhase::UnitOrders, TickPhase::Abilities]);
         if self.options.mode != crate::economy::Mode::World {
@@ -1030,7 +1020,6 @@ impl crate::match_runtime::Match {
             .collect::<Vec<_>>();
         self.retire_rail_links(&removed_ids);
         for record in &progress.removed {
-            self.record_convoy_death(&record.unit)?;
             self.companion_died(record.unit.id)?;
             progress.companions_notified += 1;
             let kind = self.rules.kinds[record.unit.kind].name.clone();

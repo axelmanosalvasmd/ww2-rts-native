@@ -53,7 +53,7 @@ pub(super) fn scene(mode: Mode, teams: &[i32]) -> Match {
     .unwrap()
 }
 #[test]
-fn classic_and_annihilation_initialize_requested_physical_logistics() {
+fn classic_and_annihilation_initialize_physical_logistics_and_deliver_every_seat() {
     for mode in [Mode::Classic, Mode::Annihilation] {
         let mut m = scene(mode, &[0, 1]);
         m.options.logistics = true;
@@ -67,6 +67,29 @@ fn classic_and_annihilation_initialize_requested_physical_logistics() {
                 .any(|u| { !m.rules.kinds[u.kind].structure && m.logistics.get(u.id).is_some() })
         );
         m.validate_tick_state().unwrap();
+        assert!(m.logistics.iter().next().is_some());
+        let selected = (0..m.start.players.len())
+            .map(|slot| crate::recipient_snapshot::SelectedSeat {
+                slot,
+                full: false,
+                omit: false,
+            })
+            .collect::<Vec<_>>();
+        let mut delivery = crate::recipient_snapshot::DeliveryState::new(&m).unwrap();
+        for _ in 0..3 {
+            let report = m.advance_tick().unwrap();
+            m.validate_logistics_runtime().unwrap();
+            let frame = delivery
+                .capture_selected_with_tick_events(&mut m, &selected, &report.events)
+                .unwrap()
+                .unwrap();
+            for seat in &selected {
+                assert_eq!(
+                    frame.recipient(seat.slot).unwrap().into_json()["logistics"]["enabled"],
+                    true
+                );
+            }
+        }
     }
 }
 

@@ -3,7 +3,7 @@ use crate::{
     economy::Faction,
     economy_state::ArmySize,
     game::Point,
-    logistics::{LogisticsState, Reserves},
+    logistics::Reserves,
     map::AuthoritativeMap,
     match_runtime::{MatchOptions, PlayerConfig},
     supply_convoys::{ConvoyState, Event, Store, StoreId, TruckState},
@@ -89,7 +89,16 @@ fn intent_log44_exact_fields_rounding_and_private_allied_stock_in_complete_frame
         .collect::<Vec<_>>();
     let truck = state.test_supply_truck(0);
     let ally_truck = state.test_supply_truck(1);
-    state.logistics = LogisticsState::default();
+    let retired = state
+        .logistics
+        .iter()
+        .map(|(id, _)| id)
+        .filter(|id| !ids.contains(id))
+        .collect::<Vec<_>>();
+    for id in &retired {
+        state.world.game.units.get_mut(id).unwrap().hp = 0.;
+    }
+    state.retire_dead(&retired).unwrap();
     for id in &ids {
         state.logistics.insert(*id, reserve());
     }

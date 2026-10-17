@@ -668,26 +668,6 @@ impl RecruitParts<'_> {
         if self.logistics.get(placed.unit.id).is_some() {
             return Err(RecruitError::InvalidState("occupied recruit reserves"));
         }
-        let definition = crate::logistics::Definition::from_catalog(kind)
-            .map_err(|e| RecruitError::Admission(e.into()))?;
-        let mut reserves = crate::logistics::LogisticsState::default();
-        reserves.initialize_unit(
-            crate::logistics::Context {
-                enabled_override: Some(self.options.logistics),
-                scenario: false,
-                mode: crate::logistics::Mode::Conquest,
-            },
-            crate::logistics::UnitFacts {
-                id: placed.unit.id,
-                kind,
-                owner: Some(slot),
-                owner_exists: slot < count,
-                guard_home: false,
-                riding: placed.unit.riding,
-            },
-            Some(&definition),
-        );
-        let reserves = reserves.remove(placed.unit.id);
         Ok(StagedRecruit {
             slot,
             kind: kind.into(),
@@ -788,9 +768,6 @@ impl RecruitParts<'_> {
         .map_err(RecruitError::Story)?;
         let purchase = prepared.commit();
         let _published = publication.publish_with(|unit, _| {
-            if let Some(reserves) = reserves.take() {
-                self.logistics.insert(unit.id, reserves);
-            }
             self.combat.initialize(unit.id);
             self.abilities.initialize(unit.id);
             self.recovery.initialize(unit.id);

@@ -2676,11 +2676,6 @@ impl crate::match_runtime::Match {
                 .convoys
                 .as_ref()
                 .is_some_and(|state| state.trucks.contains_key(&id));
-        let automatic_convoy = self
-            .convoys
-            .as_ref()
-            .and_then(|s| s.trucks.get(&id))
-            .is_some_and(|c| !c.manual);
         let fuel_speed = self.logistics.get(id).and_then(|r| {
             r.fuel.map(|fuel| {
                 let available = fuel

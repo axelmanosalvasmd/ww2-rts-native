@@ -54,6 +54,7 @@ pub(super) fn project(state: &Match, slot: usize) -> Result<Option<Value>, Snaps
                 finite(&[cut_for])?;
             }
             let cut_for = r.cut_for.unwrap_or(0.0);
+            finite(&[r.ammo, r.ammo_max, cut_for])?;
             let cut = cut_for >= GRACE;
             let grace = (cut_for > 0.0 && cut_for < GRACE).then(|| (GRACE - cut_for).ceil());
             units.push(json!({
