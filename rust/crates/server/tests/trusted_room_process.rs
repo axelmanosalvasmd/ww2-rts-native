@@ -269,7 +269,6 @@ fn ordinary_binary_refuses_unsupported_settings_before_any_start_publication() {
         json!({"t":"mode","v":"classic"}),
         json!({"t":"mode","v":"horde"}),
         json!({"t":"mode","v":"tutorial"}),
-        json!({"t":"sandbox","v":true}),
         json!({"t":"team","slot":1,"v":0}),
     ];
     for setting in cases {

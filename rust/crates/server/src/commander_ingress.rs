@@ -37,6 +37,7 @@ impl CommanderIngress {
                 | "fireat"
                 | "supply"
                 | "logisticsResume"
+                | "spawn"
         )
     }
     pub fn enqueue(&mut self, state: &mut Match, slot: usize, raw: &Value) -> Result<(), Denial> {
@@ -45,6 +46,7 @@ impl CommanderIngress {
             Some("amove") => "amove",
             Some("stop") => "stop",
             Some("stance") => "stance",
+            Some("spawn") => "spawn",
             Some("garrison") => "garrison",
             Some("dig") => "dig",
             Some("entrench") => "entrench",
@@ -69,6 +71,7 @@ impl CommanderIngress {
             Command::Move { .. }
                 | Command::Stop { .. }
                 | Command::Stance { .. }
+                | Command::Spawn { .. }
                 | Command::Enter { .. }
                 | Command::Dig { .. }
                 | Command::Entrench { .. }

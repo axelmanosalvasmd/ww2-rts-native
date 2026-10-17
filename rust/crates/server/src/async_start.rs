@@ -75,8 +75,8 @@ impl Hub {
                 "start requires one through capacity players and both Assault sides".into(),
             );
         }
-        if room.listed || room.mode != "conquest" || room.sandbox {
-            return Err("R1 requires private Conquest and sandbox off".into());
+        if room.listed || room.mode != "conquest" {
+            return Err("R1 requires private Conquest".into());
         }
         if !matches!(
             room.army.as_str(),
@@ -130,7 +130,7 @@ impl Hub {
                 tech: true,
                 supply: true,
                 logistics: false,
-                sandbox: false,
+                sandbox: room.sandbox,
             },
         })
     }

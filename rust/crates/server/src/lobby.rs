@@ -2885,6 +2885,10 @@ mod net83_followup_tests;
 mod mode_runtime_a_tests;
 
 #[cfg(test)]
+#[path = "sandbox_runtime_tests.rs"]
+mod sandbox_runtime_tests;
+
+#[cfg(test)]
 #[path = "net_runtime3_tests.rs"]
 mod net_runtime3;
 

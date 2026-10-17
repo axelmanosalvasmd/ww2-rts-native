@@ -361,6 +361,28 @@ fn raw_event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
                     owner(state, *seat)?;
                     numbers(&[at.x, at.z, *spread])?;
                 }
+                LaunchEvent::Breath {
+                    shooter,
+                    target,
+                    owner: seat,
+                    target_owner,
+                    at,
+                } => {
+                    if !state.options.sandbox {
+                        return Err(refused());
+                    }
+                    identity(u64::from(*shooter))?;
+                    identity(u64::from(*target))?;
+                    owner(state, *seat)?;
+                    owner(state, *target_owner)?;
+                    numbers(&[at.x, at.z])?;
+                }
+                LaunchEvent::BreathShell { at } => {
+                    if !state.options.sandbox {
+                        return Err(refused());
+                    }
+                    numbers(&[at.x, at.z])?;
+                }
                 LaunchEvent::Throw {
                     shooter,
                     owner: seat,
@@ -388,10 +410,6 @@ fn raw_event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
                         identity(u64::from(hit.target))?;
                         owner(state, hit.owner)?;
                     }
-                }
-                // Horde breath effects retain their separate mode admission.
-                LaunchEvent::Breath { .. } | LaunchEvent::BreathShell { .. } => {
-                    return Err(refused());
                 }
                 LaunchEvent::Contact(value) => {
                     kind(state, value.kind)?;
@@ -757,6 +775,187 @@ mod tests {
             (hidden - (time + 0.15)).abs() < 1e-12,
             "a hidden blocker must not affect until"
         );
+    }
+
+    #[test]
+    fn sandbox_live_flights_use_current_pose_exact_shape_and_recipient_visibility() {
+        let fixture: Value =
+            serde_json::from_str(include_str!("../../tests/fixtures/recipient-delivery.json"))
+                .unwrap();
+        let mut state = super::super::tests::initialize(&fixture["initial"]);
+        state.options.sandbox = true;
+        let profile = crate::match_firing::AbilityBlast::from_unit(
+            state.world.game.units[&1].kind,
+            &state.rules,
+        )
+        .unwrap();
+        let id = state
+            .launch_ability_flight(1, Point { x: 20.0, z: 20.0 }, profile, Some(1.0), None)
+            .unwrap();
+        let flight = state.firing.flights.get_mut(&id).unwrap();
+        flight.solution = Flight {
+            origin: Point3::new(73.0, 20.0, 73.0),
+            velocity: Point3::new(2.0, 0.0, 0.0),
+            gravity: 0.0,
+            stamp: 0.0,
+        };
+        flight.launched = 0.0;
+        flight.expires = 1.0;
+        flight.sequence = 1;
+        flight.max_contacts = 4;
+        let mut future = flight.clone();
+        future.id = id + 1;
+        future.launched = 10.0;
+        future.expires = 11.0;
+        future.solution.stamp = 10.0;
+        state.firing.flights.insert(future.id, future);
+        state.world.game.tick = 2;
+        let rows = super::super::flights::project(&state, 2).unwrap();
+        assert_eq!(
+            rows,
+            json!([{
+                "flight":id,"kind":"rifle","effect":"boom","seq":1,
+                "x":73.2,"y":20.0,"z":73.0,"v":[2.0,0.0,0.0],"gravity":0.0,
+                "time":0.1,"launched":0.0,"expires":1.0,"until":0.25
+            }])
+        );
+        assert_eq!(super::super::flights::project(&state, 0).unwrap(), json!([]));
+        state.world.game.reveal = true;
+        let mut expected = rows;
+        expected[0]["f"] = json!(1);
+        expected[0]["fo"] = json!(0);
+        assert_eq!(super::super::flights::project(&state, 0).unwrap(), expected);
+        let projection = SnapshotCache::new(&state).unwrap().recipient(0).unwrap();
+        assert_eq!(
+            composition::complete(projection, None).into_json()["flights"],
+            expected
+        );
+    }
+
+    #[test]
+    fn sandbox_live_flight_until_clips_current_visible_body_contact() {
+        let fixture: Value =
+            serde_json::from_str(include_str!("../../tests/fixtures/recipient-delivery.json"))
+                .unwrap();
+        let mut state = super::super::tests::initialize(&fixture["initial"]);
+        state.options.sandbox = true;
+        state.world.game.reveal = true;
+        let profile = crate::match_firing::AbilityBlast::from_unit(
+            state.world.game.units[&1].kind,
+            &state.rules,
+        )
+        .unwrap();
+        let id = state
+            .launch_ability_flight(1, Point { x: 20.0, z: 20.0 }, profile, Some(1.0), None)
+            .unwrap();
+        let flight = state.firing.flights.get_mut(&id).unwrap();
+        flight.solution = Flight {
+            origin: Point3::new(50.0, 1.0, 50.0),
+            velocity: Point3::new(20.0, 0.0, 0.0),
+            gravity: 0.0,
+            stamp: 0.0,
+        };
+        let target = state.world.game.units.get_mut(&7).unwrap();
+        target.x = 52.0;
+        target.z = 50.0;
+        state.grid = SpatialGrid::new(&state.world.game.units, 16.0);
+        let rows = super::super::flights::project(&state, 0).unwrap();
+        let end = rows[0]["until"].as_f64().unwrap();
+        assert!(
+            end > 0.0 && end < 0.15,
+            "visible body clips extrapolation: {end}"
+        );
+        // The same retained projectile without the body has the full horizon.
+        state.world.game.units.get_mut(&7).unwrap().x = 60.0;
+        state.grid = SpatialGrid::new(&state.world.game.units, 16.0);
+        assert_eq!(super::super::flights::project(&state, 0).unwrap()[0]["until"], json!(0.15));
+    }
+
+    #[test]
+    fn sandbox_throw_uses_local_fog_and_shooter_redaction() {
+        let fixture: Value =
+            serde_json::from_str(include_str!("../../tests/fixtures/recipient-delivery.json"))
+                .unwrap();
+        let mut state = super::super::tests::initialize(&fixture["initial"]);
+        state.options.sandbox = true;
+        let event = LaunchEvent::Throw {
+            shooter: 1,
+            owner: 0,
+            at: Point { x: 73.0, z: 73.0 },
+        };
+        let seats = [
+            SelectedSeat {
+                slot: 2,
+                full: false,
+                omit: false,
+            },
+            SelectedSeat {
+                slot: 0,
+                full: false,
+                omit: false,
+            },
+        ];
+        let rows = project_shots(&state, &seats, &[ShotRef::Firing(&event)]).unwrap();
+        assert_eq!(
+            rows[0].1,
+            json!([{"x":73.0,"z":73.0,"k":"throw","physical":true,"local":true}])
+        );
+        assert_eq!(rows[1].1, json!([]));
+    }
+
+    #[test]
+    fn sandbox_breath_is_public_but_hidden_actor_ids_are_removed() {
+        let fixture: Value =
+            serde_json::from_str(include_str!("../../tests/fixtures/recipient-delivery.json"))
+                .unwrap();
+        let mut state = super::super::tests::initialize(&fixture["initial"]);
+        state.options.sandbox = true;
+        let breath = LaunchEvent::Breath {
+            shooter: 900001,
+            target: 900002,
+            owner: 0,
+            target_owner: 1,
+            at: Point {
+                x: -100.0,
+                z: -100.0,
+            },
+        };
+        let shell = LaunchEvent::BreathShell {
+            at: Point {
+                x: -100.0,
+                z: -100.0,
+            },
+        };
+        let selected = [
+            SelectedSeat {
+                slot: 0,
+                full: false,
+                omit: false,
+            },
+            SelectedSeat {
+                slot: 1,
+                full: false,
+                omit: false,
+            },
+        ];
+        let shots = [ShotRef::Firing(&breath), ShotRef::Firing(&shell)];
+        for (_, rows) in project_shots(&state, &selected, &shots).unwrap() {
+            assert_eq!(
+                rows,
+                json!([
+                    {"fo":0,"to":1,"x":-100.0,"z":-100.0,"hit":true,"k":"kaiju","pub":true},
+                    {"k":"shell","x":-100.0,"z":-100.0,"pub":true}
+                ])
+            );
+        }
+        state.options.sandbox = false;
+        assert!(matches!(
+            project_shots(&state, &selected, &shots),
+            Err(SnapshotError::Unsupported {
+                capability: SnapshotCapability::ShotsAndFlights,
+                ..
+            })
+        ));
     }
 
     #[test]

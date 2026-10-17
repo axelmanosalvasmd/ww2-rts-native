@@ -110,6 +110,7 @@ mod match_destroy;
 pub mod match_end;
 pub mod match_firing;
 pub mod match_garrison;
+mod match_sandbox;
 
 mod match_gates;
 pub mod match_ground_contact;
