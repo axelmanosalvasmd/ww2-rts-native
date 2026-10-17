@@ -1,0 +1,3 @@
+- Run timed authored mission messages and objectives with side/team privacy for seated players and public-only spectator content. Preserve this state through save and restore; refuse scenario actions outside the admitted subset.
+- Strengthen spectator start and live command-silence tests, and cover immediate spectator removal without creating or releasing a seated player's drop pause. Operative lifecycle and World admission remain separate.
+- Ignore non-host spectator save/load requests without replying or accessing storage, matching the prototype.
