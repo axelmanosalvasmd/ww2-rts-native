@@ -35,13 +35,14 @@ fn net79_host_pause_freezes_room_ai_armies_and_operatives_with_one_second_frames
             hub.poll_native(now, now * 1_000_000);
             assert_eq!(hub.native_status("ABC").unwrap().fault, None);
             let state = runtime(&hub).state();
+            let next_tick = u64::try_from(state.world.game.tick + 1).unwrap();
             saw_ai_order |= state
                 .commands
-                .pending_tick(state.world.game.tick + 1)
+                .pending_tick(next_tick)
                 .any(|(key, _)| key.issuer == 1);
             saw_horde_order |= state
                 .commands
-                .pending_tick(state.world.game.tick + 1)
+                .pending_tick(next_tick)
                 .any(|(key, _)| key.issuer == 2);
             for peer in &mut peers {
                 peer.drain(&mut hub, now);
