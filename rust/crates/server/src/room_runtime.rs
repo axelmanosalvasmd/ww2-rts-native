@@ -31,7 +31,7 @@ pub enum PauseReason {
     Drop,
 }
 struct Pause {
-    slot: usize,
+    slot: Option<usize>,
     by: String,
     reason: PauseReason,
     until_ms: Option<u64>,
@@ -455,6 +455,23 @@ impl RoomRuntime {
         if slot >= self.state.world.game.players.len() {
             return Err("invalid native pause seat".into());
         }
+        self.pause_inner(Some(slot), by, reason, now_ms)
+    }
+    pub(crate) fn pause_host(
+        &mut self,
+        by: &str,
+        now_ms: u64,
+    ) -> Result<Option<Value>, String> {
+        self.pause_inner(None, by, PauseReason::Host, now_ms)
+    }
+    fn pause_inner(
+        &mut self,
+        slot: Option<usize>,
+        by: &str,
+        reason: PauseReason,
+        now_ms: u64,
+    ) -> Result<Option<Value>, String> {
+        self.running()?;
         if self.pause.is_some() {
             return Ok(None);
         }
@@ -504,7 +521,7 @@ impl RoomRuntime {
         let same_drop = self
             .pause
             .as_ref()
-            .is_some_and(|pause| pause.reason == PauseReason::Drop && pause.slot == slot);
+            .is_some_and(|pause| pause.reason == PauseReason::Drop && pause.slot == Some(slot));
         Ok(same_drop.then(|| self.resume(now_ms)))
     }
 
@@ -529,7 +546,8 @@ impl RoomRuntime {
             });
         };
         if pause.reason == PauseReason::Drop
-            && (connected[pause.slot] || pause.until_ms.is_some_and(|until| now_ms >= until))
+            && (pause.slot.is_some_and(|slot| connected[slot])
+                || pause.until_ms.is_some_and(|until| now_ms >= until))
         {
             let message = self.resume(now_ms);
             return Ok(PausePoll {

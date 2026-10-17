@@ -123,7 +123,7 @@ impl RoomAi {
             .as_ref()?
         {
             Delivered::Human(view) => Some(view),
-            Delivered::Horde(_) => None,
+            Delivered::Horde(_) | Delivered::HordePolicy { .. } => None,
         }
     }
     pub fn activate(

@@ -651,12 +651,7 @@ impl Room {
                 return false;
             }
             let message = match t {
-                "pause" => native.runtime.pause(
-                    seated.unwrap(),
-                    &me.name,
-                    crate::room_runtime::PauseReason::Host,
-                    now,
-                ),
+                "pause" => native.runtime.pause_host(&me.name, now),
                 _ => Ok(Some(native.runtime.resume(now))),
             };
             match message {

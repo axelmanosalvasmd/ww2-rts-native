@@ -76,6 +76,47 @@ fn assert_ordinary_frames(hub: &mut Hub, peers: &mut [&mut Peer], base_ms: u64) 
 }
 
 #[test]
+fn spectator_host_pauses_and_resumes_after_both_humans_leave_for_ai() {
+    let (mut hub, mut a, mut b) = room();
+    let mut watcher = Peer::new(3);
+    watcher.hello(&mut hub, true, 0);
+    hub.attach_native("ABC", native_tests::native_match(), 0)
+        .unwrap();
+    for peer in [&mut a, &mut b, &mut watcher] {
+        peer.drain(&mut hub, 0);
+    }
+    a.send(&mut hub, json!({"t":"leave"}), 1);
+    b.send(&mut hub, json!({"t":"leave"}), 2);
+    let room = &hub.rooms["ABC"];
+    assert!(room.players.iter().all(|p| p.ai && p.connection.is_none()));
+    assert!(room.is_host(watcher.c.id));
+    watcher.drain(&mut hub, 2);
+    watcher.send(&mut hub, json!({"t":"pause"}), 3);
+    assert_eq!(
+        watcher.drain(&mut hub, 3),
+        vec![json!({"t":"pause","paused":true,"by":"P3","reason":"host","left":0})]
+    );
+    let runtime = &mut hub
+        .rooms
+        .get_mut("ABC")
+        .unwrap()
+        .native
+        .as_mut()
+        .unwrap()
+        .runtime;
+    assert!(runtime.paused());
+    assert!(runtime.poll_pause(&[true, true], 40_000).unwrap().blocked);
+    assert!(runtime.fault().is_none());
+    watcher.drain(&mut hub, 40_000);
+    watcher.send(&mut hub, json!({"t":"resume"}), 40_001);
+    assert_eq!(
+        watcher.drain(&mut hub, 40_001),
+        vec![json!({"t":"pause","paused":false,"by":"","reason":"host","left":0})]
+    );
+    assert_ordinary_frames(&mut hub, &mut [&mut watcher], 40_050);
+}
+
+#[test]
 fn intent_net82_spectator_close_removes_identity_without_creating_or_releasing_drop_pause() {
     let (mut hub, mut a, mut b) = room();
     let mut watcher = Peer::new(3);
