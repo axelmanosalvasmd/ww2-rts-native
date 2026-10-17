@@ -348,9 +348,8 @@ impl SupplyRouting {
             self.handoff_key = Some(cache_key);
             self.handoffs.clear();
         }
-        let path_key =
-            [start.x, start.z, edge.x, edge.z, radius].map(|n| math::round(n * 4.0) as i64);
-        if let Some(&answer) = self.handoffs.get(&path_key) {
+        let path_key = crate::numeric_keys::handoff_key([start.x, start.z, edge.x, edge.z, radius]);
+        if let Some(answer) = path_key.and_then(|key| self.handoffs.get(&key).copied()) {
             return Ok(answer);
         }
         let route = self
@@ -372,7 +371,9 @@ impl SupplyRouting {
         }
         let answer =
             !route.waypoints.is_empty() && distance(at, edge) < 1.0 && length <= radius * 2.0;
-        self.handoffs.insert(path_key, answer);
+        if let Some(path_key) = path_key {
+            self.handoffs.insert(path_key, answer);
+        }
         Ok(answer)
     }
 }
