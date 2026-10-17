@@ -715,8 +715,14 @@ fn net43_classic_attachment_keeps_mode_map_binding_and_refuses_node_rounding_ove
 }
 
 fn malformed_tags() -> [Value; 6] {
-    [json!({"t":7}), json!({"t":[]}), json!({"t":{"command":"attack"}}),
-        json!({"t":null}), json!({}), json!([])]
+    [
+        json!({"t":7}),
+        json!({"t":[]}),
+        json!({"t":{"command":"attack"}}),
+        json!({"t":null}),
+        json!({}),
+        json!([]),
+    ]
 }
 
 fn raw_blocked(raw: &Value) -> Value {
@@ -764,18 +770,26 @@ fn net43_malformed_tags_keep_spectator_operative_stale_and_lobby_inputs_silent()
     let (unknown, mut unknown_rx) = peer(90);
     for raw in malformed_tags() {
         let mut joined = false;
-        room.hub.message("ABC", &unknown, &mut joined, raw, room.now);
+        room.hub
+            .message("ABC", &unknown, &mut joined, raw, room.now);
         assert!(!joined);
         assert!(unknown_rx.try_recv().is_err());
     }
     let (watcher, mut watcher_rx) = peer(91);
     let (operative, mut operative_rx) = peer(92);
     for (connection, hello) in [
-        (&watcher, json!({"t":"hello","token":"watcher","name":"watcher","spectate":true})),
-        (&operative, json!({"t":"hello","token":"operative","name":"operative","role":"operative","commander":1})),
+        (
+            &watcher,
+            json!({"t":"hello","token":"watcher","name":"watcher","spectate":true}),
+        ),
+        (
+            &operative,
+            json!({"t":"hello","token":"operative","name":"operative","role":"operative","commander":1}),
+        ),
     ] {
         let mut joined = false;
-        room.hub.message("ABC", connection, &mut joined, hello, room.now);
+        room.hub
+            .message("ABC", connection, &mut joined, hello, room.now);
         assert!(joined);
     }
     room.drain();
@@ -783,8 +797,13 @@ fn net43_malformed_tags_keep_spectator_operative_stale_and_lobby_inputs_silent()
     while operative_rx.try_recv().is_ok() {}
     let (replacement, replacement_rx) = peer(93);
     let mut joined = false;
-    room.hub.message("ABC", &replacement, &mut joined,
-        json!({"t":"hello","token":"seat1","name":"seat"}), room.now);
+    room.hub.message(
+        "ABC",
+        &replacement,
+        &mut joined,
+        json!({"t":"hello","token":"seat1","name":"seat"}),
+        room.now,
+    );
     assert!(joined);
     let stale = std::mem::replace(&mut room.peers[1], replacement);
     let mut stale_rx = std::mem::replace(&mut room.receivers[1], replacement_rx);
@@ -798,7 +817,8 @@ fn net43_malformed_tags_keep_spectator_operative_stale_and_lobby_inputs_silent()
     while operative_rx.try_recv().is_ok() {}
     for raw in malformed_tags() {
         for connection in [&unknown, &watcher, &operative, &stale] {
-            room.hub.message("ABC", connection, &mut true, raw.clone(), room.now);
+            room.hub
+                .message("ABC", connection, &mut true, raw.clone(), room.now);
         }
         assert!(room.drain().iter().all(Vec::is_empty));
         assert!(unknown_rx.try_recv().is_err());
@@ -846,9 +866,19 @@ fn net43_raw_and_string_denials_share_the_same_rolling_four_reply_limit() {
         room.message(1, raw.clone());
         let messages = room.drain();
         assert!(messages[0].is_empty());
-        assert_eq!(messages[1], if reply { vec![raw_blocked(&raw)] } else { vec![] });
+        assert_eq!(
+            messages[1],
+            if reply {
+                vec![raw_blocked(&raw)]
+            } else {
+                vec![]
+            }
+        );
         assert_eq!(room.state().commands.pending_commands(), 0);
     }
-    assert_eq!(room.hub.rooms["ABC"].players[1].denies, vec![200,300,1000,1100]);
+    assert_eq!(
+        room.hub.rooms["ABC"].players[1].denies,
+        vec![200, 300, 1000, 1100]
+    );
     room.healthy();
 }

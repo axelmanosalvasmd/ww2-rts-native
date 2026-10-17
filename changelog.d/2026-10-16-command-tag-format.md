@@ -1,0 +1,1 @@
+- Format the malformed-command feedback implementation and its room tests. Runtime behavior and assertions are unchanged.

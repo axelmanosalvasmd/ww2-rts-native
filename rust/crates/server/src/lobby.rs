@@ -533,7 +533,10 @@ impl Room {
         };
         let Some(t) = msg["t"].as_str() else {
             if seated.is_some()
-                && self.native.as_ref().is_some_and(|native| !native.runtime.paused())
+                && self
+                    .native
+                    .as_ref()
+                    .is_some_and(|native| !native.runtime.paused())
                 && me.connection.as_ref().is_some_and(Connection::ready)
             {
                 // JSON keeps a supplied tag's value and omits an absent tag.
