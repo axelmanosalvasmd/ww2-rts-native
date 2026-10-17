@@ -363,7 +363,7 @@ fn mode01_non_world_mode_rows_match_the_prototype_public_fields() {
                 let fields = cache.recipient(slot).unwrap().fields;
                 assert!(!fields.contains_key("mode"));
             }
-        } else if matches!(mode, Mode::Classic | Mode::Annihilation) {
+        } else if matches!(mode, Mode::Classic | Mode::Annihilation | Mode::Horde) {
             let count = m.start.players.len();
             let mut delivery = DeliveryState::new(&m).unwrap();
             let selected = (0..count)
@@ -384,11 +384,7 @@ fn mode01_non_world_mode_rows_match_the_prototype_public_fields() {
                 }
                 if mode == Mode::Classic {
                     assert!(snapshot["nodes"].is_array());
-                    if mode == Mode::Classic {
                     assert_eq!(snapshot["ghosts"], json!([]));
-                } else {
-                    assert!(snapshot.get("ghosts").is_none());
-                }
                 } else {
                     assert!(snapshot.get("nodes").is_none());
                     assert!(snapshot.get("ghosts").is_none());
