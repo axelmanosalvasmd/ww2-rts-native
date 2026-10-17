@@ -40,6 +40,13 @@ pub struct KnownBuilding {
     pub at: Point,
 }
 #[derive(Clone, Debug, PartialEq)]
+pub struct NodeObservation {
+    pub at: Point,
+    pub rate: f64,
+    pub fuel: bool,
+    pub visible: bool,
+}
+#[derive(Clone, Debug, PartialEq)]
 pub struct Context {
     pub mode: Mode,
     pub naval: bool,
@@ -59,12 +66,13 @@ pub struct Context {
     pub sight: f64,
     pub support: BTreeMap<String, f64>,
     /// Resource positions and enemy depot memories already delivered to this seat.
-    pub nodes: Vec<Point>,
+    pub nodes: Vec<NodeObservation>,
     pub known_depots: Vec<Point>,
     /// Indices of delivered nodes on owned World ground. Other modes use every node.
     pub owned_nodes: BTreeSet<usize>,
     pub build_reserve: f64,
     pub fort_reserve: f64,
+    pub claimed_nodes: BTreeSet<usize>,
     pub field: Option<crate::commander_field_policy::Facts>,
     pub world: Option<crate::commander_world_policy::Facts>,
 }
@@ -93,6 +101,7 @@ impl Default for Context {
             owned_nodes: BTreeSet::new(),
             build_reserve: 0.0,
             fort_reserve: 0.0,
+            claimed_nodes: BTreeSet::new(),
             field: None,
             world: None,
         }
@@ -203,6 +212,8 @@ pub struct State {
     pub decision: Option<Decision>,
     pub called: Option<f64>,
     pub cleared_sightings: BTreeMap<u32, f64>,
+    #[serde(default)]
+    pub node: BTreeMap<u32, usize>,
     pub(crate) fort_steps: BTreeMap<u32, u8>,
     #[serde(default)]
     pub field: crate::commander_field_policy::State,
@@ -594,47 +605,30 @@ fn plan_inner(
     let mut budget = input.manpower - reserved;
     let mut newly_busy = BTreeSet::new();
     let adaptive = context.mode.is_construction() && skill.adaptive;
-    let rushing: Vec<_> = strategic_recent
+    let rush_at = crate::commander_classic_rules::rush_at(observation, strategic_recent, skill)?;
+    let rush = rush_at.is_some();
+    // Engineers escaping a nearby rush remain available to defense, not construction.
+    let construction_units: Vec<_> = available_units
         .iter()
         .copied()
-        .filter(|e| {
-            adaptive
-                && now < 240.0
-                && now - e.time < 5.0
-                && input.units.iter().any(|u| {
-                    u.owner == input.slot
-                        && boolean(definition(u), "building")
-                        && dist(u.at, e.at) < 35.0
-                })
-        })
-        .collect();
-    let rush = !rushing.is_empty();
-    let rush_at = rush.then(|| Point {
-        x: rushing.iter().map(|s| s.at.x).sum::<f64>() / rushing.len() as f64,
-        z: rushing.iter().map(|s| s.at.z).sum::<f64>() / rushing.len() as f64,
-    });
-    // Reserve endangered engineers for the shared escape order before creating new work.
-    let construction_crew: Vec<_> = available_units
-        .iter()
-        .copied()
-        .filter(|u| {
-            !(world_policy
-                && u.kind == "engineer"
-                && rush_at.is_some_and(|at| dist(u.at, at) < 25.0))
-        })
+        .filter(|u| !rush_at.is_some_and(|at| u.kind == "engineer" && dist(u.at, at) < 25.0))
         .collect();
     let construction_view = mirrored(observation, &commands)?;
     let construction = if world_policy {
         crate::commander_world_policy::construction(
             &construction_view,
-            &mirrored_units(&construction_view, &construction_crew),
+            &mirrored_units(&construction_view, &construction_units),
             budget,
         )?
     } else {
-        crate::commander_construction::plan(
+        crate::commander_construction::plan_with_classic(
             &construction_view,
-            &mirrored_units(&construction_view, &available_units),
+            &mirrored_units(&construction_view, &construction_units),
             budget,
+            strategic_recent,
+            &mut state.node,
+            level,
+            random,
             (adaptive || skill.memory) && strategic_recent.iter().any(|s| armor(&s.kind)),
             &sight_game,
             sees,

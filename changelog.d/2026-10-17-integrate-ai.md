@@ -1,0 +1,1 @@
+- Integrate the AI chain while preserving the frozen baseline's Classic partial-delivery checks. For #342, retain both conflicting Classic retreat test hunks and the mode-startup checks from the baseline, including exact missing-capability lists; keep the matching retreat evidence note. No test assertions are weakened.

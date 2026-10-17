@@ -62,7 +62,12 @@ fn intent_ai33_delivered_depots_claim_nodes_without_hidden_authority_reads() {
     ]);
     let context = input.runtime.as_mut().unwrap();
     context.mode = Mode::Classic;
-    context.nodes = vec![Point { x: 70.0, z: 20.0 }];
+    context.nodes = vec![crate::commander_tactics::NodeObservation {
+        at: Point { x: 70.0, z: 20.0 },
+        rate: 0.0,
+        fuel: false,
+        visible: true,
+    }];
     assert_eq!(shopping(input.clone(), 1000.0, (0.0, 0.0)).buy, "engineer");
     // A nearby Barracks does not claim a resource node.
     input.units[2].at.x = 70.0;
@@ -84,7 +89,12 @@ fn intent_ai33_delivered_depots_claim_nodes_without_hidden_authority_reads() {
         .as_mut()
         .unwrap()
         .nodes
-        .push(Point { x: 100.0, z: 40.0 });
+        .push(crate::commander_tactics::NodeObservation {
+            at: Point { x: 100.0, z: 40.0 },
+            rate: 0.0,
+            fuel: false,
+            visible: true,
+        });
     assert_eq!(shopping(input, 1000.0, (0.0, 0.0)).buy, "engineer");
 }
 
@@ -258,7 +268,12 @@ fn intent_ai33_classic_reserves_only_non_depot_builds_and_rush_releases_them() {
     let rifle = economy::price_of(Mode::Classic, "rifle").unwrap().mp;
     input.manpower = cost("motorpool") + rifle - 1.0;
     assert!(!look(input.clone()).iter().any(|c| c["t"] == "buy"));
-    input.runtime.as_mut().unwrap().nodes = vec![Point { x: 100.0, z: 40.0 }];
+    input.runtime.as_mut().unwrap().nodes = vec![crate::commander_tactics::NodeObservation {
+        at: Point { x: 100.0, z: 40.0 },
+        rate: 0.0,
+        fuel: false,
+        visible: true,
+    }];
     // An available depot is not protected by a building reserve, and raises engineer demand.
     let cmds = look(input.clone());
     assert!(
@@ -337,7 +352,12 @@ fn intent_ai33_world_engineers_count_unclaimed_nodes_while_build_reserves_use_ow
     ]);
     let c = input.runtime.as_mut().unwrap();
     c.mode = Mode::World;
-    c.nodes = vec![Point { x: 100.0, z: 40.0 }];
+    c.nodes = vec![crate::commander_tactics::NodeObservation {
+        at: Point { x: 100.0, z: 40.0 },
+        rate: 0.0,
+        fuel: false,
+        visible: true,
+    }];
     for (owned, reserve) in [(false, cost("motorpool")), (true, 0.0)] {
         if owned {
             input.runtime.as_mut().unwrap().owned_nodes.insert(0);
