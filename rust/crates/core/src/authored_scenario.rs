@@ -93,12 +93,14 @@ struct TriggerState {
     count: u32,
     next: f64,
     previous: bool,
+    #[serde(deserialize_with = "required_nullable")]
     execution: Option<String>,
 }
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ArrivalUnit {
     kind: String,
+    #[serde(deserialize_with = "required_nullable")]
     authored: Option<String>,
 }
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -139,6 +141,13 @@ fn required_tick<'de, D: serde::Deserializer<'de>>(
     deserializer: D,
 ) -> Result<Option<u64>, D::Error> {
     <Option<u64> as serde::Deserialize>::deserialize(deserializer)
+}
+fn required_nullable<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: serde::Deserialize<'de>,
+{
+    <Option<T> as serde::Deserialize>::deserialize(deserializer)
 }
 fn list<'a>(data: &'a Value, key: &str) -> &'a [Value] {
     data[key].as_array().map_or(&[], Vec::as_slice)
