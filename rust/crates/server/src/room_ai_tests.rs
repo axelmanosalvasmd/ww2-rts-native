@@ -132,7 +132,11 @@ fn net48_leave_preserves_army_clears_identity_and_ignores_departed_socket() {
         if v["t"] == "lobby" && v["spectator"] == true && v["you"] == -1)));
     assert_eq!(hub.rooms["ABC"].spectators.len(), 1);
     assert_eq!(
-        hub.rooms["ABC"].spectators[0].connection.as_ref().unwrap().id,
+        hub.rooms["ABC"].spectators[0]
+            .connection
+            .as_ref()
+            .unwrap()
+            .id,
         returning.id
     );
     send(&mut hub, &returning, json!({"t":"buy", "kind":"rifle"}), 4);

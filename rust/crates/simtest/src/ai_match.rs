@@ -283,7 +283,11 @@ mod tests {
         for (slot, recipient) in run.recipients.iter().enumerate() {
             assert_eq!(recipient["tick"], 3600, "seat {slot}");
             assert!(recipient["units"].is_array(), "seat {slot}");
-            assert!(run.inputs.iter().any(|input| input.slot == slot && input.tick > 298));
+            assert!(
+                run.inputs
+                    .iter()
+                    .any(|input| input.slot == slot && input.tick > 298)
+            );
         }
     }
 

@@ -648,10 +648,11 @@ mod tests {
             snap["units"][index][11] = json!(2.5);
             snap["units"][index][12] = json!(2048 | 16384);
         }
-        snap["plans"] = json!([[9,4,30,20], [2,4,12,20], [4,4,30,20]]);
+        snap["plans"] = json!([[9, 4, 30, 20], [2, 4, 12, 20], [4, 4, 30, 20]]);
         snap["orders"] = json!([
-            [9,3,1,25,25,2,30,31,2,35,36],
-            [2,1,2,50,50], [4,1,2,60,60]
+            [9, 3, 1, 25, 25, 2, 30, 31, 2, 35, 36],
+            [2, 1, 2, 50, 50],
+            [4, 1, 2, 60, 60]
         ]);
         let view = SeatMemory::new(0, map()).unwrap().decode(&snap).unwrap();
         let mut memory = memory();

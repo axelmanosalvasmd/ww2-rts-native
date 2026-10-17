@@ -457,11 +457,7 @@ impl RoomRuntime {
         }
         self.pause_inner(Some(slot), by, reason, now_ms)
     }
-    pub(crate) fn pause_host(
-        &mut self,
-        by: &str,
-        now_ms: u64,
-    ) -> Result<Option<Value>, String> {
+    pub(crate) fn pause_host(&mut self, by: &str, now_ms: u64) -> Result<Option<Value>, String> {
         self.pause_inner(None, by, PauseReason::Host, now_ms)
     }
     fn pause_inner(
