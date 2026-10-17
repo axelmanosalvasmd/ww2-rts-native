@@ -589,7 +589,7 @@ fn original_ordinary_batches_match_selected_shot_rows_and_numeric_bits() {
                             let expected = common::decoded(&frame["outputs"]);
                             let expected_recipient = expected.as_array().unwrap().iter()
                                 .find(|row| row["slot"] == selected[0].slot).unwrap();
-                            assert_eq!(partial.fields["flights"], expected_recipient["json"]["flights"]);
+                            assert_eq!(partial.fields["flights"], expected_recipient["fields"]["flights"]);
                             assert!(
                                 partial
                                     .missing
