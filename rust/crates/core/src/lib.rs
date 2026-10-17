@@ -241,6 +241,7 @@ mod save_state;
 
 pub mod commander_field_policy;
 pub mod commander_world_policy;
+mod numeric_keys;
 
 #[cfg(test)]
 mod results_restart_tests;
