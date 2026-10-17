@@ -290,8 +290,15 @@ fn mode94_restart_keeps_settings_uses_fresh_seeds_and_runs_recipient_frames() {
     assert_ne!(fresh.options.seed, seeds.0);
     assert_ne!(fresh.start.weather_seed, seeds.1);
     assert_ne!(fresh.start.environment_seed, seeds.2);
+    assert_eq!(fresh.options.weather_seed, Some(fresh.start.weather_seed));
+    assert!(fresh.start.weather_seed <= 0x7fff_ffff);
+    assert_eq!(
+        native.receipt.as_ref().unwrap()["options"]["weatherSeed"],
+        fresh.start.weather_seed
+    );
     let mut fresh_options = fresh.options.clone();
     fresh_options.seed = settings.seed;
+    fresh_options.weather_seed = settings.weather_seed;
     assert_eq!(format!("{fresh_options:?}"), format!("{settings:?}"));
     assert_eq!(fresh.world.game.units[&unit].hp, original_units[&unit].hp);
     assert_eq!(

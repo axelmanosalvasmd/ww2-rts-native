@@ -826,8 +826,8 @@ mod tests {
             rows,
             json!([{
                 "flight":id,"kind":"rifle","effect":"boom","seq":1,
-                "x":73.2,"y":20.0,"z":73.0,"v":[2.0,0.0,0.0],"gravity":0.0,
-                "time":0.1,"launched":0.0,"expires":1.0,"until":0.25
+                "x":73.2,"y":20.0,"z":73.0,"v":[2.0,0,0],"gravity":0,
+                "time":0.1,"launched":0,"expires":1.0,"until":0.25
             }])
         );
         assert_eq!(

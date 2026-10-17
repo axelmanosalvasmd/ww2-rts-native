@@ -393,7 +393,8 @@ fn intent_log45_nonconquest_point_supply_seam_refuses_before_mutation() {
             Mode::Tutorial,
             ModeKind::Tutorial,
             "missing Tutorial runtime",
-            SnapshotError::Rules,
+            // Snapshot admission checks ordinary finish state before projection.
+            SnapshotError::UnsupportedMode,
         ),
         (
             Mode::World,
