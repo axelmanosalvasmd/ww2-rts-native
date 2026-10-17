@@ -212,16 +212,6 @@ impl Match {
                     return Err(ProductionStepError::InvalidState("training rally position"));
                 }
                 for job in row.jobs() {
-                    if self.ordinary_snapshot_only
-                        && self
-                            .rules
-                            .kind(&job.kind)
-                            .is_some_and(|kind| self.rules.kinds[kind].air)
-                    {
-                        return Err(ProductionStepError::Placement(
-                            crate::produced_units::Error::UnsupportedAir,
-                        ));
-                    }
                     validate_training_birth(self.options.mode, &self.rules, &job.kind)?;
                 }
             }
@@ -285,16 +275,6 @@ impl Match {
             from,
         )?;
         validate_training_birth(self.options.mode, &self.rules, kind)?;
-        if self.ordinary_snapshot_only
-            && self
-                .rules
-                .kind(kind)
-                .is_some_and(|index| self.rules.kinds[index].air)
-        {
-            return Err(ProductionStepError::Placement(
-                crate::produced_units::Error::UnsupportedAir,
-            ));
-        }
         let building = prepared.building();
         if !registered.contains(&building) {
             return Err(ProductionStepError::InvalidState(
@@ -481,16 +461,6 @@ impl Match {
                 ));
             }
             for job in self.production.building(building).unwrap().jobs() {
-                if self.ordinary_snapshot_only
-                    && self
-                        .rules
-                        .kind(&job.kind)
-                        .is_some_and(|kind| self.rules.kinds[kind].air)
-                {
-                    return Err(ProductionStepError::Placement(
-                        crate::produced_units::Error::UnsupportedAir,
-                    ));
-                }
                 validate_training_birth(self.options.mode, &self.rules, &job.kind)?;
             }
         }

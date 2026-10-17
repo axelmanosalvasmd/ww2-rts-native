@@ -21,6 +21,9 @@ pub struct PublicMap {
 /// All values are owned. Unit entries use the prototype's decoded field names.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SeatView {
+    pub initial_chars: Vec<u8>,
+    pub initial_height: Option<Vec<i8>>,
+    pub works: Vec<Value>,
     pub chars: Vec<u8>,
     pub flags: Vec<u16>,
     pub height: Option<Vec<i8>>,
@@ -54,6 +57,8 @@ pub struct SeatMemory {
     tick: Option<i64>,
     building_seen: BTreeMap<u32, f64>,
     mines: BTreeSet<usize>,
+    initial_chars: Vec<u8>,
+    initial_height: Option<Vec<i8>>,
     chars: Vec<u8>,
     flags: Vec<u16>,
     height: Option<Vec<i8>>,
@@ -170,6 +175,8 @@ impl SeatMemory {
             tick: None,
             building_seen: BTreeMap::new(),
             mines: BTreeSet::new(),
+            initial_chars: vec![b'?'; cells],
+            initial_height: None,
             chars: vec![b'?'; cells],
             flags: vec![0; cells],
             height: None,
@@ -197,6 +204,8 @@ impl SeatMemory {
             .iter()
             .map(|ch| terrain_flag(terrain, *ch))
             .collect::<Result<_>>()?;
+        self.initial_chars = chars.clone();
+        self.initial_height = height.clone();
         self.chars = chars;
         self.height = height;
         self.naval = naval;
@@ -473,7 +482,7 @@ impl SeatMemory {
             }
         }
         self.tick = Some(tick);
-        Ok(SeatView { chars:self.chars.clone(), flags:self.flags.clone(), height:self.height.clone(), naval:self.naval,
+        Ok(SeatView { initial_chars:self.initial_chars.clone(), initial_height:self.initial_height.clone(), works:optional_rows(&snap["works"])?.to_vec(), chars:self.chars.clone(), flags:self.flags.clone(), height:self.height.clone(), naval:self.naval,
             local_defenders: world.then(||json!({"slot":-1,"name":"Local defenders","team":-1,"faction":0,"spawn":null,"out":false})), tick, units, players, points, nodes, mines, found_mines,
             weather:json!({"now":snap["weather"][0].as_str().unwrap_or("clear"),"next":snap["weather"][1],"left":snap["weather"][2]}),
             mode:snap["mode"].clone(),army:snap["army"].clone(),smokes,strikes,covers,known_buildings:known,claimed_nodes,logistics })
@@ -599,8 +608,25 @@ impl SeatMemory {
 }
 
 impl crate::match_runtime::Match {
+    pub(super) fn require_ai_recipient_mode(&self) -> Result<()> {
+        use crate::{economy::Mode, game::ModeKind};
+        if !matches!(
+            (self.options.mode, self.world.game.mode),
+            (Mode::Default | Mode::Conquest, None)
+                | (Mode::Classic, Some(ModeKind::Classic))
+                | (Mode::Assault, Some(ModeKind::Assault))
+                | (Mode::Annihilation, Some(ModeKind::Annihilation))
+                | (Mode::Horde, Some(ModeKind::Horde))
+                | (Mode::Tutorial, Some(ModeKind::Tutorial))
+        ) {
+            return Err("AI delivery requires a canonical ordinary mode pair".into());
+        }
+        Ok(())
+    }
+
     /// Build a consumer from the same public start metadata given to ordinary clients.
     pub fn ordinary_ai_view_memory(&self, slot: usize) -> Result<SeatMemory> {
+        self.require_ai_recipient_mode()?;
         if !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode) {
             return Err("AI delivery requires a canonical ordinary match".into());
         }
@@ -659,6 +685,7 @@ impl crate::match_runtime::Match {
         delivery: &mut crate::recipient_snapshot::DeliveryState,
         full: bool,
     ) -> Result<SeatView> {
+        self.require_ai_recipient_mode()?;
         if memory.binding
             != Some((
                 self.options.seed,

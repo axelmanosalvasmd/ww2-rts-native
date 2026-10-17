@@ -162,3 +162,23 @@ and retains its original non-structure reserve assertion plus the incoming
 three-tick every-seat delivery loop. The withdrawal witness additionally proves
 recipient delivery did not mutate its reserve state. Duplicate copies of the
 same named fire-at ingress witness are consolidated without removing assertions.
+
+## Cross-chain #420
+
+Exact parent `f0b947e3b4b73fa8ee8eef00a4e299462728db7c`. Retains ordinary AI command
+union and privacy tests, qualified aircraft training and aimed-approach firing.
+Tutorial remains admitted alongside the incoming canonical ordinary-mode checks;
+its detached-view rejection becomes a positive Tutorial packet witness, while
+World refusal remains.
+
+The obsolete bound-room Classic aircraft-training refusal is renamed to
+`aircraft_purchase_and_training_pay_once_and_survive_bound_room_delivery` and
+replaced by the incoming paid FIFO completion check. Every detailed original
+Conquest purchase, metadata, private aircraft-row and multi-tick assertion stays.
+
+The active ordinary delivered adapter receives public initial terrain, delivered
+mines, wall-work and admitted ground-flight capability, just as the incoming
+adapter does. Its public terrain comes from the already-redacted startup map;
+no hidden authoritative terrain is read. Stationary and mine/engineering facts
+are completed only from those public/recipient inputs. The former false
+capability assertion now verifies the complete receiver is enabled.

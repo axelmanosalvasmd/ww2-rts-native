@@ -12,7 +12,6 @@ use serde_json::Value;
 pub(super) struct PublicFacts {
     map: PublicMap,
     owner: usize,
-    mode: Mode,
     faction: Faction,
     army: ArmySize,
     naval: bool,
@@ -63,7 +62,6 @@ impl PublicFacts {
                 points: state.start.points.iter().map(|p| json!({"x":p.at.x,"z":p.at.z,"vp":p.vp,"mp":p.mp})).collect(),
             },
             owner,
-            mode: state.options.mode,
             faction: state.options.players.get(owner).ok_or("missing commander public seat")?.faction,
             army: state.options.army,
             naval: state.world.game.naval,
@@ -275,7 +273,14 @@ impl PublicFacts {
             })
             .collect();
         let context = Context {
-            mode: self.mode,
+            mode: Mode::from_kind(view.mode["kind"].as_str()),
+            horde: view.mode["kind"] == "horde"
+                && view.mode["slot"].as_u64() == Some(self.owner as u64),
+            defender: matches!(
+                view.mode["kind"].as_str(),
+                Some("assault" | "annihilation" | "horde")
+            ) && view.mode["defenderTeam"].as_i64() == me["team"].as_i64(),
+            ground_flights: true,
             naval: self.naval,
             faction: self.faction,
             caution: weather.ai_caution(Some(&crate::weather::WeatherPlan::fixed(now))),

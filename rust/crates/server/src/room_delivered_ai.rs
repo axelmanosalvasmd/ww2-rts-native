@@ -178,6 +178,7 @@ impl RoomAi {
                     .collect::<Result<Vec<_>, _>>()
             })
             .transpose()?;
+        let memory = memory.with_terrain(chars.clone(), elevation.clone(), map["naval"] == true)?;
         let policy_view =
             CommanderViewMemory::new(slot, public, chars, elevation, map["naval"] == true)?;
         let commander = state.create_seat_commander(slot, level)?;

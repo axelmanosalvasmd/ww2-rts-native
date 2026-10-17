@@ -317,6 +317,7 @@ impl Match {
         }
         self.recipient_routing(owner)?;
         let g = &self.world.game;
+        self.require_ai_recipient_mode()?;
         if !crate::match_actor::ordinary_ground_mode(g, self.options.mode)
             || !(0..=SAFE_TICK).contains(&g.tick)
         {
@@ -603,7 +604,11 @@ fn apply_view_rows(
 
 /// Complete planner facts from the same public map and remembered rows as ai-view.
 /// Authoritative hidden terrain and hidden depot positions never enter this adapter.
-fn complete_ordinary_facts(input: &mut Input, initial_chars: &[u8], initial_height: Option<&[i8]>) {
+pub(crate) fn complete_ordinary_facts(
+    input: &mut Input,
+    initial_chars: &[u8],
+    initial_height: Option<&[i8]>,
+) {
     let Some(context) = &mut input.runtime else {
         return;
     };

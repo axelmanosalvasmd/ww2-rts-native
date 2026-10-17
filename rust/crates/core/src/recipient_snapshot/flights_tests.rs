@@ -139,6 +139,7 @@ fn live_flight_until_stops_at_fog_or_visible_static_contact_only() {
 #[test]
 fn malformed_live_flight_refuses_before_delivery_memory_changes() {
     let mut state = scene();
+    state.validate_firing_tick_state().unwrap();
     let mut delivery = DeliveryState::new(&state).unwrap();
     let before = delivery.clone();
     let world = format!("{:?}", state.world);

@@ -1,0 +1,180 @@
+diff --git a/rust/crates/core/src/match_recruitment.rs b/rust/crates/core/src/match_recruitment.rs
+index 5ec4c37e..592f063a 100644
+--- a/rust/crates/core/src/match_recruitment.rs
++++ b/rust/crates/core/src/match_recruitment.rs
+@@ -278,16 +278,6 @@ impl Match {
+         name: &str,
+         from: Option<u32>,
+     ) -> Result<CompletedRecruitUnit, RecruitError> {
+-<<<<<<< HEAD
+-        // Aircraft AA events need the complete aviation delivery adapter before
+-        // purchases may introduce planes into a bound recipient room.
+-        if self.ordinary_snapshot_only {
+-            return Err(RecruitError::Placement(
+-                crate::produced_units::Error::UnsupportedAir,
+-            ));
+-        }
+-=======
+->>>>>>> origin/runtime/flights-events-20261016
+         let facts = admission_facts(
+             &self.world.game,
+             &self.start,
+diff --git a/rust/crates/core/src/recipient_snapshot.rs b/rust/crates/core/src/recipient_snapshot.rs
+index 43a85d79..bdfcca6d 100644
+--- a/rust/crates/core/src/recipient_snapshot.rs
++++ b/rust/crates/core/src/recipient_snapshot.rs
+@@ -1,10 +1,5 @@
+-<<<<<<< HEAD
+-//! Internal ordinary and Classic projections over the canonical recipient owners.
+-//! Unsupported canonical actors remain explicit. No transport contract is added.
+-=======
+ //! Recipient projections for admitted ordinary matches.
+ //! Projectile and aviation fields follow the pinned prototype recipient rules.
+->>>>>>> origin/runtime/flights-events-20261016
+ use crate::{
+     catalog::Catalog,
+     combat,
+@@ -25,13 +20,10 @@ mod delivery;
+ mod engineering;
+ #[path = "recipient_snapshot/falling.rs"]
+ mod falling;
+-<<<<<<< HEAD
+ #[path = "recipient_snapshot/modes.rs"]
+ mod modes;
+-=======
+ #[path = "recipient_snapshot/flights.rs"]
+ mod flights;
+->>>>>>> origin/runtime/flights-events-20261016
+ #[path = "recipient_snapshot/owners.rs"]
+ mod owners;
+ #[path = "recipient_snapshot/projectiles.rs"]
+diff --git a/rust/crates/core/src/recipient_snapshot/composition.rs b/rust/crates/core/src/recipient_snapshot/composition.rs
+index 39bcd31f..5683117a 100644
+--- a/rust/crates/core/src/recipient_snapshot/composition.rs
++++ b/rust/crates/core/src/recipient_snapshot/composition.rs
+@@ -108,13 +108,10 @@ pub(super) fn complete(
+     }
+     // Admission inspected each actual canonical actor/list owner. Their
+     // absent output is a represented source result for this bounded frame.
+-<<<<<<< HEAD
+     projection
+         .fields
+         .entry("flights")
+         .or_insert_with(|| json!([]));
+-=======
+->>>>>>> origin/runtime/flights-events-20261016
+     projection.fields.insert("shots".into(), json!([]));
+     projection.fields.entry("air").or_insert_with(|| json!([]));
+     projection.fields.insert(
+@@ -191,11 +188,7 @@ pub(super) fn admit_actors(state: &Match, outside_events: &[Effect]) -> Result<(
+     {
+         return Err(refused(SnapshotCapability::ShotsAndFlights));
+     }
+-<<<<<<< HEAD
+     projectiles::validate(state)?;
+-    // Aircraft state has an owner adapter. Aviation shot encodings still need
+-    // a contract, so undrained event payloads retain their admission guard.
+-=======
+     if !state.firing.flights.is_empty() || !state.firing.salvos.is_empty() {
+         state
+             .validate_firing_tick_state()
+@@ -215,7 +208,6 @@ pub(super) fn admit_actors(state: &Match, outside_events: &[Effect]) -> Result<(
+     }
+     // The caller must drain aviation events into the chronological tick batch
+     // before delivery, just as it drains firing and support events above.
+->>>>>>> origin/runtime/flights-events-20261016
+     if !state.aviation.events.is_empty() {
+         return Err(refused(SnapshotCapability::Air));
+     }
+diff --git a/rust/crates/core/src/recipient_snapshot/projectiles.rs b/rust/crates/core/src/recipient_snapshot/projectiles.rs
+index 262260a9..c064c24f 100644
+--- a/rust/crates/core/src/recipient_snapshot/projectiles.rs
++++ b/rust/crates/core/src/recipient_snapshot/projectiles.rs
+@@ -16,17 +16,7 @@ pub(super) fn validate(state: &Match) -> Result<(), SnapshotError> {
+         state
+             .validate_firing_tick_state()
+             .map_err(|_| SnapshotError::Rules)?;
+-        if state
+-            .firing
+-            .flights
+-            .values()
+-            .any(|p| state.rules.kinds[p.source_kind].air)
+-        {
+-            return Err(SnapshotError::Unsupported {
+-                unit: 0,
+-                capability: SnapshotCapability::Air,
+-            });
+-        }
++
+     }
+     if !state.firing.grenades.is_empty() {
+         state
+diff --git a/rust/crates/core/src/recipient_snapshot/shots.rs b/rust/crates/core/src/recipient_snapshot/shots.rs
+index 165bd704..a0fdc1e0 100644
+--- a/rust/crates/core/src/recipient_snapshot/shots.rs
++++ b/rust/crates/core/src/recipient_snapshot/shots.rs
+@@ -33,15 +33,8 @@ impl<'a> TryFrom<&'a TickEvent> for ShotRef<'a> {
+             TickEvent::Support(value) => Ok(Self::Support(value)),
+             TickEvent::Environment(value) => Ok(Self::Environment(value)),
+             TickEvent::Scenario(value) => Ok(Self::Scenario(value)),
+-<<<<<<< HEAD
+             TickEvent::Horde(value) => Ok(Self::Horde(value)),
+-            TickEvent::Aviation(_) => Err(SnapshotError::Unsupported {
+-                unit: 0,
+-                capability: SnapshotCapability::Air,
+-            }),
+-=======
+             TickEvent::Aviation(value) => Ok(Self::Aviation(value)),
+->>>>>>> origin/runtime/flights-events-20261016
+         }
+     }
+ }
+@@ -73,12 +66,7 @@ impl DeliveryState {
+ 
+     /// Project the complete supplied batch before any selected memory owner
+     /// publishes. The host retains the scheduled global batch-reset policy.
+-<<<<<<< HEAD
+-    /// Retained flights pass their canonical validation before delivery.
+-    /// Unsupported AIR/debris actors and undrained producer buffers still refuse.
+-=======
+     /// Undrained producer buffers still refuse through complete-frame admission.
+->>>>>>> origin/runtime/flights-events-20261016
+     pub fn capture_selected_with_shots<'a>(
+         &mut self,
+         state: &'a mut Match,
+@@ -368,7 +356,6 @@ fn raw_event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
+                     owner(state, *seat)?;
+                     numbers(&[at.x, at.z])?;
+                 }
+-<<<<<<< HEAD
+                 LaunchEvent::SmallArms(_) => return Err(refused()),
+                 LaunchEvent::Breath {
+                     shooter,
+@@ -392,12 +379,6 @@ fn raw_event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
+                     }
+                     numbers(&[at.x, at.z])?;
+                 }
+-=======
+-                // Operative shots and Horde breath effects retain their separate admission.
+-                LaunchEvent::SmallArms(_)
+-                | LaunchEvent::Breath { .. }
+-                | LaunchEvent::BreathShell { .. } => return Err(refused()),
+->>>>>>> origin/runtime/flights-events-20261016
+                 LaunchEvent::Contact(value) => {
+                     kind(state, value.kind)?;
+                     identity(value.flight)?;
+@@ -768,14 +749,11 @@ mod tests {
+                 at: Point { x: 13.0, z: 13.0 },
+                 direction: f64::NAN,
+             }),
+-<<<<<<< HEAD
+-=======
+             TickEvent::Firing(LaunchEvent::Throw {
+                 shooter: 0,
+                 owner: 0,
+                 at: Point { x: 13.0, z: 13.0 },
+             }),
+->>>>>>> origin/runtime/flights-events-20261016
+             TickEvent::Environment(metadata.clone()),
+         ] {
+             let batch = [TickEvent::Environment(valid.clone()), unexpected];

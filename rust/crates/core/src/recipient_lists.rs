@@ -368,8 +368,8 @@ impl crate::match_runtime::Match {
             self.validate_horde_economy()?;
         } else if !crate::match_actor::ordinary_ground_mode(game, self.options.mode) {
             return Err("global ordinary lists require represented ordinary mode".into());
-            self.validate_actor_mode()?;
         }
+        self.validate_actor_mode()?;
         let mut ids = std::collections::BTreeSet::new();
         let mut rows = Vec::with_capacity(game.wrecks.len());
         for hull in &game.wrecks {

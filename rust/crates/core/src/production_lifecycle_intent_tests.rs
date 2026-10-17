@@ -418,41 +418,45 @@ fn base21_training_pauses_preserves_fifo_and_rolls_back_failed_aircraft_publicat
 }
 
 #[test]
-fn bound_room_allows_immediate_aircraft_purchase_and_refuses_classic_training_before_payment() {
+fn aircraft_purchase_and_training_pay_once_and_survive_bound_room_delivery() {
     for mode in [Mode::Conquest, Mode::Classic] {
         let mut state = scene(mode, Faction::Usa);
         let airfield = facility(&mut state, 0, "airfield", 20, 20);
         state.restrict_to_ordinary_snapshots().unwrap();
-        let before = (
+        let before = state.start.economy.players[0].clone();
+        let before_all = (
             state.start.economy.clone(),
             state.production.clone(),
             state.story.clone(),
             state.next_unit_id,
             state.world.game.units.len(),
         );
+        let id = state.next_unit_id;
+        let price = economy::price_of(mode, "fighter").unwrap();
+        let paid;
         if mode == Mode::Classic {
-            assert_eq!(
+            state
+                .recorded_world_buy(0, "fighter", Some(airfield))
+                .unwrap();
+            paid = state.start.economy.players[0].clone();
+            assert!(!state.world.game.units.contains_key(&id));
+            let duration = Catalog::compiled()
+                .unwrap()
+                .unit("fighter")
+                .unwrap()
+                .get("train")
+                .and_then(Value::number)
+                .unwrap();
+            assert!(
                 state
-                    .recorded_world_buy(0, "fighter", Some(airfield))
-                    .unwrap_err(),
-                crate::match_runtime::ProductionStepError::Placement(
-                    crate::produced_units::Error::UnsupportedAir
-                )
+                    .step_training(airfield, duration - 0.125)
+                    .unwrap()
+                    .is_none()
             );
-            assert_eq!(
-                (
-                    state.start.economy.clone(),
-                    state.production.clone(),
-                    state.story.clone(),
-                    state.next_unit_id,
-                    state.world.game.units.len()
-                ),
-                before
-            );
-            ordinary_ticks(&mut state, 4);
         } else {
             let bought = state.recorded_buy(0, "fighter", Some(airfield)).unwrap();
-            let id = before.3;
+            paid = state.start.economy.players[0].clone();
+            let id = before_all.3;
             assert_eq!(bought.unit, id);
             assert_eq!(
                 bought.purchase.request,
@@ -464,15 +468,15 @@ fn bound_room_allows_immediate_aircraft_purchase_and_refuses_classic_training_be
                 }
             );
             assert_eq!(bought.route_status, None);
-            let mut expected_economy = before.0.clone();
+            let mut expected_economy = before_all.0.clone();
             expected_economy.players[0].mp -= 280.;
             assert_eq!(state.start.economy, expected_economy);
-            assert_eq!(state.production, before.1);
-            let mut expected_story = before.2.clone();
+            assert_eq!(state.production, before_all.1);
+            let mut expected_story = before_all.2.clone();
             expected_story[0].mp_spent += 280.;
             assert_eq!(state.story, expected_story);
             assert_eq!(state.next_unit_id, id + 1);
-            assert_eq!(state.world.game.units.len(), before.4 + 1);
+            assert_eq!(state.world.game.units.len(), before_all.4 + 1);
             let unit = &state.world.game.units[&id];
             assert_eq!((unit.id, unit.owner), (id, 0));
             assert_eq!(state.rules.kinds[unit.kind].name, "fighter");
@@ -520,6 +524,25 @@ fn bound_room_allows_immediate_aircraft_purchase_and_refuses_classic_training_be
                 }
             }
         }
+        assert_eq!(paid.mp, before.mp - price.mp);
+        assert_eq!(paid.fuel, before.fuel - price.fuel);
+        ordinary_ticks(&mut state, 4);
+        let plane = &state.world.game.units[&id];
+        assert_eq!(plane.air, Some(PlaneState::Base));
+        assert_eq!(plane.at(), state.world.game.units[&airfield].at());
+        assert!(state.aviation.planes.contains_key(&id));
+        assert!(
+            state
+                .production
+                .building(airfield)
+                .unwrap()
+                .jobs()
+                .is_empty()
+        );
+        assert!(
+            state.start.economy.players[0].mp >= paid.mp,
+            "completion never charges a second purchase"
+        );
     }
 }
 

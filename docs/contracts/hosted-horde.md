@@ -52,8 +52,7 @@ terrain and public rules. Remembered terrain updates only from delivered cells.
 Owner-only plans, wallets and cooldowns are not taken from another seat. No
 policy receives a Game or Match authority handle. Full-tick and recipient guards remain in force. Retained ground flights,
 grenade tickets and salvo schedules are validated before a frame can publish.
-Aircraft weapons and plane-backed support retain the combined branch's existing
-validated delivery, including flights and per-recipient aviation events.
+The integrated #369 receiver admits aircraft weapons and plane-backed support through their existing prototype flight/event fields and per-recipient redaction. No additional wire fields are introduced. The ordinary and Horde adapters enable aimed ground abilities only with that complete receiver.
 
 Ground flight rows match `shared/sim.js:5963-5999`: `flight`, `kind`, optional
 `effect`, `seq`, `x`, `y`, `z`, `v:[vx,vy,vz]`, `gravity`, `time`, `launched`,

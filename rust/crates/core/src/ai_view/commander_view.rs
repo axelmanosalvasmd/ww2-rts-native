@@ -272,6 +272,16 @@ impl CommanderViewMemory {
             fuel: optional_wallet(&me["fuel"])?,
             large_army: !standard_army,
             height: self.elevation.clone(),
+            initial_chars: Some(view.initial_chars.clone()),
+            initial_height: view.initial_height.clone(),
+            mines: view.mines.iter().map(at).collect::<Result<_>>()?,
+            found_mines: view.found_mines.iter().map(at).collect::<Result<_>>()?,
+            bridge_cells: view
+                .initial_chars
+                .iter()
+                .enumerate()
+                .filter_map(|(i, &ch)| (ch == b'=').then_some(i))
+                .collect(),
             sight: if weather
                 .get("rains")
                 .and_then(Rule::boolean)
@@ -284,7 +294,7 @@ impl CommanderViewMemory {
             horde: mode == Mode::Horde,
             defender: matches!(mode, Mode::Horde | Mode::Assault)
                 && view.mode["defenderTeam"].as_i64() == me["team"].as_i64(),
-            ground_flights: false,
+            ground_flights: true,
             ..Context::default()
         };
         if let Some(support) = me["sup"].as_object() {
@@ -505,7 +515,19 @@ impl CommanderViewMemory {
                         } else {
                             None
                         },
-                        wall_work: false,
+                        wall_work: own
+                            && u["orderPlan"]["kind"] == 7
+                            && view.works.iter().any(|work| {
+                                work[5] == "wall"
+                                    && work[2].as_f64().is_some_and(|x| {
+                                        math::round(x * 10.0) / 10.0
+                                            == u["orderPlan"]["x"].as_f64().unwrap_or(f64::NAN)
+                                    })
+                                    && work[3].as_f64().is_some_and(|z| {
+                                        math::round(z * 10.0) / 10.0
+                                            == u["orderPlan"]["z"].as_f64().unwrap_or(f64::NAN)
+                                    })
+                            }),
                     },
                 );
             } else {
@@ -576,7 +598,7 @@ impl CommanderViewMemory {
                 standard_army,
             })
         };
-        let packet = Observation::new(Input {
+        let mut input = Input {
             width: self.width,
             height: self.height,
             tick: view.tick,
@@ -589,8 +611,21 @@ impl CommanderViewMemory {
             manpower: number(&me["mp"])?,
             research,
             runtime: Some(context),
-        })
-        .map_err(|e| e.to_string())?;
+        };
+        if view.initial_chars.len() != self.chars.len()
+            || view
+                .initial_height
+                .as_ref()
+                .is_some_and(|height| height.len() != self.chars.len())
+        {
+            return Err("invalid delivered initial terrain dimensions".into());
+        }
+        crate::match_human_observation::complete_ordinary_facts(
+            &mut input,
+            &view.initial_chars,
+            view.initial_height.as_deref(),
+        );
+        let packet = Observation::new(input).map_err(|e| e.to_string())?;
         self.tick = Some(view.tick);
         Ok(HumanView {
             tick: view.tick as u64,
@@ -703,7 +738,7 @@ mod tests {
         assert_eq!(own.attack_target, 2);
         assert_eq!(own.queued_orders, 3);
         assert_eq!(own.queued_amove, Some(Point { x: 30.0, z: 31.0 }));
-        assert!(!runtime.ground_flights);
+        assert!(runtime.ground_flights);
         assert!(!runtime.units.contains_key(&2));
         let ally = &runtime.units[&4];
         assert!(!ally.hold_fire && !ally.auto_cast);

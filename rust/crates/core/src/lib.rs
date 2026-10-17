@@ -59,6 +59,8 @@ pub mod commander_look;
 mod commander_received_vision;
 pub mod commander_support_policy;
 pub mod commander_support_runtime;
+#[cfg(test)]
+mod commander_union_tests;
 pub mod companion_ray;
 pub mod companions;
 pub mod conquest_end;
@@ -297,3 +299,6 @@ mod results_restart_tests;
 pub mod recipient_placement;
 #[cfg(test)]
 mod terrain_fire_tests;
+
+#[cfg(test)]
+mod ai_privacy_modes_tests;

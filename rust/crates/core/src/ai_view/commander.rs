@@ -177,9 +177,14 @@ impl CommanderMemory {
                 rule_number(weather_rule, "sight")?
             },
             horde: mode == Mode::Horde && view.mode["slot"].as_u64() == Some(self.slot as u64),
-            defender: matches!(mode, Mode::Horde | Mode::Assault)
+            defender: matches!(mode, Mode::Assault | Mode::Annihilation | Mode::Horde)
                 && view.mode["defenderTeam"].as_i64() == Some(i64::from(team)),
             height: view.height.clone(),
+            initial_chars: Some(view.initial_chars.clone()),
+            initial_height: view.initial_height.clone(),
+            mines: view.mines.iter().map(point).collect::<Result<_>>()?,
+            found_mines: view.found_mines.iter().map(point).collect::<Result<_>>()?,
+            ground_flights: true,
             ..Context::default()
         };
         for (name, cd) in me["sup"]
@@ -319,6 +324,16 @@ impl CommanderMemory {
                         hold_fire: own && truth(&u["holdFire"]),
                         auto_cast: own && truth(&u["auto"]),
                         cooldown: if own { number(&u["cd"])? } else { 0.0 },
+                        attack_target: if own { unsigned(&u["attackId"])? } else { 0 },
+                        queued_amove: if own {
+                            array(&u["orders"])?
+                                .iter()
+                                .find(|order| order["kind"] == 2)
+                                .map(point)
+                                .transpose()?
+                        } else {
+                            None
+                        },
                         queued_orders: if own { array(&u["orders"])?.len() } else { 0 },
                         auto_retreat: own && truth(&u["autoRetreat"]),
                         convoy: own && trucks.contains(&id),
@@ -330,17 +345,19 @@ impl CommanderMemory {
                                 u["air"]["state"].as_str(),
                                 Some("out" | "station" | "home")
                             ),
-                        wall_work: own && u["dig"]["kind"] == "wall",
-                        attack_target: if own { unsigned(&u["attackId"])? } else { 0 },
-                        queued_amove: if own {
-                            array(&u["orders"])?
-                                .iter()
-                                .find(|order| order["kind"] == 2)
-                                .map(point)
-                                .transpose()?
-                        } else {
-                            None
-                        },
+                        wall_work: own
+                            && u["orderPlan"]["kind"] == 7
+                            && view.works.iter().any(|work| {
+                                work[5] == "wall"
+                                    && work[2].as_f64().is_some_and(|x| {
+                                        crate::math::round(x * 10.0) / 10.0
+                                            == u["orderPlan"]["x"].as_f64().unwrap_or(f64::NAN)
+                                    })
+                                    && work[3].as_f64().is_some_and(|z| {
+                                        crate::math::round(z * 10.0) / 10.0
+                                            == u["orderPlan"]["z"].as_f64().unwrap_or(f64::NAN)
+                                    })
+                            }),
                     },
                 );
             }
@@ -369,6 +386,13 @@ impl CommanderMemory {
                     visible: false,
                 })
             })
+            .collect::<Result<_>>()?;
+        context.site_nodes = view
+            .nodes
+            .iter()
+            .enumerate()
+            .filter(|(index, _)| !view.claimed_nodes.contains(index))
+            .map(|(_, node)| point(node))
             .collect::<Result<_>>()?;
         context.known_depots = context
             .known_buildings
@@ -644,6 +668,79 @@ mod tests {
             view.chars[5], b'N',
             "a new delivery cannot mutate an old packet"
         );
+    }
+
+    #[test]
+    fn delivered_mode_roles_and_own_tactics_facts_follow_recipient_rows() {
+        let (mut delivery, mut snap) = delivery();
+        snap["units"][0][11] = json!(7.5);
+        snap["units"][0][12] = json!(16 | 2048 | 4096 | 8192 | 16384);
+        snap["plans"] = json!([[1, 7, 20.1, 22.2]]);
+        snap["orders"] = json!([[1, 1, 2, 31.2, 32.3]]);
+        snap["works"] = json!([[0, 0, 20.11, 22.21, 0, "wall"]]);
+        snap["nodes"] = json!([[30, 31, 1, 0]]);
+        snap["cells"] = json!([[5,"N",2,0,{"ground":"D","object":".","mineOwned":true}]]);
+        for (kind, defender) in [
+            ("conquest", false),
+            ("classic", false),
+            ("assault", true),
+            ("annihilation", true),
+            ("horde", true),
+        ] {
+            snap["mode"] = json!({"kind":kind,"slot":1,"defenderTeam":0});
+            let view = delivery.decode(&snap).unwrap();
+            let packet = CommanderMemory::new(0, 40, 40)
+                .unwrap()
+                .observe(&view)
+                .unwrap();
+            let context = packet.packet.input().runtime.as_ref().unwrap();
+            assert_eq!(context.defender, defender, "{kind}");
+            assert!(!context.horde);
+            assert!(context.ground_flights);
+            assert_eq!(context.initial_chars.as_ref().unwrap()[5], b'.');
+            assert_eq!(context.mines, vec![Point { x: 11.0, z: 1.0 }]);
+            assert_eq!(context.site_nodes, vec![Point { x: 30.0, z: 31.0 }]);
+            let own = &context.units[&1];
+            assert!(own.hold_fire && own.hold_position && own.auto_cast && own.auto_retreat);
+            assert_eq!(own.cooldown, 7.5);
+            assert_eq!(own.queued_amove, Some(Point { x: 31.2, z: 32.3 }));
+            assert!(own.wall_work);
+            assert!(!context.units[&3].hold_fire);
+        }
+        snap["mode"] = json!({"kind":"horde","slot":0,"defenderTeam":1});
+        let packet = CommanderMemory::new(0, 40, 40)
+            .unwrap()
+            .observe(&delivery.decode(&snap).unwrap())
+            .unwrap();
+        let context = packet.packet.input().runtime.as_ref().unwrap();
+        assert!(context.horde && !context.defender);
+        let mut tutorial = delivery.decode(&snap).unwrap();
+        tutorial.mode = json!({"kind":"tutorial"});
+        let tutorial_packet = CommanderMemory::new(0, 40, 40)
+            .unwrap()
+            .observe(&tutorial)
+            .unwrap();
+        assert_eq!(
+            tutorial_packet
+                .packet
+                .input()
+                .runtime
+                .as_ref()
+                .unwrap()
+                .mode,
+            Mode::Tutorial
+        );
+        let view = delivery.decode(&snap).unwrap();
+        for kind in ["world"] {
+            let mut view = view.clone();
+            view.mode = json!({"kind":kind});
+            assert!(
+                CommanderMemory::new(0, 40, 40)
+                    .unwrap()
+                    .observe(&view)
+                    .is_err()
+            );
+        }
     }
 
     #[test]

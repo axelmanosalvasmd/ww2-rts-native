@@ -144,6 +144,9 @@ impl NativeStartup {
                     .ok_or("missing Assault startup state")?
                     .defender_team,
             )?,
+            Mode::Horde if horde => {
+                StartPlan::prepare_horde(authored, &state.options, &state.rules)?
+            }
             _ => return Err("native startup requires a represented ordinary mode".into()),
         };
         // Validate the canonical mode pair even when this API is used before RoomRuntime.
