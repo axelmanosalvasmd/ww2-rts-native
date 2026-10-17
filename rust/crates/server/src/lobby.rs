@@ -1246,9 +1246,6 @@ impl Hub {
             .is_some_and(|t| t.enemy() == room.players.len());
         let horde = room.mode == "horde" && state.options.mode == Mode::Horde;
         let count = room.players.len() + usize::from(tutorial || horde);
-        if horde && !room.spectators.is_empty() {
-            return Err("Horde attachment does not admit spectators".into());
-        }
         if state.start.players.len() != count
             || state.options.players.len() != count
             || state.world.game.players.len() != count
@@ -2579,10 +2576,18 @@ impl Hub {
                     slot,
                 );
             } else if room.starting.is_none() {
-                let names = room
+                let names = native
+                    .runtime
+                    .state()
+                    .start
                     .players
                     .iter()
-                    .map(|p| p.name.clone())
+                    .enumerate()
+                    .map(|(slot, p)| {
+                        room.players
+                            .get(slot)
+                            .map_or_else(|| p.config.name.clone(), |p| p.name.clone())
+                    })
                     .collect::<Vec<_>>();
                 match native
                     .runtime

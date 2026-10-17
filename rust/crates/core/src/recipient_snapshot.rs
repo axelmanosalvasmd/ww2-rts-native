@@ -36,7 +36,6 @@ mod operative;
 mod operative_flights;
 #[path = "recipient_snapshot/owners.rs"]
 mod owners;
-#[cfg(test)]
 #[path = "recipient_snapshot/projectiles.rs"]
 mod projectiles;
 #[path = "recipient_snapshot/public_state.rs"]
@@ -302,6 +301,7 @@ fn validate_snapshot(state: &Match) -> Result<(), SnapshotError> {
             .validate_firing_grenade_step(0.)
             .map_err(|_| SnapshotError::Rules)?;
     }
+    projectiles::validate(state)?;
     engineering::validate(state)?;
     aircraft::validate(state)?;
     state

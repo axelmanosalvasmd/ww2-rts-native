@@ -1349,6 +1349,8 @@ impl Match {
                         .collect();
                     known
                 },
+                strikes: Vec::new(),
+                stationary_since: std::collections::BTreeMap::new(),
                 hidden_spawns: BTreeSet::new(),
                 site_nodes: vec![],
                 horde: false,

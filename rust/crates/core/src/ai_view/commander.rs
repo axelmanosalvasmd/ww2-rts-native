@@ -28,6 +28,7 @@ pub struct CommanderMemory {
     height: usize,
     tick: Option<i64>,
     sightings: Vec<HumanSighting>,
+    stationary: BTreeMap<u32, (Point, f64)>,
 }
 
 fn number(value: &Value) -> Result<f64> {
@@ -97,6 +98,7 @@ impl CommanderMemory {
             height,
             tick: None,
             sightings: Vec::new(),
+            stationary: BTreeMap::new(),
         })
     }
 
@@ -176,6 +178,23 @@ impl CommanderMemory {
             .ok_or("missing delivered commander support")?
         {
             context.support.insert(name.clone(), number(cd)?);
+        }
+        for strike in &view.strikes {
+            let owner = unsigned(&strike["owner"])? as usize;
+            if owner >= players.len() {
+                return Err("invalid delivered strike owner".into());
+            }
+            context
+                .strikes
+                .push(crate::commander_tactics::AnnouncedStrike {
+                    owner,
+                    kind: strike["kind"]
+                        .as_str()
+                        .ok_or("missing delivered strike kind")?
+                        .into(),
+                    at: point(strike)?,
+                    delay: number(&strike["t"])?,
+                });
         }
         let mut units = Vec::with_capacity(view.units.len());
         let mut human_units = Vec::with_capacity(view.units.len());
@@ -296,13 +315,13 @@ impl CommanderMemory {
                         convoy: own && trucks.contains(&id),
                         stock,
                         amove,
+                        air_at_base: own && u["air"]["state"] == "base",
                         airborne: flag(definition, "air")
                             && matches!(
                                 u["air"]["state"].as_str(),
                                 Some("out" | "station" | "home")
                             ),
                         wall_work: own && u["dig"]["kind"] == "wall",
-                        air_at_base: own && u["air"]["state"] == "base",
                         attack_target: if own { unsigned(&u["attackId"])? } else { 0 },
                         queued_amove: if own {
                             array(&u["orders"])?
@@ -386,6 +405,22 @@ impl CommanderMemory {
                 })
             })
             .collect::<Result<Vec<_>>>()?;
+        let now = view.tick as f64 / 20.0;
+        let mut stationary = self.stationary.clone();
+        stationary.retain(|id, _| visible.binary_search(id).is_ok());
+        for unit in units
+            .iter()
+            .filter(|u| visible.binary_search(&u.id).is_ok())
+        {
+            let previous = stationary.entry(unit.id).or_insert((unit.at, now));
+            if crate::math::hypot(unit.at.x - previous.0.x, unit.at.z - previous.0.z) > 0.1 + 1e-9 {
+                *previous = (unit.at, now);
+            }
+        }
+        context.stationary_since = stationary
+            .iter()
+            .map(|(&id, &(_, since))| (id, since))
+            .collect();
         let research = research(me, &units, &context, catalog)?;
         let packet = Observation::new(Input {
             width: self.width,
@@ -450,6 +485,7 @@ impl CommanderMemory {
         };
         self.tick = Some(view.tick);
         self.sightings = sightings;
+        self.stationary = stationary;
         Ok(result)
     }
 }
@@ -623,6 +659,173 @@ mod tests {
         assert!(
             memory.observe(&hidden).is_err(),
             "old delivered frames cannot rewind history"
+        );
+    }
+    #[test]
+    fn intent_ai34_stationary_gun_moves_or_disappears_between_attention_looks() {
+        use crate::{
+            commander_ai::Level,
+            commander_tactics::{self, State},
+            random::MatchRandom,
+        };
+        for disappeared in [false, true] {
+            let (mut delivery, mut snap) = delivery();
+            snap["units"][1][1] = json!("mg");
+            snap["sup"] = json!({"artillery":0});
+            snap["mp"] = json!(5000);
+            snap["tech"] = Value::Null;
+            let mut memory = CommanderMemory::new(0, 40, 40).unwrap();
+            let first = memory.observe(&delivery.decode(&snap).unwrap()).unwrap();
+            assert_eq!(
+                first
+                    .packet
+                    .input()
+                    .runtime
+                    .as_ref()
+                    .unwrap()
+                    .stationary_since[&2],
+                1.
+            );
+            let mut private = State::default();
+            let mut random = MatchRandom::new(34);
+            let commands = commander_tactics::plan(
+                &first.packet,
+                &[],
+                &mut private,
+                Level::Normal,
+                &mut random,
+            )
+            .unwrap();
+            assert!(commands.iter().all(|c| c["kind"] != "artillery"));
+            // The recipient producer keeps observing even when attention does not plan.
+            snap["tick"] = json!(40);
+            if disappeared {
+                snap["units"].as_array_mut().unwrap().remove(1);
+            } else {
+                snap["units"][1][3] = json!(26);
+            }
+            memory.observe(&delivery.decode(&snap).unwrap()).unwrap();
+            snap["tick"] = json!(60);
+            if disappeared {
+                snap["units"].as_array_mut().unwrap().insert(
+                    1,
+                    json!([2, "mg", 1, 25, 25, 0, 0, 50, 0, 0, 0, 0, 0, 0, null]),
+                );
+            } else {
+                snap["units"][1][3] = json!(25);
+            }
+            let returned = memory.observe(&delivery.decode(&snap).unwrap()).unwrap();
+            assert_eq!(
+                returned
+                    .packet
+                    .input()
+                    .runtime
+                    .as_ref()
+                    .unwrap()
+                    .stationary_since[&2],
+                3.
+            );
+            snap["tick"] = json!(100);
+            let next = memory.observe(&delivery.decode(&snap).unwrap()).unwrap();
+            let commands = commander_tactics::plan(
+                &next.packet,
+                &[],
+                &mut private,
+                Level::Normal,
+                &mut random,
+            )
+            .unwrap();
+            assert!(
+                commands.iter().all(|c| c["kind"] != "artillery"),
+                "{commands:?}"
+            );
+            snap["tick"] = json!(140);
+            let still = memory.observe(&delivery.decode(&snap).unwrap()).unwrap();
+            let commands = commander_tactics::plan(
+                &still.packet,
+                &[],
+                &mut private,
+                Level::Normal,
+                &mut random,
+            )
+            .unwrap();
+            assert!(
+                commands.iter().any(|c| c["kind"] == "artillery"),
+                "a truly stationary watched gun becomes eligible: {commands:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn intent_ai34_invalid_delivery_cannot_reset_stationary_history() {
+        let (mut delivery, mut snap) = delivery();
+        let mut memory = CommanderMemory::new(0, 40, 40).unwrap();
+        memory.observe(&delivery.decode(&snap).unwrap()).unwrap();
+        let before = memory.clone();
+        snap["tick"] = json!(40);
+        snap["units"][1][3] = json!(26);
+        let mut invalid = delivery.decode(&snap).unwrap();
+        invalid.players[0]["mp"] = json!("invalid");
+        assert!(memory.observe(&invalid).is_err());
+        assert_eq!(memory, before);
+    }
+
+    #[test]
+    fn intent_ai34_attention_filter_prunes_packet_clocks_and_preserves_delivery_history() {
+        use crate::{
+            commander_ai::Level,
+            commander_tactics::{self, State},
+            human_commander::ScreenView,
+            match_human_observation::human_screen_observation,
+            random::MatchRandom,
+        };
+        let (mut delivery, snap) = delivery();
+        let mut memory = CommanderMemory::new(0, 40, 40).unwrap();
+        let view = memory.observe(&delivery.decode(&snap).unwrap()).unwrap();
+        assert!(
+            view.packet
+                .input()
+                .runtime
+                .as_ref()
+                .unwrap()
+                .stationary_since
+                .contains_key(&2)
+        );
+        let screen = ScreenView {
+            tick: view.tick,
+            spawn: view.spawn,
+            units: view.units.iter().filter(|u| u.motion.id != 2).collect(),
+            visible: vec![],
+            sightings: vec![],
+            packet: &view.packet,
+        };
+        let packet = human_screen_observation(&screen).unwrap();
+        assert!(
+            !packet
+                .input()
+                .runtime
+                .as_ref()
+                .unwrap()
+                .stationary_since
+                .contains_key(&2)
+        );
+        commander_tactics::plan(
+            &packet,
+            &[],
+            &mut State::default(),
+            Level::Normal,
+            &mut MatchRandom::new(34),
+        )
+        .unwrap();
+        assert!(memory.stationary.contains_key(&2));
+        assert!(
+            view.packet
+                .input()
+                .runtime
+                .as_ref()
+                .unwrap()
+                .stationary_since
+                .contains_key(&2)
         );
     }
 }

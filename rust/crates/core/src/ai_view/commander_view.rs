@@ -32,6 +32,8 @@ pub struct CommanderViewMemory {
     naval: bool,
     tick: Option<i64>,
     sightings: BTreeMap<u32, HumanSighting>,
+    #[serde(default)]
+    stationary: BTreeMap<u32, (Point, f64)>,
 }
 
 fn at(value: &Value) -> Result<Point> {
@@ -145,6 +147,7 @@ impl CommanderViewMemory {
             naval,
             tick: None,
             sightings: BTreeMap::new(),
+            stationary: BTreeMap::new(),
         })
     }
 
@@ -286,6 +289,24 @@ impl CommanderViewMemory {
             for (key, value) in support {
                 context.support.insert(key.clone(), number(value)?);
             }
+        }
+        for strike in &view.strikes {
+            let owner = usize::try_from(integer(&strike["owner"])?)
+                .map_err(|_| "invalid delivered strike owner")?;
+            if owner >= players.len() {
+                return Err("invalid delivered strike owner".into());
+            }
+            context
+                .strikes
+                .push(crate::commander_tactics::AnnouncedStrike {
+                    owner,
+                    kind: strike["kind"]
+                        .as_str()
+                        .ok_or("missing delivered strike kind")?
+                        .into(),
+                    at: at(strike)?,
+                    delay: number(&strike["t"])?,
+                });
         }
         context.site_nodes = view.nodes.iter().map(at).collect::<Result<Vec<_>>>()?;
         context.nodes = view
@@ -509,6 +530,22 @@ impl CommanderViewMemory {
         if self.sightings.len() > 65_536 {
             return Err("commander sighting capacity exhausted".into());
         }
+        self.stationary
+            .retain(|id, _| visible.binary_search(id).is_ok());
+        for unit in units
+            .iter()
+            .filter(|u| visible.binary_search(&u.id).is_ok())
+        {
+            let previous = self.stationary.entry(unit.id).or_insert((unit.at, now));
+            if math::hypot(unit.at.x - previous.0.x, unit.at.z - previous.0.z) > 0.1 + 1e-9 {
+                *previous = (unit.at, now);
+            }
+        }
+        context.stationary_since = self
+            .stationary
+            .iter()
+            .map(|(&id, &(_, since))| (id, since))
+            .collect();
         let research = if me["tech"].is_null() {
             None
         } else {

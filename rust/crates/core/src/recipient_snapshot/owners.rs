@@ -169,6 +169,33 @@ pub(super) fn capture(state: &Match) -> Result<Vec<Map<String, Value>>, Snapshot
             push(own, "orders", json!(row));
         }
     }
+    if state.options.mode == Mode::Horde {
+        let horde = state.horde.as_ref().ok_or(SnapshotError::Rules)?;
+        // Horde shares queue/progress/rally rows through productionAccess.
+        // Paid job identities and refunds remain with the building owner.
+        let queue_rows = owners
+            .iter()
+            .map(|owner| owner["queues"].as_array().unwrap().clone())
+            .collect::<Vec<_>>();
+        for (slot, owner) in owners.iter_mut().enumerate() {
+            let mut rows = Vec::new();
+            for unit in state.world.game.units.values() {
+                if unit.owner == slot
+                    || (slot != horde.slot
+                        && unit.owner != horde.slot
+                        && state.world.game.allied(unit.owner, slot))
+                {
+                    rows.extend(
+                        queue_rows[unit.owner]
+                            .iter()
+                            .filter(|row| row[0].as_u64() == Some(u64::from(unit.id)))
+                            .cloned(),
+                    );
+                }
+            }
+            owner.insert("queues".into(), json!(rows));
+        }
+    }
     Ok(owners)
 }
 pub(super) fn movement_rows(state: &Match, slot: usize) -> Result<Value, SnapshotError> {

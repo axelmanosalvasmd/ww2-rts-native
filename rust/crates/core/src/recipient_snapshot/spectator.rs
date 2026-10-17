@@ -107,7 +107,10 @@ impl SpectatorDelivery {
             "shots".into(),
             projected.into_iter().next().ok_or(SnapshotError::Rules)?.1,
         );
-        fields.insert("flights".into(), json!([]));
+        fields.insert(
+            "flights".into(),
+            flights::project_perspective(state, 0, true)?,
+        );
         fields.insert("t".into(), json!("s"));
         // Keep the prototype's literal removal list, including its retained tech.
         for key in [

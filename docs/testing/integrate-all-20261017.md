@@ -107,3 +107,23 @@ plane-arrival object with `dir: s.dir`; `server.js:195` and the seat snapshot pa
 at line 246 use JSON.stringify. Executing that exact emission statement and send
 helper on Node v24.19.0 with controlled +0 and -0 both emits `"dir":0`.
 This is a bounded serialization component check, not a full support simulation.
+
+## Cross-chain #422
+
+Exact parent `42e3afe6b32ff289181407ff7ed9f99236fa96b5`. Retains complete ground
+flight validation, full-map watcher trajectories and the existing operative,
+Tutorial, authored-scenario, Sandbox and Horde event guards. Horde spectators
+use the already-recorded full-map watcher boundary; ordinary startup remains
+transactionally prepared before publication.
+
+Both incoming support payment/delivery witnesses remain in addition to the
+qualified invalid-kind atomicity and full-cleanup/ending witnesses. The obsolete
+fire-at refusal is represented by the existing positive fire-at ingress witness
+and retained compound-order refusal; base commands retain positive canonical
+queue admission. No garrison movement witness is removed.
+
+The incoming support planner's delivered strike announcements and stationary
+contact clocks are also populated by the active ordinary delivered-frame adapter,
+not just the independently retained Horde adapter. Its restore accepts older
+memory without stationary clocks through a default-empty field. Aircraft mission
+selection is invoked once, avoiding duplicate orders from the two composed paths.

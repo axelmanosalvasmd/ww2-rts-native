@@ -970,14 +970,15 @@ impl Match {
     }
     /// Snapshot extrapolation uses current poses and only visible unit bodies.
     /// Terrain remains canonical, matching flightUntil at the prototype pin.
-    pub(crate) fn visible_flight_contact(
+    pub(crate) fn visible_flight_contact_perspective(
         &self,
         p: &LiveFlight,
         a: projectiles::Point3,
         b: projectiles::Point3,
         slot: usize,
+        full_map: bool,
     ) -> Result<Option<FlightContact>, String> {
-        self.flight_contact_for(p, a, b, 1.0, 1.0, Some(slot))
+        self.flight_contact_for(p, a, b, 1.0, 1.0, Some((slot, full_map)))
     }
     fn flight_contact_for(
         &self,
@@ -986,7 +987,7 @@ impl Match {
         b: projectiles::Point3,
         start_fraction: f64,
         end_fraction: f64,
-        recipient: Option<usize>,
+        recipient: Option<(usize, bool)>,
     ) -> Result<Option<FlightContact>, String> {
         let g = &self.world.game;
         let level_height = n(self.firing_config()?, "levelHeight", 2.5);
@@ -1041,7 +1042,9 @@ impl Match {
                 && t.air.is_none()
                 && !t.riding
                 && t.id != p.shooter
-                && recipient.is_none_or(|slot| crate::recipient_snapshot::seen_by(self, slot, t.id))
+                && recipient.is_none_or(|(slot, full_map)| {
+                    full_map || crate::recipient_snapshot::seen_by(self, slot, t.id)
+                })
                 && (p.blast_source.is_some() || !g.allied(p.owner, t.owner))
         });
         candidates.sort_unstable();

@@ -190,6 +190,47 @@ fn intent_net82_spectator_close_removes_identity_without_creating_or_releasing_d
 }
 
 #[test]
+fn horde_watchers_receive_complete_seat_names_at_start_and_late_join() {
+    let (mut hub, mut a, mut b) = room();
+    a.send(&mut hub, json!({"t":"mode","v":"horde"}), 0);
+    let mut initial = Peer::new(3);
+    initial.hello(&mut hub, true, 0);
+    a.drain(&mut hub, 0);
+    b.drain(&mut hub, 0);
+    initial.drain(&mut hub, 0);
+
+    a.send(&mut hub, json!({"t":"start"}), 0);
+    let status = hub.native_status("ABC").unwrap();
+    assert!(status.fault.is_none());
+    let state = hub.rooms["ABC"].native.as_ref().unwrap().runtime.state();
+    let horde = state.horde.as_ref().unwrap().slot;
+    assert_eq!(horde, 2);
+    let expected = json!(["P1", "P2", state.start.players[horde].config.name]);
+    let messages = initial.drain(&mut hub, 0);
+    let start = messages.iter().find(|value| value["t"] == "start").unwrap();
+    assert_eq!(start["names"], expected);
+    assert_eq!(start["teams"], json!([0, 0, 1]));
+    assert_eq!(start["you"], 0);
+    assert!(start.get("fog").is_none());
+    let match_id = start["matchId"].clone();
+    a.drain(&mut hub, 0);
+    b.drain(&mut hub, 0);
+
+    let mut late = Peer::new(4);
+    late.hello(&mut hub, false, 1);
+    assert!(late.joined);
+    let messages = late.drain(&mut hub, 1);
+    let start = messages.iter().find(|value| value["t"] == "start").unwrap();
+    assert_eq!(start["names"], expected);
+    assert_eq!(start["teams"], json!([0, 0, 1]));
+    assert_eq!(start["matchId"], match_id);
+    assert!(start.get("fog").is_none());
+    assert_eq!(hub.rooms["ABC"].players.len(), 2);
+    assert_eq!(hub.rooms["ABC"].spectators.len(), 2);
+    assert!(hub.native_status("ABC").unwrap().fault.is_none());
+}
+
+#[test]
 fn intent_net57_seated_fog_starts_deltas_and_reconnect_leave_watchers_unmasked() {
     // Decode the prototype's URL-safe base-32 varints independently of the
     // native encoder. Runs alternate unchanged/flipped, starting unchanged.

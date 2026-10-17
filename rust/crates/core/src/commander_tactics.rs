@@ -10,6 +10,9 @@ use crate::{
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 
+#[path = "commander_tactics_support.rs"]
+mod support_planner;
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Stock {
     pub ammo: Option<f64>,
@@ -51,6 +54,13 @@ pub struct NodeObservation {
     pub visible: bool,
 }
 #[derive(Clone, Debug, PartialEq)]
+pub struct AnnouncedStrike {
+    pub owner: usize,
+    pub kind: String,
+    pub at: Point,
+    pub delay: f64,
+}
+#[derive(Clone, Debug, PartialEq)]
 pub struct Context {
     pub mode: Mode,
     pub naval: bool,
@@ -69,6 +79,10 @@ pub struct Context {
     pub smokes: Vec<crate::game::Smoke>,
     pub sight: f64,
     pub support: BTreeMap<String, f64>,
+    /// Announcements already delivered to this seat, including visible enemy strikes.
+    pub strikes: Vec<AnnouncedStrike>,
+    /// Stationary clocks learned from every delivered packet, never from simulation timers.
+    pub stationary_since: BTreeMap<u32, f64>,
     /// Resource positions and enemy depot memories already delivered to this seat.
     pub nodes: Vec<NodeObservation>,
     pub node_worth: Vec<f64>,
@@ -111,6 +125,8 @@ impl Default for Context {
             smokes: Vec::new(),
             sight: 1.0,
             support: BTreeMap::new(),
+            strikes: Vec::new(),
+            stationary_since: BTreeMap::new(),
             nodes: Vec::new(),
             node_worth: Vec::new(),
             known_depots: Vec::new(),
@@ -378,6 +394,29 @@ pub fn plan(
     random: &mut MatchRandom,
 ) -> Result<Vec<Value>, String> {
     let now = observation.input().tick as f64 / 20.0;
+    if observation.input().runtime.as_ref().is_some_and(|context| {
+        context.stationary_since.iter().any(|(id, since)| {
+            !since.is_finite()
+                || *since < 0.0
+                || *since > now
+                || observation
+                    .input()
+                    .units
+                    .binary_search_by_key(id, |u| u.id)
+                    .is_err()
+        })
+    }) {
+        return Err("invalid delivered stationary clock".into());
+    }
+    if observation.input().runtime.as_ref().is_some_and(|context| {
+        context.strikes.iter().any(|s| {
+            s.owner >= observation.input().players.len()
+                || ![s.at.x, s.at.z, s.delay].iter().all(|v| v.is_finite())
+                || !Catalog::compiled().is_ok_and(|c| c.support(&s.kind).is_ok())
+        })
+    }) {
+        return Err("invalid delivered strike announcement".into());
+    }
     let mut ids = BTreeSet::new();
     if sightings.iter().any(|s| {
         !ids.insert(s.id)
@@ -613,6 +652,8 @@ fn plan_inner(
             mine.push(u);
         }
     }
+    let support_units = available_units.clone();
+    let support_fighters = mine.clone();
     let delivered_recent: Vec<_> = sightings
         .iter()
         .filter(|s| !allied(Some(s.owner)) && now - s.time <= 60.0)
@@ -950,52 +991,8 @@ fn plan_inner(
     let strong_enough = !context.mode.is_construction()
         || !skill.adaptive
         || my_value > 1.1 * context.caution * their_value;
-    // Aircraft missions use current delivered contacts, never strategic memories.
-    let army: Vec<_> = mine
-        .iter()
-        .filter(|u| !boolean(definition(u), "air"))
-        .collect();
-    let front = if army.is_empty() {
-        me.spawn
-    } else {
-        Point {
-            x: army.iter().map(|u| u.at.x).sum::<f64>() / army.len() as f64,
-            z: army.iter().map(|u| u.at.z).sum::<f64>() / army.len() as f64,
-        }
-    };
-    for u in mine.iter().filter(|u| {
-        boolean(definition(u), "air") && context.units.get(&u.id).is_some_and(|f| f.air_at_base)
-    }) {
-        let nearest = |ground: bool| {
-            enemies
-                .iter()
-                .copied()
-                .filter(|e| {
-                    let d = definition(e);
-                    if ground {
-                        !boolean(d, "air")
-                            && !boolean(d, "building")
-                            && (!boolean(d, "infantry")
-                                || matches!(e.kind.as_str(), "at" | "flak" | "mortar" | "howitzer"))
-                    } else {
-                        boolean(d, "air")
-                    }
-                })
-                .min_by(|a, b| {
-                    dist(a.at, front)
-                        .total_cmp(&dist(b.at, front))
-                        .then(a.id.cmp(&b.id))
-                })
-        };
-        if u.kind == "attacker" {
-            if let Some(target) = nearest(true).filter(|e| dist(e.at, front) < 120.0) {
-                commands.push(json!({"t":"attack","ids":[u.id],"target":target.id}));
-            }
-        } else {
-            let at = nearest(false).map_or(front, |e| e.at);
-            commands.push(json!({"t":"move","orders":[[u.id,at.x,at.z]]}));
-        }
-    }
+    // Issue aircraft missions once from the current delivered contacts.
+    commands.extend(aircraft(observation, context, &mine, &enemies)?);
     let shopping = crate::commander_shopping::plan(
         &tactics_view,
         &mine,
@@ -1031,16 +1028,17 @@ fn plan_inner(
         last: state.called,
         spent: false,
     };
-    if !context.horde
-        && mine.len() >= 6
-        && let Some((i, p)) = input
-            .points
-            .iter()
-            .enumerate()
-            .find(|(_, p)| p.owner.is_some() && !allied(p.owner) && sees(p.at))
-        && state.mind.point_ready(i, now, skill.notice)
-        && let Some(command) = support.call("para", p.at, None, &sit, context, skill, now)?
-    {
+    if let Some(command) = support_planner::plan(
+        observation,
+        &support_units,
+        &support_fighters,
+        &enemies,
+        state,
+        &sit,
+        skill,
+        &mut support,
+        sees,
+    )? {
         commands.push(command);
     }
     let mut pending = vec![Vec::<&UnitObservation>::new(); input.points.len()];
@@ -1194,7 +1192,6 @@ fn plan_inner(
         .map_err(|e| e.to_string())?
         .get("aid")
         .ok_or("missing medic aid rules")?;
-    commands.extend(aircraft(observation, context, &mine, &enemies)?);
     let mut world_free = BTreeSet::new();
     for u in &mine {
         let d = definition(u);
@@ -1519,6 +1516,22 @@ struct SupportBudget {
     spent: bool,
 }
 impl SupportBudget {
+    fn can(&self, kind: &str, context: &Context, skill: Skill, now: f64) -> Result<bool, String> {
+        if self.spent
+            || context.support.get(kind).is_none_or(|cd| *cd > 0.0)
+            || self.last.is_some_and(|last| now - last < skill.sup_gap)
+        {
+            return Ok(false);
+        }
+        let price = economy::sup_cost(context.mode, kind).map_err(|e| e.to_string())?;
+        let (wallet, reserve) = if price.currency == economy::Currency::Manpower {
+            (self.mp, skill.sup_reserve)
+        } else {
+            (self.mun, skill.mun_reserve)
+        };
+        Ok(wallet >= price.cost + reserve)
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn call(
         &mut self,
@@ -1530,9 +1543,7 @@ impl SupportBudget {
         skill: Skill,
         now: f64,
     ) -> Result<Option<Value>, String> {
-        if self.spent
-            || context.support.get(kind).is_none_or(|cd| *cd > 0.0)
-            || self.last.is_some_and(|last| now - last < skill.sup_gap)
+        if !self.can(kind, context, skill, now)?
             || kind != "cover" && situation.at.is_some_and(|goal| dist(at, goal) > 40.0)
         {
             return Ok(None);
@@ -1543,14 +1554,6 @@ impl SupportBudget {
         } else {
             &mut self.mun
         };
-        let reserve = if price.currency == economy::Currency::Manpower {
-            skill.sup_reserve
-        } else {
-            skill.mun_reserve
-        };
-        if *wallet < price.cost + reserve {
-            return Ok(None);
-        }
         *wallet -= price.cost;
         self.last = Some(now);
         self.spent = true;
@@ -1702,6 +1705,10 @@ mod field_assault_tests;
 #[cfg(test)]
 #[path = "if25_ai_lifecycle_tests.rs"]
 mod if25_lifecycle_tests;
+
+#[cfg(test)]
+#[path = "commander_support_tests.rs"]
+mod support_tests;
 
 #[cfg(test)]
 #[path = "commander_field_policy_tests.rs"]

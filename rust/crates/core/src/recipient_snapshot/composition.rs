@@ -217,6 +217,8 @@ pub(super) fn admit_actors(state: &Match, outside_events: &[Effect]) -> Result<(
     }
     // The caller must drain aviation events into the chronological tick batch
     // before delivery, just as it drains firing and support events above.
+    projectiles::validate(state)?;
+    // Producers must drain their events before recipient publication.
     if !state.aviation.events.is_empty() {
         return Err(refused(SnapshotCapability::Air));
     }

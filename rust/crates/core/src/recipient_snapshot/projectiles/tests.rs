@@ -11,6 +11,10 @@ use crate::{
     unit_publication::{PublicationParts, StagedUnit, prepare_publication},
     weather::WeatherChoice,
 };
+use crate::{
+    game::Point,
+    projectiles::{self as geometry, Point3},
+};
 
 fn scene() -> Match {
     let map = crate::map::AuthoritativeMap::from_json(&serde_json::to_vec(&json!({
@@ -314,4 +318,52 @@ fn malformed_retained_payload_refuses_before_recipient_publication() {
             .is_err()
     );
     assert_eq!(delivery, before);
+}
+
+#[test]
+fn salvo_only_snapshot_still_validates_canonical_firing_timers() {
+    let mut state = scene();
+    let shooter = actor(&mut state, "rifle", 1, Point { x: 130., z: 130. });
+    state.firing.salvos.push(crate::match_firing::LiveSalvo {
+        at: Point { x: 30., z: 30. },
+        owner: 1,
+        left: 1,
+        next: 1.,
+        every: 0.2,
+        spread: 1.,
+    });
+    validate(&state).unwrap();
+    state.firing.units.get_mut(&shooter).unwrap().cooldown = f64::NAN;
+    assert_eq!(validate(&state), Err(SnapshotError::Rules));
+    assert!(SnapshotCache::new(&state).is_err());
+}
+
+#[test]
+fn weaponless_retained_flight_extrapolates_through_visible_static_contact() {
+    let mut state = scene();
+    let shooter = state.next_unit_id;
+    state
+        .place_starting_building(0, "hq", 35 * state.world.game.w + 35)
+        .unwrap();
+    assert!(!state.rules.kinds[state.world.game.units[&shooter].kind].weapon);
+    let target = actor(&mut state, "rifle", 1, Point { x: 40., z: 30.5 });
+    let blast = AbilityBlast::from_unit(state.rules.kind("rifle").unwrap(), &state.rules).unwrap();
+    let id = state
+        .launch_ability_flight(shooter, Point { x: 40., z: 30.5 }, blast, None, None)
+        .unwrap();
+    let p = state.firing.flights.get_mut(&id).unwrap();
+    p.solution = geometry::Flight {
+        origin: Point3::new(30.5, 1.2, 30.5),
+        velocity: Point3::new(100., 0., 0.),
+        gravity: 0.,
+        stamp: 0.,
+    };
+    p.launched = 0.;
+    p.last = 0.;
+    p.expires = 5.;
+    state.firing.events.clear();
+    state.world.game.reveal = true;
+    state.world.game.players[0].visible.push(target);
+    validate(&state).unwrap();
+    assert_eq!(for_seat(&state, 0).unwrap()[0]["until"], 0.15);
 }

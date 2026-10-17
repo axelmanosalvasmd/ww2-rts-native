@@ -57,6 +57,7 @@ fn scene() -> Match {
             effect: Some("shell"),
         },
     );
+    state.firing.next_flight = 8;
     for team in [0, 1] {
         state
             .routing_fog
@@ -486,4 +487,41 @@ mod retained_ground {
             state.rules.kinds[aircraft].name
         );
     }
+}
+
+#[test]
+fn watcher_retains_hidden_live_flights_and_bounds_them_by_full_map_contacts() {
+    let mut state = scene();
+    for team in state.routing_fog.teams.values_mut() {
+        team.vis.fill(0);
+    }
+    for player in &mut state.world.game.players {
+        player.visible.clear();
+    }
+    assert_eq!(project(&state, 2).unwrap(), json!([]));
+    let before = format!("{:?}{:?}", state.world, state.routing_fog);
+    let mut watcher = super::super::SpectatorDelivery::new(&state).unwrap();
+    let view = watcher.capture(&state, &[], true).unwrap();
+    assert_eq!(view["flights"][0]["flight"], 7);
+    assert_eq!(view["flights"][0]["f"], 1);
+    assert_eq!(view["flights"][0]["until"], 1.15);
+    assert_eq!(format!("{:?}{:?}", state.world, state.routing_fog), before);
+    // EVERYTHING.has preserves the source identity after the actor retires.
+    state.world.game.units.remove(&1).unwrap();
+    let retired = watcher.capture(&state, &[], false).unwrap();
+    assert_eq!(retired["flights"][0]["f"], 1);
+    assert_eq!(retired["flights"][0]["fo"], 0);
+    state.firing.flights.get_mut(&7).unwrap().solution.origin.y = 1.0;
+    let target = state.world.game.units.get_mut(&3).unwrap();
+    target.x = 27.0;
+    target.z = 25.0;
+    state.grid = crate::grid::SpatialGrid::new(&state.world.game.units, 16.0);
+    let view = watcher.capture(&state, &[], false).unwrap();
+    assert_eq!(view["flights"][0]["until"], 1.04);
+    assert_eq!(project(&state, 2).unwrap(), json!([]));
+    state.firing.flights.clear();
+    assert_eq!(
+        watcher.capture(&state, &[], false).unwrap()["flights"],
+        json!([])
+    );
 }
