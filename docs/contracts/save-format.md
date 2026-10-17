@@ -39,7 +39,7 @@ The root has these seven required keys. The six content owners correspond to `se
 | `map` | Full raw authored map, including private layers and triggers. It is never replaced with `mapForClient`. The prototype uses `null` in World (`server.js:426`); native World restoration is refused. |
 | `seats` | Saved roster in simulation slot order, with the keys below (`server.js:425`). |
 | `settings` | Exactly the nine setting keys below (`server.js:419,426`). |
-| `ai` | Planner memories, separately owned from `g` (`shared/ai.js:159-165`). Currently `null`; non-null memories and AI seats are refused until hosted planner restoration exists. Commander state is not added to this envelope. |
+| `ai` | Planner memories, separately owned from `g` (`shared/ai.js:159-165`). Human room saves keep this `null`; hosted AI room admission remains separate. The core AI-memory codec below can persist the external planner owner without adding envelope keys. Commander attention is not added to this envelope. |
 
 Each saved seat has `name`, `token`, `ai`, `level`, `team`, `faction`. `name` removes a trailing ` (AI)`; `ai` is boolean; `level` is the difficulty string, or `null` for a human without an AI level; `team` and `faction` are the original numeric values (`server.js:425`). A valid UTF-16 token is saved as a JSON string. A token ending in an unpaired surrogate uses `{utf16: [code units]}` so the native server's existing truncated token identity survives JSON without replacement characters. This is a private format representation, not a socket field.
 
@@ -97,6 +97,7 @@ The `state` struct field keys are listed below. These are native component bound
 | `capture_ticks`, `tick_state`, `ordinary_snapshot_only` | Capture clocks, tick phase state and the existing delivery capability restriction. |
 | `story`, `fallen`, `finish`, `timeline`, `next_unit_id` | Match statistics, fall locations, terminal decision, result samples and the canonical actor allocator. |
 | `assault`, `horde`, `tutorial`, `scenario`, `companions`, `rail_runs` | Existing mode and operative owners. Inactive records are retained; their presence does not grant room admission. |
+| `authored_mission` | Optional timed authored mission definition, execution clock, trigger state and ordered objective records. Older v1 checkpoints default to absent; restored records must match canonical execution. See [spectator-missions-v0.md](spectator-missions-v0.md). |
 | `elimination` | Optional Annihilation/Classic owner: `teams`, `bunkers`, `time_left`, `sudden_death`, `nodes`. Each resource node retains `cell`, `at` (`x`, `z`), `depot`, `rate`, `fuel`. |
 | `rules` | Omitted and reconstructed from compiled rules. Saving modified rules is refused. |
 | `world_runtime` | Omitted; saving or loading a World runtime is refused. |
@@ -122,3 +123,25 @@ A successful load clears the previous result and opens an indefinite host pause 
 Intent tests cover the save portions of NET-28 and NET-80, plus NET-89, NET-91 and NET-93. They also compare a running saved match's continuation with uninterrupted native execution, using held fire, movement and queued AutoRetreat stance changes, collecting both seats' complete recipient snapshots on every tick through a VP victory and subsequent ending ticks. Unsupported-version refusal must preserve the lobby and epoch.
 
 NET-12 (editor writes), MODE-55 (Horde records), NET-90 (World autosave), the full NET-71 callback ordering, full NET-92 seat/AI/spectator restoration and AI-63 planner memory are not claimed by ordinary match persistence.
+
+## External AI memory codec (IF-27)
+
+`Match::save_ai_memories_json` and `restore_ai_memories_json` encode and restore the separate `ai` content owner. They accept an explicit AI roster; omitted human seats lose their old AI memory. This follows `shared/ai.js:159-165` and `server.js:426,447-448`. Room save/load still refuses hosted AI seats and non-null `ai`, pending their hosting integration. These core APIs do not activate that capability or claim AI-63.
+
+The value is `null` for an older v1 human save, or an array indexed by simulation slot. A missing or null entry starts that AI fresh. Present entries use the existing lossless tagged codec. Each contains `owner`, a match `binding` (seed, dimensions, seat count and spawn), and `memory`. Ordinary memory contains the complete native policy (strategic RNG, opening aim, tactical lessons, assault membership, cooldowns and released orders) and observation memory (contacts and stationary timers). The observation's allocation address is omitted and rebound by its next observation. Native Horde memory retains its bounded pending order queue, comparison plans and scheduling state, but clears its old delivered view and waits for a fresh observation (`server.js:398-404`). No saved raw address is trusted.
+
+Ordinary camera attention, motor RNG, pending human input actions and the previous delivered packet restart on load. They belong to `ai-human.js`'s separate WeakMap (`shared/ai-human.js:35,51-65`), which `server/saves.js:18-26` does not serialize. Strategic policy and observation memory correspond to the separate AI WeakMap that is serialized. Restoring only requested AI slots implements the human-seat reset at `server.js:447-448`.
+
+Version stays 1: neither the seven envelope keys nor `g.state` changes. Existing null-memory v1 saves still load. The external codec adds the representation of a previously refused non-null owner; it changes no previously writable checkpoint. Unknown tags, wrong match/seat binding, duplicate roster seats and mismatched brain kinds are refused. The existing room capability guard continues to refuse non-null AI content.
+
+Merged policy state also persists field-work bridge, fill and demine crews, armor sightings, World rail timing and fort steps through the same tagged AI codec. Older non-null policy memory lacking the new field and World owners defaults those owners, preserving v1 compatibility. World room admission remains closed.
+Scripted Horde policy remembers its observed stationary positions and timers. Older commander memory without that policy starts it fresh. Its old decoded policy packet is cleared with the old delivered view on load, so the next action still requires a fresh delivered observation.
+
+The native Horde comparison plan also retains its optional `delivered` intent:
+optional display `plan`, display `orders`, and the `digging` flag. Display plans
+carry the existing recipient `kind` and point `at`, never hidden work or target
+data (`shared/sim.js:6016-6062`). Missing `delivered` content decodes as `None`
+for older native comparison plans. This stays inside the existing tagged
+external AI owner, with its fresh-observation requirement after load. It adds
+no match checkpoint or envelope key. The populated comparison-plan round trip
+is covered by `if27_horde_pending_memory_round_trips_order_budget_and_supersession`.

@@ -40,6 +40,7 @@ mod commander_construction;
 mod commander_fortification;
 mod commander_forward_hq;
 pub mod commander_mind;
+mod commander_mirror;
 mod commander_shopping;
 pub mod commander_tactics;
 pub mod companion_ray;
@@ -70,6 +71,7 @@ pub mod recipient_availability;
 
 #[cfg(test)]
 use crate as core_api;
+pub mod authored_mission;
 #[cfg(test)]
 #[path = "../tests/support/human_commander_facts.rs"]
 mod human_commander_test_facts;
@@ -241,3 +243,4 @@ mod save_state;
 
 pub mod commander_field_policy;
 pub mod commander_world_policy;
+mod numeric_keys;

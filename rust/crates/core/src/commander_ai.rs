@@ -10,7 +10,7 @@ use crate::{
     random::{MatchRandom, StreamId},
 };
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Level {
     Easy,
     #[default]
@@ -286,6 +286,7 @@ impl Observation {
                 || context.units.iter().any(|(id, f)| {
                     *id == 0
                         || !f.built.is_finite()
+                        || !f.cooldown.is_finite()
                         || f.amove.is_some_and(|p| !finite_point(p))
                         || f.stock.as_ref().is_some_and(|r| {
                             !r.provisions.is_finite()
@@ -364,12 +365,12 @@ impl Observation {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Aim {
     pub i: usize,
     pub until: f64,
 }
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SourceState {
     pub aim: Option<Aim>,
     pub point_failures: Vec<u8>,
