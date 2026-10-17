@@ -91,10 +91,15 @@ fn hosted_recorded_plane_support_pays_once_and_delivers_every_seat_through_retir
         state
             .initialize_tick_scene(0, TickPathConfig::default())
             .unwrap();
+        let mut baseline = scene();
+        baseline.restrict_to_ordinary_snapshots().unwrap();
+        baseline
+            .initialize_tick_scene(0, TickPathConfig::default())
+            .unwrap();
+        baseline.advance_tick().unwrap();
         // Para requires a visible landing site. The owner's spawn is visible.
         let at = state.start.players[0].spawn;
         record_at(&mut state, kind, at);
-        let wallet = state.start.economy.players[0].clone();
         let spent = state.story[0].mp_spent;
         let calls = state.story[0].support_calls;
         let next_id = state.next_unit_id;
@@ -106,13 +111,29 @@ fn hosted_recorded_plane_support_pays_once_and_delivers_every_seat_through_retir
             .unwrap();
         let cooldown = definition.get("cd").unwrap().number().unwrap();
         let delay = definition.get("delay").unwrap().number().unwrap();
-        let results = state.apply_commands(1, false).unwrap();
+        let mut first_report = Some(state.advance_tick().unwrap());
+        let results = &first_report.as_ref().unwrap().commands;
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].denial, None, "{kind}");
         assert_eq!(state.commands.pending_commands(), 0);
-        assert_eq!(state.start.economy.players[0].mp, wallet.mp - price.cost);
-        assert_eq!(state.start.economy.players[0].mun, wallet.mun);
-        assert_eq!(state.start.players[0].support[kind], cooldown);
+        assert_eq!(
+            state.start.economy.players[0].mp,
+            baseline.start.economy.players[0].mp - price.cost
+        );
+        assert_eq!(
+            state.start.economy.players[0].mun,
+            baseline.start.economy.players[0].mun
+        );
+        // Commands publish before the same tick's strike and cooldown phases.
+        let dt = state.rules.movement.tick;
+        assert!(
+            state
+                .start
+                .points
+                .iter()
+                .all(|point| point.kind.as_deref() != Some("radio"))
+        );
+        assert_eq!(state.start.players[0].support[kind], cooldown - dt);
         assert_eq!(state.story[0].mp_spent, spent + price.cost);
         assert_eq!(state.story[0].support_calls, calls + 1.0);
         assert_eq!(state.next_unit_id, next_id);
@@ -123,7 +144,7 @@ fn hosted_recorded_plane_support_pays_once_and_delivers_every_seat_through_retir
             (0, at.x, at.z, 0.0, false)
         );
         assert_eq!(strike.runtime.as_ref().unwrap().kind.name(), kind);
-        assert_eq!(strike.runtime.as_ref().unwrap().delay, delay);
+        assert_eq!(strike.runtime.as_ref().unwrap().delay, delay - dt);
         let paid = (
             state.start.economy.clone(),
             state.start.players[0].support.clone(),
@@ -170,9 +191,14 @@ fn hosted_recorded_plane_support_pays_once_and_delivers_every_seat_through_retir
             .collect::<Vec<_>>();
         let mut delivery = DeliveryState::new(&state).unwrap();
         let mut arrived = false;
-        for _ in 0..2000 {
-            let report = state.advance_tick().unwrap();
-            assert!(report.commands.is_empty());
+        for tick in 1..=2000 {
+            let report = if tick == 1 {
+                first_report.take().unwrap()
+            } else {
+                let report = state.advance_tick().unwrap();
+                assert!(report.commands.is_empty());
+                report
+            };
             let plane = report.events.iter().any(|event| {
                 matches!(event,
                 crate::match_tick::TickEvent::Support(crate::match_support::SupportEvent::Plane {
