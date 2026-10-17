@@ -642,6 +642,8 @@ fn intent_net46_spectator_army_commands_are_silent_and_never_queued() {
         watcher.drain(&mut hub, 0),
         vec![json!({"t":"pong","c":123,"srv":[0.0,2]})]
     );
+    assert!(a.drain(&mut hub, 0).is_empty());
+    assert!(b.drain(&mut hub, 0).is_empty());
     // The same valid order enters the queue from the owning seated connection.
     a.send(&mut hub, json!({"t":"move","orders":[[actor,12,12]]}), 0);
     assert_eq!(
