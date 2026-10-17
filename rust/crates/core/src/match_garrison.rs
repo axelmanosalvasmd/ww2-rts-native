@@ -118,12 +118,12 @@ impl Match {
                 candidates.push(cell);
             }
         }
-        candidates.into_iter().min_by(|a, b| {
+        crate::sort::first_by(candidates, |a, b| {
             let distance = |cell| {
                 let p = center(g.w, cell);
                 math::hypot(p.x - from.x, p.z - from.z)
             };
-            distance(*a).total_cmp(&distance(*b)).then_with(|| a.cmp(b))
+            distance(a) - distance(b)
         })
     }
     pub fn execute_enter_command(

@@ -566,9 +566,7 @@ fn groups(
                 z: math::round(o.at.z),
             }
         };
-        // Numeric keys reproduce source string equality, including +0 and -0.
-        let bits = |v: f64| if v == 0.0 { 0 } else { v.to_bits() };
-        let key = (bits(key.x), bits(key.z));
+        let key = crate::numeric_keys::point_key(key);
         if let Some(&group) = group_indices.get(&key) {
             groups[group].push(i);
         } else {
