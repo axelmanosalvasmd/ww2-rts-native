@@ -126,13 +126,21 @@ fn net48_leave_preserves_army_clears_identity_and_ignores_departed_socket() {
     assert!(drain(&mut rb).is_empty());
     let (returning, mut rr) = client(3);
     hello(&mut hub, &returning, "b", 3);
-    assert!(
-        drain(&mut rr)
-            .iter()
-            .any(|v| matches!(v, Output::Close(..)))
+    let returned = drain(&mut rr);
+    assert!(returned.iter().all(|v| !matches!(v, Output::Close(..))));
+    assert!(returned.iter().any(|v| matches!(v, Output::Json(v)
+        if v["t"] == "lobby" && v["spectator"] == true && v["you"] == -1)));
+    assert_eq!(hub.rooms["ABC"].spectators.len(), 1);
+    assert_eq!(
+        hub.rooms["ABC"].spectators[0].connection.as_ref().unwrap().id,
+        returning.id
     );
+    send(&mut hub, &returning, json!({"t":"buy", "kind":"rifle"}), 4);
+    assert_eq!(runtime(&hub).state().commands.pending_commands(), pending);
     assert_eq!(hub.rooms["ABC"].players.len(), 2);
     assert!(hub.rooms["ABC"].players[1].ai);
+    assert!(hub.rooms["ABC"].players[1].connection.is_none());
+    assert!(hub.rooms["ABC"].players[1].token.is_empty());
 }
 
 #[test]
