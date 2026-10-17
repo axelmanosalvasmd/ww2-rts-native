@@ -1004,7 +1004,15 @@ impl crate::match_runtime::Match {
             return self.execute_enter_command(owner, ids, *at, *queue);
         }
         if let Command::FireAt { ids, at, queue } = command {
-            return self.aircraft_area_command(owner, ids, *at, *queue);
+            if ids.iter().any(|raw| {
+                u32::try_from(*raw)
+                    .ok()
+                    .and_then(|id| self.world.game.units.get(&id))
+                    .is_some_and(|u| u.owner == owner && u.air.is_some())
+            }) {
+                return self.aircraft_area_command(owner, ids, *at, *queue);
+            }
+            return self.ground_fire_at_command(owner, ids, *at, *queue);
         }
         if let Command::Entrench { ids, order, queue } = command {
             return self.execute_entrench(owner, ids, *order, *queue, winner_decided);
@@ -1946,6 +1954,15 @@ impl crate::path_requests::PathRequestContext for RequestContext<'_> {
         kind: crate::path_requests::RequestKind,
     ) -> Option<Point> {
         use crate::path_requests::RequestKind;
+        if kind == RequestKind::FireAt {
+            return match self.match_state.current_fire_at_goal(id) {
+                Ok(goal) => goal,
+                Err(error) => {
+                    self.error = Some(error);
+                    None
+                }
+            };
+        }
         if kind == RequestKind::Dig {
             return self.match_state.current_dig_goal(id);
         }
@@ -2078,6 +2095,14 @@ impl crate::path_requests::PathRequestContext for RequestContext<'_> {
                         .unwrap()
                         .attack_id = 0
                 }
+                crate::path_requests::RequestKind::FireAt => {
+                    self.match_state
+                        .commands
+                        .units
+                        .get_mut(&u.id)
+                        .unwrap()
+                        .fire_at = None
+                }
                 crate::path_requests::RequestKind::Nade => {
                     self.match_state.commands.units.get_mut(&u.id).unwrap().nade = None;
                     let ability = self.match_state.abilities.get_mut(u.id).unwrap();
@@ -2137,6 +2162,9 @@ impl crate::match_runtime::Match {
         // current_goal cannot report errors through the scheduler's Option API.
         // Validate Board and Attack callbacks before observation or FIFO service can write.
         for request in self.commands.requests.queued_requests() {
+            if request.kind == crate::path_requests::RequestKind::FireAt {
+                self.current_fire_at_goal(request.unit)?;
+            }
             if request.kind == crate::path_requests::RequestKind::AttackId {
                 self.current_attack_goal(request.unit)?;
             }
@@ -2409,6 +2437,7 @@ impl crate::match_runtime::Match {
                 | crate::path_requests::RequestKind::Build
                 | crate::path_requests::RequestKind::Board
                 | crate::path_requests::RequestKind::AttackId
+                | crate::path_requests::RequestKind::FireAt
         ) {
             return Err("unsupported command path request".into());
         }
@@ -2426,6 +2455,9 @@ impl crate::match_runtime::Match {
         }
         if kind == crate::path_requests::RequestKind::AttackId {
             self.current_attack_goal(id)?;
+        }
+        if kind == crate::path_requests::RequestKind::FireAt {
+            self.current_fire_at_goal(id)?;
         }
         if kind == crate::path_requests::RequestKind::Board {
             self.current_board_goal(id)?;

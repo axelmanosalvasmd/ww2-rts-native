@@ -311,6 +311,9 @@ fn project_recipient(
     if let Some(logistics) = logistics::project(state, slot)? {
         fields.insert("logistics".into(), logistics);
     }
+    if !state.firing.flights.is_empty() {
+        fields.insert("flights".into(), shots::live_flights(state, slot)?);
+    }
     Ok(RecipientProjection {
         fields,
         missing: vec![
