@@ -284,7 +284,10 @@ mod tests {
         assert_eq!(first.inputs, second.inputs);
         assert_eq!(first.recipients, second.recipients);
         assert_eq!(first.snapshot_passes, second.snapshot_passes);
-        assert_eq!(first.state.start.random.snapshot(), second.state.start.random.snapshot());
+        assert_eq!(
+            first.state.start.random.snapshot(),
+            second.state.start.random.snapshot()
+        );
         assert!(first.state.tick_state.fault().is_none());
         assert!(second.state.tick_state.fault().is_none());
     }

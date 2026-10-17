@@ -221,9 +221,7 @@ fn watched_dive_enters_admission_then_cooldowns_select_artillery_or_wait_without
         m.world.game.players[0].visible = vec![enemy, heavy];
         m.start.economy.players[0].mun = 1000.0;
         for (kind, cd) in &mut m.start.players[0].support {
-            *cd = if (kind == "dive" && dive_ready)
-                || (kind == "artillery" && artillery_ready)
-            {
+            *cd = if (kind == "dive" && dive_ready) || (kind == "artillery" && artillery_ready) {
                 0.0
             } else {
                 100.0

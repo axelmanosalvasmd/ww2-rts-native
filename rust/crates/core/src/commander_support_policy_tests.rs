@@ -151,7 +151,11 @@ fn admitted_air_support_requires_its_target_readiness_and_cooldown() {
     let targets = observation(units);
     let no_enemies = observation(vec![unit(1, "rifle", 0, 100.0)]);
     for kind in ["dive", "para", "bombing", "strafe", "recon"] {
-        let obs = if kind == "recon" { &no_enemies } else { &targets };
+        let obs = if kind == "recon" {
+            &no_enemies
+        } else {
+            &targets
+        };
         let mut f = facts(obs, &[kind]);
         assert_eq!(
             chosen(obs, &f, Level::Normal, 0.0).as_deref(),
@@ -160,7 +164,12 @@ fn admitted_air_support_requires_its_target_readiness_and_cooldown() {
         );
         if kind != "recon" {
             assert_eq!(
-                chosen(&no_enemies, &facts(&no_enemies, &[kind]), Level::Normal, 0.0),
+                chosen(
+                    &no_enemies,
+                    &facts(&no_enemies, &[kind]),
+                    Level::Normal,
+                    0.0
+                ),
                 None
             );
         }
@@ -192,10 +201,7 @@ fn air_support_priority_falls_back_through_bombing_artillery_and_strafe() {
     ]);
     let mut f = facts(&obs, &["dive", "bombing", "artillery", "strafe"]);
     for kind in ["dive", "bombing", "artillery", "strafe"] {
-        assert_eq!(
-            chosen(&obs, &f, Level::Normal, 0.0).as_deref(),
-            Some(kind)
-        );
+        assert_eq!(chosen(&obs, &f, Level::Normal, 0.0).as_deref(), Some(kind));
         f.cooldowns.insert(kind.into(), 1.0);
     }
     assert_eq!(chosen(&obs, &f, Level::Normal, 0.0), None);
