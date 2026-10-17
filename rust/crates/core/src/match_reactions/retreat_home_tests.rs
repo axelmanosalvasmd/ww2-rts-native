@@ -4,7 +4,7 @@ use crate::{
     game::PlaneState,
     match_commands::{Command, MoveOutcome, UnitControl},
     misc_retreat_support_tests::{delivered_tick, publish_rifle, scene, seats},
-    recipient_snapshot::{DeliveryState, SnapshotCache, SnapshotError},
+    recipient_snapshot::{DeliveryState, SelectedSeat, SnapshotCache, SnapshotError},
     supply_convoys::{ConvoyState, Store, StoreId, Truck, TruckState},
 };
 
@@ -348,6 +348,25 @@ fn mov48_manual_retreat_exits_house_moves_home_and_delivers_every_seat() {
     assert!(m.tick_state.fault().is_none());
 }
 
+fn classic_delivered_tick(
+    state: &mut Match,
+    delivery: &mut DeliveryState,
+    selected: &[SelectedSeat],
+) {
+    let report = state.advance_tick().unwrap();
+    let expected_mode = crate::recipient_snapshot::mode_row(state).unwrap();
+    assert_eq!(expected_mode["kind"], "classic");
+    let frame = delivery
+        .capture_selected_with_tick_events(state, selected, &report.events)
+        .unwrap()
+        .unwrap();
+    for seat in selected {
+        let snapshot = frame.recipient(seat.slot).unwrap().into_json();
+        assert_eq!(snapshot["t"], "s");
+        assert_eq!(snapshot.get("mode"), Some(&expected_mode));
+    }
+}
+
 fn retreat_through_legs(mode: Mode) {
     let mut m = long_route_scene(mode);
     let at = Point { x: 281., z: 41. };
@@ -356,11 +375,13 @@ fn retreat_through_legs(mode: Mode) {
     m.commands.units.get_mut(&id).unwrap().hold_fire = true;
     let home = m.reaction_home(id).unwrap();
     let selected = seats(&m);
-    let mut delivery = if mode == Mode::Classic {
-        None
-    } else {
-        Some(DeliveryState::new(&m).unwrap())
-    };
+    if mode == Mode::Classic {
+        assert_eq!(
+            crate::recipient_snapshot::mode_row(&m).unwrap(),
+            serde_json::json!({"kind":"classic","timeLeft":1500.0,"suddenDeath":false})
+        );
+    }
+    let mut delivery = DeliveryState::new(&m).unwrap();
     assert_eq!(
         m.execute_command(
             0,
@@ -378,15 +399,10 @@ fn retreat_through_legs(mode: Mode) {
     let mut reached_first_leg = false;
     let mut leg_ends = BTreeSet::new();
     for _ in 0..2500 {
-        if let Some(delivery) = &mut delivery {
-            delivered_tick(&mut m, delivery, &selected);
+        if mode == Mode::Classic {
+            classic_delivered_tick(&mut m, &mut delivery, &selected);
         } else {
-            m.advance_tick().unwrap();
-            // Classic core ticks are supported; complete recipient delivery remains guarded.
-            assert!(matches!(
-                SnapshotCache::new(&m),
-                Err(SnapshotError::UnsupportedMode)
-            ));
+            delivered_tick(&mut m, &mut delivery, &selected);
         }
         let u = &m.world.game.units[&id];
         if let Some(end) = u.path.last() {
@@ -409,14 +425,10 @@ fn retreat_through_legs(mode: Mode) {
     assert_eq!(m.commands.units[&id].outcome, Some(MoveOutcome::Arrived));
     assert!(m.tick_state.fault().is_none());
     for _ in 0..3 {
-        if let Some(delivery) = &mut delivery {
-            delivered_tick(&mut m, delivery, &selected);
+        if mode == Mode::Classic {
+            classic_delivered_tick(&mut m, &mut delivery, &selected);
         } else {
-            m.advance_tick().unwrap();
-            assert!(matches!(
-                SnapshotCache::new(&m),
-                Err(SnapshotError::UnsupportedMode)
-            ));
+            delivered_tick(&mut m, &mut delivery, &selected);
         }
     }
     assert!(m.tick_state.fault().is_none());
