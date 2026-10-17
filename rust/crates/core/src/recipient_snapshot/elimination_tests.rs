@@ -200,7 +200,6 @@ fn elimination_snapshot_admission_rejects_missing_state_and_other_modes() {
     for (mode, kind) in [
         (Mode::World, ModeKind::World),
         (Mode::Assault, ModeKind::Assault),
-        (Mode::Horde, ModeKind::Horde),
         (Mode::Tutorial, ModeKind::Tutorial),
         (Mode::Annihilation, ModeKind::Classic),
     ] {
@@ -211,7 +210,15 @@ fn elimination_snapshot_admission_rejects_missing_state_and_other_modes() {
             Err(SnapshotError::UnsupportedMode)
         ));
     }
+    // Horde is represented, but changing a Classic tag does not create its owner.
+    state.options.mode = Mode::Horde;
+    state.world.game.mode = Some(ModeKind::Horde);
+    assert!(matches!(
+        SnapshotCache::new(&state),
+        Err(SnapshotError::Rules)
+    ));
     state.options.mode = Mode::Classic;
+    state.world.game.mode = Some(ModeKind::Classic);
     state.elimination.as_mut().unwrap().time_left = Some(f64::NAN);
     assert!(SnapshotCache::new(&state).is_err());
     state.elimination = None;
