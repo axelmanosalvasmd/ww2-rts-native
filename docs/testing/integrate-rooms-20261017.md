@@ -17,7 +17,7 @@ Base: `61947c5b8a8438eb6ccbefa02e7d269c4e032472`. This branch merges exact PR he
 - #385 contracts: retain the current protocol status and R1 ingress entry, plus both incoming contract entries.
 - #385 snapshot cache: retain extracted shared validation and cache-build instrumentation, move the incoming ordinary-mode and state validation into that validator, and preserve companion admission. Keep frozen-main Classic building memory and incoming nodes. Complete list delivery permits represented Classic nodes; World still fails mode admission.
 - #385 startup: retain authored-mission definition binding and select the correct ordinary mode's StartPlan. Carry named armies, spectators, readiness and logistics into the incoming async request owner.
-- #385 lobby: use the incoming async helpers and result publisher; preserve host pause/resume, ordinary ingress, operative dispatch, spectator behavior and every test module. Host end runs before the pause gate through one end implementation. Block fresh joins only during generation, preserving existing running-match spectator and operative joins. Suppress both commander and spectator resync during generation.
+- #385 lobby: use the incoming async helpers and result publisher; preserve host pause/resume, ordinary ingress, operative dispatch, spectator behavior and every test module. Host end runs before the pause gate through one end implementation. Keep commander seats fixed during generation while preserving spectator and operative membership. Suppress both commander and spectator resync during generation.
 
 ## Rewritten tests
 
@@ -27,4 +27,6 @@ Base: `61947c5b8a8438eb6ccbefa02e7d269c4e032472`. This branch merges exact PR he
 
 ## Validation
 
-Pending the four-merge checkpoint and final exact-head checks. Historical PR results do not qualify this branch.
+The first four-merge build at `89b6ca27` failed before execution: two incoming test helpers omitted `Output::Watcher` arms, and the async server fixture omitted `static_files`. Those fixture integration errors were repaired.
+
+The next full three-package attempt at `88ad16b0` reached the added operative rollback test, whose hello fixture omitted required names. The source repair supplies them and strengthens the test to prove accepted companion input and delivery restoration. Source review also found that pending operative and spectator reconnects needed affected-connection restoration after failed generation. Historical PR results do not qualify this branch. Final exact-head validation follows below.

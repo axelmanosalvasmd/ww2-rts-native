@@ -2161,11 +2161,6 @@ impl Hub {
             p.name = name;
             p.disconnected = None;
         } else {
-            if room.starting.is_some() {
-                connection.send(json!({"t":"deny","cmd":"join","reason":"blocked"}));
-                connection.close(1008, "native roster fixed");
-                return;
-            }
             let p = Person {
                 token,
                 name,
@@ -2181,7 +2176,11 @@ impl Hub {
                 diagnostics: crate::diagnostics::PlayerDiagnostics::default(),
                 last_match: None,
             };
-            if room.native.is_none() && room.has_seat(&self.maps) && msg["spectate"] != true {
+            if room.native.is_none()
+                && room.starting.is_none()
+                && room.has_seat(&self.maps)
+                && msg["spectate"] != true
+            {
                 room.add_seat(p);
             } else if room.spectators.len() < MAX_SPECTATORS {
                 room.spectators.push(p);
@@ -2204,7 +2203,7 @@ impl Hub {
                     native.epoch,
                     slot,
                 );
-            } else {
+            } else if room.starting.is_none() {
                 let names = room
                     .players
                     .iter()

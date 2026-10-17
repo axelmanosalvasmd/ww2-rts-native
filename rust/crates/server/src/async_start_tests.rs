@@ -408,99 +408,358 @@ fn net37_failed_restart_settles_old_writes_and_restores_replaced_seat_before_fin
     finish_ordinary_match(&mut hub, &mut receivers, 150);
 }
 
-#[test]
-fn pending_restart_keeps_operative_input_delivery_and_membership_unchanged() {
-    let (mut hub, [host, _], mut receivers) = room();
-    let (tx, mut op_rx) = mpsc::channel(128);
+fn recipient(id: u64) -> (Connection, mpsc::Receiver<Output>) {
+    let (tx, rx) = mpsc::channel(512);
     let (cancel, _) = watch::channel(false);
-    let op = Connection::new(3, tx, cancel);
-    hub.message(
-        "ABC",
-        &op,
-        &mut false,
-        json!({"t":"hello","token":"operative","role":"operative","commander":0}),
-        0,
-    );
-    hub.start_trusted("ABC", host.id, false, 0).unwrap();
-    drain(&mut hub, &mut receivers, 0);
-    while op_rx.try_recv().is_ok() {}
-    let before = hub.rooms["ABC"]
+    (Connection::new(id, tx, cancel), rx)
+}
+
+fn join_recipient(hub: &mut Hub, connection: &Connection, message: Value, now: u64) {
+    let mut joined = false;
+    hub.message("ABC", connection, &mut joined, message, now);
+    assert!(joined, "hello must be accepted");
+}
+
+fn recipient_messages(receiver: &mut mpsc::Receiver<Output>) -> Vec<Value> {
+    let mut messages = Vec::new();
+    while let Ok(output) = receiver.try_recv() {
+        match output {
+            Output::Json(message) => messages.push(message),
+            Output::Watcher(json) => messages.push(serde_json::from_str(&json).unwrap()),
+            Output::Snapshot(_) => panic!("unexpected commander snapshot"),
+            Output::Close(code, reason) => panic!("unexpected close {code}: {reason}"),
+        }
+    }
+    messages
+}
+
+fn retained_checkpoint(hub: &Hub) -> Value {
+    hub.rooms["ABC"]
         .native
         .as_ref()
         .unwrap()
         .runtime
         .save_json()
-        .unwrap();
+        .unwrap()
+}
+
+fn retained_state(hub: &Hub) -> &Match {
+    hub.rooms["ABC"].native.as_ref().unwrap().runtime.state()
+}
+
+#[test]
+fn pending_restart_keeps_operative_input_delivery_and_membership_unchanged() {
+    let (mut hub, [host, _], mut receivers) = room();
+    let (op, mut op_rx) = recipient(3);
+    let (stable, mut stable_rx) = recipient(4);
+    let (dropped, mut dropped_rx) = recipient(5);
+    for (connection, token) in [
+        (&op, "operative"),
+        (&stable, "stable"),
+        (&dropped, "dropped"),
+    ] {
+        join_recipient(
+            &mut hub,
+            connection,
+            json!({"t":"hello","token":token,"name":token,"role":"operative","commander":0}),
+            0,
+        );
+    }
+    hub.start_trusted("ABC", host.id, false, 0).unwrap();
+    // Establish real delivery ledgers before suspending the runtime.
+    for callback in 0..4 {
+        let now = callback * 50;
+        hub.poll_native(now, now * 1_000_000);
+        drain(&mut hub, &mut receivers, now);
+        for receiver in [&mut op_rx, &mut stable_rx, &mut dropped_rx] {
+            recipient_messages(receiver);
+        }
+    }
+    for connection in [&op, &stable, &dropped] {
+        hub.message(
+            "ABC",
+            connection,
+            &mut true,
+            json!({"t":"fps","seq":9,"forward":1,"strafe":0,"yaw":0,"pitch":0}),
+            180,
+        );
+    }
+    let before = retained_checkpoint(&hub);
     let delivery = hub.rooms["ABC"].operatives[0].net.clone();
-    let input_at = hub.rooms["ABC"].operatives[0].input_at;
+    let stable_delivery = hub.rooms["ABC"].operatives[1].net.clone();
+    assert_eq!(
+        retained_state(&hub)
+            .companions
+            .get("operative")
+            .unwrap()
+            .last_seq,
+        9
+    );
     let request = hub.claim_trusted_start("ABC", host.id, true).unwrap();
     hub.message(
         "ABC",
         &op,
         &mut true,
-        json!({"t":"fps","seq":0,"forward":1,"strafe":0,"yaw":0,"pitch":0}),
-        100,
+        json!({"t":"fps","seq":99,"forward":1,"strafe":0,"yaw":0,"pitch":0}),
+        200,
     );
-    let (tx, mut returning_rx) = mpsc::channel(16);
-    let (cancel, _) = watch::channel(false);
-    let returning = Connection::new(4, tx, cancel);
-    let mut joined = false;
-    hub.message(
-        "ABC",
+    let (returning, mut returning_rx) = recipient(6);
+    join_recipient(
+        &mut hub,
         &returning,
-        &mut joined,
-        json!({"t":"hello","token":"operative","role":"operative","commander":0}),
-        100,
+        json!({"t":"hello","token":"operative","name":"Returned","role":"operative","commander":0}),
+        200,
     );
-    assert!(joined);
-    assert_eq!(hub.rooms["ABC"].operatives.len(), 1);
-    assert_eq!(
-        hub.rooms["ABC"].operatives[0]
-            .person
-            .connection
-            .as_ref()
-            .unwrap()
-            .id,
-        returning.id
-    );
-    assert_eq!(hub.rooms["ABC"].operatives[0].input_at, input_at);
+    hub.disconnected("ABC", dropped.id, 200);
+    assert_eq!(retained_checkpoint(&hub), before);
+    let (reconnected, mut reconnected_rx) = recipient(7);
+    let (fresh, mut fresh_rx) = recipient(8);
+    for (connection, token) in [(&reconnected, "dropped"), (&fresh, "fresh")] {
+        join_recipient(
+            &mut hub,
+            connection,
+            json!({"t":"hello","token":token,"name":token,"role":"operative","commander":0}),
+            200,
+        );
+    }
+    assert_eq!(hub.rooms["ABC"].operatives.len(), 4);
+    assert_eq!(hub.rooms["ABC"].operatives[0].input_at, 180);
     assert_eq!(hub.rooms["ABC"].operatives[0].net, delivery);
-    assert_eq!(
-        hub.rooms["ABC"]
-            .native
-            .as_ref()
-            .unwrap()
-            .runtime
-            .save_json()
-            .unwrap(),
-        before
+    assert!(hub.rooms["ABC"].operatives[3].stream.is_none());
+    assert_eq!(retained_checkpoint(&hub), before);
+    for receiver in [&mut returning_rx, &mut reconnected_rx, &mut fresh_rx] {
+        assert!(
+            recipient_messages(receiver)
+                .iter()
+                .all(|message| message["t"] == "lobby")
+        );
+    }
+    recipient_messages(&mut stable_rx);
+    assert!(
+        hub.complete_trusted_start("ABC", request, Err("generation failed".into()), 200)
+            .is_err()
     );
-    while let Ok(output) = returning_rx.try_recv() {
-        assert!(matches!(output, Output::Json(message) if message["t"] == "lobby"));
+    drain(&mut hub, &mut receivers, 200);
+    // Unchanged sockets keep their ledger, accepted sequence and input clock.
+    assert_eq!(hub.rooms["ABC"].operatives[1].net, stable_delivery);
+    assert_eq!(hub.rooms["ABC"].operatives[1].input_at, 180);
+    assert!(
+        !recipient_messages(&mut stable_rx)
+            .iter()
+            .any(|message| message["t"] == "start")
+    );
+    assert_eq!(
+        retained_state(&hub)
+            .companions
+            .get("stable")
+            .unwrap()
+            .last_seq,
+        9
+    );
+    for (index, receiver) in [
+        (0, &mut returning_rx),
+        (2, &mut reconnected_rx),
+        (3, &mut fresh_rx),
+    ] {
+        let messages = recipient_messages(receiver);
+        let starts = messages
+            .iter()
+            .filter(|message| message["t"] == "start")
+            .collect::<Vec<_>>();
+        assert_eq!(starts.len(), 1);
+        assert_eq!(starts[0]["role"], "operative");
+        assert_eq!(starts[0]["matchId"], 1);
+        assert_eq!(starts[0]["operative"]["seq"], -1);
+        assert!(hub.rooms["ABC"].operatives[index].stream.is_some());
+        assert_eq!(hub.rooms["ABC"].operatives[index].input_at, 0);
+    }
+    // Checking last_seq proves acceptance by the companion, beyond the server clock.
+    for (connection, token) in [
+        (&returning, "operative"),
+        (&reconnected, "dropped"),
+        (&fresh, "fresh"),
+    ] {
+        hub.message(
+            "ABC",
+            connection,
+            &mut true,
+            json!({"t":"fps","seq":0,"forward":1,"strafe":0,"yaw":0,"pitch":0}),
+            220,
+        );
+        let companion = retained_state(&hub).companions.get(token).unwrap();
+        assert!(companion.online);
+        assert_eq!(companion.last_seq, 0);
+        assert!(companion.input.is_some());
+    }
+    let mut frames = [0; 4];
+    for callback in 5..9 {
+        let now = callback * 50;
+        hub.poll_native(now, now * 1_000_000);
+        drain(&mut hub, &mut receivers, now);
+        for (index, receiver) in [
+            &mut returning_rx,
+            &mut reconnected_rx,
+            &mut fresh_rx,
+            &mut stable_rx,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            for message in recipient_messages(receiver) {
+                if message["t"] == "s" {
+                    if frames[index] == 0 && index < 3 {
+                        assert_eq!(message["all"], true);
+                    }
+                    frames[index] += 1;
+                }
+            }
+        }
+    }
+    assert!(frames.into_iter().all(|count| count > 0));
+    // A socket that stays disconnected is applied only after failed generation.
+    let before_drop = retained_checkpoint(&hub);
+    let request = hub.claim_trusted_start("ABC", host.id, true).unwrap();
+    hub.disconnected("ABC", fresh.id, 420);
+    assert_eq!(retained_checkpoint(&hub), before_drop);
+    assert!(
+        hub.complete_trusted_start("ABC", request, Err("failed again".into()), 420)
+            .is_err()
+    );
+    let companion = retained_state(&hub).companions.get("fresh").unwrap();
+    assert!(!companion.online);
+    assert!(companion.input.is_none());
+    drain(&mut hub, &mut receivers, 420);
+    finish_ordinary_match(&mut hub, &mut receivers, 450);
+}
+
+#[test]
+fn pending_restart_defers_spectator_starts_and_preserves_shared_delivery_until_rollback() {
+    let (mut hub, [host, _], mut receivers) = room();
+    let (stable, mut stable_rx) = recipient(3);
+    let (watcher, mut watcher_rx) = recipient(4);
+    for (connection, token) in [(&stable, "stable"), (&watcher, "watcher")] {
+        join_recipient(
+            &mut hub,
+            connection,
+            json!({"t":"hello","token":token,"name":token,"spectate":true}),
+            0,
+        );
+    }
+    hub.start_trusted("ABC", host.id, false, 0).unwrap();
+    for callback in 0..4 {
+        let now = callback * 50;
+        hub.poll_native(now, now * 1_000_000);
+        drain(&mut hub, &mut receivers, now);
+        recipient_messages(&mut stable_rx);
+        recipient_messages(&mut watcher_rx);
+    }
+    let native = hub.rooms["ABC"].native.as_ref().unwrap();
+    assert!(native.watch_started);
+    let delivery = native.watch_delivery.clone();
+    let before = retained_checkpoint(&hub);
+    let request = hub.claim_trusted_start("ABC", host.id, true).unwrap();
+    let (returning, mut returning_rx) = recipient(5);
+    let (fresh, mut fresh_rx) = recipient(6);
+    for (connection, token) in [(&returning, "watcher"), (&fresh, "fresh")] {
+        join_recipient(
+            &mut hub,
+            connection,
+            json!({"t":"hello","token":token,"name":token,"spectate":token == "watcher"}),
+            200,
+        );
+    }
+    assert_eq!(hub.rooms["ABC"].spectators.len(), 3);
+    assert_eq!(hub.rooms["ABC"].players.len(), 2);
+    assert_eq!(
+        hub.rooms["ABC"].native.as_ref().unwrap().watch_delivery,
+        delivery
+    );
+    assert_eq!(retained_checkpoint(&hub), before);
+    for receiver in [&mut returning_rx, &mut fresh_rx, &mut stable_rx] {
+        assert!(
+            recipient_messages(receiver)
+                .iter()
+                .all(|message| message["t"] == "lobby")
+        );
     }
     assert!(
-        hub.complete_trusted_start("ABC", request, Err("generation failed".into()), 100)
+        hub.complete_trusted_start("ABC", request, Err("generation failed".into()), 200)
+            .is_err()
+    );
+    drain(&mut hub, &mut receivers, 200);
+    assert_eq!(retained_checkpoint(&hub), before);
+    let mut expected_delivery = delivery;
+    expected_delivery.request_full();
+    assert_eq!(
+        hub.rooms["ABC"].native.as_ref().unwrap().watch_delivery,
+        expected_delivery
+    );
+    assert!(
+        !recipient_messages(&mut stable_rx)
+            .iter()
+            .any(|message| message["t"] == "start")
+    );
+    for receiver in [&mut returning_rx, &mut fresh_rx] {
+        let messages = recipient_messages(receiver);
+        let starts = messages
+            .iter()
+            .filter(|message| message["t"] == "start")
+            .collect::<Vec<_>>();
+        assert_eq!(starts.len(), 1);
+        assert_eq!(starts[0]["matchId"], 1);
+        assert!(starts[0].get("fog").is_none());
+    }
+    let mut saw_shared = false;
+    for callback in 4..8 {
+        let now = callback * 50;
+        hub.poll_native(now, now * 1_000_000);
+        drain(&mut hub, &mut receivers, now);
+        let mut shared = Vec::new();
+        for receiver in [&mut stable_rx, &mut returning_rx, &mut fresh_rx] {
+            while let Ok(output) = receiver.try_recv() {
+                match output {
+                    Output::Watcher(json) => shared.push(json),
+                    Output::Json(_) => {}
+                    _ => panic!("unexpected spectator output"),
+                }
+            }
+        }
+        if !shared.is_empty() {
+            assert_eq!(shared.len(), 3);
+            assert!(Arc::ptr_eq(&shared[0], &shared[1]));
+            assert!(Arc::ptr_eq(&shared[0], &shared[2]));
+            if !saw_shared {
+                assert_eq!(
+                    serde_json::from_str::<Value>(&shared[0]).unwrap()["all"],
+                    true
+                );
+            }
+            saw_shared = true;
+        }
+    }
+    assert!(saw_shared);
+    let delivery = hub.rooms["ABC"]
+        .native
+        .as_ref()
+        .unwrap()
+        .watch_delivery
+        .clone();
+    let request = hub.claim_trusted_start("ABC", host.id, true).unwrap();
+    assert!(
+        hub.complete_trusted_start("ABC", request, Err("failed again".into()), 375)
             .is_err()
     );
     assert_eq!(
-        hub.rooms["ABC"]
-            .native
-            .as_ref()
-            .unwrap()
-            .runtime
-            .save_json()
-            .unwrap(),
-        before
+        hub.rooms["ABC"].native.as_ref().unwrap().watch_delivery,
+        delivery
     );
-    drain(&mut hub, &mut receivers, 100);
-    hub.message(
-        "ABC",
-        &returning,
-        &mut true,
-        json!({"t":"fps","seq":0,"forward":1,"strafe":0,"yaw":0,"pitch":0}),
-        120,
-    );
-    assert_eq!(hub.rooms["ABC"].operatives[0].input_at, 120);
-    hub.disconnected("ABC", returning.id, 120);
-    finish_ordinary_match(&mut hub, &mut receivers, 150);
+    for receiver in [&mut stable_rx, &mut returning_rx, &mut fresh_rx] {
+        assert!(
+            !recipient_messages(receiver)
+                .iter()
+                .any(|message| message["t"] == "start")
+        );
+    }
+    drain(&mut hub, &mut receivers, 375);
+    finish_ordinary_match(&mut hub, &mut receivers, 400);
 }

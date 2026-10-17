@@ -49,7 +49,32 @@ with hosted Horde admission; these tests make no claim about that branch.
 
 During pending generation, operative FPS does not reach the retained match, and
 operative hello updates membership without starting or resetting an operative in
-that match (`server.js:360-363,598-614,630-635`). Native keeps the old match only
-as rollback state. `pending_restart_keeps_operative_input_delivery_and_membership_unchanged`
-checks ignored input, reconnect without a premature start, exact checkpoint and
-delivery preservation, resumed input after failure, and ordinary match completion.
+that match (`server.js:360-363,598-614,630-635`). Operative disconnect updates room
+membership immediately and defers the retained companion's disconnect until
+rollback. Spectator hello retains ordinary membership rules, including new
+spectators while starting, but sends no retained-match start and does not change
+the shared watcher delivery ledger.
+
+Each pending claim records operative and spectator tokens with their connection
+IDs so rollback can identify affected recipients. Changed online operatives use
+the existing `start_operative` owner to join or reconnect the retained match and
+initialize their private streams; those that remain offline disconnect their
+retained companions. Unchanged operative sockets keep their accepted input and
+delivery state. Changed online spectators receive the existing watcher start,
+and a previously active shared watcher stream requests a full next frame without
+resetting its ledger. Unchanged spectators receive no extra start.
+
+The source regression
+`pending_restart_keeps_operative_input_delivery_and_membership_unchanged` uses
+named, accepted hellos and checks the exact core checkpoint throughout suspended
+generation, including disconnect and new membership. After rollback it checks
+accepted companion `last_seq`, initialized starts and full frames for replaced,
+reconnected and new operatives, and preservation of an unchanged operative's
+ledger and input. A second failed restart checks a deferred permanent disconnect.
+`pending_restart_defers_spectator_starts_and_preserves_shared_delivery_until_rollback`
+checks pending spectator membership and ledger preservation, changed-recipient
+starts on rollback, and one shared full frame for all watchers. Both regressions
+retain ordinary completion through `finish_ordinary_match`, including every
+commander seat's snapshots and all ending callbacks. These source changes have
+not been compiled or executed; results from the parent's already compiled
+`88ad16b0` binary do not qualify them.

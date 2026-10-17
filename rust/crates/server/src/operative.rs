@@ -175,6 +175,39 @@ impl Room {
         }
         Ok(())
     }
+    pub(super) fn restore_pending_operatives(
+        &mut self,
+        previous: &[(Vec<u16>, Option<u64>)],
+        now: u64,
+    ) -> Result<(), String> {
+        for index in 0..self.operatives.len() {
+            let op = &self.operatives[index];
+            let connection = op.person.connection.as_ref().map(|c| c.id);
+            if previous
+                .iter()
+                .any(|(token, id)| *token == op.person.token && *id == connection)
+            {
+                continue;
+            }
+            if op.person.connection.as_ref().is_some_and(Connection::ready) {
+                self.start_operative(index, now)?;
+            } else {
+                let key = op.key();
+                if let Some(companion) = self
+                    .native
+                    .as_mut()
+                    .unwrap()
+                    .runtime
+                    .state_mut()
+                    .companions
+                    .get_mut(&key)
+                {
+                    companion.disconnect();
+                }
+            }
+        }
+        Ok(())
+    }
     /// A current operative socket consumes its entire whitelist here.
     pub(super) fn operative_message(&mut self, id: u64, msg: &Value, now: u64) -> Option<bool> {
         let op = self.operatives.iter_mut().find(|op| {
@@ -239,7 +272,8 @@ impl Room {
             return false;
         };
         op.person.connection = None;
-        if let Some(native) = &mut self.native
+        if self.starting.is_none()
+            && let Some(native) = &mut self.native
             && let Some(companion) = native.runtime.state_mut().companions.get_mut(&op.key())
         {
             companion.disconnect();

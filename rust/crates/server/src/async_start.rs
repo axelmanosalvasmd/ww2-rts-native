@@ -4,6 +4,8 @@ use super::*;
 pub(super) struct PendingStart {
     token: Arc<()>,
     connections: Vec<Option<u64>>,
+    operatives: Vec<(Vec<u16>, Option<u64>)>,
+    spectators: Vec<(Vec<u16>, u64)>,
 }
 
 #[derive(Clone)]
@@ -148,6 +150,26 @@ impl Hub {
                 .iter()
                 .map(|person| person.connection.as_ref().map(|c| c.id))
                 .collect(),
+            operatives: room
+                .operatives
+                .iter()
+                .map(|op| {
+                    (
+                        op.person.token.clone(),
+                        op.person.connection.as_ref().map(|c| c.id),
+                    )
+                })
+                .collect(),
+            spectators: room
+                .spectators
+                .iter()
+                .filter_map(|person| {
+                    person
+                        .connection
+                        .as_ref()
+                        .map(|connection| (person.token.clone(), connection.id))
+                })
+                .collect(),
         });
         Ok(request)
     }
@@ -257,6 +279,45 @@ impl Hub {
                             }
                         }
                     }
+                    let watchers = room
+                        .spectators
+                        .iter()
+                        .filter_map(|person| {
+                            person.connection.as_ref().filter(|connection| {
+                                connection.ready()
+                                    && !pending.spectators.iter().any(|(token, id)| {
+                                        *token == person.token && *id == connection.id
+                                    })
+                            })
+                        })
+                        .collect::<Vec<_>>();
+                    if !watchers.is_empty() {
+                        match native.runtime.collect_watcher_start(
+                            &native.startup,
+                            &names,
+                            native.epoch,
+                        ) {
+                            Ok(start) => {
+                                // Watchers share a ledger. A reconnect requests one
+                                // full next frame without resetting that ledger.
+                                if native.watch_started {
+                                    native.watch_delivery.request_full();
+                                }
+                                for connection in watchers {
+                                    connection.send(start.clone());
+                                    if native.runtime.paused() {
+                                        connection.send(native.runtime.pause_message(now));
+                                    }
+                                }
+                            }
+                            Err(fault) => native.runtime.fault_stop(fault),
+                        }
+                    }
+                }
+                if room.native.is_some()
+                    && let Err(fault) = room.restore_pending_operatives(&pending.operatives, now)
+                {
+                    room.native.as_mut().unwrap().runtime.fault_stop(fault);
                 }
                 for person in &room.players {
                     if let Some(connection) = &person.connection {
