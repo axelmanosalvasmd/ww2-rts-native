@@ -41,7 +41,7 @@ impl DeliveryState {
         outside_events: &'a [Effect],
     ) -> Result<GroundListDeliveryFrame<'a>, SnapshotError> {
         admit_actors(state, outside_events)?;
-        self.preflight(state, full, omit)?;
+        let rows = self.preflight(state, full, omit)?;
         let count = state.world.game.players.len();
         let prepared = state
             .prepare_ordinary_recipient_lists(&(0..count).collect::<Vec<_>>())
@@ -60,7 +60,7 @@ impl DeliveryState {
             .publish_ordinary_recipient_lists(prepared)
             .map_err(|_| SnapshotError::Rules)?;
         Ok(GroundListDeliveryFrame {
-            frame: self.capture(state, full, omit)?,
+            frame: self.capture_admitted(state, &delivery::all_seats(full, omit), rows)?,
             lists,
             _outside_events: outside_events,
         })

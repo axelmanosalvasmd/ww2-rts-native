@@ -78,11 +78,11 @@ impl DeliveryState {
         if selected.is_empty() {
             return Ok(None);
         }
-        self.preflight_selected(state, selected)?;
+        let rows = self.preflight_selected(state, selected)?;
         composition::admit_actors(state, &[])?;
         let projected = project_shots(state, selected, shots)?;
         let frame = self
-            .capture_selected_with_lists(state, selected, &[])?
+            .capture_selected_with_lists_admitted(state, selected, &[], rows)?
             .ok_or(SnapshotError::InvalidRecipient)?;
         Ok(Some(SelectedGroundShotFrame {
             frame,

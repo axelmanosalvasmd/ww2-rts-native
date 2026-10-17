@@ -355,7 +355,10 @@ fn mode01_non_world_mode_rows_match_the_prototype_public_fields() {
             _ => unreachable!(),
         };
         assert_eq!(mode_row(&m).unwrap(), expected, "{mode:?}");
-        if matches!(mode, Mode::Conquest | Mode::Assault | Mode::Tutorial) {
+        if matches!(
+            mode,
+            Mode::Conquest | Mode::Assault | Mode::Tutorial | Mode::Classic
+        ) {
             let cache = SnapshotCache::new(&m).unwrap();
             for slot in 0..m.start.players.len() {
                 let fields = cache.recipient(slot).unwrap().fields;

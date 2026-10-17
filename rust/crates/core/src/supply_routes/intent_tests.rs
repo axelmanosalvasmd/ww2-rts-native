@@ -57,6 +57,75 @@ fn p(x: f64, z: f64) -> Point {
 }
 
 #[test]
+fn if26_handoff_cache_groups_quarters_without_saturating_large_keys() {
+    let rules = Rules::compiled().unwrap();
+    let rifle = &rules.kinds[rules.kind("rifle").unwrap()];
+    let mut ground = Ground::open(64, 64);
+    for y in 39..=41 {
+        ground.flags[y * 64 + 40] = MOVE | VBLOCK;
+    }
+    let mut routing = SupplyRouting {
+        handoff_key: Some((0, 0, 0)),
+        ..SupplyRouting::default()
+    };
+    let request = Handoff {
+        tick: 0,
+        start: p(75.0, 81.0),
+        store: p(87.0, 81.0),
+        radius: 15.01,
+    };
+    // This stored answer deliberately disagrees with the reachable detour.
+    routing.handoffs.insert([300, 324, 348, 324, 60], false);
+    assert!(
+        !routing
+            .handoff(request, ground.terrain(), rifle, &[])
+            .unwrap()
+    );
+    assert!(
+        !routing
+            .handoff(
+                Handoff {
+                    radius: 15.124,
+                    ..request
+                },
+                ground.terrain(),
+                rifle,
+                &[]
+            )
+            .unwrap()
+    );
+    assert!(
+        routing
+            .handoff(
+                Handoff {
+                    radius: 15.125,
+                    ..request
+                },
+                ground.terrain(),
+                rifle,
+                &[]
+            )
+            .unwrap()
+    );
+    routing
+        .handoffs
+        .insert([300, 324, 348, 324, i64::MAX], false);
+    let count = routing.handoffs.len();
+    for radius in [2_f64.powi(61), 2_f64.powi(62), f64::MAX] {
+        assert!(
+            routing
+                .handoff(Handoff { radius, ..request }, ground.terrain(), rifle, &[])
+                .unwrap()
+        );
+    }
+    assert_eq!(
+        routing.handoffs.len(),
+        count,
+        "large keys do not reuse or overwrite a saturated legacy key"
+    );
+}
+
+#[test]
 fn log37_short_hops_skip_search_and_danger_views_refresh_per_owner_epoch_or_knowledge() {
     let rules = Rules::compiled().unwrap();
     let truck = rules.kinds.iter().find(|k| k.name == "truck").unwrap();

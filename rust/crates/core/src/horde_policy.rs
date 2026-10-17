@@ -15,7 +15,7 @@ use crate::{
 
 /// A decoded delivered unit, including owner-only cooldown/stance facts for
 /// owned units. Enemy rows must already have passed the recipient visibility filter.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Unit {
     pub id: u32,
     pub owner: usize,
@@ -31,14 +31,14 @@ pub struct Unit {
     pub riding: bool,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct PointFact {
     pub at: Point,
     pub owner: Option<usize>,
     pub visible: bool,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Strike {
     pub at: Point,
     pub owner: usize,
@@ -48,7 +48,7 @@ pub struct Strike {
 
 /// Rust-private decoded facts, not a wire schema or an authoritative-world view.
 /// Coordinates, health, wallets and cooldowns retain delivered precision.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Facts {
     pub tick: i64,
     pub slot: usize,
@@ -61,13 +61,13 @@ pub struct Facts {
     pub strikes: Vec<Strike>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 struct Still {
     at: Point,
     since: f64,
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct HordePolicy {
     still: BTreeMap<u32, Still>,
     last_observation: Option<i64>,
