@@ -5,3 +5,4 @@
 - Combine Horde ground production and Classic logistics training with Annihilation logistics and the existing Horde startup fallback. Keep idle Horde construction and unassigned repair refused; ordinary Horde ticks enter construction only for assigned facility work. Preserve authored mission, aviation and operative event delivery alongside Horde effects.
 - Extend the mode-row lifecycle assertion to admitted Horde snapshots while retaining the separate hosted-room boundary at this integration checkpoint.
 - Update the shared-facility recruitment and room-option Horde tests to require healthy core ticks and snapshots while preserving their ownership, payment, rally and hosted-attachment checks.
+- Record the logistics integration conflict decisions and test rewrites for the final integrator.
