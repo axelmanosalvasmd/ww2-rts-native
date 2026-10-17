@@ -263,6 +263,9 @@ mod movement_tick_phase_tests;
 mod movement_tick_privacy_tests;
 #[cfg(test)]
 mod movement_tick_speed_tests;
+#[cfg(test)]
+mod production_lifecycle_intent_tests;
+
 mod numeric_keys;
 #[cfg(test)]
 mod terrain_fire_tests;

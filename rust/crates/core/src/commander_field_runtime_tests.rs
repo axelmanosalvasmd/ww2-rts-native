@@ -8,9 +8,7 @@ use crate::{
     match_commands::Command,
     match_runtime::{Match, MatchOptions, PlayerConfig},
     orders::OrderKey,
-    recipient_snapshot::{
-        DeliveryState, SelectedSeat, SnapshotCache, SnapshotCapability, SnapshotError,
-    },
+    recipient_snapshot::{DeliveryState, SelectedSeat, SnapshotCache, SnapshotError},
     weather::WeatherChoice,
 };
 use serde_json::{Value, json};
@@ -99,34 +97,26 @@ fn enqueue(state: &mut Match, sequence: u64, command: Value) {
         )
         .unwrap();
 }
-fn collect_classic_partial(state: &mut Match, delivery: &mut DeliveryState) {
-    let mode = state.elimination.as_ref().unwrap();
-    let expected = json!({
-        "kind":"classic",
-        "timeLeft":crate::math::max(0.0, mode.time_left.unwrap().ceil()),
-        "suddenDeath":mode.sudden_death
-    });
+fn collect_classic_complete(state: &mut Match, delivery: &mut DeliveryState) {
+    let expected = crate::recipient_snapshot::mode_row(state).unwrap();
+    assert_eq!(expected["kind"], "classic");
     let count = state.start.players.len();
+    let selected = (0..count)
+        .map(|slot| SelectedSeat { slot, full: false, omit: false })
+        .collect::<Vec<_>>();
     let frame = delivery
-        .capture(state, &vec![false; count], &vec![false; count])
+        .capture_selected_with_tick_events(state, &selected, &[])
+        .unwrap()
         .unwrap();
-    assert_eq!(
-        frame.slots().collect::<Vec<_>>(),
-        (0..count).collect::<Vec<_>>()
-    );
+    assert_eq!(frame.slots().collect::<Vec<_>>(), (0..count).collect::<Vec<_>>());
     for slot in 0..count {
-        let projection = frame.recipient(slot).unwrap();
-        assert_eq!(projection.fields["mode"], expected, "Classic seat {slot}");
-        assert!(projection.fields["units"].is_array());
-        assert!(projection.fields["works"].is_array());
-        assert_eq!(
-            projection.missing,
-            vec![
-                SnapshotCapability::WrecksAndFoundMines,
-                SnapshotCapability::ShotsAndFlights,
-                SnapshotCapability::TeamEffects,
-            ]
-        );
+        let snapshot = frame.recipient(slot).unwrap().into_json();
+        assert_eq!(snapshot["t"], "s");
+        assert_eq!(snapshot["mode"], expected, "Classic seat {slot}");
+        assert!(snapshot.get("missing").is_none());
+        for field in ["units", "works", "wrecks", "foundMines", "shots", "flights", "smokes", "strikes"] {
+            assert!(snapshot[field].is_array(), "Classic seat {slot}: {field}");
+        }
     }
 }
 
@@ -143,17 +133,15 @@ fn tick_and_collect(state: &mut Match, delivery: Option<&mut DeliveryState>) {
         state.validate_gate_actor(id).unwrap();
     }
     let Some(delivery) = delivery else {
-        // These existing mode snapshot bounds are independent of Gate admission.
+        // Unsupported mode snapshot bounds remain independent of Gate admission.
         assert!(matches!(
             SnapshotCache::new(state),
             Err(SnapshotError::UnsupportedMode)
         ));
         return;
     };
-    if state.options.mode == Mode::Classic {
-        collect_classic_partial(state, delivery);
-        return;
-    }
+    let classic_mode = (state.options.mode == Mode::Classic)
+        .then(|| crate::recipient_snapshot::mode_row(state).unwrap());
     let selected: Vec<_> = (0..state.start.players.len())
         .map(|slot| SelectedSeat {
             slot,
@@ -165,10 +153,22 @@ fn tick_and_collect(state: &mut Match, delivery: Option<&mut DeliveryState>) {
         .capture_selected_with_tick_events(state, &selected, &report.events)
         .unwrap()
         .unwrap();
+    assert_eq!(
+        frame.slots().collect::<Vec<_>>(),
+        selected.iter().map(|seat| seat.slot).collect::<Vec<_>>()
+    );
     for seat in selected {
         let snapshot = frame.recipient(seat.slot).unwrap().into_json();
+        assert_eq!(snapshot["t"], "s");
+        assert!(snapshot.get("missing").is_none());
+        for field in ["wrecks", "foundMines", "shots", "flights"] {
+            assert!(snapshot[field].is_array(), "seat {}: {field}", seat.slot);
+        }
         assert!(snapshot["units"].is_array());
         assert!(snapshot["works"].is_array());
+        if let Some(expected) = &classic_mode {
+            assert_eq!(snapshot.get("mode"), Some(expected));
+        }
     }
 }
 fn count(state: &Match, kind: &str) -> usize {
@@ -208,7 +208,7 @@ fn intent_ai50_gate_order_completes_in_each_real_ordinary_mode_with_supported_se
             json!({"t":"dig","kind":"gate","ids":[builder],
             "x":80.0,"z":45.0,"dir":0.0}),
         );
-        let mut delivery = if matches!(mode, Mode::Default | Mode::Conquest | Mode::Classic) {
+        let mut delivery = if matches!(mode, Mode::Default | Mode::Conquest | Mode::Classic | Mode::Annihilation) {
             Some(DeliveryState::new(&state).unwrap())
         } else {
             assert!(matches!(
@@ -218,7 +218,7 @@ fn intent_ai50_gate_order_completes_in_each_real_ordinary_mode_with_supported_se
             None
         };
         if mode == Mode::Classic {
-            collect_classic_partial(&mut state, delivery.as_mut().unwrap());
+            collect_classic_complete(&mut state, delivery.as_mut().unwrap());
         }
         tick_and_collect(&mut state, delivery.as_mut());
         let job = state.field_works.jobs().get(&builder).unwrap();

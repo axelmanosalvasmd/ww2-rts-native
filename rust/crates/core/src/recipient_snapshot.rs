@@ -739,6 +739,20 @@ impl Match {
     /// Bind hosted purchases to the current ordinary snapshot capabilities.
     pub fn restrict_to_ordinary_snapshots(&mut self) -> Result<(), SnapshotError> {
         self.preflight_ordinary_snapshot()?;
+        // A queued plane can later emit AntiAir or PlaneDown. Keep hosted
+        // training closed until the aviation event adapter is integrated.
+        for (id, building) in self.production.buildings() {
+            if building.jobs().iter().any(|job| {
+                self.rules
+                    .kind(&job.kind)
+                    .is_some_and(|kind| self.rules.kinds[kind].air)
+            }) {
+                return Err(SnapshotError::Unsupported {
+                    unit: id,
+                    capability: SnapshotCapability::Air,
+                });
+            }
+        }
         self.ordinary_snapshot_only = true;
         Ok(())
     }
@@ -1277,6 +1291,10 @@ mod map_house_selected_tests;
 #[cfg(test)]
 #[path = "recipient_snapshot/net52_tests.rs"]
 mod net52_tests;
+
+#[cfg(test)]
+#[path = "recipient_snapshot/production_state_tests.rs"]
+mod production_state_tests;
 
 #[cfg(test)]
 #[path = "recipient_snapshot/combat_filter_tests.rs"]

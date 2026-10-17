@@ -76,6 +76,13 @@ pub(super) fn capture_perspective(
         if !mode.is_null() {
             fields.insert("mode".into(), mode);
         }
+        if state.options.mode == Mode::Classic {
+            let nodes = state
+                .ordinary_snapshot_nodes()
+                .map_err(|_| SnapshotError::Rules)?
+                .ok_or(SnapshotError::Rules)?;
+            fields.insert("nodes".into(), json!(nodes));
+        }
         // Reuse Source's six-field ghost rows. Never consult a hidden live building here.
         if state.options.mode == Mode::Classic {
             let rows = state

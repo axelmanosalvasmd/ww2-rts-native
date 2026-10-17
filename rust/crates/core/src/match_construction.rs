@@ -47,6 +47,24 @@ fn number(value: &Value, key: &str) -> Result<f64, String> {
 }
 
 impl Match {
+    /// Claims belong to the canonical mode node owner and only to this exact depot.
+    pub(crate) fn release_depot_claim(&mut self, id: UnitId) {
+        if let Some(state) = self.elimination.as_mut() {
+            for node in &mut state.nodes {
+                if node.depot == Some(id) {
+                    node.depot = None;
+                }
+            }
+        }
+        if let Some(state) = self.world_runtime.as_mut() {
+            for node in &mut state.nodes {
+                if node.depot == Some(id) {
+                    node.depot = None;
+                }
+            }
+        }
+    }
+
     fn validate_construction_mode(&self) -> Result<(), String> {
         if self.options.mode == crate::economy::Mode::Horde {
             self.validate_horde_economy()
@@ -177,15 +195,9 @@ impl Match {
         self.building_rallies.remove(&id);
         self.recruit_metadata.remove(&id);
         self.aviation.remove(id);
-        if let Some(world) = self.world_runtime.as_mut() {
-            for node in &mut world.nodes {
-                if node.depot == Some(id) {
-                    node.depot = None;
-                }
-            }
-        }
         self.start.economy.players[owner].mp = wallet;
         story.commit();
+        self.release_depot_claim(id);
         Ok(None)
     }
     fn validate_construction_actor(&self, id: UnitId) -> Result<(), String> {
@@ -924,9 +936,8 @@ impl Match {
 }
 
 impl Match {
-    /// Pay and stamp an admitted static site before computing any crew route.
-    /// Depot nodes require a separate provider. Ordinary and Classic sites,
-    /// including enabled caches, use the same canonical construction publisher.
+    /// Pay and stamp an admitted site before computing any crew route.
+    /// Classic depots claim their canonical resource node only after site publication.
     pub fn execute_build(
         &mut self,
         owner: usize,
@@ -957,9 +968,6 @@ impl Match {
             .contains(&name)
         {
             return Ok(Some(Denial::Blocked));
-        }
-        if name == "depot" {
-            return Ok(Some(Denial::Unsupported));
         }
         let types = crate::economy::builder_types(self.options.mode).map_err(|e| e.to_string())?;
         let builders = selected
@@ -1048,13 +1056,30 @@ impl Match {
         if name == "supplycache" && !self.options.logistics {
             return self.construction_denial(&selected, Denial::Blocked);
         }
+        // Use the shared placement kernel with the canonical Classic node list. The
+        // result carries the selected node index, which is claimed only after publication.
+        let nodes = self
+            .elimination
+            .as_ref()
+            .map(|state| {
+                state
+                    .nodes
+                    .iter()
+                    .map(|node| crate::building_placement::Node {
+                        cell: node.cell,
+                        at: node.at,
+                        claimed: node.depot.is_some(),
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
         let placement = crate::building_placement::check(
             &crate::building_placement::Context {
                 game: &self.world.game,
                 rules: &self.rules,
                 mode: self.options.mode,
                 logistics: self.options.logistics,
-                nodes: &[],
+                nodes: &nodes,
                 owned_cells: None,
                 rail_yard: None,
             },
@@ -1068,13 +1093,14 @@ impl Match {
                 Reason::Blocked => Denial::Blocked,
                 Reason::NotVisible => Denial::NotVisible,
                 Reason::Coast => Denial::Coast,
-                // World and node construction are refused before this ordinary query.
+                // World territory and rail placement remain outside this admitted path.
                 Reason::Territory | Reason::Rail => {
                     return Err("unexpected World placement reason".into());
                 }
             };
             return self.construction_denial(&selected, denial);
         }
+        let node_index = placement.node;
         let cells = placement.cells.ok_or("missing construction footprint")?;
         let center = placement.at;
         self.world
@@ -1213,6 +1239,9 @@ impl Match {
             owner,
             cost,
         )?;
+        if let Some(index) = node_index {
+            self.elimination.as_mut().unwrap().nodes[index].depot = Some(id);
+        }
         Ok(None)
     }
 }
@@ -1228,3 +1257,7 @@ mod native_intent;
 #[cfg(test)]
 #[path = "match_construction_logistics_tests.rs"]
 mod logistics_intent;
+
+#[cfg(test)]
+#[path = "base_construction_runtime_tests.rs"]
+mod construction_runtime;
