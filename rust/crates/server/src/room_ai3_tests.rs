@@ -371,3 +371,6 @@ fn mode09_horde_departure_activates_normal_ai_clears_token_and_only_its_drop_pau
         .resume(6);
     run_callbacks(&mut hub, &mut peers, 1, 12);
 }
+
+#[path = "net79_pause_tests.rs"]
+mod pause;

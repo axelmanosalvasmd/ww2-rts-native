@@ -58,3 +58,9 @@ The staged tree differs from Git's automatic merge tree only in the fifteen conf
 ## Coordination
 
 Issue #5 was read during reconciliation. Owner decision `axel-decision-merge-without-ack-20261016` (comment `6227193135`) acknowledges the updated merge rules: exact-head checks, mergeability, base-first stacks, main-CI pause and retained local reviews. Hermes now reviews after merge. World admission stays closed, and Unreal adoption remains owner-controlled. No coordination message was posted from this source-only subtask. PR #378 and PR #423 currently expose no comments or reviews through the read-only API query.
+
+## Repairs exposed by compilation
+
+The first focused build on S1 found two `UnitFacts` initializers in `ai_view/commander.rs` that lacked main's new `hold_fire`, `auto_cast` and `cooldown` fields. This file had merged automatically. Both recipient observation providers now populate those facts from delivered owner `holdFire`, `auto` and `cd` values, leaving foreign facts false or zero. Their existing privacy tests also check the new mappings. The source decoder and prototype `shared/ai-view.js:9-21` already define these fields; no authoritative-state read or protocol field is added.
+
+The required formatter also reformatted the reconciled branches in `recipient_snapshot.rs` and `match_tick_events.rs` without changing their behavior. These changes follow the merge commit and are covered by the NET-79 changelog fragment.

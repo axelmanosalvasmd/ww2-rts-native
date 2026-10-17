@@ -215,7 +215,9 @@ fn validate_snapshot(state: &Match) -> Result<(), SnapshotError> {
         return Err(SnapshotError::UnsupportedMode);
     }
     if state.options.mode == Mode::Horde {
-        state.validate_horde_economy().map_err(|_| SnapshotError::Rules)?;
+        state
+            .validate_horde_economy()
+            .map_err(|_| SnapshotError::Rules)?;
     }
     let g = &state.world.game;
     let cells = g.w.checked_mul(g.h).ok_or(SnapshotError::Rules)?;
@@ -254,10 +256,12 @@ fn validate_snapshot(state: &Match) -> Result<(), SnapshotError> {
     if state.options.mode == Mode::Horde {
         projectiles::validate(state)?;
     }
-    state.prepare_companion_tick().map_err(|_| SnapshotError::Unsupported {
-        unit: 0,
-        capability: SnapshotCapability::Operatives,
-    })?;
+    state
+        .prepare_companion_tick()
+        .map_err(|_| SnapshotError::Unsupported {
+            unit: 0,
+            capability: SnapshotCapability::Operatives,
+        })?;
     Ok(())
 }
 
@@ -340,10 +344,7 @@ fn project_recipient(
             })
             && operative_flights::validate(state).is_ok()
         {
-            fields.insert(
-                "flights".into(),
-                operative_flights::project(state, slot)?,
-            );
+            fields.insert("flights".into(), operative_flights::project(state, slot)?);
         } else {
             fields.insert("flights".into(), flights::project(state, slot)?);
         }

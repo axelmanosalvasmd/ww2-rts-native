@@ -438,6 +438,9 @@ impl CommanderViewMemory {
                             number(&u["built"])?
                         },
                         hold_position: own && truth(&u["holdPos"]),
+                        hold_fire: own && truth(&u["holdFire"]),
+                        auto_cast: own && truth(&u["auto"]),
+                        cooldown: if own { number(&u["cd"])? } else { 0.0 },
                         auto_retreat: own && truth(&u["autoRetreat"]),
                         queued_orders: if own {
                             optional_rows(&u["orders"])?.len()
@@ -585,7 +588,21 @@ mod tests {
         let mut snap = snapshot();
         snap["mun"] = json!(45);
         snap["fuel"] = json!(12);
-        let view = SeatMemory::new(0, map()).unwrap().decode(&snap).unwrap();
+        for row in snap["units"].as_array_mut().unwrap() {
+            row[11] = json!(2.5);
+            row[12] = json!(2048 | 4096 | 16384);
+        }
+        let mut view = SeatMemory::new(0, map()).unwrap().decode(&snap).unwrap();
+        for id in [2, 4] {
+            assert_eq!(view.units[&id]["cd"], 0);
+            assert_eq!(view.units[&id]["holdFire"], false);
+            assert_eq!(view.units[&id]["auto"], false);
+            // The commander adapter must also mask private facts on a foreign packet.
+            let foreign = view.units.get_mut(&id).unwrap();
+            foreign["holdFire"] = json!(true);
+            foreign["auto"] = json!(true);
+            foreign["cd"] = json!(99.0);
+        }
         let human = memory().observe(&view, &snap).unwrap();
         let input = human.packet.input();
         assert_eq!(
@@ -599,6 +616,10 @@ mod tests {
         assert_eq!(runtime.sight, 0.7);
         assert_eq!(runtime.units[&9].queued_orders, 1);
         assert!(runtime.units[&9].hold_position);
+        assert!(runtime.units[&9].hold_fire && runtime.units[&9].auto_cast);
+        assert_eq!(runtime.units[&9].cooldown, 2.5);
+        assert!(!runtime.units[&4].hold_fire && !runtime.units[&4].auto_cast);
+        assert_eq!(runtime.units[&4].cooldown, 0.0);
         assert_eq!(runtime.units[&9].amove, Some(Point { x: 40.0, z: 40.0 }));
         assert!(!runtime.units.contains_key(&2));
         assert_eq!(runtime.units[&4].queued_orders, 0);
@@ -1032,6 +1053,9 @@ mod delivered {
                         UnitFacts {
                             built: optional_number(&u["built"])?.unwrap_or(1.0),
                             hold_position: own && truth(&u["holdPos"]),
+                            hold_fire: own && truth(&u["holdFire"]),
+                            auto_cast: own && truth(&u["auto"]),
+                            cooldown: if own { number(&u["cd"])? } else { 0.0 },
                             queued_orders: if own { array(&u["orders"])?.len() } else { 0 },
                             auto_retreat: own && truth(&u["autoRetreat"]),
                             convoy: own && trucks.contains(&id),
@@ -1279,7 +1303,21 @@ mod delivered {
         fn delivered_defender_packet_keeps_own_intent_economy_and_received_terrain() {
             let (mut delivery, mut snap) = delivery();
             snap["cells"] = json!([[5,"N",2,0,{"ground":"D","object":".","mineOwned":true}]]);
-            let view = delivery.decode(&snap).unwrap();
+            for row in snap["units"].as_array_mut().unwrap() {
+                row[11] = json!(3.5);
+                row[12] = json!(2048 | 16384);
+            }
+            let mut view = delivery.decode(&snap).unwrap();
+            for id in [2, 3] {
+                assert_eq!(view.units[&id]["cd"], 0);
+                assert_eq!(view.units[&id]["holdFire"], false);
+                assert_eq!(view.units[&id]["auto"], false);
+                // Recheck the adapter's owner boundary independently of SeatMemory.
+                let foreign = view.units.get_mut(&id).unwrap();
+                foreign["holdFire"] = json!(true);
+                foreign["auto"] = json!(true);
+                foreign["cd"] = json!(99.0);
+            }
             let result = CommanderMemory::new(0, 40, 40)
                 .unwrap()
                 .observe(&view)
@@ -1292,6 +1330,11 @@ mod delivered {
             assert_eq!(input.manpower, 420.0);
             assert_eq!(context.munitions, 160.0);
             assert_eq!(context.support["artillery"], 5.0);
+            assert!(context.units[&1].hold_fire && context.units[&1].auto_cast);
+            assert_eq!(context.units[&1].cooldown, 3.5);
+            assert!(!context.units[&3].hold_fire && !context.units[&3].auto_cast);
+            assert_eq!(context.units[&3].cooldown, 0.0);
+            assert!(!context.units.contains_key(&2));
             assert_eq!(
                 input.research.as_ref().unwrap().busy,
                 vec![Technology::Guns]
