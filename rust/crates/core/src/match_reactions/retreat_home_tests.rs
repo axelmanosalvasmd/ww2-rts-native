@@ -392,7 +392,7 @@ fn retreat_through_legs(mode: Mode) {
             delivered_tick(&mut m, delivery, &selected);
         } else {
             m.advance_tick().unwrap();
-            // Classic component rows are supported; complete list delivery stays guarded.
+            // Check every Classic seat after each ordinary movement tick.
             collect_classic_components(&m);
         }
         let u = &m.world.game.units[&id];
