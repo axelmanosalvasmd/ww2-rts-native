@@ -49,9 +49,9 @@ impl DeliveryState {
         full: &[bool],
         omit: &[bool],
     ) -> Result<DeliveryFrame<'a>, SnapshotError> {
-        self.preflight(state, full, omit)?;
+        let rows = self.preflight(state, full, omit)?;
         let selected = all_seats(full, omit);
-        self.capture_admitted(state, &selected)
+        self.capture_admitted(state, &selected, rows)
     }
     // Every caller admits these exact owners against the same immutable frame
     // before publication. Selected list publication changes only wreck memory.
@@ -59,6 +59,7 @@ impl DeliveryState {
         &mut self,
         state: &'a mut Match,
         selected: &[super::selected::SelectedSeat],
+        rows: SnapshotRows,
     ) -> Result<DeliveryFrame<'a>, SnapshotError> {
         let remembered = selected
             .iter()
@@ -124,7 +125,7 @@ impl DeliveryState {
             updates.push((slot, update));
             acknowledgments.push((slot, seat));
         }
-        let cache = SnapshotCache::new(state)?;
+        let cache = SnapshotCache::with_rows(state, rows);
         for (slot, seat) in acknowledgments {
             self.seats[slot] = seat;
         }
@@ -137,7 +138,7 @@ impl DeliveryState {
         state: &Match,
         full: &[bool],
         omit: &[bool],
-    ) -> Result<(), SnapshotError> {
+    ) -> Result<SnapshotRows, SnapshotError> {
         let count = state.world.game.players.len();
         if self.dimensions != (state.world.game.w, state.world.game.h)
             || self.seats.len() != count
@@ -152,7 +153,7 @@ impl DeliveryState {
         &self,
         state: &Match,
         selected: &[super::selected::SelectedSeat],
-    ) -> Result<(), SnapshotError> {
+    ) -> Result<SnapshotRows, SnapshotError> {
         let count = state.world.game.players.len();
         if self.dimensions != (state.world.game.w, state.world.game.h) || self.seats.len() != count
         {
@@ -171,10 +172,10 @@ impl DeliveryState {
                 .preflight_observed_terrain(seat.slot)
                 .map_err(|_| SnapshotError::Rules)?;
         }
-        Ok(())
+        Ok(cache.into_rows())
     }
 }
-fn all_seats(full: &[bool], omit: &[bool]) -> Vec<super::selected::SelectedSeat> {
+pub(super) fn all_seats(full: &[bool], omit: &[bool]) -> Vec<super::selected::SelectedSeat> {
     full.iter()
         .zip(omit)
         .enumerate()

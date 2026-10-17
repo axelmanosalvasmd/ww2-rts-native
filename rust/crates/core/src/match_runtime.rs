@@ -729,6 +729,8 @@ pub struct Match {
     pub scenario: Option<crate::legacy_scenario::LegacyScenario>,
     #[serde(default)]
     pub authored_scenario: Option<crate::authored_scenario::AuthoredScenario>,
+    #[serde(default)]
+    pub authored_mission: Option<crate::authored_mission::AuthoredMission>,
     pub logistics: crate::logistics::LogisticsState,
     pub convoys: Option<crate::supply_convoys::ConvoyState>,
     pub supply_net: crate::supply_network::GroundSupplyNetwork,
@@ -924,6 +926,7 @@ impl Match {
             produced_placer: crate::produced_units::ProducedPlacer::new(),
             scenario,
             authored_scenario,
+            authored_mission: None,
             logistics: crate::logistics::LogisticsState::default(),
             convoys: None,
             supply_net: crate::supply_network::GroundSupplyNetwork::default(),

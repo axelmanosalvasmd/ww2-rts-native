@@ -23,7 +23,7 @@ mod recipient_packet;
 
 const SAFE_TICK: i64 = 9_007_199_254_740_991;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 struct Sighting {
     id: u32,
     kind: String,
@@ -33,7 +33,7 @@ struct Sighting {
     worth: f64,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 struct Stationary {
     id: u32,
     at: Point,
@@ -42,9 +42,10 @@ struct Stationary {
 
 /// The source AI view memory, not human camera attention or policy intent.
 /// Reset by replacing this value when a person resumes the seat or the match changes.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct HumanObservationMemory {
     owner: usize,
+    #[serde(skip)]
     binding: Option<(usize, usize, usize, u64)>,
     tick: Option<i64>,
     sightings: Vec<Sighting>,
@@ -62,6 +63,34 @@ impl HumanObservationMemory {
     }
     pub fn owner(&self) -> usize {
         self.owner
+    }
+    pub(crate) fn validate_save_binding(&self, state: &Match) -> Result<(), String> {
+        let game = &state.world.game;
+        let binding = (
+            state.world.initial().chars.as_ptr() as usize,
+            game.w,
+            game.h,
+            state.options.seed,
+        );
+        if self.owner >= game.players.len()
+            || self.binding.is_some_and(|old| old != binding)
+            || self.tick.is_some_and(|tick| tick < 0 || tick > game.tick)
+            || self.sightings.len() > 65_536
+            || self.still.len() > 65_536
+            || self.sightings.iter().any(|s| {
+                s.owner >= game.players.len()
+                    || !finite(s.at)
+                    || !s.time.is_finite()
+                    || !s.worth.is_finite()
+            })
+            || self
+                .still
+                .iter()
+                .any(|s| !finite(s.at) || !s.since.is_finite())
+        {
+            return Err("AI observation memory binding or clock mismatch".into());
+        }
+        Ok(())
     }
 }
 
@@ -83,7 +112,8 @@ impl HumanShot {
             crate::match_tick::TickEvent::Aviation(_)
             | crate::match_tick::TickEvent::Scenario(_)
             | crate::match_tick::TickEvent::AuthoredScenario(_)
-            | crate::match_tick::TickEvent::Horde(_) => Self::Other,
+            | crate::match_tick::TickEvent::Horde(_)
+            | crate::match_tick::TickEvent::AuthoredMission(_) => Self::Other,
         }
     }
 

@@ -331,6 +331,7 @@ impl Match {
             produced_placer: crate::produced_units::ProducedPlacer::new(),
             scenario: None,
             authored_scenario: None,
+            authored_mission: None,
             logistics: crate::logistics::LogisticsState::default(),
             capture_ticks: Vec::new(),
             story: vec![crate::match_story::PlayerStory::default(); count],
@@ -829,6 +830,10 @@ fn world_find_site(
     }
     None
 }
+
+#[cfg(test)]
+#[path = "bases_batch4_fort_tests.rs"]
+mod bases_batch4_fort_tests;
 
 #[cfg(test)]
 mod region_lookup_tests {

@@ -11,6 +11,11 @@ CMB-150 remains incomplete without World recovery, sandbox spawn and convoy comm
 Internal FireAt uses the existing unit-control cell, queued command owner and deterministic projectile state. Waiting orders normalize to one unit and a cell-center point, projected as existing owner order kind 5. Active plans use the same kind. Direct guns approach intact terrain, accept a first wall only when it belongs to the target structure, and stop after the target cell is destroyed. Salvos keep firing on open ground until replaced. Both use the existing ammunition and shortage owners.
 
 The complete recipient adapter previously rejected all persistent projectiles. Ground flights now use the existing prototype flight row, current fog visibility, hidden shooter removal and a visual horizon clipped by fog and visible contacts. This changes no row shape, contract or public command whitelist. Public `fireat` and compound `orders` remain blocked. World tactical FireAt and replacing a pending aimed ability remain closed at admission. Main's aircraft area owner remains unchanged, including its refusal of mixed selections containing an eligible ground sheller. AI house-shelling and medic chores remain separate work.
+
+## External AI memory across native checkpoints (2026-10-16)
+
+The separate AI save owner now has a core codec for policy and observation memory. Ordinary commander attention and queued motor inputs reset on load, matching the prototype's unsaved commander WeakMap. Native strategic RNG and bounded Horde pending-order state remain with their policy owner; native routing caches continue to use the persistence choice recorded in `design.d/2026-10-16-save-load.md`. Existing save v1 bodies and null AI content remain compatible. Hosted AI room admission and AI-63 remain separate. `docs/contracts/save-format.md` specifies the representation and `if27_save_continuation_keeps_planner_memory_and_resets_commander_attention` exercises the load boundary and subsequent native ticks.
+
 ## Owner parity decisions A, B and C (2026-10-16)
 
 The [recorded owner decisions](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6217590741) approve the differences below, the Rust-only acceptance of the listed client rows, and World deferral for milestone R1. Julio recorded both owners' decisions after Axel's voice approval; Axel's written confirmation on #5 is requested in that comment. This section records the decisions for STATUS-ABC.
@@ -5110,6 +5115,14 @@ Classic full ticks and non-ordinary recipient snapshots remain guarded. CMB-130 
 The owner decision `julio-373-merged-decisions-20261016` authorizes additive C queries for IF-04 and IF-12. Keep ABI 2's existing scalar version and every existing function and layout. Introduce minor revision 1 and a separate minor-version query so old consumers keep their version check. New queries use caller-owned JSON buffers with the existing error and panic conventions; variable result shapes need no new fixed-layout structs. This is a cold authoring/preview surface, with no performance claim or new wire format.
 
 Placement reads only the existing recipient handle. Authoring creates detached state from the user's own document. No running World room is admitted. World placement history, team-qualified recipient demine knowledge and complete seeded fairness equivalence remain explicitly bounded in `docs/contracts/abi-queries.md`. This implementation candidate requires exact-signature review before Unreal adoption.
+
+## World fort capture follows main's bounded component (2026-10-16)
+
+PR #336 keeps main's World region, elimination and finish behavior from #301, including fort-owner transfers in the bounded component. Tick admission still refuses an imminent fort transfer before commands. The constructor's existing fort ranks retain a read-only regression test. The atomicity witness stages a damaged fort and an eliminated owner's construction plan, then requires the combined income, capture and elimination phase to refuse before changing units, owners, footprints, wallets or regions. World construction, Gate physics, recipient snapshots and hosted admission remain guarded. BASE-54 remains uncounted in this branch.
+
+## Borrowed building placement (2026-10-16)
+
+Ordinary Build admission uses one read-only building-placement query. It borrows terrain, actors, visibility and optional node, territory and rail-yard facts, so previews can use the same rule without adding match state. Equal-distance nodes retain their input index, matching the prototype's stable sort. The query returns the selected footprint and snapped centre even when a later rule refuses it. Visibility precedes territory, rail, node overlap, coast and physical occupancy. World facts are exercised as components; they do not admit World construction, hosted rooms or recipient delivery. Fortifications retain their separate existing query.
 
 ## Horde core reveal, shared facilities and scripted policy (2026-10-16)
 

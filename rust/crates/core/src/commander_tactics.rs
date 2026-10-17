@@ -188,24 +188,25 @@ impl Skill {
         s
     }
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum SituationKind {
     Defense,
     Wait,
     Push,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Situation {
     pub kind: SituationKind,
     pub until: f64,
     pub point: Option<usize>,
     pub threat: Option<u32>,
     pub at: Option<Point>,
-    pub counter: Option<&'static str>,
+    #[serde(deserialize_with = "crate::save_state::optional_static_string")]
+    pub counter: Option<crate::save_state::StaticStr>,
     pub safe: Option<usize>,
     pub failed_at: u8,
 }
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct State {
     pub mind: Mind,
     pub raid: Option<crate::commander_classic_rules::Raid>,
@@ -218,12 +219,14 @@ pub struct State {
     pub called: Option<f64>,
     pub cleared_sightings: BTreeMap<u32, f64>,
     pub(crate) fort_steps: BTreeMap<u32, u8>,
+    #[serde(default)]
     pub field: crate::commander_field_policy::State,
+    #[serde(default)]
     pub world: crate::commander_world_policy::State,
     pub(crate) engineering: crate::commander_engineering::State,
     pub(crate) armor_ever_seen: bool,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Decision {
     pub situation: SituationKind,
     pub buy: String,
@@ -727,30 +730,33 @@ fn plan_inner(
         {
             state.released.insert(id);
         }
-        let held = enemies
-            .iter()
-            .copied()
-            .filter(|e| {
-                watched(e.id)
-                    && !boolean(definition(e), "air")
-                    && !boolean(definition(e), "structure")
-            })
-            .filter(|e| {
-                dist(e.at, me.spawn) <= 32.0
-                    || input.points.iter().any(|p| {
-                        allied(p.owner) && dist(e.at, p.at) <= observation.point_radius() + 4.0
-                    })
-                    || input.units.iter().any(|u| {
-                        u.owner == input.slot
-                            && ((u.kind == "depot" && dist(e.at, u.at) <= 24.0)
-                                || (u.kind == "hq" && dist(e.at, u.at) <= 32.0))
-                    })
-            })
-            .min_by(|a, b| {
-                dist(a.at, me.spawn)
-                    .total_cmp(&dist(b.at, me.spawn))
-                    .then(a.id.cmp(&b.id))
-            });
+        let held = crate::sort::first_by(
+            enemies
+                .iter()
+                .copied()
+                .filter(|e| {
+                    watched(e.id)
+                        && !boolean(definition(e), "air")
+                        && !boolean(definition(e), "structure")
+                })
+                .filter(|e| {
+                    dist(e.at, me.spawn) <= 32.0
+                        || input.points.iter().any(|p| {
+                            allied(p.owner) && dist(e.at, p.at) <= observation.point_radius() + 4.0
+                        })
+                        || input.units.iter().any(|u| {
+                            u.owner == input.slot
+                                && ((u.kind == "depot" && dist(e.at, u.at) <= 24.0)
+                                    || (u.kind == "hq" && dist(e.at, u.at) <= 32.0))
+                        })
+                }),
+            |a, b| {
+                crate::sort::then(
+                    dist(a.at, me.spawn) - dist(b.at, me.spawn),
+                    f64::from(a.id) - f64::from(b.id),
+                )
+            },
+        );
         let holds = state.situation.as_ref().is_some_and(|op| {
             now + 1e-9 < op.until
                 && match op.kind {
@@ -912,7 +918,7 @@ fn plan_inner(
         &mut state.raid,
         skill,
     )?;
-    let targets = crate::commander_classic_rules::targets(observation, context)?;
+    let mut targets = crate::commander_classic_rules::targets(observation, context)?;
     let my_value: f64 = mine.iter().map(|u| worth(u, definition(u))).sum();
     let their_value: f64 = targets.first().and_then(|t| t.0).map_or(0.0, |owner| {
         strategic_recent
@@ -1286,14 +1292,8 @@ fn plan_inner(
             && !targets.is_empty()
         {
             if hands < skill.hands {
-                let target = targets
-                    .iter()
-                    .min_by(|a, b| {
-                        dist(u.at, a.2)
-                            .total_cmp(&dist(u.at, b.2))
-                            .then(a.1.cmp(&b.1))
-                    })
-                    .unwrap();
+                crate::sort::sort_by(&mut targets, |a, b| dist(u.at, a.2) - dist(u.at, b.2));
+                let target = targets[0];
                 hands += 1;
                 attacks.push((u.id, target.2));
                 armed.insert(u.id);

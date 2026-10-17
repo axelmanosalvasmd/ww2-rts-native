@@ -86,12 +86,13 @@ pub(super) fn capture_perspective(
         }
         // Reuse Source's six-field ghost rows. Never consult a hidden live building here.
         if matches!(state.options.mode, Mode::Classic | Mode::World) {
-            let ghosts = state
+            let rows = state
                 .classic_known_buildings
                 .iter()
                 .find(|(team, _)| *team == g.players[slot].team)
-                .into_iter()
-                .flat_map(|(_, rows)| rows)
+                .map_or(&[][..], |(_, rows)| rows.as_slice());
+            let ghosts = rows
+                .iter()
                 .filter(|row| !seen_by(state, slot, row.id))
                 .map(|row| {
                     let kind = state
@@ -119,7 +120,24 @@ pub(super) fn capture_perspective(
             fields.insert("ghosts".into(), json!(ghosts));
         }
         if let Some(scenario) = &state.authored_scenario {
-            fields.insert("scenario".into(), scenario.recipient(state, slot));
+            let mut projection = scenario.recipient(state, slot);
+            if full_map {
+                projection["objectives"]
+                    .as_array_mut()
+                    .ok_or(SnapshotError::Rules)?
+                    .retain(|objective| objective["recipients"] == "public");
+            }
+            fields.insert("scenario".into(), projection);
+        } else if let Some(mission) = &state.authored_mission {
+            let teams = g
+                .players
+                .iter()
+                .map(|player| player.team)
+                .collect::<Vec<_>>();
+            fields.insert(
+                "scenario".into(),
+                mission.projection(slot, &teams, full_map),
+            );
         } else if state.scenario.is_some() {
             // The admitted migrated engine has no authored objectives.
             fields.insert("scenario".into(), json!({"version":1,"objectives":[]}));

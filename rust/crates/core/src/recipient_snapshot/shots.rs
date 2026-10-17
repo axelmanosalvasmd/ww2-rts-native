@@ -23,6 +23,7 @@ pub enum ShotRef<'a> {
     Scenario(&'a SayAction),
     AuthoredScenario(&'a crate::authored_scenario::ScenarioSay),
     Horde(&'a crate::match_horde::HordeEvent),
+    AuthoredMission(&'a Value),
 }
 
 impl<'a> TryFrom<&'a TickEvent> for ShotRef<'a> {
@@ -37,6 +38,7 @@ impl<'a> TryFrom<&'a TickEvent> for ShotRef<'a> {
             TickEvent::Horde(value) => Ok(Self::Horde(value)),
             TickEvent::Aviation(value) => Ok(Self::Aviation(value)),
             TickEvent::AuthoredScenario(value) => Ok(Self::AuthoredScenario(value)),
+            TickEvent::AuthoredMission(value) => Ok(Self::AuthoredMission(value)),
         }
     }
 }
@@ -78,11 +80,11 @@ impl DeliveryState {
         if selected.is_empty() {
             return Ok(None);
         }
-        self.preflight_selected(state, selected)?;
+        let rows = self.preflight_selected(state, selected)?;
         composition::admit_actors(state, &[])?;
         let projected = project_shots(state, selected, shots)?;
         let frame = self
-            .capture_selected_with_lists(state, selected, &[])?
+            .capture_selected_with_lists_admitted(state, selected, &[], rows)?
             .ok_or(SnapshotError::InvalidRecipient)?;
         Ok(Some(SelectedGroundShotFrame {
             frame,
@@ -220,6 +222,20 @@ fn raw_event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
                 crate::match_horde::HordeEvent::BossSurfaced { at } => finite(&[at.x, at.z])?,
             }
             Ok(value.shot_json())
+        }
+        ShotRef::AuthoredMission(value) => {
+            let mission = state
+                .authored_mission
+                .as_ref()
+                .ok_or(SnapshotError::Rules)?;
+            if !mission.accepts_shot(value)
+                || value["atTick"]
+                    .as_i64()
+                    .is_none_or(|tick| tick > state.world.game.tick)
+            {
+                return Err(SnapshotError::Rules);
+            }
+            Ok(value.clone())
         }
         ShotRef::Scenario(value) => {
             validate_public_say(value).map_err(|_| SnapshotError::Rules)?;
@@ -531,7 +547,12 @@ pub(super) fn project_shots_perspective(
         .map(|shot| {
             event(state, shot).map(|row| {
                 (
-                    matches!(shot, ShotRef::Scenario(_) | ShotRef::AuthoredScenario(_)),
+                    matches!(
+                        shot,
+                        ShotRef::Scenario(_)
+                            | ShotRef::AuthoredScenario(_)
+                            | ShotRef::AuthoredMission(_)
+                    ),
                     row,
                 )
             })
@@ -551,16 +572,23 @@ pub(super) fn project_shots_perspective(
         let visible = &fog.team(g, &state.rules, g.players[seat.slot].team).vis;
         let mut rows = Vec::new();
         for (public_say, event) in &events {
-            // Scenario recipient policy applies independently of fog and reveal.
+            // Mission messages have recipient policies instead of ground geometry.
             if *public_say {
-                if crate::authored_scenario::permitted(
-                    state,
-                    event["scenarioRecipients"]
-                        .as_str()
-                        .ok_or(SnapshotError::Rules)?,
-                    event["scenarioSide"].as_u64().ok_or(SnapshotError::Rules)? as usize,
-                    seat.slot,
-                ) {
+                let policy = event["scenarioRecipients"]
+                    .as_str()
+                    .ok_or(SnapshotError::Rules)?;
+                let side = event["scenarioSide"].as_u64().ok_or(SnapshotError::Rules)? as usize;
+                let allowed = policy == "public"
+                    || (!full_map
+                        && match policy {
+                            "side" => side == seat.slot,
+                            "team" => g
+                                .players
+                                .get(side)
+                                .is_some_and(|p| p.team == g.players[seat.slot].team),
+                            _ => false,
+                        });
+                if allowed {
                     rows.push(event.clone());
                 }
                 continue;

@@ -274,6 +274,10 @@ impl AuthoredScenario {
             next_execution: 1,
         }
     }
+    pub(crate) fn matches_map(&self, map: &crate::map::AuthoritativeMap) -> bool {
+        crate::scenario_validation::explicit_scenario(map.source()) == Some(&self.data)
+    }
+
     pub(crate) fn recipient(&self, state: &Match, slot: usize) -> Value {
         json!({"version":1,"objectives":self.objectives.iter()
             .filter(|o| permitted(state,&o.recipients,o.side,slot)).map(Objective::row).collect::<Vec<_>>()})

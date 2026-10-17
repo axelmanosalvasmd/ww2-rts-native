@@ -70,6 +70,7 @@ fn event_json(m: &Match, event: &TickEvent) -> Value {
         TickEvent::Scenario(say) => say.shot_json(),
         TickEvent::AuthoredScenario(say) => say.shot_json(),
         TickEvent::Horde(event) => event.shot_json(),
+        TickEvent::AuthoredMission(row) => row.clone(),
         TickEvent::Support(event) => match event {
             SupportEvent::Shell(p) => json!({"x":p.x,"z":p.z,"k":"shell","pub":true}),
             SupportEvent::Bomb(p) => json!({"x":p.x,"z":p.z,"k":"bomb","pub":true}),
@@ -264,6 +265,7 @@ fn actual_tick_owns_complete_original_chronological_outputs() {
                     TickEvent::Environment(_) => 3,
                     TickEvent::Scenario(_)
                     | TickEvent::AuthoredScenario(_)
+                    | TickEvent::AuthoredMission(_)
                     | TickEvent::Horde(_) => {
                         panic!("the original four-family fixture has no Scenario or Horde output")
                     }

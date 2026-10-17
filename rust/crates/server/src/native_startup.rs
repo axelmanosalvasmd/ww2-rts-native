@@ -114,6 +114,7 @@ impl NativeStartup {
         {
             return Err("native startup authoring map binding changed".into());
         }
+        state.validate_authored_map_binding(authored)?;
         let plan = match state.options.mode {
             Mode::Default | Mode::Conquest => {
                 StartPlan::prepare(authored, &state.options, &state.rules)?

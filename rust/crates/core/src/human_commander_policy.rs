@@ -14,7 +14,7 @@ use serde_json::{Value, json};
 
 /// One seat's private strategic state and existing Ai-purpose random stream.
 /// Human motor timing is a separate stream owned by HumanState.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct HumanPolicy {
     owner: u32,
     source: SourceState,
@@ -23,6 +23,10 @@ pub struct HumanPolicy {
 }
 
 impl HumanPolicy {
+    pub(crate) fn save_owner(&self) -> u32 {
+        self.owner
+    }
+
     pub fn new(owner: u32, recorded_match_seed: u64) -> Self {
         Self {
             owner,

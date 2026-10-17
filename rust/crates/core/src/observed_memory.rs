@@ -499,6 +499,45 @@ mod tests {
             .unwrap()
     }
     #[test]
+    fn if26_terrain_json_comparison_ignores_zero_sign_and_preserves_nearby_fields() {
+        let mut w = world();
+        let mut memory = ObservedMemory::new(&w, 0, 7).unwrap();
+        let frame = ObservationFrame {
+            team: 0,
+            skip_fog: false,
+        };
+        w.game.wear.as_mut().unwrap()[30] = -0.0;
+        w.log_cell(30, false).unwrap();
+        assert_eq!(memory.refresh(&mut w, frame, &mut Seen).unwrap(), 1);
+        memory.take_changes();
+        let revision = memory.revision();
+        w.game.wear.as_mut().unwrap()[30] = 0.0;
+        w.log_cell(30, false).unwrap();
+        assert_eq!(memory.refresh(&mut w, frame, &mut Seen).unwrap(), 0);
+        assert_eq!(memory.revision(), revision);
+        assert!(memory.outbox().is_empty());
+        for value in [1.0_f32, f32::from_bits(1.0_f32.to_bits() + 1)] {
+            w.game.wear.as_mut().unwrap()[30] = value;
+            w.log_cell(30, false).unwrap();
+            assert_eq!(memory.refresh(&mut w, frame, &mut Seen).unwrap(), 1);
+            let changes = memory.take_changes();
+            assert_eq!(changes.len(), 1);
+            assert_eq!(changes[0].row.data.ground_wear, value);
+        }
+        let row = &memory.full_rows()[0];
+        let mut absent = row.row.clone();
+        absent.data.trench_front = None;
+        let mut present = absent.clone();
+        present.data.trench_front = Some(0.0);
+        let remembered = ObservedRow {
+            row: absent,
+            mine_owned: None,
+            revision: 1,
+        };
+        assert!(!remembered.same_content(&present, None));
+        assert!(!remembered.same_content(&remembered.row, Some(false)));
+    }
+    #[test]
     fn preparation_preserves_deferred_registration_and_unchanged_key_actions() {
         let mut w = world();
         let mut memory = ObservedMemory::new(&w, 0, 7).unwrap();

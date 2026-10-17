@@ -181,9 +181,48 @@ fn emit_destroy(
 }
 
 impl Match {
-    /// Preflight only the migrated public legacy-trigger subset used by the tick and snapshot.
+    /// Bind a saved authored owner to the exact private definition of its source map.
+    pub fn validate_authored_map_binding(
+        &self,
+        map: &crate::map::AuthoritativeMap,
+    ) -> Result<(), String> {
+        let owners = usize::from(self.scenario.is_some())
+            + usize::from(self.authored_scenario.is_some())
+            + usize::from(self.authored_mission.is_some());
+        if owners > 1 {
+            return Err("authored and legacy scenario owners cannot coexist".into());
+        }
+        let matches = if let Some(scenario) = &self.authored_scenario {
+            scenario.matches_map(map)
+        } else if let Some(mission) = &self.authored_mission {
+            mission.matches_map(map)
+        } else {
+            crate::scenario_validation::explicit_scenario(map.source()).is_none()
+        };
+        if !matches {
+            return Err("authored scenario definition disagrees with source map".into());
+        }
+        Ok(())
+    }
+
+    /// Validate admitted mission owners before ticks, snapshots and checkpoint restoration.
     pub fn preflight_legacy_scenario(&self) -> Result<(), String> {
         self.preflight_authored_scenario()?;
+        if let Some(mission) = &self.authored_mission {
+            if self.scenario.is_some() || self.authored_scenario.is_some() {
+                return Err("authored and legacy scenario owners cannot coexist".into());
+            }
+            mission.validate(self.world.game.players.len())?;
+            if self.world.game.tick < 0
+                || mission
+                    .last_tick()
+                    .is_some_and(|tick| tick > self.world.game.tick as u64)
+                || (self.finish.is_none()
+                    && mission.last_tick().unwrap_or(0) != self.world.game.tick as u64)
+            {
+                return Err("authored mission clock disagrees with match tick".into());
+            }
+        }
         let Some(scenario) = &self.scenario else {
             return Ok(());
         };
