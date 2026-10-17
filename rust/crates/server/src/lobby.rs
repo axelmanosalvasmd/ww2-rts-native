@@ -2006,13 +2006,7 @@ impl Hub {
         if self.trusted.is_none() && msg["t"] == "start" {
             // Invalid Start preconditions are ignored, as in the prototype.
             let ready = self.rooms.get(code).is_some_and(|room| {
-                room.is_host(connection_id)
-                    && room.native.is_none()
-                    && !room.players.is_empty()
-                    && room.players.len() <= room.capacity(&self.maps)
-                    && (room.mode != "assault"
-                        || (room.players.iter().any(|p| p.team == room.defender)
-                            && room.players.iter().any(|p| p.team != room.defender)))
+                room.is_host(connection_id) && room.native.is_none() && room.start_ready(&self.maps)
             });
             if ready && let Err(error) = self.start_public(code, now) {
                 if let Some(room) = self.rooms.get_mut(code) {

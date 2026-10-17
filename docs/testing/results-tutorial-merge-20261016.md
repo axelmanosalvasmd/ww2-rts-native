@@ -133,3 +133,13 @@ Post-merge test adapter repair: Tutorial Peer::drain explicitly rejects hosted O
 Post-merge runtime correction: lobby result.you is now null when the current result has no story, matching prototype server.js:348. This prevents prior last_match outcomes from leaking after host End. The two-human Tutorial test retains prior victory/defeat outcomes before starting and ending the next room. Tutorial Peer::drain also completes output byte accounting before dispatch, matching the actual socket writer.
 
 Tutorial hold witness clock correction: CatchUpClock starts due at zero. Poll callback 1 at time zero, then advance by 50 ms, so each assertion measures one callback rather than consuming the initial two due ticks in the first poll. No runtime clock behavior changed.
+
+## Qualification repairs
+
+The first 374-test composed run passed 371 tests and exposed three integration gaps:
+
+- `async_start.rs`: restore main's existing start_ready guard before the newer private R1 policy checks. The earlier main conflict had placed this synchronous guard inside public Start's conflict; it belongs in the async trusted owner too. `lobby.rs` public Start now calls the same readiness helper, retaining host/native checks and every capacity/Assault predicate. The inherited mode04 test remains unchanged.
+- `recipient_lists.rs`: validate canonical Tutorial state before raw-list and per-recipient list publication. Replacing a malformed Horde state's identity with Tutorial must still refuse. The inherited canonical_horde_global_lists_survive_ticks_and_every_seat_delivery guard assertions remain unchanged.
+- `mode_startup_tests.rs::mode01_non_world_mode_rows_match_the_prototype_public_fields`: preserve every literal component field expectation, and replace the obsolete blanket non-Conquest refusal with exact mode projection for every seat in every admitted non-World mode. Malformed mode-pair and owner checks remain in their separate tests.
+
+The later main `6f02f83a` merge into `b9987e7b` was automatic with no file changes. Merge `3c5b08de` exactly matches automatic tree `f5ab02fb30e8b9844bdcdf84d89d436b97de11ff`; no additional merge hunk exists.

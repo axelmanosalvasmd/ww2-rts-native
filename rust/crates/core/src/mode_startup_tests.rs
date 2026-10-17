@@ -324,10 +324,10 @@ fn base52_first_fitting_site_moves_away_from_a_nearby_income_point() {
 
 #[test]
 fn mode01_non_world_mode_rows_match_the_prototype_public_fields() {
-    use crate::recipient_snapshot::{SnapshotCache, SnapshotError, mode_row};
+    use crate::recipient_snapshot::{SnapshotCache, mode_row};
 
     // Prototype sim.js:5895-5898; Tutorial's initial goal is tutorial.js:11.
-    // The component row does not admit the other modes to whole-frame delivery.
+    // Every admitted recipient projection must retain the exact component mode row.
     for mode in MODES {
         let m = create(mode, ArmySize::Standard).unwrap();
         let expected = match mode {
@@ -355,13 +355,14 @@ fn mode01_non_world_mode_rows_match_the_prototype_public_fields() {
             _ => unreachable!(),
         };
         assert_eq!(mode_row(&m).unwrap(), expected, "{mode:?}");
-        if mode == Mode::Conquest {
-            assert!(SnapshotCache::new(&m).is_ok());
-        } else {
-            assert!(matches!(
-                SnapshotCache::new(&m),
-                Err(SnapshotError::UnsupportedMode)
-            ));
+        let cache = SnapshotCache::new(&m).unwrap_or_else(|error| panic!("{mode:?}: {error:?}"));
+        for slot in 0..m.world.game.players.len() {
+            let row = cache.recipient(slot).unwrap().fields;
+            assert_eq!(
+                row.get("mode").cloned().unwrap_or(Json::Null),
+                expected,
+                "{mode:?} seat {slot}"
+            );
         }
     }
     let mut default = create(Mode::Conquest, ArmySize::Standard).unwrap();

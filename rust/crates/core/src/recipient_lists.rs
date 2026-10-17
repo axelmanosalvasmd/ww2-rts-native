@@ -167,6 +167,9 @@ impl crate::match_runtime::Match {
     /// Capture list facts after current canonical state changes. No delivery cursor is drained.
     /// Ordinary wreck memory is per seat; World wreck memory is shared by team.
     pub fn recipient_snapshot_lists(&mut self, owner: usize) -> Result<RecipientLists, String> {
+        if self.options.mode == crate::economy::Mode::Tutorial {
+            self.validate_tutorial_state()?;
+        }
         let g = &self.world.game;
         let player = g.players.get(owner).ok_or("invalid list recipient")?;
         if !(0..6).contains(&player.team) {
@@ -309,6 +312,9 @@ impl crate::match_runtime::Match {
             self.validate_horde_economy()?;
         } else if !crate::match_actor::ordinary_ground_mode(game, self.options.mode) {
             return Err("global ordinary lists require represented ordinary mode".into());
+        }
+        if self.options.mode == crate::economy::Mode::Tutorial {
+            self.validate_tutorial_state()?;
         }
         let mut ids = std::collections::BTreeSet::new();
         let mut rows = Vec::with_capacity(game.wrecks.len());
