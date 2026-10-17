@@ -24,6 +24,10 @@ mod falling;
 mod modes;
 #[path = "recipient_snapshot/logistics.rs"]
 mod logistics;
+#[path = "recipient_snapshot/operative.rs"]
+mod operative;
+#[path = "recipient_snapshot/operative_flights.rs"]
+mod operative_flights;
 #[path = "recipient_snapshot/owners.rs"]
 mod owners;
 #[path = "recipient_snapshot/public_state.rs"]
@@ -39,6 +43,7 @@ mod support;
 pub use composition::{GroundListDeliveryFrame, QuiescentDeliveryFrame, SupportedSeatSnapshot};
 pub use delivery::{DeliveryFrame, DeliveryState};
 pub use modes::mode_row;
+pub use operative::OperativeDelivery;
 pub use selected::{SelectedDeliveryFrame, SelectedGroundListFrame, SelectedSeat};
 pub use shots::{SelectedGroundShotFrame, ShotRef};
 pub use spectator::SpectatorDelivery;
@@ -241,6 +246,23 @@ fn validate_snapshot(state: &Match) -> Result<(), SnapshotError> {
     }
     engineering::validate(state)?;
     aircraft::validate(state)?;
+    state
+        .prepare_companion_tick()
+        .map_err(|_| SnapshotError::Unsupported {
+            unit: g
+                .units
+                .values()
+                .find(|unit| {
+                    state
+                        .commands
+                        .units
+                        .get(&unit.id)
+                        .is_some_and(|control| control.operative)
+                        && !state.companions.soldiers.contains_key(&unit.id)
+                })
+                .map_or(0, |unit| unit.id),
+            capability: SnapshotCapability::Operatives,
+        })?;
     Ok(())
 }
 
@@ -312,7 +334,7 @@ fn project_recipient(
         fields.insert("logistics".into(), logistics);
     }
     if !state.firing.flights.is_empty() {
-        fields.insert("flights".into(), shots::live_flights(state, slot)?);
+        fields.insert("flights".into(), operative_flights::project(state, slot)?);
     }
     Ok(RecipientProjection {
         fields,
@@ -371,9 +393,6 @@ fn unit_row(state: &Match, u: &Unit) -> Result<Value, SnapshotError> {
         .map_err(|_| unsupported(SnapshotCapability::GateState))?;
     crate::match_construction::validate_build_activity(u, control)
         .map_err(|_| unsupported(SnapshotCapability::Engineering))?;
-    if control.operative {
-        return Err(unsupported(SnapshotCapability::Operatives));
-    }
     let ability = state
         .abilities
         .get(u.id)
@@ -413,6 +432,9 @@ fn unit_row(state: &Match, u: &Unit) -> Result<Value, SnapshotError> {
         u.built.unwrap_or(1.0),
     ])?;
     let mut flags = 0u64;
+    if control.operative {
+        flags |= 131072;
+    }
     if u.air.is_some() && !vision::airborne(u) {
         flags |= 512;
     }

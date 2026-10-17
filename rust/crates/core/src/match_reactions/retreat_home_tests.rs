@@ -4,7 +4,9 @@ use crate::{
     game::PlaneState,
     match_commands::{Command, MoveOutcome, UnitControl},
     misc_retreat_support_tests::{delivered_tick, publish_rifle, scene, seats},
-    recipient_snapshot::{DeliveryState, SnapshotCache, SnapshotError},
+    recipient_snapshot::{
+        DeliveryState, SnapshotCache, SnapshotCapability, SnapshotError, mode_row,
+    },
     supply_convoys::{ConvoyState, Store, StoreId, Truck, TruckState},
 };
 
@@ -348,6 +350,36 @@ fn mov48_manual_retreat_exits_house_moves_home_and_delivers_every_seat() {
     assert!(m.tick_state.fault().is_none());
 }
 
+fn assert_classic_retreat_projection(m: &Match, id: u32) {
+    let projection = SnapshotCache::new(m).unwrap().recipient(0).unwrap();
+    assert_eq!(projection.fields["mode"], mode_row(m).unwrap());
+    assert!(
+        projection
+            .missing
+            .contains(&SnapshotCapability::ShotsAndFlights)
+    );
+    let row = projection.fields["units"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|row| row[0] == serde_json::json!(id))
+        .unwrap()
+        .as_array()
+        .unwrap();
+    assert_eq!(
+        &row[..3],
+        &[
+            serde_json::json!(id),
+            serde_json::json!("rifle"),
+            serde_json::json!(0),
+        ]
+    );
+    assert_eq!(
+        row[12].as_u64().unwrap() & 1,
+        u64::from(m.world.game.units[&id].retreating)
+    );
+}
+
 fn retreat_through_legs(mode: Mode) {
     let mut m = long_route_scene(mode);
     let at = Point { x: 281., z: 41. };
@@ -375,6 +407,9 @@ fn retreat_through_legs(mode: Mode) {
     let mut leg_ends = BTreeSet::new();
     for _ in 0..2500 {
         delivered_tick(&mut m, &mut delivery, &selected);
+        if mode == Mode::Classic {
+            assert_classic_retreat_projection(&m, id);
+        }
         let u = &m.world.game.units[&id];
         if let Some(end) = u.path.last() {
             leg_ends.insert((end.x.to_bits(), end.z.to_bits()));
@@ -397,6 +432,9 @@ fn retreat_through_legs(mode: Mode) {
     assert!(m.tick_state.fault().is_none());
     for _ in 0..3 {
         delivered_tick(&mut m, &mut delivery, &selected);
+        if mode == Mode::Classic {
+            assert_classic_retreat_projection(&m, id);
+        }
     }
     assert!(m.tick_state.fault().is_none());
 }

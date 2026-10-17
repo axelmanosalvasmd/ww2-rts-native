@@ -338,6 +338,26 @@ impl RoomRuntime {
             self.meter.snap_every()
         ])
     }
+    pub(crate) fn frame_events(&self, kind: FrameKind) -> &[TickEvent] {
+        if kind == FrameKind::Scheduled {
+            &self.pending_events
+        } else {
+            &[]
+        }
+    }
+    pub(crate) fn operative_list_scope(&mut self) -> Result<ListScope, String> {
+        let raw = self.state.ordinary_snapshot_raw_lists()?;
+        self.batch = self
+            .batch
+            .checked_add(1)
+            .ok_or("native snapshot batch exhausted")?;
+        let versions = self
+            .lists
+            .capture(self.batch, Some(&raw.wrecks), raw.nodes.as_ref())
+            .map_err(|e| e.to_string())?;
+        Ok(ListScope::Shared(versions))
+    }
+
     pub(crate) fn open_loaded_pause(
         &mut self,
         slot: usize,

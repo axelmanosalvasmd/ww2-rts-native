@@ -8,7 +8,9 @@ use crate::{
     match_commands::Command,
     match_runtime::{Match, MatchOptions, PlayerConfig},
     orders::OrderKey,
-    recipient_snapshot::{DeliveryState, SelectedSeat, SnapshotCache, SnapshotError},
+    recipient_snapshot::{
+        DeliveryState, SelectedSeat, SnapshotCache, SnapshotCapability, SnapshotError, mode_row,
+    },
     weather::WeatherChoice,
 };
 use serde_json::{Value, json};
@@ -97,6 +99,26 @@ fn enqueue(state: &mut Match, sequence: u64, command: Value) {
         )
         .unwrap();
 }
+fn assert_mode_recipient_scope(state: &Match) {
+    if state.options.mode == Mode::Classic {
+        let cache = SnapshotCache::new(state).unwrap();
+        let expected = mode_row(state).unwrap();
+        for slot in 0..state.world.game.players.len() {
+            let projection = cache.recipient(slot).unwrap();
+            assert_eq!(projection.fields["mode"], expected);
+            assert!(
+                projection
+                    .missing
+                    .contains(&SnapshotCapability::ShotsAndFlights)
+            );
+        }
+    } else {
+        assert!(matches!(
+            SnapshotCache::new(state),
+            Err(SnapshotError::UnsupportedMode)
+        ));
+    }
+}
 fn tick_and_collect(state: &mut Match, delivery: Option<&mut DeliveryState>) {
     let report = state.advance_tick().unwrap();
     assert!(
@@ -110,11 +132,8 @@ fn tick_and_collect(state: &mut Match, delivery: Option<&mut DeliveryState>) {
         state.validate_gate_actor(id).unwrap();
     }
     let Some(delivery) = delivery else {
-        // These existing mode snapshot bounds are independent of Gate admission.
-        assert!(matches!(
-            SnapshotCache::new(state),
-            Err(SnapshotError::UnsupportedMode)
-        ));
+        // Classic checks only its recipient component here.
+        assert_mode_recipient_scope(state);
         return;
     };
     let selected: Vec<_> = (0..state.start.players.len())
@@ -168,10 +187,7 @@ fn intent_ai50_gate_order_completes_in_each_real_ordinary_mode_with_supported_se
         let mut delivery = if matches!(mode, Mode::Default | Mode::Conquest | Mode::Classic) {
             Some(DeliveryState::new(&state).unwrap())
         } else {
-            assert!(matches!(
-                SnapshotCache::new(&state),
-                Err(SnapshotError::UnsupportedMode)
-            ));
+            assert_mode_recipient_scope(&state);
             None
         };
         tick_and_collect(&mut state, delivery.as_mut());

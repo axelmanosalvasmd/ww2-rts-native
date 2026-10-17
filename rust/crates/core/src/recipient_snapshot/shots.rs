@@ -286,13 +286,29 @@ fn raw_event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
                     owner(state, *seat)?;
                     numbers(&[at.x, at.z, *spread])?;
                 }
-                // SmallArms is an operative payload. Throw is shared by ordinary
-                // abilities and operatives, with no retained source provenance.
-                // Horde breath effects also remain outside ordinary recipient admission.
-                LaunchEvent::Throw { .. }
-                | LaunchEvent::SmallArms(_)
-                | LaunchEvent::Breath { .. }
-                | LaunchEvent::BreathShell { .. } => return Err(refused()),
+                LaunchEvent::Throw {
+                    shooter,
+                    owner: seat,
+                    at,
+                } => {
+                    operative_flights::shooter(state, *shooter, *seat)?;
+                    numbers(&[at.x, at.z])?;
+                }
+                LaunchEvent::SmallArms(value) => {
+                    operative_flights::shooter(state, value.shooter, value.owner)?;
+                    point(value.at)?;
+                    if !matches!(value.effect, "sniper" | "commando") {
+                        return Err(refused());
+                    }
+                    if let Some(hit) = value.hit {
+                        identity(u64::from(hit.target))?;
+                        owner(state, hit.owner)?;
+                    }
+                }
+                // Horde breath effects retain their separate mode admission.
+                LaunchEvent::Breath { .. } | LaunchEvent::BreathShell { .. } => {
+                    return Err(refused());
+                }
                 LaunchEvent::Contact(value) => {
                     kind(state, value.kind)?;
                     identity(value.flight)?;
@@ -337,7 +353,7 @@ fn allied(state: &Match, slot: usize, row: &Value, key: &str) -> bool {
         .is_some_and(|owner| state.world.game.allied(owner, slot))
 }
 
-fn flight_visible(state: &Match, visible: &[u8], at: Point) -> bool {
+pub(super) fn flight_visible(state: &Match, visible: &[u8], at: Point) -> bool {
     state.world.game.reveal
         || state
             .world
@@ -346,7 +362,7 @@ fn flight_visible(state: &Match, visible: &[u8], at: Point) -> bool {
             .is_some_and(|cell| visible[cell] != 0)
 }
 
-fn until(state: &Match, visible: &[u8], shot: &Value) -> Result<f64, SnapshotError> {
+pub(super) fn until(state: &Match, visible: &[u8], shot: &Value) -> Result<f64, SnapshotError> {
     let value = |key: &str| shot[key].as_f64().ok_or(SnapshotError::Rules);
     let time = value("time")?;
     let expires = value("expires")?;
