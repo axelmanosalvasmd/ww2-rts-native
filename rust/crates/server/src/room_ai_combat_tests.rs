@@ -89,8 +89,27 @@ fn hosted_horde_ai_grenade_survives_every_seat_delivery_until_natural_detonation
     .unwrap();
     let horde = state.horde.as_ref().unwrap().slot;
     let rifle = publish(&mut state, horde, "rifle", Point { x: 80.0, z: 80.0 });
-    let mg = publish(&mut state, 0, "mg", Point { x: 90.0, z: 80.0 });
-    // Declared initial scene: visible opposing infantry in grenade range. The
+    let mg = publish(&mut state, 0, "mg", Point { x: 100.0, z: 80.0 });
+    // Direct firing calls must still reject malformed or non-aimed controls.
+    state.commands.units.get_mut(&rifle).unwrap().nade = Some(Point {
+        x: f64::NAN,
+        z: 80.0,
+    });
+    assert_eq!(
+        state.apply_unit_firing(rifle, false, 0.05).unwrap_err(),
+        "invalid aimed ability point"
+    );
+    state.commands.units.get_mut(&rifle).unwrap().nade = None;
+    state.commands.units.get_mut(&mg).unwrap().nade = Some(Point { x: 80.0, z: 80.0 });
+    assert_eq!(
+        state.apply_unit_firing(mg, false, 0.05).unwrap_err(),
+        "pending firing aim requires an aimed ability"
+    );
+    state.commands.units.get_mut(&mg).unwrap().nade = None;
+    // AI targets up to range + 4. At 20 m the rifle must approach its 18 m throw.
+    // A short initial reload expires while that aimed approach is still active.
+    state.firing.get_mut(rifle).unwrap().cooldown = 0.15;
+    // Declared initial scene: visible opposing infantry beyond grenade range. The
     // ordinary tick phase, policy and command queue own everything after setup.
     state.world.game.reveal = true;
     state.end_horde_break().unwrap();
@@ -107,6 +126,8 @@ fn hosted_horde_ai_grenade_survives_every_seat_delivery_until_natural_detonation
     let mut delivered_throws = 0;
     let mut delivered_flights = 0;
     let mut after_expiration = 0;
+    let mut approach_ticks = 0;
+    let mut approach_shots = 0;
     for _ in 0..180 {
         let report = runtime.advance_tick(&[false, false]).unwrap();
         for result in &report.commands {
@@ -114,6 +135,22 @@ fn hosted_horde_ai_grenade_survives_every_seat_delivery_until_natural_detonation
                 assert_eq!(result.denial, None, "scripted grenade command was refused");
                 accepted.insert(result.key);
             }
+        }
+        if runtime
+            .state()
+            .commands
+            .units
+            .get(&rifle)
+            .is_some_and(|control| control.nade.is_some())
+        {
+            approach_ticks += 1;
+            let actor = &runtime.state().world.game.units[&rifle];
+            assert!(
+                actor.x > 80.0,
+                "pending ability did not approach its target"
+            );
+            assert!(!actor.path.is_empty());
+            assert!(runtime.state().abilities.get(rifle).unwrap().aimed_walked);
         }
         for grenade in &runtime.state().firing.grenades {
             if runtime
@@ -178,6 +215,17 @@ fn hosted_horde_ai_grenade_survives_every_seat_delivery_until_natural_detonation
                 if shot["k"] == "throw" && shot["f"].as_u64() == Some(u64::from(rifle)) {
                     delivered_throws += 1;
                 }
+                if runtime
+                    .state()
+                    .commands
+                    .units
+                    .get(&rifle)
+                    .is_some_and(|control| control.nade.is_some())
+                    && shot["f"].as_u64() == Some(u64::from(rifle))
+                    && shot["k"] == "flight"
+                {
+                    approach_shots += 1;
+                }
                 if shot["k"] == "contact"
                     && shot["terminal"] == true
                     && shot["explosive"] == true
@@ -196,6 +244,14 @@ fn hosted_horde_ai_grenade_survives_every_seat_delivery_until_natural_detonation
     assert!(
         !aimed.is_empty(),
         "actual hosted policy never aimed its grenade"
+    );
+    assert!(
+        approach_ticks > 1,
+        "policy never retained an out-of-range aim"
+    );
+    assert!(
+        approach_shots > 0,
+        "ordinary firing stopped during the aimed approach"
     );
     assert_eq!(
         aimed, accepted,

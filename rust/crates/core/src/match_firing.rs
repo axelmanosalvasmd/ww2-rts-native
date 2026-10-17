@@ -1597,8 +1597,25 @@ impl Match {
             .units
             .get(&id)
             .ok_or("missing canonical unit control")?;
-        if kind.air || kind.rail || control.operative || control.nade.is_some() {
+        if kind.air
+            || kind.rail
+            || control.operative
+            || (control.nade.is_some() && self.options.mode == crate::economy::Mode::World)
+        {
             return Err("air, rail, operative and aimed ability firing are unsupported".into());
+        }
+        if control.nade.is_some() {
+            // The ordinary ability phase may retain an out-of-range aim while
+            // approaching it. Source sim.js:5416-5430,5553-5580 still fires normally.
+            self.validate_abilities()?;
+            if !matches!(
+                self.ability_kind(id)?,
+                crate::match_abilities::AbilityKind::Grenade
+                    | crate::match_abilities::AbilityKind::Satchel
+                    | crate::match_abilities::AbilityKind::Barrage
+            ) {
+                return Err("pending firing aim requires an aimed ability".into());
+            }
         }
         if u.riding {
             return Ok(());
