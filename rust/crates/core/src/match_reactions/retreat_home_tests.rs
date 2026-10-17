@@ -358,6 +358,13 @@ fn classic_retreat_projection_tick(m: &mut Match, delivery: &mut DeliveryState, 
     });
     let count = m.start.players.len();
     let retreating = m.world.game.units[&id].retreating;
+    let hidden: Vec<_> = (0..count)
+        .map(|slot| {
+            !m.world.game.reveal
+                && !m.world.game.allied(0, slot)
+                && !m.world.game.players[slot].sees(id)
+        })
+        .collect();
     let frame = delivery
         .capture(m, &vec![false; count], &vec![false; count])
         .unwrap();
@@ -365,8 +372,19 @@ fn classic_retreat_projection_tick(m: &mut Match, delivery: &mut DeliveryState, 
         frame.slots().collect::<Vec<_>>(),
         (0..count).collect::<Vec<_>>()
     );
-    for slot in 0..count {
+    for (slot, hidden) in hidden.iter().copied().enumerate() {
         let projection = frame.recipient(slot).unwrap();
+        if hidden {
+            assert!(
+                projection.fields["units"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .all(|row| row[0].as_u64() != Some(u64::from(id)))
+            );
+        }
+        assert!(projection.fields["cells"].is_array());
+        assert_eq!(projection.fields["works"], serde_json::json!([]));
         assert_eq!(projection.fields["mode"], expected, "Classic seat {slot}");
         assert_eq!(
             projection.missing,

@@ -38,6 +38,7 @@ pub mod commander_ai;
 pub mod commander_assault;
 pub mod commander_classic_rules;
 mod commander_construction;
+mod commander_engineering;
 mod commander_fortification;
 mod commander_forward_hq;
 pub mod commander_mind;

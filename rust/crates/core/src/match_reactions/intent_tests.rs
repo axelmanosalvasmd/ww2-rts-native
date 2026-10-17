@@ -729,3 +729,25 @@ fn cmb80_world_allied_production_recovers_commanders_without_funding_local_defen
     );
     assert_eq!(m.start.economy.players.len(), 2);
 }
+
+#[test]
+fn if25_reaction_home_equal_distance_keeps_first_finished_own_hq() {
+    let mut m = scene();
+    let actor = add(&mut m, "rifle", 0, Point { x: 60.0, z: 30.0 });
+    for u in m.world.game.units.values_mut() {
+        if m.rules.kinds[u.kind].name == "hq" {
+            u.built = Some(0.5);
+        }
+    }
+    let left = Point { x: 40.0, z: 30.0 };
+    let right = Point { x: 80.0, z: 30.0 };
+    let first = add(&mut m, "hq", 0, left);
+    let second = add(&mut m, "hq", 0, right);
+    add(&mut m, "hq", 1, Point { x: 60.0, z: 30.0 });
+    assert_eq!(m.reaction_home(actor).unwrap(), left);
+    m.world.game.units.get_mut(&first).unwrap().x = right.x;
+    m.world.game.units.get_mut(&second).unwrap().x = left.x;
+    assert_eq!(m.reaction_home(actor).unwrap(), right);
+    m.world.game.units.get_mut(&first).unwrap().built = Some(0.5);
+    assert_eq!(m.reaction_home(actor).unwrap(), left);
+}

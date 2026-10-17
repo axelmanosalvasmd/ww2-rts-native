@@ -461,6 +461,12 @@ fn intent_ai66_classic_site_draws_once_per_eligible_engineer_even_without_build(
         assert_eq!(random, before, "{reason}");
         if reason == "repair" {
             assert!(result.commands.iter().all(|c| c["t"] == "assist"));
+        } else if reason == "depot" {
+            assert_eq!(
+                result.commands,
+                [json!({"t":"build", "ids":[workers[0].id],
+                "kind":"depot", "x":100.0, "z":100.0})]
+            );
         } else {
             assert!(result.commands.is_empty(), "{reason}");
         }

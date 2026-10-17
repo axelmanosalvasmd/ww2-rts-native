@@ -192,7 +192,7 @@ mod tests {
     };
     use std::collections::BTreeMap;
 
-    fn unit(id: u32, kind: &str, x: f64, z: f64) -> UnitObservation {
+    pub(super) fn unit(id: u32, kind: &str, x: f64, z: f64) -> UnitObservation {
         let catalog = Catalog::compiled().unwrap();
         let d = catalog.unit(kind).unwrap();
         UnitObservation {
@@ -217,7 +217,7 @@ mod tests {
             nade: false,
         }
     }
-    fn fixture() -> Input {
+    pub(super) fn fixture() -> Input {
         let units = vec![
             unit(1, "rifle", 110.0, 80.0),
             unit(2, "rifle", 110.0, 80.0),
@@ -301,7 +301,11 @@ mod tests {
             sections: BTreeMap::new(),
         }
     }
-    fn propose(input: Input, budget: f64, sees: impl Fn(Point) -> bool) -> Option<Forward> {
+    pub(super) fn propose(
+        input: Input,
+        budget: f64,
+        sees: impl Fn(Point) -> bool,
+    ) -> Option<Forward> {
         let ground = terrain(&input);
         let observation = Observation::new(input).unwrap();
         let available: Vec<_> = observation
@@ -312,7 +316,7 @@ mod tests {
             .collect();
         plan(&observation, &available, budget, &ground, sees).unwrap()
     }
-    fn location(forward: &Forward) -> Point {
+    pub(super) fn location(forward: &Forward) -> Point {
         Point {
             x: forward.command["x"].as_f64().unwrap(),
             z: forward.command["z"].as_f64().unwrap(),
@@ -542,5 +546,35 @@ mod tests {
                 .unit,
             3
         );
+    }
+}
+
+#[cfg(test)]
+mod if25_hq_tests {
+    use super::tests::{fixture, location, propose, unit};
+    use super::*;
+
+    #[test]
+    fn if25_forward_hq_nearest_hq_ties_keep_observed_hq_order() {
+        for (first, second, expected) in [(20.0, 200.0, 89.0), (200.0, 20.0, 129.0)] {
+            let mut input = fixture();
+            input.units[3].at.x = first;
+            input.units.push(unit(11, "hq", second, 80.0));
+            input.runtime.as_mut().unwrap().units.insert(
+                11,
+                crate::commander_tactics::UnitFacts {
+                    built: 1.0,
+                    ..Default::default()
+                },
+            );
+            let forward = propose(input, 200.0, |_| true).unwrap();
+            assert_eq!(
+                location(&forward),
+                Point {
+                    x: expected,
+                    z: 79.0
+                }
+            );
+        }
     }
 }

@@ -1606,6 +1606,13 @@ impl crate::match_runtime::Match {
             self.aviation.remove(u.id);
             self.logistics.remove(u.id);
             self.production.remove_building(u.id);
+            if let Some(state) = &mut self.elimination {
+                for node in &mut state.nodes {
+                    if node.depot == Some(u.id) {
+                        node.depot = None;
+                    }
+                }
+            }
             self.building_rallies.remove(&u.id);
             // Source buildingCells retains historical ruin ownership/position after retirement.
 

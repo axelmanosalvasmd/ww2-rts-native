@@ -266,8 +266,11 @@ impl Observation {
                 })
                 || context
                     .known_buildings
-                    .windows(2)
-                    .any(|w| w[0].id >= w[1].id)
+                    .iter()
+                    .map(|row| row.id)
+                    .collect::<std::collections::BTreeSet<_>>()
+                    .len()
+                    != context.known_buildings.len()
                 || context
                     .owned_nodes
                     .iter()
@@ -277,6 +280,26 @@ impl Observation {
                     .iter()
                     .chain(&context.known_depots)
                     .any(|p| !finite_point(*p))
+                || context
+                    .mines
+                    .iter()
+                    .chain(&context.found_mines)
+                    .any(|p| !within(*p))
+                || context
+                    .bridge_cells
+                    .iter()
+                    .chain(&context.spoiled_cells)
+                    .any(|&cell| cell >= cells)
+                || context
+                    .claimed_nodes
+                    .iter()
+                    .any(|&i| i >= context.nodes.len())
+                || (!context.node_worth.is_empty()
+                    && context.node_worth.len() != context.nodes.len())
+                || context
+                    .node_worth
+                    .iter()
+                    .any(|worth| !worth.is_finite() || *worth < 0.0)
                 || context.height.as_ref().is_some_and(|h| h.len() != cells)
                 || context
                     .smokes
@@ -303,7 +326,15 @@ impl Observation {
             if u.owner >= input.players.len() {
                 return Err(PolicyError::UnitOwner);
             }
-            if !within(u.at) || u.path.len() > 4096 || u.path.iter().any(|p| !within(*p)) {
+            let d = catalog.unit(&u.kind).map_err(|_| PolicyError::UnitKind)?;
+            let runtime_air = input.runtime.is_some()
+                && d.get("air").and_then(Value::boolean) == Some(true)
+                && u.at.x.is_finite()
+                && u.at.z.is_finite();
+            if !(within(u.at) || runtime_air)
+                || u.path.len() > 4096
+                || u.path.iter().any(|p| !within(*p))
+            {
                 return Err(PolicyError::Position);
             }
             if !u.hp.is_finite() || !u.supp.is_finite() || u.hp < 0.0 || u.supp < 0.0 {
@@ -314,7 +345,6 @@ impl Observation {
             {
                 return Err(PolicyError::PrivateUnitFields);
             }
-            let d = catalog.unit(&u.kind).map_err(|_| PolicyError::UnitKind)?;
             let is = |name| d.get(name).and_then(Value::boolean).unwrap_or(false);
             let health = d
                 .get("models")

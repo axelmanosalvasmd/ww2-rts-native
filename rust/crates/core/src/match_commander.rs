@@ -1096,8 +1096,12 @@ impl Match {
                     || p.needs.is_some_and(|i| i >= self.start.points.len())
             })
             || g.units.values().any(|u| {
+                let aircraft_pose = u.air.is_some()
+                    && self.rules.kinds.get(u.kind).is_some_and(|kind| kind.air)
+                    && u.x.is_finite()
+                    && u.z.is_finite();
                 u.id == 0
-                    || !within(u.at())
+                    || !(within(u.at()) || aircraft_pose)
                     || u.hp < 0.0
                     || !u.supp.is_finite()
                     || u.supp < 0.0
@@ -1329,7 +1333,22 @@ impl Match {
                 caution: crate::weather::WeatherRules::compiled()
                     .map_err(|e| e.to_string())?
                     .ai_caution(Some(&self.start.weather)),
-                known_buildings: vec![],
+                known_buildings: {
+                    let known: Vec<_> = self
+                        .classic_known_buildings
+                        .iter()
+                        .find(|(team, _)| *team == g.players[owner].team)
+                        .into_iter()
+                        .flat_map(|(_, rows)| rows)
+                        .map(|row| crate::commander_tactics::KnownBuilding {
+                            id: row.id,
+                            kind: self.rules.kinds[row.kind].name.clone(),
+                            owner: row.owner,
+                            at: point(row.at),
+                        })
+                        .collect();
+                    known
+                },
                 hidden_spawns: BTreeSet::new(),
                 site_nodes: vec![],
                 horde: false,
@@ -1363,7 +1382,26 @@ impl Match {
                         .collect()
                 },
                 sight: g.sight_mul(&self.rules),
-                nodes: Vec::new(),
+                nodes: self.elimination.as_ref().map_or_else(Vec::new, |state| {
+                    state.nodes.iter().map(|node| node.at).collect()
+                }),
+                node_worth: self.elimination.as_ref().map_or_else(Vec::new, |state| {
+                    state
+                        .nodes
+                        .iter()
+                        .map(|node| if node.fuel { 2.5 } else { node.rate })
+                        .collect()
+                }),
+                bridge_cells: initial
+                    .chars
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(cell, &ch)| (ch == b'=').then_some(cell))
+                    .collect(),
+                spoiled_cells: Vec::new(),
+                mines: Vec::new(),
+                found_mines: Vec::new(),
+                claimed_nodes: BTreeSet::new(),
                 known_depots: Vec::new(),
                 owned_nodes: BTreeSet::new(),
                 build_reserve: 0.0,
@@ -1412,6 +1450,10 @@ impl Match {
                                         .is_some_and(|c| c.trucks.contains_key(&u.id)),
                                 amove: None,
                                 airborne: u.air.is_some() && vision::airborne(u),
+                                air_ready: u.owner == owner
+                                    && u.air
+                                        .as_ref()
+                                        .is_some_and(|air| *air == crate::game::PlaneState::Base),
                                 wall_work: u.owner == owner
                                     && self.field_works.jobs().get(&u.id).is_some_and(|job| {
                                         job.kind == crate::field_works::FortKind::Wall

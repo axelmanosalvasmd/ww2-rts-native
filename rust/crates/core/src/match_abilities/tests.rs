@@ -983,3 +983,39 @@ fn rejected_ap_launch_preserves_loaded_round_ammunition_and_random_stream() {
     assert!(m.firing.flights.is_empty());
     assert!(m.firing.take_events().is_empty());
 }
+
+#[test]
+fn if25_grenade_autocast_equal_distance_keeps_candidate_order() {
+    for swap in [false, true] {
+        let a = if swap { (30.0, 42.0) } else { (42.0, 30.0) };
+        let b = if swap { (42.0, 30.0) } else { (30.0, 42.0) };
+        let (mut m, _) = make(&json!({
+            "map": { "name":"Grenade tie", "w":40,"h":40,
+                "rows":vec![".".repeat(40);40],
+                "spawns":[{"x":2,"y":2},{"x":37,"y":37}],
+                "points":[{"x":20,"y":20}] },
+            "units":[
+                {"id":1,"type":"rifle","owner":0,"x":30,"z":30},
+                {"id":2,"type":"rifle","owner":1,"x":a.0,"z":a.1},
+                {"id":3,"type":"rifle","owner":1,"x":b.0,"z":b.1}
+            ]
+        }));
+        assert_eq!(m.ability_kind(1).unwrap(), super::AbilityKind::Grenade);
+        for id in [2, 3] {
+            let u = &m.world.game.units[&id];
+            let cell = m.world.game.cell_of(u.x, u.z).unwrap();
+            m.world.game.flags[cell] |= crate::game::COVER;
+        }
+        assert_eq!(
+            m.autocast_target(1).unwrap(),
+            Some(AutocastTarget::At(Point { x: a.0, z: a.1 }))
+        );
+        let u = &m.world.game.units[&2];
+        let cell = m.world.game.cell_of(u.x, u.z).unwrap();
+        m.world.game.flags[cell] &= !crate::game::COVER;
+        assert_eq!(
+            m.autocast_target(1).unwrap(),
+            Some(AutocastTarget::At(Point { x: b.0, z: b.1 }))
+        );
+    }
+}

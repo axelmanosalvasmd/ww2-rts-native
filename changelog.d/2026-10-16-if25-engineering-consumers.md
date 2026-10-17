@@ -1,0 +1,2 @@
+- Add recipient-fed AI bridge rebuilding, spoiled-ground filling and detected-mine clearing, with stable bridge and crew ordering and remembered pending work.
+- Add direct tests for engineering sort ties, repeated crew sorting, visibility approaches, crew retirement and saved pending work. Exercise received fill and mine jobs through ordinary ticks, completion and snapshots for every seat. Canonical denial receipts remain outside the detached planner.

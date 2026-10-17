@@ -576,3 +576,68 @@ fn intent_ai08_delivered_sightings_expire_and_stillness_restarts() {
     }
     assert!(saw_expiry && saw_lost_stillness && saw_motion_reset && saw_return);
 }
+
+#[test]
+fn if25_delivered_engineering_facts_use_remembered_terrain_and_public_map_only() {
+    let f = fixture();
+    let mut state = instance(&f["cases"][0]);
+    let mut input = state
+        .human_commander_observation(&mut HumanObservationMemory::new(0))
+        .unwrap()
+        .packet
+        .input()
+        .clone();
+    let initial = state.world.initial();
+    let mut authored = initial.chars.clone();
+    let original = vec![1; input.chars.len()];
+    let width = input.width;
+    let road = 5 * width + 5;
+    let crater = road + 1;
+    let sunk = road + 2;
+    let dry = road + 3;
+    authored[road] = b'D';
+    input.chars[road] = b'R';
+    input.chars[crater] = b'F';
+    input.chars[sunk] = b'.';
+    input.chars[dry] = b'+';
+    let context = input.runtime.as_mut().unwrap();
+    context.height = Some(original.clone());
+    context.height.as_mut().unwrap()[sunk] = 0;
+    context.mines = vec![Point { x: 11.0, z: 11.0 }];
+    context.nodes = vec![Point { x: 11.0, z: 11.0 }, Point { x: 31.0, z: 11.0 }];
+    context.node_worth = vec![2.0, 2.5];
+    context.known_buildings = vec![crate::commander_tactics::KnownBuilding {
+        id: 999,
+        kind: "depot".into(),
+        owner: 1,
+        at: Point { x: 31.0, z: 11.0 },
+    }];
+    complete_ordinary_facts(&mut input, &authored, Some(&original));
+    let context = input.runtime.as_ref().unwrap();
+    assert!(context.spoiled_cells.contains(&road));
+    assert!(context.spoiled_cells.contains(&crater));
+    assert!(context.spoiled_cells.contains(&sunk));
+    assert!(!context.spoiled_cells.contains(&dry));
+    assert!(context.claimed_nodes.contains(&1));
+    assert_eq!(context.known_depots, vec![Point { x: 31.0, z: 11.0 }]);
+    Observation::new(input.clone()).unwrap();
+    for malformed in [f64::NAN, f64::INFINITY] {
+        let mut invalid = input.clone();
+        invalid.runtime.as_mut().unwrap().node_worth[0] = malformed;
+        assert_eq!(
+            Observation::new(invalid),
+            Err(crate::commander_ai::PolicyError::RuntimeContext)
+        );
+    }
+    let mut invalid = input;
+    invalid
+        .runtime
+        .as_mut()
+        .unwrap()
+        .bridge_cells
+        .push(width * invalid.height);
+    assert_eq!(
+        Observation::new(invalid),
+        Err(crate::commander_ai::PolicyError::RuntimeContext)
+    );
+}
