@@ -3,3 +3,4 @@
 - Strengthen the existing operative row and grenade-flight tests to compare cached and uncached projections, and require both paths to reject missing operative runtime state. Retain every existing assertion; no expected behavior or test is removed.
 - Add the explicit uncached-projection import required by the nested operative test module.
 - Preserve main's exact offending-unit identity when an operative control has no soldier metadata. The incoming cached/uncached refusal test and all its expected values stay unchanged. Other operative lifecycle errors retain the global unit-zero diagnostic.
+- Rewrite `mode01_non_world_mode_rows_match_the_prototype_public_fields` after its Classic refusal fails against main's deliberate #396 component admission. Require every Classic recipient to carry the exact existing mode row and an empty ghost list. Preserve Conquest admission, every other mode refusal, all six exact public mode rows and the Default row assertion.
