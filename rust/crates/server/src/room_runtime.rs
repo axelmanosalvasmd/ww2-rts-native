@@ -489,3 +489,7 @@ mod tests;
 #[cfg(test)]
 #[path = "construction_production_tests.rs"]
 mod construction_production_tests;
+
+#[cfg(test)]
+#[path = "spectator_mission_tests.rs"]
+mod spectator_mission_tests;
