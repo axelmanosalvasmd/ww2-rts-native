@@ -270,21 +270,23 @@ mod tests {
     }
 
     #[test]
-    fn seed7_full_run_preserves_the_first_unsupported_recipient_failure() {
+    fn seed7_full_run_delivers_beyond_the_old_recipient_boundary_and_replays() {
         let map = AuthoritativeMap::from_json(include_bytes!(
             "../tests/fixtures/ai-runner-default-map.json"
         ))
         .unwrap();
-        let error = match play_match(&map, options(7), &["easy"; 3], 3600) {
-            Ok(_) => panic!("recipient support changed; review the retained AI-65 blocker"),
-            Err(error) => error,
-        };
-        // PR #351's motorpool reserve suppresses opening buys and advances movement.
-        // Retain the exact first refusal after the resulting earlier rifle flights.
-        assert_eq!(
-            error,
-            "AI runner tick 298 recipient pass: Unsupported { unit: 0, capability: ShotsAndFlights }"
-        );
+        let first = play_match(&map, options(7), &["easy"; 3], 3600).unwrap();
+        let second = play_match(&map, options(7), &["easy"; 3], 3600).unwrap();
+        assert!(first.state.world.game.tick > 298);
+        assert!(first.snapshot_passes > 149);
+        assert_eq!(first.recipients.len(), 3);
+        assert!(!first.inputs.is_empty());
+        assert_eq!(first.inputs, second.inputs);
+        assert_eq!(first.recipients, second.recipients);
+        assert_eq!(first.snapshot_passes, second.snapshot_passes);
+        assert_eq!(first.state.start.random.snapshot(), second.state.start.random.snapshot());
+        assert!(first.state.tick_state.fault().is_none());
+        assert!(second.state.tick_state.fault().is_none());
     }
 
     #[test]

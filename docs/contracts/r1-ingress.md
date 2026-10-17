@@ -4,15 +4,16 @@ Compatibility source: `reference/ww2-rts` at
 `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`. This extends command admission in
 the existing private, two-human Conquest R1 room. It keeps the existing wire
 shapes, canonical meters and recipient view. World, Tutorial, Horde, spectators,
-operatives and convoy command admission remain outside this batch.
+operatives and World recovery remain outside this batch. Ordinary convoy
+commands and FireAt are admitted by the ROOM-COMMANDS successor.
 
 The owner decisions are `julio-owner-decisions-recorded-20261016`
 (issue #5, comment 6217590741), groups F and M. Julio's later owner instruction
 `julio-owner-merge-now-20261016` (6217727398) confirms the grant and says Axel's
 later written line does not gate implementation. Axel also confirmed these
 decisions on #5 in `axel-owner-confirm-a-to-p-20261016`. This follows the handoff
-and preserves `axel-interface-response-004`. Hermes' exact-head content review
-remains required; no ack is claimed here.
+and preserves `axel-interface-response-004`. No Hermes ack is claimed here. The stream stops after PR creation; the
+orchestrator owns later CI, review and merge decisions.
 
 ## Host controls and resync
 
@@ -47,6 +48,9 @@ in place (`shared/command-feedback.js:2-8`).
 | Command | Existing JSON fields | Prototype dispatch |
 | --- | --- | --- |
 | `move`, `amove` | `orders:[[id,x,z]]`, optional `ids`, `queue`, `together`, `face` | `shared/sim.js:3421-3461` |
+| `fireat` | `ids`, `x`, `z`, optional `queue` | `shared/sim.js:3462-3477` |
+| `supply` | `ids` or `orders:[[id,x,z]]`, `target` | `shared/supply-convoys.js:573-610` |
+| `logisticsResume` | `ids` or `orders:[[id,x,z]]` | `shared/supply-convoys.js:573-590` |
 | `garrison` | `ids`, `x`, `z`, optional `queue` | `shared/sim.js:3478` |
 | `stop` | `ids` | `shared/sim.js:3511-3514` |
 | `retreat`, `stance`, `cover` | `ids`; `key`,`on` for stance; optional `queue` for cover | `shared/sim.js:3571,3574,3580` |
@@ -85,34 +89,51 @@ Normal Conquest results retain `winner`, `teams`, `names`, `reason`, `at`,
 `server.js:348,753` and `shared/story.js:66-70`. This proves the Conquest and
 host-end portions of MODE-90; other modes and Horde results remain unqualified.
 
+## Room command composition
+
+FireAt preserves the prototype JSON object and denial reasons (`blocked`,
+`notVisible`, `needs`, `queueFull`). Salvo weapons can target unseen open ground;
+direct terrain guns require a cell with hit points. Ground queues retain their
+existing owner-only order kind 5 (`shared/sim.js:3381-3390,5894,6027` and native
+`recipient_snapshot/owners.rs`). Bombers take an immediate area mission even
+when `queue:true`; a mixed bomber and ground selection applies both behaviors
+(`shared/sim.js:3462-3477`). Finite coordinates use the prototype's clamp to map
+extent (`shared/sim.js:3258`); an exact upper extent lies outside the cell grid.
+
+Convoy selection runs before ordinary troop selection. It preserves raw order
+and duplicate IDs without the troop cap, uses `ids` when it is an array, and
+otherwise derives IDs from `orders`. Only live trucks owned by the seated issuer
+participate. Supply targets must be live friendly reserve-bearing units or
+completed supply caches. Missing selection/targets return `needs`; a valid
+selection whose route/job cannot be assigned returns `blocked`. Without enabled
+convoys these commands return the prototype fallback `blocked`. Supply and resume
+use the existing recipient-fed routes, stores, reserves and convoy state. No new
+snapshot fields are introduced. `logisticsResume` clears manual/hold state and
+restarts the retained job (`shared/supply-convoys.js:573-610`).
+
+Every admitted command uses the canonical next-tick queue. Guests may issue
+FireAt and convoy commands for their own units. Host-only restrictions remain
+on the prototype host controls; ordinary commands have no extra host gate
+(`server.js:696-715`). Paused gameplay is ignored; spoofed authority fields never
+select a slot, tick or sequence. Denial delivery and throttle are unchanged.
+Pending convoy inputs survive the existing versioned JSON checkpoint.
+
 ## Held dependencies
 
-Sandbox, attack, fireat, ability, autocast, build, board, unload,
-escort, rail and grouped orders retain their existing public refusal. Tutorial
-auto-start, convoy commands and recovery are also deferred. The prototype's
-research message is named `tech`; no `research` message is added.
+Sandbox, attack, ability, autocast, build, board, unload, escort, rail and grouped
+orders retain their public guards on this composition. World recovery stays
+deferred under decision C. NET-43 therefore remains partial, despite the three
+additional command families. The attempted #393 merge was aborted because its
+sandbox-only flight adapter competes with #369's general ordinary adapter; see
+the complete merge record in `docs/testing/room-commands-20261016.md`.
 
-Broader ingress cannot safely open against this base: persistent firing flights,
-salvos and grenades are refused by
-`rust/crates/core/src/recipient_snapshot/composition.rs` in `admit_actors`, while
-`match_firing.rs` can create those actors after an accepted attack or aimed
-ability. Plane-backed support similarly exceeds the adapter's
-`SUPPORTED_SUPPORT_KINDS`. The flights/events stream must carry those complete
-lifecycles before these command families or unrestricted sandbox births open.
-Queued ability and fireat rows also need their prototype owner-only order
-encodings before their waiting state can be delivered.
+The #296 base previously limited support to Artillery, Smoke and Cover and
+refused aircraft purchases because snapshots could not carry flights. Integrated
+#369 now supplies all eight support kinds and the flight/event projection.
+This does not open the other guarded public command families. NET-58 is qualified
+only for the ordinary #369 event and flight families; operative small-arms and
+Horde breath events still retain their separate admission guards.
 
 ## PR 296 integration
 
-The RESOLVE-296 successor carries the ground-order and host-control behavior
-from #366 at `21a1e3fa`, including its core cover and garrison repairs and
-socket lifecycle test. Attack retains #366's `blocked` refusal on this base;
-#296's older `unseen` expectation is superseded until #369 delivers flights.
-
-Two #296 families remain additional to #366: `buy` (`unit`, optional `from`,
-`shared/sim.js:3781-3802`) and `support` (`kind`, `x`, `z`,
-`shared/sim.js:3680-3688`). They use the existing parser and core denial feedback.
-Aircraft purchases remain refused by the core's ordinary-snapshot guard.
-Only Artillery, Smoke and Cover support pass the snapshot lifecycle allowlist;
-all other kinds refuse with `unsupported` before reserving input. This keeps
-main's actor, lifecycle and World guards intact. NET-43 remains partial.
+Buy and support keep their existing prototype messages and canonical next-tick queue. The integrated flight/event adapter carries all eight support kinds and aircraft purchases. NET-43 remains partial because the other public command guards remain.

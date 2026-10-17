@@ -1,0 +1,1 @@
+- Keep seated command and convoy witnesses exhaustive after main added spectator output. Each helper now fails explicitly if watcher output reaches a seated commander; all existing snapshot and command assertions remain.

@@ -67,6 +67,13 @@ pub enum Stance {
 /// Internal recorded input. This is not a WebSocket or C interface.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Command {
+    Supply {
+        ids: Vec<i64>,
+        target: i64,
+    },
+    LogisticsResume {
+        ids: Vec<i64>,
+    },
     Compound {
         commands: Vec<serde_json::Value>,
         queue: bool,
@@ -456,6 +463,28 @@ impl Command {
                 rows.iter().map(|v| safe_id(v).unwrap_or(-1)).collect()
             });
         match object.get("t").and_then(|v| v.as_str()) {
+            Some("supply" | "logisticsResume") => {
+                // Convoy selection has no ordinary troop cap and falls back to orders.
+                let ids = object
+                    .get("ids")
+                    .and_then(|v| v.as_array())
+                    .map(|rows| rows.iter().map(|v| safe_id(v).unwrap_or(-1)).collect())
+                    .unwrap_or_else(|| {
+                        object
+                            .get("orders")
+                            .and_then(|v| v.as_array())
+                            .map(|rows| rows.iter().map(|v| safe_id(&v[0]).unwrap_or(-1)).collect())
+                            .unwrap_or_default()
+                    });
+                if object["t"] == "supply" {
+                    Ok(Self::Supply {
+                        ids,
+                        target: object.get("target").and_then(safe_id).unwrap_or(-1),
+                    })
+                } else {
+                    Ok(Self::LogisticsResume { ids })
+                }
+            }
             Some("orders") => Ok(Self::Compound {
                 commands: object
                     .get("commands")
@@ -928,6 +957,13 @@ impl crate::match_runtime::Match {
         if let Command::Compound { commands, queue } = command {
             return self.execute_compound_orders(owner, commands, *queue, winner_decided);
         }
+        match command {
+            Command::Supply { ids, target } => {
+                return self.execute_convoy_input(owner, ids, Some(*target));
+            }
+            Command::LogisticsResume { ids } => return self.execute_convoy_input(owner, ids, None),
+            _ => {}
+        }
         self.validate_building_activity_rows()?;
         if let Command::Rally { ids, id, at } = command {
             return self.set_rally(owner, ids, *id, *at);
@@ -1117,7 +1153,9 @@ impl crate::match_runtime::Match {
             | Command::Attack { ids, .. }
             | Command::Escort { ids, .. }
             | Command::Retreat { ids } => ids.clone(),
-            Command::Compound { .. }
+            Command::Supply { .. }
+            | Command::LogisticsResume { .. }
+            | Command::Compound { .. }
             | Command::Build { .. }
             | Command::Assist { .. }
             | Command::Cancel { .. }
@@ -1586,7 +1624,9 @@ impl crate::match_runtime::Match {
                     self.commands.units.get_mut(&id).unwrap().auto_cast = *on;
                 }
             }
-            Command::Compound { .. }
+            Command::Supply { .. }
+            | Command::LogisticsResume { .. }
+            | Command::Compound { .. }
             | Command::Attack { .. }
             | Command::Build { .. }
             | Command::Assist { .. }

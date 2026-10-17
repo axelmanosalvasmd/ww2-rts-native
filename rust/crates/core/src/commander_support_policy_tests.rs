@@ -109,7 +109,7 @@ fn chosen(obs: &Observation, facts: &SupportFacts, level: Level, called: f64) ->
 }
 
 #[test]
-fn cover_ignores_the_situation_leash_and_unsupported_dive_stays_closed() {
+fn cover_ignores_the_situation_leash_while_dive_requires_a_watched_fight() {
     let obs = observation(vec![
         unit(1, "engineer", 0, 100.0),
         unit(2, "tank", 1, 120.0),
@@ -129,7 +129,10 @@ fn cover_ignores_the_situation_leash_and_unsupported_dive_stays_closed() {
     f.strikes[0].owner = 0;
     assert_eq!(chosen(&obs, &f, Level::Normal, 0.0), None);
     f.situation = None;
-    assert_eq!(chosen(&obs, &f, Level::Normal, 0.0), None);
+    assert_eq!(
+        chosen(&obs, &f, Level::Normal, 0.0).as_deref(),
+        Some("dive")
+    );
     f.watched.clear();
     assert_eq!(chosen(&obs, &f, Level::Normal, 0.0), None);
     f.strikes[0].owner = 1;
@@ -138,7 +141,7 @@ fn cover_ignores_the_situation_leash_and_unsupported_dive_stays_closed() {
 }
 
 #[test]
-fn unsupported_support_stays_closed_with_ready_targets_wallets_and_cooldowns() {
+fn admitted_air_support_requires_its_target_readiness_and_cooldown() {
     let mut units: Vec<_> = (1..=6).map(|id| unit(id, "rifle", 0, 100.0)).collect();
     units.extend([
         unit(7, "tank", 1, 130.0),
@@ -147,30 +150,54 @@ fn unsupported_support_stays_closed_with_ready_targets_wallets_and_cooldowns() {
     ]);
     let targets = observation(units);
     let no_enemies = observation(vec![unit(1, "rifle", 0, 100.0)]);
-    for obs in [&targets, &no_enemies] {
-        for kind in ["dive", "para", "bombing", "strafe", "recon"] {
+    for kind in ["dive", "para", "bombing", "strafe", "recon"] {
+        let obs = if kind == "recon" { &no_enemies } else { &targets };
+        let mut f = facts(obs, &[kind]);
+        assert_eq!(
+            chosen(obs, &f, Level::Normal, 0.0).as_deref(),
+            Some(kind),
+            "ready {kind} must be selected for its qualifying target"
+        );
+        if kind != "recon" {
             assert_eq!(
-                chosen(obs, &facts(obs, &[kind]), Level::Normal, 0.0),
-                None,
-                "unsupported {kind} must not reach admission"
+                chosen(&no_enemies, &facts(&no_enemies, &[kind]), Level::Normal, 0.0),
+                None
             );
         }
+        f.cooldowns.insert(kind.into(), 0.01);
+        assert_eq!(chosen(obs, &f, Level::Normal, 0.0), None);
+        f.cooldowns.insert(kind.into(), 0.0);
+        match kind {
+            "para" => f.ready_points.clear(),
+            "recon" => {
+                assert_eq!(
+                    chosen(&targets, &facts(&targets, &[kind]), Level::Normal, 0.0),
+                    None
+                );
+                continue;
+            }
+            _ => f.watched.clear(),
+        }
+        assert_eq!(chosen(obs, &f, Level::Normal, 0.0), None);
     }
 }
 
 #[test]
-fn artillery_remains_available_when_higher_priority_air_support_is_ready() {
+fn air_support_priority_falls_back_through_bombing_artillery_and_strafe() {
     let obs = observation(vec![
         unit(1, "rifle", 0, 100.0),
         unit(2, "tank", 1, 130.0),
         unit(3, "rifle", 1, 132.0),
+        unit(4, "rifle", 1, 134.0),
     ]);
     let mut f = facts(&obs, &["dive", "bombing", "artillery", "strafe"]);
-    assert_eq!(
-        chosen(&obs, &f, Level::Normal, 0.0).as_deref(),
-        Some("artillery")
-    );
-    f.cooldowns.insert("artillery".into(), 1.0);
+    for kind in ["dive", "bombing", "artillery", "strafe"] {
+        assert_eq!(
+            chosen(&obs, &f, Level::Normal, 0.0).as_deref(),
+            Some(kind)
+        );
+        f.cooldowns.insert(kind.into(), 1.0);
+    }
     assert_eq!(chosen(&obs, &f, Level::Normal, 0.0), None);
 }
 
