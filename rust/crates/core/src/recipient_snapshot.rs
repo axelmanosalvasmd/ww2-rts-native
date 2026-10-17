@@ -1,4 +1,4 @@
-//! Internal ordinary recipient projections and an explicitly admitted quiet seat envelope.
+//! Internal ordinary-mode projections and an explicitly admitted seat envelope.
 //! Unsupported canonical actors remain explicit. No transport contract is added.
 //! Projectile and aviation fields follow the pinned prototype recipient rules.
 use crate::{
@@ -206,16 +206,34 @@ impl<'a> SnapshotCache<'a> {
 
 fn validate_snapshot(state: &Match) -> Result<(), SnapshotError> {
     if !matches!(
-        (state.options.mode, state.world.game.mode),
-        (Mode::Default | Mode::Conquest, None)
-            | (Mode::Classic, Some(crate::game::ModeKind::Classic))
-    ) || state.world.geography().is_some()
-        || state.assault.is_some()
+        state.options.mode,
+        Mode::Default
+            | Mode::Conquest
+            | Mode::Assault
+            | Mode::Annihilation
+            | Mode::Classic
+            | Mode::Tutorial
+    ) || !crate::match_actor::ordinary_ground_mode(&state.world.game, state.options.mode)
+        || state.world.geography().is_some()
+        || (state.options.mode != Mode::Assault && state.assault.is_some())
         || state.world_runtime.is_some()
+        || state.world.game.mode.is_some() && state.validate_ordinary_finish_state().is_err()
+        || matches!(state.options.mode, Mode::Annihilation | Mode::Classic)
+            && state.validate_elimination_state().is_err()
     {
         return Err(SnapshotError::UnsupportedMode);
     }
-    if state.options.mode == Mode::Classic {
+    if state.options.mode == Mode::Tutorial {
+        state
+            .validate_tutorial_state()
+            .map_err(|_| SnapshotError::Rules)?;
+    }
+    if state.options.mode == Mode::Assault {
+        state
+            .validate_match_finish_state()
+            .map_err(|_| SnapshotError::Rules)?;
+    }
+    if matches!(state.options.mode, Mode::Annihilation | Mode::Classic) {
         state
             .validate_elimination_state()
             .map_err(|_| SnapshotError::Rules)?;
@@ -251,6 +269,20 @@ fn validate_snapshot(state: &Match) -> Result<(), SnapshotError> {
             return Err(SnapshotError::Rules);
         }
         finite(&[u.x, u.z])?;
+    }
+    if !state.firing.flights.is_empty()
+        || !state.firing.salvos.is_empty()
+        || !state.firing.grenades.is_empty()
+    {
+        state
+            .validate_firing_tick_state()
+            .map_err(|_| SnapshotError::Rules)?;
+        state
+            .validate_firing_salvos()
+            .map_err(|_| SnapshotError::Rules)?;
+        state
+            .validate_firing_grenade_step(0.)
+            .map_err(|_| SnapshotError::Rules)?;
     }
     engineering::validate(state)?;
     aircraft::validate(state)?;
@@ -596,7 +628,8 @@ fn economy_fields(state: &Match, slot: usize) -> Result<Map<String, Value>, Snap
     let p = &state.start.economy.players[slot];
     finite(&[p.mp, p.mun, p.fuel, p.inc, p.vp])?;
     let mut fields = Map::new();
-    // Conquest leaves mun/fuel undefined; Classic initializes both wallets.
+    // Classic initializes these wallets. Other admitted ordinary modes leave
+    // them undefined in the prototype, even though native accounting has zeros.
     for (key, value) in [("mp", p.mp.floor()), ("inc", r(p.inc))] {
         fields.insert(key.into(), json!(value));
     }
@@ -1253,6 +1286,10 @@ mod map_house_selected_tests;
 #[cfg(test)]
 #[path = "recipient_snapshot/net52_tests.rs"]
 mod net52_tests;
+
+#[cfg(test)]
+#[path = "economy_currency_tests.rs"]
+mod economy_currency_tests;
 
 #[cfg(test)]
 #[path = "recipient_snapshot/combat_filter_tests.rs"]

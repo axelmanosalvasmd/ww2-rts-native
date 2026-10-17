@@ -1,7 +1,7 @@
 //! Operative turn provider for the single Match tick runner.
 use crate::{
     companions::{CombatRequest, RESPAWN_TICKS, SAFE_INTEGER},
-    economy::Mode,
+    match_actor::ordinary_ground_mode,
     match_runtime::Match,
 };
 
@@ -20,8 +20,7 @@ impl Match {
             }
             return Ok(());
         }
-        if !matches!(self.options.mode, Mode::Default | Mode::Conquest)
-            || self.world.game.mode.is_some()
+        if !ordinary_ground_mode(&self.world.game, self.options.mode)
             || !(0..SAFE_INTEGER - RESPAWN_TICKS).contains(&self.world.game.tick)
         {
             return Err("invalid operative tick mode or clock".into());
@@ -95,7 +94,7 @@ impl Match {
 mod tests {
     use super::*;
     use crate::{
-        economy::Faction,
+        economy::{Faction, Mode},
         economy_state::ArmySize,
         map::AuthoritativeMap,
         match_runtime::{MatchOptions, PlayerConfig},

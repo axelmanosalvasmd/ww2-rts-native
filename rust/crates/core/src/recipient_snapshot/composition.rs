@@ -51,7 +51,7 @@ impl DeliveryState {
             return Err(SnapshotError::InvalidRecipient);
         }
         for (slot, (owner, list)) in prepared.results().iter().enumerate() {
-            if slot != *owner || list.nodes.is_some() {
+            if slot != *owner || (list.nodes.is_some() && state.options.mode != Mode::Classic) {
                 return Err(SnapshotError::UnsupportedMode);
             }
             lists.push(list.clone());

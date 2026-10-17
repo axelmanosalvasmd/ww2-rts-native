@@ -1,0 +1,2 @@
+- Connect canonical Horde research admission and early progression to the existing shared defender labs, with separate research progress for each player and no shared access for the Horde attacker. Full Horde ticking and hosting remain guarded.
+- Add native Match research checks across Default, Conquest, Assault, Annihilation and Classic, including retained HQ and Armory pauses, research prices, tier requirements, same-HQ recruitment and tiers surviving HQ destruction. Check Tutorial's disabled research and Horde's component research path separately.

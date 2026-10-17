@@ -329,7 +329,7 @@ fn mode01_non_world_mode_rows_match_the_prototype_public_fields() {
     };
 
     // Prototype sim.js:5895-5898; Tutorial's initial goal is tutorial.js:11.
-    // Classic has partial delivery; the other non-Conquest modes remain refused.
+    // Ordinary modes carry their exact public row; closed modes remain refused.
     for mode in MODES {
         let mut m = create(mode, ArmySize::Standard).unwrap();
         let expected = match mode {
@@ -385,6 +385,15 @@ fn mode01_non_world_mode_rows_match_the_prototype_public_fields() {
                         SnapshotCapability::ShotsAndFlights,
                         SnapshotCapability::TeamEffects,
                     ]
+                );
+            }
+        } else if matches!(mode, Mode::Assault | Mode::Annihilation | Mode::Tutorial) {
+            let cache = SnapshotCache::new(&m).unwrap();
+            for slot in 0..m.start.players.len() {
+                assert_eq!(
+                    cache.recipient(slot).unwrap().fields["mode"],
+                    expected,
+                    "{mode:?} seat {slot}"
                 );
             }
         } else {

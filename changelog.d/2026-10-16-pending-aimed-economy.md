@@ -1,0 +1,1 @@
+- Keep ordinary ticks running while a squad approaches an aimed ability target. The firing phase no longer rejects the pending order, and Classic charges Munitions at the actual throw after rechecking the wallet.

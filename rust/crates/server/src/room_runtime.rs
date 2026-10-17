@@ -1,5 +1,5 @@
-//! One trusted host runtime over the canonical Match and recipient producers.
-//! Public network start and complete gameplay admission are separate work.
+//! One room runtime over the canonical Match and recipient producers.
+//! Gameplay admission remains with the server command handlers.
 use crate::{
     snapshot_lists::{ListScope, ListVersions, RoomListCache},
     tick_timing::{TickMeter, TickSample},

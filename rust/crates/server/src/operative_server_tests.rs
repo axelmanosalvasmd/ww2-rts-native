@@ -2,8 +2,15 @@ use super::*;
 
 #[path = "operative_lifecycle_tests.rs"]
 mod lifecycle;
+
 #[path = "operative_room_tests.rs"]
 mod room_protocol;
+
+#[path = "operative_supplemental_tests.rs"]
+mod supplemental;
+
+#[path = "operative_timing_tests.rs"]
+mod timing;
 
 fn client(id: u64) -> (Connection, mpsc::Receiver<Output>) {
     let (tx, rx) = mpsc::channel(256);
@@ -284,10 +291,28 @@ fn operative_permission_whitelist_is_silent_except_name_and_latency_ping() {
             messages(&mut receiver);
             drain_commanders(&mut hub, &mut receivers, 0);
         }
-        let roster = lobby(&hub, op.id)["players"].clone();
+        let before = lobby(&hub, op.id);
+        let denies = hub.rooms["ABC"].operatives[0].person.denies.clone();
+        let gameplay = || {
+            let state = state(&hub);
+            format!(
+                "{:?}{:?}{:?}{:?}",
+                state.world.game.units, state.commands.units, state.start.economy, state.companions
+            )
+        };
+        let gameplay_before = playing.then(gameplay);
         for message in [
             json!({"t":"move","orders":[[1,100,100]]}),
             json!({"t":"stop","ids":[1]}),
+            json!({"t":"attack","ids":[1],"target":2}),
+            json!({"t":"retreat","ids":[1]}),
+            json!({"t":"stance","ids":[1],"holdFire":true}),
+            json!({"t":"buy","kind":"rifle"}),
+            json!({"t":"support","kind":"bombing","x":100,"z":100}),
+            json!({"t":"ability","ids":[1],"key":"nade","x":100,"z":100}),
+            json!({"t":"move","orders":"malformed"}),
+            json!({"t":"save"}),
+            json!({"t":"loadSave","id":"private"}),
             json!({"t":"start"}),
             json!({"t":"restart"}),
             json!({"t":"end"}),
@@ -312,7 +337,8 @@ fn operative_permission_whitelist_is_silent_except_name_and_latency_ping() {
                     .all(Vec::is_empty)
             );
         }
-        assert_eq!(lobby(&hub, op.id)["players"], roster);
+        assert_eq!(lobby(&hub, op.id), before);
+        assert_eq!(hub.rooms["ABC"].operatives[0].person.denies, denies);
         assert_eq!(hub.rooms["ABC"].operatives.len(), 1);
         assert!(hub.rooms["ABC"].spectators.is_empty());
         assert_eq!(hub.native_status("ABC").is_ok(), playing);
@@ -320,6 +346,17 @@ fn operative_permission_whitelist_is_silent_except_name_and_latency_ping() {
             assert!(!hub.native_status("ABC").unwrap().paused);
             assert_eq!(hub.native_status("ABC").unwrap().tick, 0);
             assert_eq!(state(&hub).commands.pending_commands(), 0);
+            let state = state(&hub);
+            assert_eq!(
+                gameplay_before.unwrap(),
+                format!(
+                    "{:?}{:?}{:?}{:?}",
+                    state.world.game.units,
+                    state.commands.units,
+                    state.start.economy,
+                    state.companions
+                )
+            );
         }
         command(&mut hub, &op, json!({"t":"ping","c":123,"rtt":18.6}), 21);
         let pong = messages(&mut receiver);

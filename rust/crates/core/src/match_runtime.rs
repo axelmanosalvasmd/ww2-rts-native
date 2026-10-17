@@ -118,7 +118,7 @@ impl StartPlan {
         )
     }
 
-    pub(crate) fn prepare_elimination(
+    pub fn prepare_elimination(
         map: &crate::map::AuthoritativeMap,
         options: &MatchOptions,
         rules: &Rules,
@@ -133,7 +133,7 @@ impl StartPlan {
         )
     }
 
-    pub(crate) fn prepare_tutorial(
+    pub fn prepare_tutorial(
         map: &crate::map::AuthoritativeMap,
         options: &MatchOptions,
         rules: &Rules,
@@ -164,7 +164,7 @@ impl StartPlan {
         )
     }
 
-    pub(crate) fn prepare_assault(
+    pub fn prepare_assault(
         map: &crate::map::AuthoritativeMap,
         options: &MatchOptions,
         rules: &Rules,

@@ -1,0 +1,1 @@
+- Update the ordinary server restart regression to require fresh recorded seeds, including rollover from `u64::MAX` to zero, while preserving settings and matching both recipients' startup data. This replaces its old identical-seed expectation.

@@ -208,7 +208,10 @@ fn intent_ai50_gate_order_completes_in_each_real_ordinary_mode_with_supported_se
             json!({"t":"dig","kind":"gate","ids":[builder],
             "x":80.0,"z":45.0,"dir":0.0}),
         );
-        let mut delivery = if matches!(mode, Mode::Default | Mode::Conquest | Mode::Classic) {
+        let mut delivery = if matches!(
+            mode,
+            Mode::Default | Mode::Conquest | Mode::Classic | Mode::Assault | Mode::Annihilation
+        ) {
             Some(DeliveryState::new(&state).unwrap())
         } else {
             assert!(matches!(

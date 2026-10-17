@@ -125,5 +125,133 @@ the stream does not exist. String names are cleaned and broadcast to all room
 members; non-string names are ignored (`server.js:194,634-635`).
 
 FPS-39 remains unclaimed because its load branch belongs to the save/load
-stream. The remaining assigned NET and IF rows stay for a later batch; this
-batch does not infer their complete coverage from these narrower FPS checks.
+stream. OPERATIVES-2 does not infer complete NET or IF coverage from these
+narrower FPS checks.
+
+## OPERATIVES-3 verification scope
+
+This follow-up adds server tests over PR #371. The required merge of main
+also composes operative admission with save/load, retains operative membership
+when a loaded room replaces its seats, and adds serialization derives required
+by the combined core. It proves only the operative portions of these five rows:
+
+- NET-25: `net25_operative_live_takeover_preserves_person_and_ignores_old_socket_close`
+  covers a live replacement in lobby and play, token precedence over the requested
+  role and commander, the exact replaced message before close, retained person
+  state, input reset, and silence from late messages and a late close on the old
+  socket (`server.js:596-603,614,620,719`).
+- NET-28: `net28_net29_operative_broadcasts_keep_change_order_and_shifted_commander_identity`
+  checks actual broadcasts to both seats and both operatives in change order.
+  Each roster entry has exactly `name`, `commander`, `online`. Operative lobby
+  fields remain `role:"operative"`, `you:-1`, `spectator:false`, `amHost:false`.
+  Removing a non-final seat moves the commander's index; removing that commander
+  leaves -1 even after another human takes the index (`server.js:338-350`).
+- NET-29: the same broadcast test checks cleaning, the 16-character limit,
+  empty-name fallback and silence for non-string names. The existing
+  `operative_resync_and_rename_cover_lobby_play_pause_and_ending` also covers
+  rename broadcasts during play, pause, ending and the returned lobby
+  (`server.js:194,635,638`).
+- NET-46: `operative_permission_whitelist_is_silent_except_name_and_latency_ping`
+  checks valid and malformed army commands, host actions, save/load requests,
+  seat changes and map pings. They produce no messages, queued commands, roster
+  changes or deny-budget consumption (`server.js:630-636`).
+- NET-82: `net82_operative_offline_identity_survives_lobby_cleanup_deadline`
+  checks offline roster publication, retained membership past ten seconds and
+  token reuse. The live disconnect test also checks cleared input, an idle soldier,
+  no pause and no offline respawn. The live takeover test checks that closing a
+  replaced socket leaves its successor online (`server.js:568-575,718-725`).
+
+`operative_room_members_deliver_every_tick_through_natural_finish_lobby_and_restart`
+adds a room-level lifecycle check. An ordinary Conquest objective earns VP to
+finish the match. Both seat snapshots and both independent operative views are
+collected on every advancing tick; full seat reads preserve the production
+terrain outboxes. Actual scheduled socket delivery retains equal cadence for
+every online recipient. One operative disconnects and reconnects during play.
+Both retain their roles through the full ending hold and lobby return, then
+receive fresh starts on a new match and restart (`server.js:307-319,392-413,560-565,718-725,738-760`).
+
+Spectator portions of NET-25/28/29/46/82 remain with SPECTATORS. Save listings and
+loaded starts remain with save/load. FPS-39, NET-26, NET-40, NET-53 and IF-28 are
+not claimed by this batch. No World, wire, ABI, header or privacy rule is added.
+In particular, the confirmed exact attacker position through age 10 and the
+single cached-path nonowner mask at `shared/sim.js:5903` remain unchanged.
+
+The save/load merge retains operatives transactionally: after all restoration
+checks pass, each record moves to the loaded room and its commander follows
+the same present person into the restored seat array. If that person receives
+no saved seat, the commander becomes -1. Failed loads leave the existing room
+membership untouched. Operative messages reach their whitelist before the
+save/load host handlers, so save, load and loaded-resume requests stay silent
+(`server.js:436-450,630-636`).
+`fps39_loaded_operatives_keep_identity_through_finish_start_and_restart`
+(originally `operative_load_merge_retains_membership_and_remaps_the_commander_person`)
+checks a real save and load with reordered present seats, fresh starts and
+sequence resets for two operatives, host-only loaded resume and subsequent
+fault-free ticks. This is an integration check, not a claim for the full save/load
+or FPS-39 row.
+
+The default-map load check also exercises authored houses. Their existing
+`WorldStructure.kind` value is `"house"` (`structure::StructureKind::House`),
+so the compiled checkpoint-string decoder accepts that tag alongside
+`"building"` and `"bridge"`. This restores existing map content without adding
+fields or accepting arbitrary static strings.
+
+## OPERATIVES-4 verification scope
+
+This follow-up changes tests and documentation over PR #374. It adds no message,
+field, recipient rule or gameplay state. Owner decisions G and P are acknowledged:
+`operative.from` retains the rounded attacker position through age 10, including
+hidden attackers, and nonowners use the single cached-path mask.
+
+- FPS-39: `fps39_loaded_operatives_keep_identity_through_finish_start_and_restart`
+  extends the saved-room test through natural VP victory, all 120 ending callbacks,
+  lobby return, a new start and restart. Both operatives retain their roles and
+  commander associations. Every new match sends a fresh exact operative start,
+  with a new match ID and reset sequence. Every advancing tick collects both
+  commander snapshots and both operative views without fault. Failed-load
+  atomicity, reordered present seats and loaded host pause remain asserted
+  (`server.js:392-413,436-450,560-565,738-760`). The existing
+  `operative_room_members_deliver_every_tick_through_natural_finish_lobby_and_restart`
+  independently covers the original unsaved match lifecycle.
+- NET-53: `net53_cached_rows_keep_only_public_bits_for_allies_and_enemies`
+  checks each bit from 0 through 24 and their union at the cached-row projection
+  boundary. Owner cooldown and flags survive; allies and enemies get cooldown 0
+  and only bits 0-10, 15, 18 and 20-22. Every other row column remains exact.
+  `net53_real_rows_hide_targets_per_recipient_and_restore_them_when_seen`
+  uses a real operative row with nonzero cooldown, all private stances and
+  autocast. It independently changes owner and allied visibility, checks the
+  enemy's own visible target, hides the target again and checks target 0
+  (`shared/sim.js:5899-5905,5941-5945`). The exhaustive bit case tests the
+  projection component, not gameplay production of simultaneous flags.
+- IF-28: `if28_native_input_log_replays_tick_order_away_pause_and_operative_throttle`
+  replays an explicit native server input log with messages, polls, disconnect,
+  resume and reconnect. Commands retain server-assigned next-tick keys and
+  arrival sequence despite forged stamps. Polls at 49/50 ms and 199/200 ms check
+  20 Hz boundaries; paused polls keep the tick and pending commands unchanged.
+  The first resumed tick derives `away` from socket presence, and the next tick
+  after reconnect clears it. Operative messages exercise 19/20/39/40 ms and
+  paused-input rejection. Replaying the same log compares every full tagged
+  checkpoint, including queues and RNG state; reversing two stance arrivals
+  must change the final state (`shared/sim.js:27`;
+  `server.js:630-633,712-714,784,791-800`). This is an intent test over the native
+  command queue, not a captured live JavaScript session or a new recorder.
+- NET-28: `net28_net93_lobby_save_list_is_synchronous_private_and_newest_first`
+  checks ordered save-list broadcasts, private-field omission and newest-first
+  sorting. The all-role lobby case includes seats, a spectator and an operative.
+  `net29_all_room_roles_clean_names_and_broadcast_in_arrival_order` checks exact
+  roster revision order and recipient counts on ordinary lobby changes
+  (`server.js:338-351`; `server/saves.js:39-49`).
+- NET-29: the all-role rename test checks cleaned fallback, truncation and valid
+  names from both seats, a spectator and an operative, with silence for non-string
+  names. Every recipient receives exactly the same ordered twelve revisions
+  (`server.js:194,635,638`). Existing operative rename coverage still exercises
+  play, pause, ending and the returned lobby.
+
+The supplemental spectator takeover and close tests cover lobby identity,
+retained deny/RTT state, stale-socket isolation, immediate spectator removal,
+fresh same-token admission and the exact ten-second seat cleanup boundary.
+They do not complete NET-25 or NET-82. NET-25 still needs seated AI and
+commander-helper resets on rejoin. NET-26 and NET-46 require running spectator
+admission, which remains guarded on this stack; NET-82 also needs its running
+spectator no-pause path. Those paths belong to PR #372. Partial evidence is not
+claimed as a complete row. World admission and the ABI/header remain unchanged.

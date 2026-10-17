@@ -183,12 +183,12 @@ impl crate::match_runtime::Match {
             .filter_map(|(&c, &bits)| ((bits >> team & 1) != 0 && g.chars[c] == b'N').then_some(c))
             .collect();
         match (self.options.mode, g.mode) {
-            (crate::economy::Mode::Default | crate::economy::Mode::Conquest, None) => {
+            _ if crate::match_actor::ordinary_ground_mode(g, self.options.mode) => {
                 let wrecks = self.observed_wreck_rows(owner)?;
                 Ok(RecipientLists {
                     wrecks,
                     found_mines,
-                    nodes: None,
+                    nodes: self.ordinary_snapshot_nodes()?,
                 })
             }
             (crate::economy::Mode::World, Some(ModeKind::World)) => {
@@ -302,14 +302,9 @@ pub struct OrdinaryRawLists {
 impl crate::match_runtime::Match {
     pub fn ordinary_snapshot_raw_lists(&self) -> Result<OrdinaryRawLists, String> {
         let game = &self.world.game;
-        let classic = match (self.options.mode, game.mode) {
-            (crate::economy::Mode::Default | crate::economy::Mode::Conquest, None) => false,
-            (crate::economy::Mode::Classic, Some(ModeKind::Classic)) => {
-                self.validate_elimination_state()?;
-                true
-            }
-            _ => return Err("global lists require matching Conquest or Classic".into()),
-        };
+        if !crate::match_actor::ordinary_ground_mode(game, self.options.mode) {
+            return Err("global ordinary lists require represented ordinary mode".into());
+        }
         let mut ids = std::collections::BTreeSet::new();
         let mut rows = Vec::with_capacity(game.wrecks.len());
         for hull in &game.wrecks {
@@ -327,21 +322,40 @@ impl crate::match_runtime::Match {
             .ok_or("missing global wreck display facts")?;
             rows.push(row.to_json());
         }
-        let nodes = if classic {
-            let classic = self.elimination.as_ref().expect("validated Classic state");
-            let nodes = &classic.nodes;
-            Some(Value::Array(
-                nodes
-                    .iter()
-                    .map(|n| json!([rounded(n.at.x), rounded(n.at.z), n.rate, u8::from(n.fuel)]))
-                    .collect(),
-            ))
-        } else {
-            None
-        };
         Ok(OrdinaryRawLists {
             wrecks: Value::Array(rows),
-            nodes,
+            nodes: self
+                .ordinary_snapshot_nodes()?
+                .map(|nodes| json!(nodes.iter().map(|row| row.map(number)).collect::<Vec<_>>())),
         })
+    }
+
+    pub(crate) fn ordinary_snapshot_nodes(&self) -> Result<Option<Vec<[f64; 4]>>, String> {
+        if self.options.mode != crate::economy::Mode::Classic {
+            return Ok(None);
+        }
+        self.validate_elimination_state()?;
+        let nodes = &self
+            .elimination
+            .as_ref()
+            .ok_or("missing Classic nodes")?
+            .nodes;
+        nodes
+            .iter()
+            .map(|n| {
+                let row = [
+                    rounded(n.at.x),
+                    rounded(n.at.z),
+                    n.rate,
+                    f64::from(u8::from(n.fuel)),
+                ];
+                if row.iter().all(|v| v.is_finite()) {
+                    Ok(row)
+                } else {
+                    Err("invalid Classic node display facts".into())
+                }
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map(Some)
     }
 }

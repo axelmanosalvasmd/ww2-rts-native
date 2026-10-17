@@ -1,0 +1,1 @@
+- Check fortified rear Flak placement at its 2x2 footprint center, including the map-cell flooring used by the prototype.

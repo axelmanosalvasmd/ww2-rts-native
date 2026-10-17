@@ -3,9 +3,9 @@ use crate::{
     combat::CombatEvent,
     companion_ray,
     companions::{Input, OPERATIVE, SAFE_INTEGER, WEAPONS},
-    economy::Mode,
     environment,
     game::{CELL, Point},
+    match_actor::ordinary_ground_mode,
     match_combat::{DamageWorld, ExplosionSource},
     match_firing::{AbilityBlast, LaunchEvent, SmallArmsEvent, SmallArmsHit},
     match_runtime::Match,
@@ -27,8 +27,7 @@ impl Match {
         let op = &self.companions.records[&companion];
         let body = &self.companions.soldiers[&unit];
         let u = &self.world.game.units[&unit];
-        if !matches!(self.options.mode, Mode::Default | Mode::Conquest)
-            || self.world.game.mode.is_some()
+        if !ordinary_ground_mode(&self.world.game, self.options.mode)
             || winner_decided
             || self.finish.is_some()
             || !op.online
@@ -97,8 +96,7 @@ impl Match {
         let body = &self.companions.soldiers[&unit];
         let op = &self.companions.records[&companion];
         let u = &self.world.game.units[&unit];
-        if !matches!(self.options.mode, Mode::Default | Mode::Conquest)
-            || self.world.game.mode.is_some()
+        if !ordinary_ground_mode(&self.world.game, self.options.mode)
             || winner_decided
             || self.finish.is_some()
             || !op.online

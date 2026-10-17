@@ -8,8 +8,11 @@ These files reserve contract topics; no protocol or ABI is approved by their cre
 | --- | --- | --- | --- |
 | protocol.md | Julio | Axel | v0 draft; technical answers recorded (#5); operative hit-position, spectator reference behavior and cached-mask decisions confirmed by both owners on 2026-10-16, recorded in protocol.md |
 | [r1-ingress.md](r1-ingress.md) | Julio | Axel | Prototype-identical ordinary R1 ingress candidate under the recorded groups F/M grant; exact-head runtime ack pending |
+| [start-cancellation.md](start-cancellation.md) | Julio | Axel | Identical prototype v0 pending-start cancellation and scenario-denial shapes; exact-head acknowledgement pending |
+| [ordinary-results.md](ordinary-results.md) | Julio | Axel | Identical prototype v0 ordinary mode/result fields; owner groups N/P recorded in #5 comment 6217590741; exact-head acknowledgement pending |
 | terrain.md | Julio | Axel | v0 draft; technical answers recorded (#5) |
 | [save-format.md](save-format.md) | Julio | Axel | Private JSON format v1; owner group I recorded in #5 comment 6217590741; implementation exact-head acknowledgement pending |
+| [sandbox.md](sandbox.md) | Julio | Axel | Prototype sandbox start, spawn and recipient rules under owner decisions M/N/P; implementation exact-head acknowledgement pending |
 | [startup-tables/README.md](startup-tables/README.md) | Julio | Axel | Content/schema v1 candidate explicitly accepted by both owners in PR #195 review; internal producer/platform proof integrated through PR #198 at `514e15f4`; transport #199 remains unagreed and unimplemented; Unreal adoption pending |
 | [combat-recipient-filtering.md](combat-recipient-filtering.md) | Julio | Axel | Existing prototype unit and ghost shapes; cached-path privacy mask under confirmed owner decision P; no World or Classic room admission |
 | rust-unreal-abi.md | Julio | Axel | Six ABI 2 recipient-view calls authoritative through PR #16, merged at `d88ef6d`; broader v0 contract remains draft; approved header unchanged; consumer source published in draft PR #201 at `9551d3976e9145c81030cf5a81ec7f0764b04d12`, explicitly not for merge, neither merged nor adopted on main; fresh live and complete decoder adoption pending |
@@ -23,3 +26,5 @@ review remains required.
 Contract PRs must state native/reference baseline, version/status, fields and semantics, ownership/privacy, error/recovery behavior, compatibility transition, fixtures and verification evidence. Both owners must explicitly approve breaking changes before adoption. Mark a contract agreed only after approvals and merge. Do not put credentials or private sessions in fixtures.
 
 The ABI 2 approval is limited to the six recipient-view calls in `rust-unreal-abi.md` and their staged Unreal consumer update. It does not approve additional interfaces. The operative privacy decisions recorded in `protocol.md` have separate owner confirmation. The broader drafts remain drafts; merged jointly approved scope is authoritative.
+
+[Owner economy projection](economy-projection.md) records the prototype-identical internal currency fields and mode scope. It does not approve additional public mode admission or C interfaces.

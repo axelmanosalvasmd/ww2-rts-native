@@ -62,9 +62,31 @@ impl NativeStartup {
         settings: StartupSettings<'_>,
         authored: &ww2_core::map::AuthoritativeMap,
     ) -> Result<Self, String> {
-        if settings.mode != "conquest"
-            || !matches!(state.options.mode, Mode::Default | Mode::Conquest)
-            || state.world.game.mode.is_some()
+        let mode_matches = matches!(
+            (settings.mode, state.options.mode, state.world.game.mode),
+            ("conquest", Mode::Default | Mode::Conquest, None)
+                | (
+                    "tutorial",
+                    Mode::Tutorial,
+                    Some(ww2_core::game::ModeKind::Tutorial)
+                )
+                | (
+                    "assault",
+                    Mode::Assault,
+                    Some(ww2_core::game::ModeKind::Assault)
+                )
+                | (
+                    "annihilation",
+                    Mode::Annihilation,
+                    Some(ww2_core::game::ModeKind::Annihilation)
+                )
+                | (
+                    "classic",
+                    Mode::Classic,
+                    Some(ww2_core::game::ModeKind::Classic)
+                )
+        );
+        if !mode_matches
             || state.options.map_key.as_deref() != Some(settings.map)
             || state.options.weather != WeatherChoice::from_reference(Some(settings.weather))
             || state.options.sandbox != settings.sandbox
@@ -112,7 +134,22 @@ impl NativeStartup {
         {
             return Err("native startup mission definition disagrees with the bound map".into());
         }
-        let plan = StartPlan::prepare(authored, &state.options, &state.rules)?;
+        let plan = match state.options.mode {
+            Mode::Tutorial => StartPlan::prepare_tutorial(authored, &state.options, &state.rules)?,
+            Mode::Assault => StartPlan::prepare_assault(
+                authored,
+                &state.options,
+                &state.rules,
+                state
+                    .assault
+                    .ok_or("missing Assault startup state")?
+                    .defender_team,
+            )?,
+            Mode::Classic | Mode::Annihilation => {
+                StartPlan::prepare_elimination(authored, &state.options, &state.rules)?
+            }
+            _ => StartPlan::prepare(authored, &state.options, &state.rules)?,
+        };
         if plan.players.len() != state.start.players.len()
             || plan
                 .players
@@ -138,6 +175,13 @@ impl NativeStartup {
         names: &[String],
         match_id: u64,
     ) -> Result<StartEnvelope, String> {
+        let mut names = names.to_vec();
+        if state
+            .tutorial_state()
+            .is_some_and(|t| t.enemy() == names.len())
+        {
+            names.push(state.options.players[names.len()].name.clone());
+        }
         if names.len() != self.count
             || state.start.players.len() != self.count
             || state.world.game.players.len() != self.count

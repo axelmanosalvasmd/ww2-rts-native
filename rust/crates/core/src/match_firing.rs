@@ -1114,8 +1114,8 @@ impl Match {
     }
     fn fire_breath(&mut self, id: UnitId, target: UnitId) -> Result<(), String> {
         self.supported_firing_mode()?;
-        if self.options.mode != crate::economy::Mode::Horde {
-            return Err("beam firing requires canonical Horde mode".into());
+        if self.options.mode != crate::economy::Mode::Horde && !self.options.sandbox {
+            return Err("beam firing requires Horde or sandbox".into());
         }
         self.validate_firing_units()?;
         let g = &self.world.game;
@@ -1471,13 +1471,7 @@ impl Match {
         Ok(())
     }
 
-    /// Physical salvos retain the reference timer's two draws for each emitted segment.
-    /// The projectile already carries the physical payload, so this timer emits no second blast.
-    pub fn advance_firing_salvos(&mut self, dt: f64) -> Result<(), String> {
-        self.supported_firing_mode()?;
-        if !dt.is_finite() || dt < 0.0 {
-            return Err("invalid salvo timer step".into());
-        }
+    pub(crate) fn validate_firing_salvos(&self) -> Result<(), String> {
         if self.firing.salvos.iter().any(|s| {
             s.left == 0
                 || s.left > 4096
@@ -1490,6 +1484,17 @@ impl Match {
         }) {
             return Err("invalid physical salvo".into());
         }
+        Ok(())
+    }
+
+    /// Physical salvos retain the reference timer's two draws for each emitted segment.
+    /// The projectile already carries the physical payload, so this timer emits no second blast.
+    pub fn advance_firing_salvos(&mut self, dt: f64) -> Result<(), String> {
+        self.supported_firing_mode()?;
+        if !dt.is_finite() || dt < 0.0 {
+            return Err("invalid salvo timer step".into());
+        }
+        self.validate_firing_salvos()?;
         for s in &mut self.firing.salvos {
             s.next -= dt;
             if s.next > 0.0 {
@@ -1594,8 +1599,8 @@ impl Match {
             .units
             .get(&id)
             .ok_or("missing canonical unit control")?;
-        if kind.air || kind.rail || control.operative || control.nade.is_some() {
-            return Err("air, rail, operative and aimed ability firing are unsupported".into());
+        if kind.air || kind.rail || control.operative {
+            return Err("air, rail and operative firing are unsupported".into());
         }
         if u.riding {
             return Ok(());
@@ -1610,8 +1615,11 @@ impl Match {
             self.commands.units.get_mut(&id).unwrap().aim = u.rot;
             return Ok(());
         };
-        if flag(w, "beam") && self.options.mode != crate::economy::Mode::Horde {
-            return Err("beam firing requires canonical Horde mode".into());
+        if flag(w, "beam")
+            && self.options.mode != crate::economy::Mode::Horde
+            && !self.options.sandbox
+        {
+            return Err("beam firing requires Horde or sandbox".into());
         }
         let hull = !kind.infantry && !kind.structure && !moving;
         if hull {
