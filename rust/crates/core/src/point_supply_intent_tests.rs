@@ -378,21 +378,28 @@ fn intent_log46_cut_depot_is_excluded_from_territory_sources() {
 
 #[test]
 fn intent_log45_nonconquest_point_supply_seam_refuses_before_mutation() {
-    use crate::game::ModeKind;
+    use crate::{game::ModeKind, recipient_snapshot::SnapshotError};
     // The flood component has no mode input. Mode exclusions belong to adapters.
     // Inject only mode identity into the ordinary scene to test its admission
     // boundary. These inputs are not admitted Horde, Tutorial or World rooms.
-    for (mode, kind, refusal) in [
-        (Mode::Horde, ModeKind::Horde, "missing Horde state"),
+    for (mode, kind, refusal, snapshot_error) in [
+        (
+            Mode::Horde,
+            ModeKind::Horde,
+            "missing Horde state",
+            SnapshotError::Rules,
+        ),
         (
             Mode::Tutorial,
             ModeKind::Tutorial,
             "missing Tutorial runtime",
+            SnapshotError::Rules,
         ),
         (
             Mode::World,
             ModeKind::World,
             "ordinary finish state requires Conquest or Tutorial",
+            SnapshotError::UnsupportedMode,
         ),
     ] {
         for supply in [true, false] {
@@ -407,10 +414,7 @@ fn intent_log45_nonconquest_point_supply_seam_refuses_before_mutation() {
             assert_eq!(m.start.points, points);
             assert_eq!(m.start.economy, wallets);
             assert!(m.tick_state.fault().is_none());
-            assert_eq!(
-                SnapshotCache::new(&m).err(),
-                Some(crate::recipient_snapshot::SnapshotError::UnsupportedMode)
-            );
+            assert_eq!(SnapshotCache::new(&m).err(), Some(snapshot_error.clone()));
         }
     }
 }
