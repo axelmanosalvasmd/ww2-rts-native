@@ -259,25 +259,23 @@ fn validate_snapshot(state: &Match) -> Result<(), SnapshotError> {
     if state.options.mode == Mode::Horde {
         projectiles::validate(state)?;
     }
-    state
-        .prepare_companion_tick()
-        .map_err(|_| {
-            let unit = state
-                .commands
-                .units
-                .iter()
-                .find_map(|(&id, control)| {
-                    (control.operative
-                        && g.units.contains_key(&id)
-                        && state.check_companion(id).is_err())
-                    .then_some(id)
-                })
-                .unwrap_or(0);
-            SnapshotError::Unsupported {
-                unit,
-                capability: SnapshotCapability::Operatives,
-            }
-        })?;
+    state.prepare_companion_tick().map_err(|_| {
+        let unit = state
+            .commands
+            .units
+            .iter()
+            .find_map(|(&id, control)| {
+                (control.operative
+                    && g.units.contains_key(&id)
+                    && state.check_companion(id).is_err())
+                .then_some(id)
+            })
+            .unwrap_or(0);
+        SnapshotError::Unsupported {
+            unit,
+            capability: SnapshotCapability::Operatives,
+        }
+    })?;
     Ok(())
 }
 
