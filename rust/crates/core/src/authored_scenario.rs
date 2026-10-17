@@ -275,7 +275,14 @@ impl AuthoredScenario {
         }
     }
     pub(crate) fn matches_map(&self, map: &crate::map::AuthoritativeMap) -> bool {
-        crate::scenario_validation::explicit_scenario(map.source()) == Some(&self.data)
+        let Some(expected) = crate::scenario_validation::explicit_scenario(map.source()) else {
+            return false;
+        };
+        // Localization fallback observes object order; Value equality ignores it.
+        match (serde_json::to_vec(&self.data), serde_json::to_vec(expected)) {
+            (Ok(actual), Ok(expected)) => actual == expected,
+            _ => false,
+        }
     }
 
     pub(crate) fn recipient(&self, state: &Match, slot: usize) -> Value {

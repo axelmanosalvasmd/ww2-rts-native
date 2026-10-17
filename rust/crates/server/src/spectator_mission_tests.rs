@@ -287,4 +287,27 @@ fn authored_mission_admission_refuses_unimplemented_actions_and_changed_map_bind
         crate::native_startup::NativeStartup::prepare_loaded(&original, settings, &different)
             .is_err()
     );
+
+    let mut ordered = raw.clone();
+    ordered["scenario"]["triggers"][0]["actions"][1]["text"] =
+        serde_json::from_str(r#"{"es":"Primero","fr":"Deuxieme"}"#).unwrap();
+    let ordered_state = state(&ordered);
+    let mut reordered = ordered.clone();
+    reordered["scenario"]["triggers"][0]["actions"][1]["text"] =
+        serde_json::from_str(r#"{"fr":"Deuxieme","es":"Primero"}"#).unwrap();
+    let bind = |map: &Value| {
+        crate::native_startup::NativeStartup::prepare_loaded(
+            &ordered_state,
+            crate::native_startup::StartupSettings {
+                map: "river-pass",
+                mode: "conquest",
+                army: "standard",
+                weather: "map",
+                sandbox: false,
+            },
+            map,
+        )
+    };
+    assert!(bind(&ordered).is_ok());
+    assert!(bind(&reordered).is_err());
 }
