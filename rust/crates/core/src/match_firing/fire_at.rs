@@ -108,7 +108,11 @@ impl Match {
         }
         Ok(())
     }
-    pub(super) fn fire_at_weapon(&mut self, id: UnitId, terrain_suppression: f64) -> Result<(), String> {
+    pub(super) fn fire_at_weapon(
+        &mut self,
+        id: UnitId,
+        terrain_suppression: f64,
+    ) -> Result<(), String> {
         let u = &self.world.game.units[&id];
         let w = self.weapon(u)?.ok_or("unarmed terrain order")?;
         self.firing.initialize(id).target_id = 0;

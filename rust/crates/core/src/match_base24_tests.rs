@@ -158,16 +158,25 @@ fn base24_shared_rally_drives_buyer_owned_paid_recruitment() {
     assert_eq!(m.building_rallies[&maker], Some(at));
     let cache = SnapshotCache::new(&m).unwrap();
     for slot in 0..m.world.game.players.len() {
-        assert_eq!(cache.recipient(slot).unwrap().fields["mode"]["kind"], "horde");
+        assert_eq!(
+            cache.recipient(slot).unwrap().fields["mode"]["kind"],
+            "horde"
+        );
     }
     drop(cache);
     let mut delivery = DeliveryState::new(&m).unwrap();
     let selected = (0..m.world.game.players.len())
-        .map(|slot| SelectedSeat { slot, full: true, omit: false })
+        .map(|slot| SelectedSeat {
+            slot,
+            full: true,
+            omit: false,
+        })
         .collect::<Vec<_>>();
     let report = m.advance_tick().unwrap();
-    let frame = delivery.capture_selected_with_tick_events(&mut m, &selected, &report.events)
-        .unwrap().unwrap();
+    let frame = delivery
+        .capture_selected_with_tick_events(&mut m, &selected, &report.events)
+        .unwrap()
+        .unwrap();
     for seat in &selected {
         let snapshot = frame.recipient(seat.slot).unwrap().into_json();
         assert_eq!(snapshot["t"], "s");

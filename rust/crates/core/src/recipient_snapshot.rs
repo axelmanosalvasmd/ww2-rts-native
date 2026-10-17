@@ -211,7 +211,10 @@ fn validate_snapshot(state: &Match) -> Result<(), SnapshotError> {
         (state.options.mode, state.world.game.mode),
         (Mode::Default | Mode::Conquest, None)
             | (Mode::Classic, Some(crate::game::ModeKind::Classic))
-            | (Mode::Annihilation, Some(crate::game::ModeKind::Annihilation))
+            | (
+                Mode::Annihilation,
+                Some(crate::game::ModeKind::Annihilation)
+            )
             | (Mode::Horde, Some(crate::game::ModeKind::Horde))
     ) || state.world.geography().is_some()
         || state.assault.is_some()
@@ -220,7 +223,9 @@ fn validate_snapshot(state: &Match) -> Result<(), SnapshotError> {
         return Err(SnapshotError::UnsupportedMode);
     }
     if matches!(state.options.mode, Mode::Classic | Mode::Annihilation) {
-        state.validate_elimination_state().map_err(|_| SnapshotError::Rules)?;
+        state
+            .validate_elimination_state()
+            .map_err(|_| SnapshotError::Rules)?;
     }
     if state.options.mode == Mode::Horde {
         state

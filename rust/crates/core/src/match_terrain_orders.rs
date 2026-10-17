@@ -114,7 +114,6 @@ impl Match {
         }
         Ok(())
     }
-
 }
 
 #[cfg(test)]

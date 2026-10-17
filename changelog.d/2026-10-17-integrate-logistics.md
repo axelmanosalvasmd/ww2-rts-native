@@ -6,3 +6,4 @@
 - Extend the mode-row lifecycle assertion to admitted Horde snapshots while retaining the separate hosted-room boundary at this integration checkpoint.
 - Update the shared-facility recruitment and room-option Horde tests to require healthy core ticks and snapshots while preserving their ownership, payment, rally and hosted-attachment checks.
 - Record the logistics integration conflict decisions and test rewrites for the final integrator.
+- Format the reconciled logistics integration sources with the pinned Rust toolchain.

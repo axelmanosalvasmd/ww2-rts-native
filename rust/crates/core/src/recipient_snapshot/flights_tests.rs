@@ -194,7 +194,8 @@ mod retained_ground {
 
     fn scene() -> Match {
         let fixture: Value =
-            serde_json::from_str(include_str!("../../tests/fixtures/recipient-selected.json")).unwrap();
+            serde_json::from_str(include_str!("../../tests/fixtures/recipient-selected.json"))
+                .unwrap();
         super::super::super::tests::initialize(&fixture["initial"])
     }
 
@@ -351,7 +352,8 @@ mod retained_ground {
     }
 
     #[test]
-    fn complete_seats_deliver_retained_ground_flights_and_physical_tickets_without_draining_events() {
+    fn complete_seats_deliver_retained_ground_flights_and_physical_tickets_without_draining_events()
+    {
         let mut state = scene();
         state.world.game.reveal = true;
         let p = flight(&state);
@@ -475,6 +477,9 @@ mod retained_ground {
             .unwrap();
         let snapshot = frame.recipient(0).unwrap().into_json();
         assert_eq!(snapshot["flights"].as_array().unwrap().len(), 1);
-        assert_eq!(snapshot["flights"][0]["kind"], state.rules.kinds[aircraft].name);
+        assert_eq!(
+            snapshot["flights"][0]["kind"],
+            state.rules.kinds[aircraft].name
+        );
     }
 }

@@ -312,7 +312,12 @@ impl Match {
             && (self.options.mode != crate::economy::Mode::Horde
                 || self.commands.units.iter().any(|(worker, control)| {
                     control.build_target.is_some()
-                        && self.world.game.units.get(worker).is_some_and(|unit| unit.build)
+                        && self
+                            .world
+                            .game
+                            .units
+                            .get(worker)
+                            .is_some_and(|unit| unit.build)
                 }))
     }
 

@@ -102,19 +102,35 @@ fn collect_classic_complete(state: &mut Match, delivery: &mut DeliveryState) {
     assert_eq!(expected["kind"], "classic");
     let count = state.start.players.len();
     let selected = (0..count)
-        .map(|slot| SelectedSeat { slot, full: false, omit: false })
+        .map(|slot| SelectedSeat {
+            slot,
+            full: false,
+            omit: false,
+        })
         .collect::<Vec<_>>();
     let frame = delivery
         .capture_selected_with_tick_events(state, &selected, &[])
         .unwrap()
         .unwrap();
-    assert_eq!(frame.slots().collect::<Vec<_>>(), (0..count).collect::<Vec<_>>());
+    assert_eq!(
+        frame.slots().collect::<Vec<_>>(),
+        (0..count).collect::<Vec<_>>()
+    );
     for slot in 0..count {
         let snapshot = frame.recipient(slot).unwrap().into_json();
         assert_eq!(snapshot["t"], "s");
         assert_eq!(snapshot["mode"], expected, "Classic seat {slot}");
         assert!(snapshot.get("missing").is_none());
-        for field in ["units", "works", "wrecks", "foundMines", "shots", "flights", "smokes", "strikes"] {
+        for field in [
+            "units",
+            "works",
+            "wrecks",
+            "foundMines",
+            "shots",
+            "flights",
+            "smokes",
+            "strikes",
+        ] {
             assert!(snapshot[field].is_array(), "Classic seat {slot}: {field}");
         }
     }
@@ -208,7 +224,10 @@ fn intent_ai50_gate_order_completes_in_each_real_ordinary_mode_with_supported_se
             json!({"t":"dig","kind":"gate","ids":[builder],
             "x":80.0,"z":45.0,"dir":0.0}),
         );
-        let mut delivery = if matches!(mode, Mode::Default | Mode::Conquest | Mode::Classic | Mode::Annihilation) {
+        let mut delivery = if matches!(
+            mode,
+            Mode::Default | Mode::Conquest | Mode::Classic | Mode::Annihilation
+        ) {
             Some(DeliveryState::new(&state).unwrap())
         } else {
             assert!(matches!(

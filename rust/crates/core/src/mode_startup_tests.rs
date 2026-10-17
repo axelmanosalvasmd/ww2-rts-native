@@ -367,13 +367,20 @@ fn mode01_non_world_mode_rows_match_the_prototype_public_fields() {
             let count = m.start.players.len();
             let mut delivery = DeliveryState::new(&m).unwrap();
             let selected = (0..count)
-                .map(|slot| SelectedSeat { slot, full: true, omit: false })
+                .map(|slot| SelectedSeat {
+                    slot,
+                    full: true,
+                    omit: false,
+                })
                 .collect::<Vec<_>>();
             let frame = delivery
                 .capture_selected_with_tick_events(&mut m, &selected, &[])
                 .unwrap()
                 .unwrap();
-            assert_eq!(frame.slots().collect::<Vec<_>>(), (0..count).collect::<Vec<_>>());
+            assert_eq!(
+                frame.slots().collect::<Vec<_>>(),
+                (0..count).collect::<Vec<_>>()
+            );
             for slot in 0..count {
                 let snapshot = frame.recipient(slot).unwrap().into_json();
                 assert_eq!(snapshot["t"], "s");

@@ -2773,11 +2773,11 @@ mod save_load_tests;
 #[path = "lobby_saves.rs"]
 mod save_runtime;
 
-#[cfg(test)]
-#[path = "room_command_ingress_tests.rs"]
-mod room_command_ingress_tests;
 #[path = "lobby_options.rs"]
 mod lobby_options;
 #[cfg(test)]
 #[path = "mode_options_tests.rs"]
 mod mode_options_tests;
+#[cfg(test)]
+#[path = "room_command_ingress_tests.rs"]
+mod room_command_ingress_tests;
