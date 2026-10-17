@@ -19,6 +19,10 @@ Ordinary saves remain v1 and authored saves remain v2 under `docs/contracts/save
 
 - `localization_side_key_is_text_and_not_an_authored_side_reference`: retain the translation-key check with the required English fallback.
 
+- `authored_mission_admission_refuses_unimplemented_actions_and_changed_map_bindings` becomes `authored_mission_admission_runs_engine_actions_and_refuses_changed_map_bindings`: verify the newly admitted canonical destruction while retaining stale-clock, legacy-trigger, World and map-binding checks.
+
 ## Verification
 
 The first checkpoint at `9fd2f291` compiled and ran 28 tests: 26 passed and two engine startup tests failed because the old timed validator rejected areas/groups. Independent source review identified the same gate. The repair uses the full ordinary engine validator while retaining the English-fallback restriction. Rerun pending.
+
+The next checkpoint at `6110d917` ran 1,522 tests: 1,521 passed and one room-preparation test failed on the separate timed-only map-binding validator. The repair compares the full saved definition directly with the raw map and preserves null-scenario legacy triggers.

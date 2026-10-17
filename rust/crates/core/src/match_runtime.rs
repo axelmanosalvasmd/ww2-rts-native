@@ -208,7 +208,7 @@ impl StartPlan {
         }
         let world_mode = matches!(&profile, StartupProfile::World(_));
         let tutorial = matches!(&profile, StartupProfile::Tutorial);
-        if let Some(data) = map.source().get("scenario") {
+        if let Some(data) = map.source().get("scenario").filter(|data| !data.is_null()) {
             crate::authored_scenario::validate_definition(
                 data,
                 options.players.len(),

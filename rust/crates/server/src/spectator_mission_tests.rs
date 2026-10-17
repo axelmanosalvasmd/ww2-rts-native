@@ -229,7 +229,7 @@ fn intent_net77_authored_objectives_and_private_messages_filter_spectators_throu
 }
 
 #[test]
-fn authored_mission_admission_refuses_unimplemented_actions_and_changed_map_bindings() {
+fn authored_mission_admission_runs_engine_actions_and_refuses_changed_map_bindings() {
     let raw = authored_map();
     let original = state(&raw);
     // Reject a valid mission history attached to a later unfinished match clock.
@@ -243,11 +243,22 @@ fn authored_mission_admission_refuses_unimplemented_actions_and_changed_map_bind
     let legacy = state(&legacy);
     assert!(legacy.scenario.is_some());
     assert!(legacy.authored_scenario.is_none());
-    let mut unsupported = raw.clone();
-    unsupported["scenario"]["triggers"][0]["actions"] =
-        json!([{"kind":"destroy","box":[10,10,11,11]}]);
-    let map = AuthoritativeMap::from_json(&serde_json::to_vec(&unsupported).unwrap()).unwrap();
-    assert!(Match::new(&map, original.options.clone()).is_err());
+    let mut destructive = raw.clone();
+    destructive["rows"][20] = json!(format!("{}#{}", ".".repeat(20), ".".repeat(43)));
+    destructive["scenario"]["triggers"][0]["actions"] =
+        json!([{"kind":"destroy","box":[20,20,20,20]}]);
+    let mut admitted = state(&destructive);
+    assert_eq!(admitted.world.game.chars[20 * 64 + 20], b'#');
+    for _ in 0..3 {
+        admitted.advance_tick().unwrap();
+        admitted.ordinary_snapshot_raw_lists().unwrap();
+        assert!(admitted.tick_state.fault().is_none());
+    }
+    assert_eq!(admitted.world.game.chars[20 * 64 + 20], b'+');
+    let map = AuthoritativeMap::from_json(&serde_json::to_vec(&destructive).unwrap()).unwrap();
+    let mut unsupported_mode = original.options.clone();
+    unsupported_mode.mode = Mode::World;
+    assert!(Match::new(&map, unsupported_mode).is_err());
     let mut different = raw.clone();
     different["scenario"]["objectives"][0]["text"] = json!({"en":"Changed mission"});
     let settings = crate::native_startup::StartupSettings {
