@@ -396,7 +396,7 @@ fn mixed_ordinary_and_operative_grenades_keep_each_recipient_live_and_refuse_cor
         .unwrap();
     let ordinary_id = ordinary.id;
     let at = ordinary.at();
-    let blast = AbilityBlast::from_unit(ordinary.kind, state.rules).unwrap();
+    let blast = AbilityBlast::from_unit(ordinary.kind, &state.rules).unwrap();
     let ordinary_flight = state
         .launch_ability_flight(ordinary_id, at, blast, None, None)
         .unwrap();

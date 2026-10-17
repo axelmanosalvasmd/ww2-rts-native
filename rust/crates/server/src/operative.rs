@@ -104,6 +104,7 @@ impl Room {
                     level: "normal",
                     disconnected: None,
                     denies: Vec::new(),
+                    map_pings: Vec::new(),
                     rtt: None,
                     diagnostics: crate::diagnostics::PlayerDiagnostics::default(),
                     last_match: None,
