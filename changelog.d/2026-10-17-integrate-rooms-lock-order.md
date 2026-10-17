@@ -1,0 +1,1 @@
+- Normalize the merged server dependency list in Cargo.lock to Cargo's generated ordering before locked integration validation. Package versions, checksums and dependency membership are unchanged.
