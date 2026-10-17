@@ -21,6 +21,9 @@ pub struct Stock {
 pub struct UnitFacts {
     pub built: f64,
     pub hold_position: bool,
+    pub hold_fire: bool,
+    pub auto_cast: bool,
+    pub cooldown: f64,
     pub queued_orders: usize,
     pub auto_retreat: bool,
     pub convoy: bool,
@@ -358,6 +361,35 @@ pub fn plan(
     *random = rng;
     Ok(result)
 }
+// Each planner stage sees the local effects of earlier queued attempts. The
+// original delivered packet stays immutable and actual admission happens later.
+pub(crate) fn mirrored(
+    observation: &Observation,
+    commands: &[Value],
+) -> Result<Observation, String> {
+    let mut mirror = crate::commander_mirror::Mirror::new(observation.input());
+    for command in commands {
+        mirror.apply(command, true)?;
+    }
+    Observation::new(mirror.input().clone()).map_err(|e| e.to_string())
+}
+
+fn mirrored_units<'a>(
+    observation: &'a Observation,
+    units: &[&UnitObservation],
+) -> Vec<&'a UnitObservation> {
+    units
+        .iter()
+        .map(|unit| {
+            let input = observation.input();
+            &input.units[input
+                .units
+                .binary_search_by_key(&unit.id, |u| u.id)
+                .unwrap()]
+        })
+        .collect()
+}
+
 fn plan_inner(
     observation: &Observation,
     sightings: &[Sighting],
@@ -552,7 +584,7 @@ fn plan_inner(
     } else {
         &remembered
     };
-    let (research_commands, reserved, research_mun) = research(observation, context)?;
+    let (research_commands, reserved, _research_mun) = research(observation, context)?;
     let tier_savings = if research_commands.is_empty() {
         reserved
     } else {
@@ -591,12 +623,17 @@ fn plan_inner(
                 && rush_at.is_some_and(|at| dist(u.at, at) < 25.0))
         })
         .collect();
+    let construction_view = mirrored(observation, &commands)?;
     let construction = if world_policy {
-        crate::commander_world_policy::construction(observation, &construction_crew, budget)?
+        crate::commander_world_policy::construction(
+            &construction_view,
+            &mirrored_units(&construction_view, &construction_crew),
+            budget,
+        )?
     } else {
         crate::commander_construction::plan(
-            observation,
-            &available_units,
+            &construction_view,
+            &mirrored_units(&construction_view, &available_units),
             budget,
             (adaptive || skill.memory) && strategic_recent.iter().any(|s| armor(&s.kind)),
             &sight_game,
@@ -611,9 +648,10 @@ fn plan_inner(
     commands.extend(construction.commands);
     let mut fort_reserve = 0.0;
     if !rush {
+        let fortification_view = mirrored(observation, &commands)?;
         let fortification = crate::commander_fortification::plan_after_builds(
-            observation,
-            &available_units,
+            &fortification_view,
+            &mirrored_units(&fortification_view, &available_units),
             budget,
             build_reserve,
             tier_savings,
@@ -837,6 +875,9 @@ fn plan_inner(
             state.aim = Some((i, sit.until));
         }
     }
+    let tactics_view = mirrored(observation, &commands)?;
+    let mine = mirrored_units(&tactics_view, &mine);
+    let available_units = mirrored_units(&tactics_view, &available_units);
     let adaptive_mine: Vec<_> = mine
         .iter()
         .copied()
@@ -848,8 +889,8 @@ fn plan_inner(
         .filter(|u| !newly_busy.contains(&u.id))
         .collect();
     let adaptive = crate::commander_classic_rules::plan(
-        observation,
-        context,
+        &tactics_view,
+        tactics_view.input().runtime.as_ref().unwrap(),
         &adaptive_mine,
         &adaptive_available,
         strategic_recent,
@@ -871,7 +912,7 @@ fn plan_inner(
         || !skill.adaptive
         || my_value > 1.1 * context.caution * their_value;
     let shopping = crate::commander_shopping::plan(
-        observation,
+        &tactics_view,
         &mine,
         strategic_recent,
         armor_seen.len(),
@@ -897,9 +938,11 @@ fn plan_inner(
             .filter(|raw| !(world_policy && raw["t"] == "recover")),
     );
     budget = shopping.remaining_mp;
+    let support_view = mirrored(observation, &commands)?;
+    let support_context = support_view.input().runtime.as_ref().unwrap();
     let mut support = SupportBudget {
         mp: budget,
-        mun: context.munitions - research_mun,
+        mun: support_context.munitions,
         last: state.called,
         spent: false,
     };
@@ -1262,32 +1305,14 @@ fn plan_inner(
         operation_situation.at = Some(target.2);
     }
     let recovering = retreat.iter().copied().collect();
-    // Later assault phases must see this look's construction and field-work assignments.
-    let mut operation_input = input.clone();
-    for command in &commands {
-        for id in command["ids"].as_array().into_iter().flatten() {
-            let Some(unit) = id
-                .as_u64()
-                .and_then(|id| operation_input.units.iter_mut().find(|u| u.id as u64 == id))
-            else {
-                continue;
-            };
-            match command["t"].as_str() {
-                Some("build" | "assist") => unit.build = true,
-                Some("dig") => unit.dig = true,
-                Some("entrench") => unit.entrench = true,
-                _ => {}
-            }
-        }
-    }
-    let operation_observation = Observation::new(operation_input).map_err(|e| e.to_string())?;
+    let operation_observation = mirrored(observation, &commands)?;
     let live_sightings: Vec<_> = remembered.iter().map(|s| (*s).clone()).collect();
     let operation = if context.horde || world_policy {
         crate::commander_assault::Plan::default()
     } else {
         crate::commander_assault::plan(
             &operation_observation,
-            context,
+            operation_observation.input().runtime.as_ref().unwrap(),
             &state.mind,
             Some(&operation_situation),
             skill,

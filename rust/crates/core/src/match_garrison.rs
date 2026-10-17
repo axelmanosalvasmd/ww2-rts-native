@@ -157,7 +157,7 @@ impl Match {
         taken.extend(self.commands.units.values().filter_map(|c| c.enter));
         let mut entered = false;
         let mut reason = Denial::Needs;
-        for &raw in ids {
+        for &raw in ids.iter().take(50.max(self.world.game.units.len())) {
             let Some(id) = self.eligible_command_unit(raw, owner, &Command::Unsupported) else {
                 continue;
             };
