@@ -242,57 +242,104 @@ fn net91_save_storage_round_trip_retains_content_and_per_room_per_kind_limits() 
 }
 #[test]
 fn net28_net93_lobby_save_list_is_synchronous_private_and_newest_first() {
-    let dir = TestDir::new();
-    let (mut hub, a, mut ra, _, mut rb) = setup(&dir);
-    let store = hub.saves.clone();
-    let first = store
-        .write(
-            "ABC",
-            "manual",
-            &envelope(),
-            json!({"mode":"conquest","minutes":1,"names":["First"]}),
-            1_800_000_000_000,
-        )
-        .unwrap();
-    hub.rooms["ABC"].broadcast(&hub.maps, &hub.public_url);
-    let second=store.write("ABC","auto",&envelope(),json!({"mode":"world","minutes":2,"names":["Second"],"world":{"total":8,"owned":[3,2]}}),1_800_000_000_001).unwrap();
-    store
-        .write(
-            "XYZ",
-            "manual",
-            &envelope(),
-            json!({"mode":"conquest","minutes":0,"names":["Other"]}),
-            1_800_000_000_002,
-        )
-        .unwrap();
-    std::fs::write(dir.0.join("ABC-1800000000003-manual.json"), b"{broken").unwrap();
-    hub.rooms["ABC"].broadcast(&hub.maps, &hub.public_url);
-    for receiver in [&mut ra, &mut rb] {
-        let received = messages(&mut hub, receiver);
-        assert_eq!(received.len(), 2);
-        assert_eq!(
-            received[0]["saves"],
-            json!([{"id":first,"kind":"manual","savedAt":1_800_000_000_000u64,"mode":"conquest","minutes":1,"names":["First"]}])
-        );
-        assert_eq!(
-            received[1]["saves"],
-            json!([
-            {"id":second,"kind":"auto","savedAt":1_800_000_000_001u64,"mode":"world","minutes":2,"names":["Second"],"world":{"total":8,"owned":[3,2]}},
-            {"id":first,"kind":"manual","savedAt":1_800_000_000_000u64,"mode":"conquest","minutes":1,"names":["First"]}])
-        );
-        let text = received[1]["saves"].to_string();
-        for secret in [
-            "guard", "triggers", "private", "memory", "bytes", "token", "XYZ",
-        ] {
-            assert!(!text.contains(secret));
+    fn check_broadcasts(
+        hub: &mut Hub,
+        dir: &TestDir,
+        host_id: u64,
+        receivers: &mut [&mut mpsc::Receiver<Output>],
+    ) {
+        let store = hub.saves.clone();
+        let first = store
+            .write(
+                "ABC",
+                "manual",
+                &envelope(),
+                json!({"mode":"conquest","minutes":1,"names":["First"]}),
+                1_800_000_000_000,
+            )
+            .unwrap();
+        hub.rooms["ABC"].broadcast(&hub.maps, &hub.public_url);
+        let second=store.write("ABC","auto",&envelope(),json!({"mode":"world","minutes":2,"names":["Second"],"world":{"total":8,"owned":[3,2]}}),1_800_000_000_001).unwrap();
+        store
+            .write(
+                "XYZ",
+                "manual",
+                &envelope(),
+                json!({"mode":"conquest","minutes":0,"names":["Other"]}),
+                1_800_000_000_002,
+            )
+            .unwrap();
+        std::fs::write(dir.0.join("ABC-1800000000003-manual.json"), b"{broken").unwrap();
+        hub.rooms["ABC"].broadcast(&hub.maps, &hub.public_url);
+        for receiver in receivers {
+            let received = messages(hub, receiver);
+            assert_eq!(received.len(), 2);
+            assert_eq!(
+                received[0]["saves"],
+                json!([{"id":first,"kind":"manual","savedAt":1_800_000_000_000u64,"mode":"conquest","minutes":1,"names":["First"]}])
+            );
+            assert_eq!(
+                received[1]["saves"],
+                json!([
+                {"id":second,"kind":"auto","savedAt":1_800_000_000_001u64,"mode":"world","minutes":2,"names":["Second"],"world":{"total":8,"owned":[3,2]}},
+                {"id":first,"kind":"manual","savedAt":1_800_000_000_000u64,"mode":"conquest","minutes":1,"names":["First"]}])
+            );
+            let text = received[1]["saves"].to_string();
+            for secret in [
+                "guard", "triggers", "private", "memory", "bytes", "token", "XYZ",
+            ] {
+                assert!(!text.contains(secret));
+            }
         }
+        assert_eq!(
+            hub.rooms["ABC"].lobby(host_id, &hub.maps, &hub.public_url)["saves"]
+                .as_array()
+                .unwrap()
+                .len(),
+            2
+        );
     }
-    assert_eq!(
-        hub.rooms["ABC"].lobby(a.id, &hub.maps, &hub.public_url)["saves"]
-            .as_array()
-            .unwrap()
-            .len(),
-        2
+    let running_dir = TestDir::new();
+    let (mut running, host, mut host_rx, _, mut guest_rx) = setup(&running_dir);
+    assert!(running.rooms["ABC"].native.is_some());
+    check_broadcasts(
+        &mut running,
+        &running_dir,
+        host.id,
+        &mut [&mut host_rx, &mut guest_rx],
+    );
+    let dir = TestDir::new();
+    let mut hub = Hub::new(32, String::new());
+    hub.configure_saves(dir.0.clone());
+    let (a, mut ra) = peer(1);
+    let (b, mut rb) = peer(2);
+    let (watcher, mut watcher_rx) = peer(3);
+    let (operative, mut operative_rx) = peer(4);
+    for (client, message) in [
+        (&a, json!({"t":"hello","token":"host","name":"Host"})),
+        (&b, json!({"t":"hello","token":"guest","name":"Guest"})),
+        (
+            &watcher,
+            json!({"t":"hello","token":"watch","name":"Watcher","spectate":true}),
+        ),
+        (
+            &operative,
+            json!({"t":"hello","token":"friend","name":"Friend","role":"operative","commander":0}),
+        ),
+    ] {
+        let mut joined = false;
+        hub.message("ABC", client, &mut joined, message, 0);
+        assert!(joined);
+    }
+    for receiver in [&mut ra, &mut rb, &mut watcher_rx, &mut operative_rx] {
+        messages(&mut hub, receiver);
+    }
+    assert!(hub.rooms["ABC"].native.is_none());
+    check_broadcasts(
+        &mut hub,
+        &dir,
+        a.id,
+        &mut [&mut ra, &mut rb, &mut watcher_rx, &mut operative_rx],
     );
 }
 #[test]
