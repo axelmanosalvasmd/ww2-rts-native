@@ -359,7 +359,11 @@ fn mode01_non_world_mode_rows_match_the_prototype_public_fields() {
             let cache = SnapshotCache::new(&m).unwrap();
             for slot in 0..m.start.players.len() {
                 let snapshot = cache.recipient(slot).unwrap();
-                assert_eq!(snapshot.fields["mode"], expected);
+                if expected.is_null() {
+                    assert!(!snapshot.fields.contains_key("mode"));
+                } else {
+                    assert_eq!(snapshot.fields.get("mode"), Some(&expected));
+                }
                 assert!(snapshot.fields["units"].is_array());
             }
         } else {
