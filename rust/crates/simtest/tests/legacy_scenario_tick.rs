@@ -76,6 +76,7 @@ fn shots(state: &Match, events: &[TickEvent]) -> Value {
             .iter()
             .map(|event| match event {
                 TickEvent::Scenario(say) => say.shot_json(),
+                TickEvent::AuthoredMission(row) => row.clone(),
                 TickEvent::Environment(effect) => effect.to_json(),
                 TickEvent::Firing(event) => event.to_json(&state.rules),
                 TickEvent::Support(_) | TickEvent::Aviation(_) | TickEvent::Horde(_) => {

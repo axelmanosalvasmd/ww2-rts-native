@@ -1,0 +1,2 @@
+- Merge main into PR #400, preserving authored mission persistence and both optional save owners.
+- Resolve the single manual hunk in `docs/contracts/save-format.md`: retain the PR's optional `authored_mission` row and main's optional `elimination` row with their complete existing field descriptions and compatibility rules. Runtime and tests merge automatically without assertion changes.

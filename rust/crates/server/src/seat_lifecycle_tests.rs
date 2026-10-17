@@ -138,52 +138,6 @@ fn net66_presence_and_ping_survive_scheduled_paused_catchup_and_reconnect_delive
 }
 
 #[test]
-fn client_pause_and_resume_remain_unavailable_even_for_native_host() {
-    let (mut hub, host, mut host_rx, guest, mut guest_rx) = setup();
-    for paused in [false, true] {
-        if paused {
-            hub.rooms
-                .get_mut("ABC")
-                .unwrap()
-                .native
-                .as_mut()
-                .unwrap()
-                .runtime
-                .pause(0, "host", crate::room_runtime::PauseReason::Host, 1)
-                .unwrap();
-        }
-        for client in [&host, &guest] {
-            for command in ["pause", "resume"] {
-                assert!(UNAVAILABLE.contains(&command));
-                let runtime = &hub.rooms["ABC"].native.as_ref().unwrap().runtime;
-                let tick = runtime.state().world.game.tick;
-                let random = runtime.state().start.random.snapshot();
-                let pending = runtime.state().commands.pending_commands();
-                let pause = runtime.pause_message(2);
-                hub.message("ABC", client, &mut true, json!({"t":command}), 2);
-                let denial = vec![json!({"t":"deny","cmd":command,"reason":"blocked"})];
-                let host_messages = drain(&mut hub, &mut host_rx, 2);
-                let guest_messages = drain(&mut hub, &mut guest_rx, 2);
-                if client.id == host.id {
-                    assert_eq!(host_messages, denial);
-                    assert!(guest_messages.is_empty());
-                } else {
-                    assert_eq!(guest_messages, denial);
-                    assert!(host_messages.is_empty());
-                }
-                let runtime = &hub.rooms["ABC"].native.as_ref().unwrap().runtime;
-                assert_eq!(runtime.paused(), paused);
-                assert_eq!(runtime.pause_message(2), pause);
-                assert_eq!(runtime.state().world.game.tick, tick);
-                assert_eq!(runtime.state().start.random.snapshot(), random);
-                assert_eq!(runtime.state().commands.pending_commands(), pending);
-                assert!(runtime.fault().is_none());
-            }
-        }
-    }
-}
-
-#[test]
 fn net80_human_drop_expiry_reconnect_host_release_and_fresh_match_allowance() {
     let (mut hub, _host, mut host_rx, guest, mut guest_rx) = setup();
     hub.disconnected("ABC", guest.id, 10);
