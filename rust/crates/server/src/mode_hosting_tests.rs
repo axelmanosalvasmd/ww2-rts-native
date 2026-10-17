@@ -5,6 +5,7 @@ fn drain(hub: &mut Hub, rx: &mut mpsc::Receiver<Output>, now: u64) -> Vec<Value>
     let mut messages = Vec::new();
     while let Ok(output) = rx.try_recv() {
         match output {
+            Output::Watcher(_) => panic!("watcher output on seated connection"),
             Output::Json(message) => messages.push(message),
             Output::Snapshot(frame) => {
                 messages.push(serde_json::from_str(&frame.json).unwrap());
