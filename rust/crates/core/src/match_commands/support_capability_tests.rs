@@ -227,7 +227,8 @@ fn hosted_recorded_support_pays_once_and_delivers_every_seat_through_cleanup_and
         } else {
             Point { x: 128., z: 128. }
         };
-        let expected_arrival = json!({"k":kind,"x":at.x,"z":at.z,"dir":0.,"fo":0,"pub":true});
+        // The shared wire projector canonicalizes numeric zero to integer JSON zero.
+        let expected_arrival = json!({"k":kind,"x":at.x,"z":at.z,"dir":0,"fo":0,"pub":true});
         record(&mut state, kind);
         let selected = (0..2)
             .map(|slot| SelectedSeat {
@@ -237,7 +238,7 @@ fn hosted_recorded_support_pays_once_and_delivers_every_seat_through_cleanup_and
             })
             .collect::<Vec<_>>();
         let mut delivery = DeliveryState::new(&state).unwrap();
-        let mut arrived = [false; 2];
+        let mut arrived = [0_usize; 2];
         let mut cleaned = 0;
         for tick in 1..=600 {
             let report = state.advance_tick().unwrap();
@@ -266,7 +267,15 @@ fn hosted_recorded_support_pays_once_and_delivers_every_seat_through_cleanup_and
                         .iter()
                         .all(|strike| strike[0] == kind && strike[5] == 0)
                 );
-                *arrived_at_seat |= row["shots"].as_array().unwrap().contains(&expected_arrival);
+                for arrival in row["shots"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .filter(|shot| shot["k"] == kind)
+                {
+                    assert_eq!(arrival, &expected_arrival, "{kind} arrival at seat {slot}");
+                    *arrived_at_seat += 1;
+                }
             }
             drop(frame);
             assert!(state.tick_state.fault().is_none());
@@ -280,8 +289,8 @@ fn hosted_recorded_support_pays_once_and_delivers_every_seat_through_cleanup_and
         assert_eq!(cleaned, 8, "{kind} must naturally retire before ending");
         if kind != "artillery" {
             assert!(
-                arrived.into_iter().all(|value| value),
-                "{kind} arrival must reach both seats"
+                arrived.into_iter().all(|value| value == 1),
+                "{kind} arrival must reach both seats exactly once"
             );
         }
         assert_eq!(state.story[0].support_calls, calls + 1.0);

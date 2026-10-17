@@ -264,10 +264,38 @@ fn ordinary_binary_refuses_unsupported_settings_before_any_start_publication() {
     for setting in cases {
         let server = BinaryServer::start(true, SEED);
         let mut host = Client::join(server.address, "a");
-        let _guest = Client::join(server.address, "b");
+        let mut guest = Client::join(server.address, "b");
         host.send(setting.clone());
         host.barrier();
         host.send(json!({"t":"start"}));
+        if setting["t"] == "mode" && setting["v"] == "horde" {
+            // Horde is now admitted by this chain. Preserve a real-socket
+            // witness rather than merely deleting the former refusal case.
+            let starts = [
+                host.until(|m| m["t"] == "start"),
+                guest.until(|m| m["t"] == "start"),
+            ];
+            assert_eq!(starts[0]["matchId"], starts[1]["matchId"]);
+            for (slot, start) in starts.iter().enumerate() {
+                assert_eq!(start["you"], slot);
+                assert_eq!(start["sandbox"], false);
+                assert_eq!(start["names"].as_array().unwrap().len(), 3);
+                assert_eq!(start["names"][2], "Horde");
+                assert_eq!(start["teams"], json!([0, 0, 1]));
+            }
+            for _ in 0..3 {
+                for frame in [
+                    host.until(|m| m["t"] == "s"),
+                    guest.until(|m| m["t"] == "s"),
+                ] {
+                    assert_eq!(frame["mode"]["kind"], "horde");
+                    assert_eq!(frame["online"].as_array().unwrap().len(), 2);
+                    assert!(frame["tick"].as_u64().unwrap() > 0);
+                }
+            }
+            assert!(!server.log().contains("NATIVE_FAULT"));
+            continue;
+        }
         assert_eq!(host.deny("start")["reason"], "scenario", "{setting}");
         assert!(
             host.barrier()

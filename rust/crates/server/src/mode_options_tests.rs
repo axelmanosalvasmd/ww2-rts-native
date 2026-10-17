@@ -285,7 +285,8 @@ fn mode11_existing_native_constructors_keep_switches_bases_and_every_seat_frames
                 control.hold_fire = true;
                 control.auto_cast = false;
             }
-            if matches!(name, "assault" | "tutorial") {
+            // Assault delivery is admitted by this chain; Tutorial remains separate.
+            if name == "tutorial" {
                 for _ in 0..4 {
                     state.advance_tick().unwrap();
                 }
