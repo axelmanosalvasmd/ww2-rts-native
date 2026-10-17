@@ -1,0 +1,1 @@
+- Preserve the merged recipient cache, AI save and numeric-key owners alongside room commands, operative events and Horde delivery. Reconcile the combat-filter test's orphan-operative error with the earlier canonical companion validator; both refusal assertions remain.

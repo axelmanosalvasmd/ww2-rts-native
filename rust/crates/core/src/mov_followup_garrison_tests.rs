@@ -581,3 +581,21 @@ fn mov48_eng33_manual_and_wounded_garrisons_exit_then_reach_home_through_finish(
         }
     }
 }
+
+#[test]
+fn if25_garrison_equal_distance_keeps_breadth_first_edge_order_through_match() {
+    let mut rows = vec![".".repeat(64); 64];
+    rows[20].replace_range(20..22, "BB");
+    rows[21].replace_range(20..22, "BB");
+    let mut arena = Arena::new(Mode::Conquest, rows);
+    let id = arena.add("rifle", point(42.0, 42.0));
+    assert_eq!(arena.enter(id, point(43.0, 43.0), false), None);
+    // Every edge cell is equally distant. The requested cell starts the BFS.
+    assert_eq!(arena.state.commands.units[&id].enter, Some(21 * 64 + 21));
+    arena.wait_inside(id);
+    assert_eq!(
+        arena.state.world.game.units[&id].garrison,
+        Some(21 * 64 + 21)
+    );
+    arena.finish();
+}

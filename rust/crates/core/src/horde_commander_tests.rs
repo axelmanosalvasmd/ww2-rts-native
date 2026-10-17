@@ -736,6 +736,230 @@ fn full_private_policy_survives_natural_ordinary_finish_and_all_seat_snapshots()
 }
 
 #[test]
+fn if26_json_equivalent_deferred_plans_reach_ordinary_ticks_and_all_seat_snapshots() {
+    let mut m = scene(false);
+    let all = add_rifles(&mut m, 0, 9);
+    let mut view = wave_view(&m, 0, 0);
+    view.units.get_mut(&all[4]).unwrap().plan.goal = Some(Point {
+        x: f64::NAN,
+        z: -0.0,
+    });
+    view.units
+        .get_mut(&all[5])
+        .unwrap()
+        .plan
+        .orders
+        .push_back(movement(&[all[5]], false, f64::NAN));
+    view.units.get_mut(&all[6]).unwrap().plan.goal = Some(Point { x: 1.0, z: 1.0 });
+    view.units.get_mut(&all[7]).unwrap().plan.goal = Some(Point { x: -0.0, z: 1.0 });
+    let mut state = HordeCommander::new(0);
+    state.observe(live(&view), view.clone()).unwrap();
+    let mut emitted = state
+        .submit(live(&view), movement(&all, false, 100.0))
+        .unwrap();
+    assert_eq!(ids(&emitted), all[..4]);
+    assert_eq!(state.pending(), 5);
+
+    // These non-finite values belong only to the detached observation. The
+    // emitted commands and the ordinary Match retain valid finite coordinates.
+    view.tick = 2;
+    view.units.get_mut(&all[4]).unwrap().plan.goal = Some(Point {
+        x: f64::INFINITY,
+        z: 0.0,
+    });
+    view.units.get_mut(&all[5]).unwrap().plan.orders =
+        VecDeque::from([movement(&[all[5]], false, f64::NEG_INFINITY)]);
+    view.units
+        .get_mut(&all[6])
+        .unwrap()
+        .plan
+        .goal
+        .as_mut()
+        .unwrap()
+        .x = f64::from_bits(1.0_f64.to_bits() + 1);
+    view.units
+        .get_mut(&all[7])
+        .unwrap()
+        .plan
+        .goal
+        .as_mut()
+        .unwrap()
+        .x = 0.0;
+    view.units.get_mut(&all[8]).unwrap().plan.goal = Some(Point {
+        x: f64::NAN,
+        z: 0.0,
+    });
+    let next = state.observe(live(&view), view).unwrap();
+    assert_eq!(ids(&next), [all[4], all[5], all[7]]);
+    assert_eq!(state.pending(), 0);
+    emitted.extend(next);
+    for command in &emitted {
+        m.execute_command(0, command, false).unwrap();
+    }
+    let mut delivery = DeliveryState::new(&m).unwrap();
+    for _ in 0..6 {
+        let report = m.advance_tick().unwrap();
+        assert_eq!(m.tick_state.fault(), None);
+        let selected = [0, 1].map(|slot| SelectedSeat {
+            slot,
+            full: false,
+            omit: false,
+        });
+        let frame = delivery
+            .capture_selected_with_tick_events(&mut m, &selected, &report.events)
+            .unwrap()
+            .unwrap();
+        for slot in 0..2 {
+            assert_eq!(frame.recipient(slot).unwrap().into_json()["t"], "s");
+        }
+    }
+    assert!(m.world.game.units[&all[4]].path_gen > 0);
+}
+
+#[test]
+fn if26_destination_groups_fold_zero_keep_exact_neighbors_and_round_plain_moves() {
+    use crate::command_destinations::{self, Context, Request};
+    let mut m = scene(false);
+    let all = add_rifles(&mut m, 0, 2);
+    for id in &all {
+        m.world.game.units.get_mut(id).unwrap().hold_pos = true;
+    }
+    let hit_at = BTreeMap::new();
+    let context = Context {
+        game: &m.world.game,
+        rules: &m.rules,
+        grid: &m.grid,
+        points: &[],
+        hit_at: &hit_at,
+    };
+    let positive = [
+        Request {
+            id: all[0],
+            at: Point { x: 0.0, z: 90.0 },
+        },
+        Request {
+            id: all[1],
+            at: Point { x: 0.0, z: 90.0 },
+        },
+    ];
+    let mut signed = positive;
+    signed[1].at.x = -0.0;
+    let expected = command_destinations::spread_facing(&context, &positive, 0.0).unwrap();
+    assert_ne!(expected, positive);
+    assert_eq!(
+        command_destinations::spread_queued_facing(&context, &signed, 0.0).unwrap(),
+        expected
+    );
+    assert_eq!(
+        command_destinations::end_spots(&context, &signed, Some(0.0)).unwrap(),
+        expected
+    );
+
+    let adjacent = [
+        Request {
+            id: all[0],
+            at: Point { x: 90.0, z: 90.0 },
+        },
+        Request {
+            id: all[1],
+            at: Point {
+                x: f64::from_bits(90.0_f64.to_bits() + 1),
+                z: 90.0,
+            },
+        },
+    ];
+    assert_eq!(
+        command_destinations::spread_queued_facing(&context, &adjacent, 0.0).unwrap(),
+        adjacent
+    );
+    assert_eq!(
+        command_destinations::end_spots(&context, &adjacent, Some(0.0)).unwrap(),
+        adjacent
+    );
+    assert_ne!(
+        command_destinations::end_spots(&context, &adjacent, None).unwrap(),
+        adjacent
+    );
+    let mut invalid = adjacent;
+    invalid[0].at.x = f64::NAN;
+    assert_eq!(
+        command_destinations::spread_queued_facing(&context, &invalid, 0.0),
+        Err(command_destinations::Error::InvalidInput)
+    );
+}
+
+#[test]
+fn if26_deferred_dig_intent_ignores_progress_and_keeps_destination_kind_and_order_identity() {
+    let mut m = scene(false);
+    let all = add_rifles(&mut m, 0, 9);
+    let mut view = wave_view(&m, 0, 0);
+    let dig = Dig {
+        project: None,
+        kind: crate::field_works::FortKind::Trench,
+        at: Point { x: 80.0, z: 90.0 },
+        direction: 0.0,
+        cells: vec![],
+        elapsed: 0.0,
+        original_cells: None,
+        front: None,
+        reach: None,
+        from: None,
+        waits: 0,
+        step_back: None,
+    };
+    for id in &all[4..] {
+        view.units.get_mut(id).unwrap().plan.dig = Some(dig.clone());
+    }
+    let mut state = HordeCommander::new(0);
+    state.observe(live(&view), view.clone()).unwrap();
+    state
+        .submit(live(&view), movement(&all, false, 100.0))
+        .unwrap();
+    assert_eq!(state.pending(), 5);
+    view.tick = 2;
+    let changed = view
+        .units
+        .get_mut(&all[4])
+        .unwrap()
+        .plan
+        .dig
+        .as_mut()
+        .unwrap();
+    changed.elapsed = 1.25;
+    changed.waits = 3;
+    changed.original_cells = Some(4);
+    changed.reach = Some(20.0);
+    changed.from = Some(Point { x: 78.0, z: 90.0 });
+    changed.step_back = Some(Point { x: 76.0, z: 90.0 });
+    let changed = view
+        .units
+        .get_mut(&all[5])
+        .unwrap()
+        .plan
+        .dig
+        .as_mut()
+        .unwrap();
+    changed.at.x = f64::from_bits(changed.at.x.to_bits() + 1);
+    view.units
+        .get_mut(&all[6])
+        .unwrap()
+        .plan
+        .dig
+        .as_mut()
+        .unwrap()
+        .kind = crate::field_works::FortKind::Wire;
+    view.units.get_mut(&all[7]).unwrap().plan.dig = None;
+    view.units.get_mut(&all[8]).unwrap().plan.path_generation += 1;
+    let emitted = state.observe(live(&view), view).unwrap();
+    assert_eq!(
+        ids(&emitted),
+        [all[4]],
+        "only progress preserves the player's pending intent"
+    );
+    assert_eq!(state.pending(), 0);
+}
+
+#[test]
 fn full_policy_aimed_intent_supersedes_older_pending_movement_before_flush() {
     let mut m = scene(false);
     let all = add_rifles(&mut m, 0, 20);
