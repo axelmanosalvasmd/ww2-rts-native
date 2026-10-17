@@ -5,7 +5,6 @@ use crate::{
     companions::{Input, OPERATIVE, SAFE_INTEGER, WEAPONS},
     environment,
     game::{CELL, Point},
-    match_actor::ordinary_ground_mode,
     match_combat::{DamageWorld, ExplosionSource},
     match_firing::{AbilityBlast, LaunchEvent, SmallArmsEvent, SmallArmsHit},
     match_runtime::Match,

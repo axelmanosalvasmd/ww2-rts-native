@@ -63,7 +63,6 @@ fn messages(receiver: &mut mpsc::Receiver<Output>) -> Vec<Value> {
                 panic!("commander and operative sockets cannot receive watcher frames")
             }
             Output::Snapshot(_) => panic!("operative delivery uses its own JSON stream"),
-            Output::Watcher(_) => panic!("watcher output reached a seated or operative recipient"),
             Output::Close(_, reason) => panic!("unexpected close: {reason}"),
         }
     }
@@ -86,9 +85,6 @@ fn drain_commanders(
                 Output::Snapshot(write) => {
                     result.push(serde_json::from_str(&write.json).unwrap());
                     hub.complete_snapshot(&write, true, now);
-                }
-                Output::Watcher(_) => {
-                    panic!("watcher output reached a seated or operative recipient")
                 }
                 Output::Close(_, reason) => panic!("unexpected commander close: {reason}"),
             }

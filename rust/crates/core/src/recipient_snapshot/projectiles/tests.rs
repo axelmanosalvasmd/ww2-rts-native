@@ -1,4 +1,5 @@
 use super::super::*;
+use super::{for_seat, validate};
 use crate::{
     economy::Faction,
     economy_state::ArmySize,
@@ -10,10 +11,6 @@ use crate::{
     projectiles::{self as geometry, Point3},
     unit_publication::{PublicationParts, StagedUnit, prepare_publication},
     weather::WeatherChoice,
-};
-use crate::{
-    game::Point,
-    projectiles::{self as geometry, Point3},
 };
 
 fn scene() -> Match {

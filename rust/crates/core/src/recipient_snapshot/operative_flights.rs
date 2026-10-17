@@ -54,11 +54,10 @@ pub(super) fn validate(state: &Match) -> Result<(), SnapshotError> {
                 .get(&flight.shooter)
                 .is_some_and(|unit| unit.owner != flight.owner)
             || state.rules.kinds.get(flight.source_kind).is_none()
-            || operative
-                && (state.rules.kinds[flight.source_kind].name != "rifle"
-                    || flight.blast_source.is_none()
-                    || !flight.explosive
-                    || flight.effect != Some("boom"))
+            || (state.rules.kinds[flight.source_kind].name != "rifle"
+                || flight.blast_source.is_none()
+                || !flight.explosive
+                || flight.effect != Some("boom"))
             || ![
                 flight.launched,
                 flight.expires,

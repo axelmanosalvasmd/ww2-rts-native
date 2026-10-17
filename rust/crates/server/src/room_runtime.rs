@@ -61,6 +61,10 @@ mod ai;
 
 pub struct RoomRuntime {
     delivered_ai: ai::RoomAi,
+    #[cfg(test)]
+    pub(crate) ai: Option<crate::room_ai::RoomAi>,
+    #[cfg(test)]
+    pub(crate) legacy_ai_queued: usize,
     state: Match,
     delivery: DeliveryState,
     watchers: ww2_core::recipient_snapshot::SpectatorDelivery,
@@ -80,6 +84,11 @@ pub struct RoomRuntime {
     snapshot_production_calls: u64,
 }
 impl RoomRuntime {
+    #[cfg(test)]
+    pub(crate) fn take_ai_trace(&mut self) -> Vec<ai::DecisionTrace> {
+        self.delivered_ai.take_trace()
+    }
+
     /// Establish full start baselines on the existing receipt owner without shot previews.
     pub(crate) fn collect_starts(
         &mut self,
@@ -152,6 +161,10 @@ impl RoomRuntime {
         Ok(Self {
             state,
             delivered_ai: ai::RoomAi::default(),
+            #[cfg(test)]
+            ai: None,
+            #[cfg(test)]
+            legacy_ai_queued: 0,
             delivery,
             watchers: Default::default(),
             lists: RoomListCache::default(),
@@ -273,6 +286,7 @@ impl RoomRuntime {
     pub(crate) fn think(&mut self, sent: bool) -> Result<(), String> {
         self.running()?;
         if let Some(ai) = &mut self.ai {
+            let before = self.state.commands.pending_commands();
             ai.tick(
                 &mut self.state,
                 &mut self.delivery,
@@ -280,6 +294,11 @@ impl RoomRuntime {
                 self.event_generation,
                 &self.pending_events,
             )?;
+            self.legacy_ai_queued += self
+                .state
+                .commands
+                .pending_commands()
+                .saturating_sub(before);
         }
         Ok(())
     }

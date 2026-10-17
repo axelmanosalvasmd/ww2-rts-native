@@ -1,5 +1,6 @@
 use super::*;
 use crate::room_runtime::PauseReason;
+use std::collections::BTreeSet;
 use ww2_core::{recipient_snapshot::SelectedSeat, seat_commander::Brain};
 
 struct Peer {
@@ -130,6 +131,16 @@ fn run_callbacks(hub: &mut Hub, peers: &mut [Peer; 3], first: u64, last: u64) {
         let now = callback * 50;
         hub.poll_native(now, now * 1_000_000);
         assert_eq!(hub.native_status("ABC").unwrap().fault, None);
+        assert_production_queue(
+            &mut hub
+                .rooms
+                .get_mut("ABC")
+                .unwrap()
+                .native
+                .as_mut()
+                .unwrap()
+                .runtime,
+        );
         for (role, peer) in peers.iter_mut().enumerate() {
             for message in peer.drain(hub, now) {
                 if message["t"] == "s" {
@@ -374,3 +385,96 @@ fn mode09_horde_departure_activates_normal_ai_clears_token_and_only_its_drop_pau
 
 #[path = "net79_pause_tests.rs"]
 mod pause;
+
+/// Match observed policy advances to the actual canonical next-tick queue.
+pub(super) fn assert_production_queue(runtime: &mut RoomRuntime) -> (BTreeSet<usize>, usize) {
+    let trace = runtime.take_ai_trace();
+    let tick = runtime.state().world.game.tick;
+    let mut owners = BTreeSet::new();
+    let mut expected = BTreeMap::new();
+    for decision in trace {
+        assert_eq!(
+            decision.tick, tick,
+            "trace must describe this callback's tick"
+        );
+        assert!(
+            owners.insert(decision.slot),
+            "duplicate production owner for seat {} at tick {tick}",
+            decision.slot
+        );
+        for (key, command) in decision.accepted {
+            assert_eq!(key.tick, tick as u64 + 1);
+            assert_eq!(key.issuer, decision.slot as u32);
+            assert!(expected.insert(key, command).is_none());
+        }
+    }
+    let actual = runtime
+        .state()
+        .commands
+        .pending_tick(tick as u64 + 1)
+        .map(|(key, command)| (*key, command.clone()))
+        .collect::<BTreeMap<_, _>>();
+    assert_eq!(
+        actual, expected,
+        "the canonical queue must contain exactly the sole owner's accepted intents"
+    );
+    assert!(
+        runtime.ai.is_none(),
+        "legacy comparison owner cannot be active in production rooms"
+    );
+    assert_eq!(
+        runtime.legacy_ai_queued, 0,
+        "legacy owner must enqueue zero production commands"
+    );
+    (owners, expected.len())
+}
+
+#[test]
+fn integrated_single_owner_matches_actual_queue_for_ordinary_assault_and_both_horde_roles() {
+    for mode in ["conquest", "assault", "horde"] {
+        let (mut hub, mut peers) = room(mode == "horde", "hard");
+        if mode == "assault" {
+            peers[0].send(&mut hub, json!({"t":"mode","v":"assault"}), 0);
+            peers[0].send(&mut hub, json!({"t":"defender","v":1}), 0);
+        }
+        peers[0].send(&mut hub, json!({"t":"start"}), 0);
+        assert_eq!(hub.native_status("ABC").unwrap().fault, None);
+        for (role, peer) in peers.iter_mut().enumerate() {
+            assert_start(
+                &peer.drain(&mut hub, 0),
+                role,
+                if mode == "horde" { 3 } else { 2 },
+                false,
+            );
+        }
+        let mut seen = BTreeSet::new();
+        let mut queued = 0;
+        for callback in 0..=500_u64 {
+            let now = callback * 50;
+            hub.poll_native(now, now * 1_000_000);
+            assert_eq!(hub.native_status("ABC").unwrap().fault, None, "{mode}");
+            for peer in &mut peers {
+                peer.drain(&mut hub, now);
+            }
+            let native = hub.rooms.get_mut("ABC").unwrap().native.as_mut().unwrap();
+            let (owners, count) = assert_production_queue(&mut native.runtime);
+            seen.extend(owners);
+            queued += count;
+        }
+        assert!(queued > 0, "{mode} must exercise real queued AI intent");
+        assert_eq!(
+            seen,
+            if mode == "horde" {
+                BTreeSet::from([1, 2])
+            } else {
+                BTreeSet::from([1])
+            }
+        );
+        if mode == "horde" {
+            assert_eq!(
+                runtime(&hub).ai_level(2),
+                Some(ww2_core::commander_ai::Level::Normal)
+            );
+        }
+    }
+}

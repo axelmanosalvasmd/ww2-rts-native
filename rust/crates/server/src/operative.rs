@@ -106,7 +106,6 @@ impl Room {
                     denies: Vec::new(),
                     map_pings: Vec::new(),
                     rtt: None,
-                    map_pings: Vec::new(),
                     diagnostics: crate::diagnostics::PlayerDiagnostics::default(),
                     last_match: None,
                 },

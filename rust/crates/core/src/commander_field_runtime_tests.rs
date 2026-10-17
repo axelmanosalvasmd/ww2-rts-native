@@ -176,7 +176,7 @@ fn collect_classic_complete(state: &mut Match, delivery: &mut DeliveryState) {
     }
 }
 
-fn tick_and_collect(state: &mut Match, delivery: Option<&mut DeliveryState>) {
+fn tick_and_collect(state: &mut Match, delivery: &mut DeliveryState) {
     let report = state.advance_tick().unwrap();
     assert!(
         report.commands.iter().all(|result| result.denial.is_none()),
@@ -188,14 +188,6 @@ fn tick_and_collect(state: &mut Match, delivery: Option<&mut DeliveryState>) {
     for &id in state.world.game.units.keys() {
         state.validate_gate_actor(id).unwrap();
     }
-    let Some(delivery) = delivery else {
-        // Unsupported mode snapshot bounds remain independent of Gate admission.
-        assert!(matches!(
-            SnapshotCache::new(state),
-            Err(SnapshotError::UnsupportedMode)
-        ));
-        return;
-    };
     let snapshot_mode = (!matches!(state.options.mode, Mode::Default | Mode::Conquest))
         .then(|| crate::recipient_snapshot::mode_row(state).unwrap());
     let selected: Vec<_> = (0..state.start.players.len())
@@ -266,22 +258,11 @@ fn intent_ai50_gate_order_completes_in_each_real_ordinary_mode_with_supported_se
             json!({"t":"dig","kind":"gate","ids":[builder],
             "x":80.0,"z":45.0,"dir":0.0}),
         );
-        let mut delivery = if matches!(
-            mode,
-            Mode::Default | Mode::Conquest | Mode::Classic | Mode::Assault | Mode::Annihilation
-        ) {
-            Some(DeliveryState::new(&state).unwrap())
-        } else {
-            assert!(matches!(
-                SnapshotCache::new(&state),
-                Err(SnapshotError::UnsupportedMode)
-            ));
-            None
-        };
+        let mut delivery = DeliveryState::new(&state).unwrap();
         if mode == Mode::Classic {
-            collect_classic_complete(&mut state, delivery.as_mut().unwrap());
+            collect_classic_complete(&mut state, &mut delivery);
         }
-        tick_and_collect(&mut state, delivery.as_mut());
+        tick_and_collect(&mut state, &mut delivery);
         let job = state.field_works.jobs().get(&builder).unwrap();
         assert_eq!(job.kind, FortKind::Gate);
         assert_eq!(job.cells.len(), 3);

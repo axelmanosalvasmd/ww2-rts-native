@@ -637,7 +637,7 @@ mod tests {
     use super::*;
     use crate::{
         commander_ai::{Input, PlayerObservation},
-        commander_tactics::{KnownBuilding, NodeObservation, UnitFacts as RuntimeFacts},
+        commander_tactics::{KnownBuilding, UnitFacts as RuntimeFacts},
     };
     fn unit(id: u32, kind: &str, x: f64, z: f64) -> UnitObservation {
         let d = Catalog::compiled().unwrap().unit(kind).unwrap();

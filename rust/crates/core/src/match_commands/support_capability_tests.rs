@@ -604,7 +604,7 @@ fn hosted_recorded_plane_support_pays_once_and_delivers_every_seat_through_retir
 
     let mut state = scene();
     // Unrestricted component admission keeps the same canonical publication.
-    record_at(&mut state, "recon");
+    record(&mut state, "recon");
     assert_eq!(state.apply_commands(1, false).unwrap()[0].denial, None);
     assert_eq!(
         state.world.game.strikes[0].runtime.as_ref().unwrap().kind,

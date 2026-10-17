@@ -639,7 +639,8 @@ impl Room {
         }
         let host = self.is_host(id);
         let attached = self.native.is_some();
-        if attached && (t == "leave" || t == "handAi") {
+        if attached && matches!(msg["t"].as_str(), Some("leave" | "handAi")) {
+            let t = msg["t"].as_str().unwrap();
             let target = if t == "leave" {
                 seated.filter(|slot| !self.players[*slot].ai)
             } else if host {
@@ -1184,7 +1185,6 @@ impl Hub {
             saves: crate::saves::SaveStore::new("saves".into()),
             authored_maps_dir: None,
             records: crate::HordeRecords::new("horde-records.json"),
-            authored_maps_dir: None,
         }
     }
     pub(crate) fn configure_records(&mut self, records: crate::HordeRecords) {
@@ -2006,17 +2006,7 @@ impl Hub {
                         }
                     }
                 }
-                // All requested human and internal Horde views refresh before either owner acts.
-                let think_at = Instant::now();
-                if let Err(error) = room.native.as_mut().unwrap().runtime.think(sent) {
-                    room.native
-                        .as_mut()
-                        .unwrap()
-                        .runtime
-                        .fault_stop(format!("Horde AI scheduling: {error}"));
-                    continue;
-                }
-                let horde_think = think_at.elapsed().as_secs_f64() * 1000.0;
+                // Selected recipient views refresh before the sole production AI owner acts.
                 let think_at = Instant::now();
                 if let Err(error) = room.native.as_mut().unwrap().runtime.tick_ai(sent) {
                     room.native
@@ -2026,7 +2016,7 @@ impl Hub {
                         .fault_stop(format!("room AI: {error}"));
                     continue;
                 }
-                let think = horde_think + think_at.elapsed().as_secs_f64() * 1000.0;
+                let think = think_at.elapsed().as_secs_f64() * 1000.0;
                 let sample = TickSample {
                     sent,
                     durations: [

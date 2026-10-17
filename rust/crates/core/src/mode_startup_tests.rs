@@ -325,9 +325,7 @@ fn base52_first_fitting_site_moves_away_from_a_nearby_income_point() {
 
 #[test]
 fn mode01_non_world_mode_rows_match_the_prototype_public_fields() {
-    use crate::recipient_snapshot::{
-        DeliveryState, SelectedSeat, SnapshotCache, SnapshotError, mode_row,
-    };
+    use crate::recipient_snapshot::{DeliveryState, SelectedSeat, SnapshotCache, mode_row};
 
     // Prototype sim.js:5895-5898; Tutorial's initial goal is tutorial.js:11.
     // Ordinary modes carry their exact public row; closed modes remain refused.
@@ -524,6 +522,7 @@ fn mode01_mode_rows_round_timers_and_refuse_invalid_values_or_mode_pairs() {
 
 #[test]
 fn all_admitted_mode_rows_survive_six_tick_selected_delivery() {
+    use crate::recipient_snapshot::{DeliveryState, SelectedSeat, mode_row};
     for mode in MODES {
         let mut m = create(mode, ArmySize::Standard).unwrap();
         let selected: Vec<_> = (0..m.start.players.len())

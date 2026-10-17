@@ -24,14 +24,28 @@ struct Consumer {
     #[cfg(test)]
     decoded: Option<ww2_core::ai_view::SeatView>,
 }
+#[cfg(test)]
+#[derive(Clone, Debug)]
+pub(crate) struct DecisionTrace {
+    pub tick: i64,
+    pub slot: usize,
+    pub accepted: Vec<(OrderKey, Command)>,
+}
 #[derive(Default)]
 pub(super) struct RoomAi {
+    #[cfg(test)]
+    trace: Vec<DecisionTrace>,
     schedule: Schedule,
     consumers: BTreeMap<usize, Consumer>,
     delivered: Vec<DeliveredSeat<Delivered>>,
     fresh: BTreeMap<usize, Delivered>,
 }
 impl RoomAi {
+    #[cfg(test)]
+    pub fn take_trace(&mut self) -> Vec<DecisionTrace> {
+        std::mem::take(&mut self.trace)
+    }
+
     fn save_memories_with(
         &self,
         seats: usize,
@@ -397,6 +411,12 @@ impl RoomAi {
                     .collect::<Vec<_>>(),
                 Advance::Horde(commands) => commands,
             };
+            #[cfg(test)]
+            let mut trace = DecisionTrace {
+                tick,
+                slot,
+                accepted: Vec::new(),
+            };
             for command in commands {
                 let next = (tick as u64).checked_add(1).ok_or("AI tick exhausted")?;
                 let sequence = state
@@ -408,18 +428,24 @@ impl RoomAi {
                     .unwrap_or(0)
                     .checked_add(1)
                     .ok_or("AI sequence exhausted")?;
-                match state.enqueue_command(
-                    OrderKey {
-                        tick: next,
-                        issuer: slot as u32,
-                        sequence,
-                    },
-                    command,
-                ) {
-                    Ok(()) | Err(QueueError::Full) => {}
+                let key = OrderKey {
+                    tick: next,
+                    issuer: slot as u32,
+                    sequence,
+                };
+                #[cfg(test)]
+                let recorded = command.clone();
+                match state.enqueue_command(key, command) {
+                    Ok(()) => {
+                        #[cfg(test)]
+                        trace.accepted.push((key, recorded));
+                    }
+                    Err(QueueError::Full) => {}
                     Err(error) => return Err(format!("room AI admission: {error:?}")),
                 }
             }
+            #[cfg(test)]
+            self.trace.push(trace);
         }
         self.fresh.clear();
         Ok(())

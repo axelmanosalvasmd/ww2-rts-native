@@ -16,12 +16,10 @@ fn outputs(hub: &mut Hub, rx: &mut mpsc::Receiver<Output>, now: u64) -> Vec<Valu
         match output {
             Output::Watcher(_) => panic!("watcher output on seated connection"),
             Output::Json(value) => result.push(value),
-            Output::Watcher(json) => result.push(serde_json::from_str(&json).unwrap()),
             Output::Snapshot(frame) => {
                 result.push(serde_json::from_str(&frame.json).unwrap());
                 hub.complete_snapshot(&frame, true, now);
             }
-            Output::Watcher(_) => panic!("unexpected watcher output on Horde commander channel"),
             Output::Close(code, reason) => panic!("unexpected close {code}: {reason}"),
         }
     }

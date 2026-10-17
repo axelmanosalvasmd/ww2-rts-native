@@ -326,88 +326,90 @@ fn failed_current_write_drops_and_resumes_only_its_stable_seat_once() {
 
 #[test]
 fn final_hold_frame_precedes_result_and_old_tickets_survive_new_attachment() {
-    let (mut h, _, mut ra, _, mut rb) = room();
-    let mut state = native_match();
-    state
-        .record_story_tally(Some(0), ww2_core::match_story::StoryKey::Kills, 3.4)
-        .unwrap();
-    state
-        .record_story_tally(Some(1), ww2_core::match_story::StoryKey::Losses, 2.4)
-        .unwrap();
-    state.start.economy.players[0].vp = state.start.win_vp;
-    let victory = state.apply_conquest_victory().unwrap().unwrap();
-    let old_epoch = h.attach_native("ABC", state, 0).unwrap();
-    for callback in 0..119_u64 {
-        h.poll_native(callback * 50, callback * 50_000_000);
-        for receiver in [&mut ra, &mut rb] {
-            while let Ok(output) = receiver.try_recv() {
-                if let Output::Snapshot(write) = output {
-                    h.complete_snapshot(&write, true, callback * 50);
+    for prefix in [119_u64, 118] {
+        let (mut h, _, mut ra, _, mut rb) = room();
+        let mut state = native_match();
+        state
+            .record_story_tally(Some(0), ww2_core::match_story::StoryKey::Kills, 3.4)
+            .unwrap();
+        state
+            .record_story_tally(Some(1), ww2_core::match_story::StoryKey::Losses, 2.4)
+            .unwrap();
+        state.start.economy.players[0].vp = state.start.win_vp;
+        let victory = state.apply_conquest_victory().unwrap().unwrap();
+        let old_epoch = h.attach_native("ABC", state, 0).unwrap();
+        for callback in 0..prefix {
+            h.poll_native(callback * 50, callback * 50_000_000);
+            for receiver in [&mut ra, &mut rb] {
+                while let Ok(output) = receiver.try_recv() {
+                    if let Output::Snapshot(write) = output {
+                        h.complete_snapshot(&write, true, callback * 50);
+                    }
                 }
             }
         }
+        assert!(!h.native_status("ABC").unwrap().ending_complete);
+        assert_eq!(h.native_status("ABC").unwrap().held, prefix as u16);
+        h.poll_native(5950, 5_950_000_000);
+        let mut final_writes = Vec::new();
+        for (slot, receiver) in [&mut ra, &mut rb].into_iter().enumerate() {
+            let Output::Snapshot(frame) = receiver.try_recv().unwrap() else {
+                panic!("final frame must precede result")
+            };
+            assert_eq!(frame.epoch, old_epoch);
+            let Output::Json(resume) = receiver.try_recv().unwrap() else {
+                panic!("expected resume before lobby")
+            };
+            assert_eq!(resume["paused"], false);
+            let Output::Json(lobby) = receiver.try_recv().unwrap() else {
+                panic!("expected result lobby")
+            };
+            let result = &lobby["result"];
+            assert_eq!(lobby["state"], "lobby");
+            assert_eq!(result["winner"], 0);
+            assert_eq!(result["teams"], json!([0, 1]));
+            assert_eq!(result["names"], json!(["a", "b"]));
+            assert_eq!(result["reason"], "vp");
+            assert_eq!(result["endTick"], victory.end_tick);
+            assert_eq!(result["at"]["x"].as_f64(), Some(victory.end_at.x));
+            assert_eq!(result["story"][0]["kills"].as_f64(), Some(3.0));
+            assert_eq!(result["story"][1]["losses"].as_f64(), Some(2.0));
+            assert_eq!(result["you"]["team"], slot);
+            assert_eq!(
+                result["you"]["outcome"],
+                if slot == 0 { "victory" } else { "defeat" }
+            );
+            assert_eq!(result.as_object().unwrap().len(), 11);
+            final_writes.push(frame);
+        }
+        let completed = h.native_status("ABC").unwrap();
+        assert_eq!(completed.tick, 60);
+        assert_eq!(completed.held, 120);
+        assert!(completed.ending_complete);
+        assert!(h.rooms["ABC"].native.is_none());
+        let outstanding = h.accounts[&1].pressure.inflight();
+        assert!(outstanding > 0);
+        let new_epoch = h.attach_native("ABC", native_match(), 6000).unwrap();
+        initial_start(&mut ra);
+        initial_start(&mut rb);
+        assert!(new_epoch > old_epoch);
+        assert_eq!(h.accounts[&1].pressure.inflight(), outstanding);
+        let history = h.accounts[&1].delivery.clone();
+        for frame in &final_writes {
+            h.complete_snapshot(frame, true, 6001);
+        }
+        assert_eq!(h.accounts[&1].pressure.inflight(), 0);
+        assert_eq!(h.accounts[&1].delivery, history);
+        assert!(!h.accounts[&1].full_terrain);
+        assert_eq!(h.native_status("ABC").unwrap().tick, 0);
+        assert!(ra.try_recv().is_err());
+        h.poll_native(6000, 6_000_000_000);
+        h.poll_native(6050, 6_050_000_000);
+        let next = write(&mut ra);
+        assert_eq!(next.epoch, new_epoch);
+        assert!(next.ticket > final_writes[0].ticket);
+        h.complete_snapshot(&next, true, 6051);
     }
-    assert!(!h.native_status("ABC").unwrap().ending_complete);
-    assert_eq!(h.native_status("ABC").unwrap().held, 119);
-    h.poll_native(5950, 5_950_000_000);
-    let mut final_writes = Vec::new();
-    for (slot, receiver) in [&mut ra, &mut rb].into_iter().enumerate() {
-        let Output::Snapshot(frame) = receiver.try_recv().unwrap() else {
-            panic!("final frame must precede result")
-        };
-        assert_eq!(frame.epoch, old_epoch);
-        let Output::Json(resume) = receiver.try_recv().unwrap() else {
-            panic!("expected resume before lobby")
-        };
-        assert_eq!(resume["paused"], false);
-        let Output::Json(lobby) = receiver.try_recv().unwrap() else {
-            panic!("expected result lobby")
-        };
-        let result = &lobby["result"];
-        assert_eq!(lobby["state"], "lobby");
-        assert_eq!(result["winner"], 0);
-        assert_eq!(result["teams"], json!([0, 1]));
-        assert_eq!(result["names"], json!(["a", "b"]));
-        assert_eq!(result["reason"], "vp");
-        assert_eq!(result["endTick"], victory.end_tick);
-        assert_eq!(result["at"]["x"].as_f64(), Some(victory.end_at.x));
-        assert_eq!(result["story"][0]["kills"].as_f64(), Some(3.0));
-        assert_eq!(result["story"][1]["losses"].as_f64(), Some(2.0));
-        assert_eq!(result["you"]["team"], slot);
-        assert_eq!(
-            result["you"]["outcome"],
-            if slot == 0 { "victory" } else { "defeat" }
-        );
-        assert_eq!(result.as_object().unwrap().len(), 11);
-        final_writes.push(frame);
-    }
-    let completed = h.native_status("ABC").unwrap();
-    assert_eq!(completed.tick, 60);
-    assert_eq!(completed.held, 120);
-    assert!(completed.ending_complete);
-    assert!(h.rooms["ABC"].native.is_none());
-    let outstanding = h.accounts[&1].pressure.inflight();
-    assert!(outstanding > 0);
-    let new_epoch = h.attach_native("ABC", native_match(), 6000).unwrap();
-    initial_start(&mut ra);
-    initial_start(&mut rb);
-    assert!(new_epoch > old_epoch);
-    assert_eq!(h.accounts[&1].pressure.inflight(), outstanding);
-    let history = h.accounts[&1].delivery.clone();
-    for frame in &final_writes {
-        h.complete_snapshot(frame, true, 6001);
-    }
-    assert_eq!(h.accounts[&1].pressure.inflight(), 0);
-    assert_eq!(h.accounts[&1].delivery, history);
-    assert!(!h.accounts[&1].full_terrain);
-    assert_eq!(h.native_status("ABC").unwrap().tick, 0);
-    assert!(ra.try_recv().is_err());
-    h.poll_native(6000, 6_000_000_000);
-    h.poll_native(6050, 6_050_000_000);
-    let next = write(&mut ra);
-    assert_eq!(next.epoch, new_epoch);
-    assert!(next.ticket > final_writes[0].ticket);
-    h.complete_snapshot(&next, true, 6051);
 }
 
 #[test]

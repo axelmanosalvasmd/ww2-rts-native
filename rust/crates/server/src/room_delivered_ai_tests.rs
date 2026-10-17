@@ -616,6 +616,7 @@ fn ai63_hosted_save_restores_planners_resets_humans_and_restarts_commanders() {
             room.collect_frame(&selected, FrameKind::Scheduled).unwrap();
         }
         room.tick_ai(sent).unwrap();
+        super::room_ai3_tests::assert_production_queue(room);
     }
     let memories = runtime(&hub).save_ai_memories();
     assert_eq!(
@@ -735,6 +736,7 @@ fn ai63_hosted_save_restores_planners_resets_humans_and_restarts_commanders() {
         drain(&mut rh);
         let room = runtime_mut(&mut hub);
         room.collect_frame(&selected, FrameKind::Current).unwrap();
+        super::room_ai3_tests::assert_production_queue(room);
         assert!(room.fault().is_none());
         assert!(room.tick_failure().is_none());
     }

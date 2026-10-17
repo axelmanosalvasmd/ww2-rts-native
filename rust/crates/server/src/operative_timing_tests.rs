@@ -177,7 +177,6 @@ fn if28_native_input_log_replays_tick_order_away_pause_and_operative_throttle() 
                         returned_messages.push(serde_json::from_str(&write.json).unwrap());
                         hub.complete_snapshot(&write, true, *now);
                     }
-                    Output::Watcher(_) => panic!("unexpected watcher output for returning seat"),
                     Output::Close(_, reason) => panic!("unexpected returning seat close: {reason}"),
                 }
             }

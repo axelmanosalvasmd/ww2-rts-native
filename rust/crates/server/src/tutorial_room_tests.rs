@@ -349,6 +349,16 @@ fn net18_tutorial_hello_autostarts_once_and_delivers_every_seat() {
     hub.poll_native(0, 0);
     hub.poll_native(100, 100_000_000);
     assert_eq!(hub.native_status("TUT").unwrap().fault, None);
+    let room_runtime = runtime(&mut hub);
+    assert!(room_runtime.ai_selected().is_empty());
+    assert!(room_runtime.ai_commander(0).is_none());
+    assert!(
+        room_runtime.ai_commander(1).is_none(),
+        "Tutorial enemy is scripted, never an AI scheduler"
+    );
+    assert!(room_runtime.take_ai_trace().is_empty());
+    assert!(room_runtime.ai.is_none());
+    assert_eq!(room_runtime.legacy_ai_queued, 0);
     for row in peer.drain(&mut hub).into_iter().filter(|r| r["t"] == "s") {
         assert_eq!(row["online"], json!([true]));
         assert_eq!(row["ping"], json!([null]));

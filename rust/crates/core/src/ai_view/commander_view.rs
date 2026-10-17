@@ -480,6 +480,22 @@ impl CommanderViewMemory {
                             0
                         },
                         amove,
+                        attack_target: if own {
+                            u32::try_from(integer(&u["attackId"])?)
+                                .map_err(|_| "invalid delivered attack target")?
+                        } else {
+                            0
+                        },
+                        queued_amove: if own {
+                            optional_rows(&u["orders"])?
+                                .iter()
+                                .find(|order| order["kind"] == 2)
+                                .map(at)
+                                .transpose()?
+                        } else {
+                            None
+                        },
+                        air_at_base: own && u["air"]["state"] == "base",
                         airborne: is("air")
                             && matches!(
                                 u["air"]["state"].as_str(),
@@ -582,6 +598,23 @@ impl CommanderViewMemory {
                 standard_army,
             })
         };
+        context.field = Some(crate::commander_field_policy::Facts {
+            initial_chars: view.initial_chars.clone(),
+            initial_height: view.initial_height.clone(),
+            ground: view.ground.clone(),
+            bridges: view
+                .initial_chars
+                .iter()
+                .zip(&view.chars)
+                .enumerate()
+                .filter_map(|(cell, (initial, current))| {
+                    (*initial == b'=' || *current == b'=').then_some(cell)
+                })
+                .collect(),
+            mines: context.mines.clone(),
+            found_mines: context.found_mines.clone(),
+            free_nodes: context.site_nodes.clone(),
+        });
         let mut input = Input {
             width: self.width,
             height: self.height,
@@ -1190,6 +1223,17 @@ mod delivered {
                             convoy: own && trucks.contains(&id),
                             stock,
                             amove,
+                            attack_target: if own { unsigned(&u["attackId"])? } else { 0 },
+                            queued_amove: if own {
+                                array(&u["orders"])?
+                                    .iter()
+                                    .find(|o| o["kind"] == 2)
+                                    .map(point)
+                                    .transpose()?
+                            } else {
+                                None
+                            },
+                            air_at_base: own && u["air"]["state"] == "base",
                             airborne: flag(definition, "air")
                                 && matches!(
                                     u["air"]["state"].as_str(),

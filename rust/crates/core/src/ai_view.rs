@@ -5,6 +5,7 @@ use crate::{catalog::Catalog, math, recipient_snapshot::SupportedSeatSnapshot};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 
+pub mod commander;
 mod commander_view;
 pub use commander_view::CommanderViewMemory;
 mod horde;
