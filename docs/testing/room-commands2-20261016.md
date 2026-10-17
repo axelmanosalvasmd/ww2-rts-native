@@ -98,3 +98,17 @@ Incoming main `52a8315f` includes #396 combat filtering, #392 numeric keys and #
 - This integration record and `changelog.d/2026-10-16-roomcmds2-main-composition.md` document these changes.
 
 Automatic delivery changes retain row reuse through event/list/terrain publication. Classic nodes and incoming building ghosts coexist. Public Classic startup, World admission, and canonical guard boundaries remain unchanged. The stream PR records the final merge tree comparison and qualification head.
+
+## Main composition after spectator missions
+
+Incoming main `3c33cd040b8fcaa71d2795b3b3030c749b522706` adds #400 spectator mission paths. From parent `8c1d1dae8fe6a13a5feb9f737eadd613fa73caed`, its conflicted automatic tree is `83183c06893709b4600d2e7f78bc00a91807975e` (computed with those literal parent SHAs). Every hand-edited region follows:
+
+- `match_human_observation.rs` (one): retain both Horde and AuthoredMission as noncombat observation events.
+- `match_tick.rs` (one): retain both event variants.
+- `recipient_snapshot/shots.rs` (three): retain both borrowed variants, both validated raw-event arms and authored mission chronology checks. Preserve the existing admitted Aviation conversion instead of restoring the incoming historical Air refusal.
+- `native_startup.rs` (one): retain incoming authored-mission map-definition binding, then choose the existing Horde, Classic or ordinary StartPlan builder. Keep every map/layout and mode guard.
+- `simtest/tests/common/companion_tick.rs` (one): handle both event variants without changing fixture predicates.
+- `simtest/tests/match_tick_events.rs` (two): convert both event families and retain their refusal in the original four-family fixture. Extend its panic text to name AuthoredMission; all assertions remain.
+- This record documents the merge. No other path is manually changed in this merge.
+
+The automatic authored-mission field initializers, validation, spectator filtering and tests remain. No prototype, C ABI or parity-status file is edited by this reconciliation.
