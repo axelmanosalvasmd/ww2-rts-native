@@ -3,8 +3,8 @@
 The `NET-58` row in `docs/parity/server.md` cites the prototype at
 `reference/ww2-rts/shared/sim.js:5965-6009,6079-6088` (`e4e579a`).
 The composed implementation retains the inherited tests below and adds focused
-operative and Horde checks. Execution is pending the parent stream's slot run;
-this document is a source mapping, not a passing-test receipt.
+operative and Horde checks. This document maps source coverage; the stream PR
+records the producing head and execution results.
 
 | NET-58 clause | Registered native test | Evidence scope |
 | --- | --- | --- |

@@ -36,7 +36,11 @@ fn scene() -> Match {
             sequence: 2,
             max_contacts: 3,
             near: 0.0,
-            start_cell: usize::MAX,
+            start_cell: state
+                .world
+                .game
+                .cell_of(solution.origin.x, solution.origin.z)
+                .unwrap(),
             intended: Some(3),
             damage_scale: 1.0,
             armor_piercing: false,
