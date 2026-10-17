@@ -569,9 +569,6 @@ impl Room {
             }
             return false;
         }
-        if seated.is_none() && (CommanderIngress::recognizes(t) || UNAVAILABLE.contains(&t)) {
-            return false;
-        }
         if host && matches!(t, "pause" | "resume" | "end") && self.native.is_some() {
             let native = self.native.as_mut().unwrap();
             if native.runtime.fault().is_some()
@@ -630,6 +627,9 @@ impl Room {
             .as_ref()
             .is_some_and(|native| native.runtime.paused())
         {
+            return false;
+        }
+        if seated.is_none() && (CommanderIngress::recognizes(t) || UNAVAILABLE.contains(&t)) {
             return false;
         }
         if CommanderIngress::recognizes(t)

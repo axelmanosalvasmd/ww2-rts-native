@@ -592,6 +592,91 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn base_commands_reserve_canonical_input_before_mutating_state() {
+        for case in 0..3 {
+            let mut state = crate::lobby::native_tests::native_match();
+            let mut ingress = CommanderIngress::default();
+            let hq = state
+                .world
+                .game
+                .units
+                .values()
+                .find(|unit| unit.owner == 0 && state.rules.kinds[unit.kind].name == "hq")
+                .unwrap()
+                .id;
+            let at = state
+                .world
+                .game
+                .units
+                .values()
+                .find(|unit| unit.owner == 0 && state.rules.kinds[unit.kind].name == "rifle")
+                .unwrap()
+                .at();
+            let raw = match case {
+                0 => json!({"t":"cancel", "id":hq}),
+                1 => json!({"t":"rally", "id":hq, "x":at.x, "z":at.z}),
+                _ => json!({"t":"rally", "x":at.x, "z":at.z}),
+            };
+            let before = format!(
+                "{:?}",
+                (
+                    &state.world,
+                    &state.start.economy,
+                    &state.building_rallies,
+                    &state.player_rallies
+                )
+            );
+            assert_eq!(ingress.enqueue(&mut state, 0, &raw), Ok(()));
+            assert_eq!(state.commands.pending_commands(), 1);
+            let key = OrderKey {
+                tick: 1,
+                issuer: 0,
+                sequence: 1,
+            };
+            assert_eq!(
+                state
+                    .commands
+                    .pending_tick(1)
+                    .map(|(key, command)| (*key, command.clone()))
+                    .collect::<Vec<_>>(),
+                vec![(key, Command::from_json(&raw).unwrap())]
+            );
+            assert_eq!(ingress.feedback.get(&key), raw["t"].as_str().as_ref());
+            assert_eq!(
+                format!(
+                    "{:?}",
+                    (
+                        &state.world,
+                        &state.start.economy,
+                        &state.building_rallies,
+                        &state.player_rallies
+                    )
+                ),
+                before
+            );
+            let report = state.advance_tick().unwrap();
+            let feedback = ingress.complete(&report.commands);
+            if case == 0 {
+                assert_eq!(feedback, vec![(0, "cancel", Denial::Unseen)]);
+                assert!(state.world.game.units.contains_key(&hq));
+            } else {
+                assert!(feedback.is_empty());
+                if case == 1 {
+                    assert_eq!(state.building_rallies[&hq], Some(at));
+                } else {
+                    assert_eq!(state.player_rallies[0], Some(at));
+                }
+            }
+            assert_eq!(state.commands.pending_commands(), 0);
+            assert!(ingress.feedback.is_empty());
+            let cache = ww2_core::recipient_snapshot::SnapshotCache::new(&state).unwrap();
+            for slot in 0..2 {
+                cache.recipient(slot).unwrap();
+            }
+        }
+    }
 }
 
 #[cfg(test)]

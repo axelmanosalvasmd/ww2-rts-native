@@ -45,8 +45,9 @@ The spectator projection supplies `EVERYTHING.has` (`server.js:204,219-220`),
 so `seenBy` retains even absent actors (`shared/sim.js:5945`); cached unit targets
 and local/nonlocal shots follow that predicate (`shared/sim.js:5901,6002-6003,6083-6087`).
 Seated recipients retain their existing visibility and identity-redaction rules.
-Only public scenario objectives and authored shots reach spectators. Existing
-ordinary capability guards still reject unsupported simulation state.
+Only public scenario objectives and authored shots reach spectators. The timed
+message/objective subset is described in [spectator-missions-v0.md](spectator-missions-v0.md).
+Existing ordinary capability guards still reject unsupported simulation state.
 
 Terrain keeps the prototype's seat 0 team mine knowledge despite lifting fog:
 unfound enemy mines remain hidden, and `foundMines` contains seat 0's team
@@ -56,7 +57,8 @@ remembered lists owned by commander seats are not drained by a watcher read.
 
 Spectator army commands produce no reply and never enter the command queue
 (`server.js:712-714`). Latency `ping`, name changes and shared `resync` remain
-available. A spectator whose queued output exceeds 4 MiB closes with code 1013
+available. Non-host spectator `save` and `loadSave` requests are also ignored
+without a reply or storage access (`server.js:690-695,712-714`). A spectator whose queued output exceeds 4 MiB closes with code 1013
 and reason `too far behind`; exactly 4 MiB is still eligible
 (`server.js:266-273`). A reconnect rebuilds from a fresh start and forces the
 existing shared stream full. Spectators remain in the room through the ending
