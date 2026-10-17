@@ -92,6 +92,29 @@ fn net79_host_pause_freezes_room_ai_armies_and_operatives_with_one_second_frames
             runtime(&hub).state().commands.pending_commands(),
             pending_before + 1
         );
+        // Materialize current recipient fog before freezing the full checkpoint.
+        // Current frames leave initialized AI observations unchanged.
+        let count = runtime(&hub).state().world.game.players.len();
+        let selected = (0..count)
+            .map(|slot| SelectedSeat {
+                slot,
+                full: false,
+                omit: false,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            hub.rooms
+                .get_mut("ABC")
+                .unwrap()
+                .native
+                .as_mut()
+                .unwrap()
+                .runtime
+                .collect_frame(&selected, FrameKind::Current)
+                .unwrap()
+                .len(),
+            count
+        );
         peers[0].send(&mut hub, json!({"t":"pause"}), 12_050);
         let pause = json!({"t":"pause", "paused":true, "by":"Host", "reason":"host", "left":0});
         for peer in &mut peers {

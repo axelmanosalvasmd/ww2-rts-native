@@ -184,3 +184,9 @@ Preserved tests:
 ## Verification boundary
 
 Source comparisons verify both resolved files are byte-identical to the first-parent files, contain no conflict markers, and retain the intended module registrations. This reconciliation is source-only. Parent owns final compilation, formatting, tests and merge completion.
+
+## Rebuilt merged-head failures
+
+The rebuilt `88a65bbd` selection ran 259 tests: 257 passed and two failed. The NET-79 full-checkpoint difference contained only lazy `routing_fog` cache refresh (retained pose, team visibility and cache key/version). The witness now collects a current frame for every canonical seat before pause and checkpoint capture, retaining its full equality assertion on every paused callback. Current frames do not refresh initialized AI observations.
+
+`eng12_unrepresented_modes_and_logistics_cannot_publish_paid_or_waiting_gates` exposed a separate guard integration issue. The fixture changes mode tags to Horde without constructing canonical Horde ownership. Shared ordinary actor lookup now recognizes its roster shape. The gate-specific admission predicate now requires `validate_horde_economy` for Horde, so paid and queued gate creation still reject malformed state. Canonical Horde gate support and ordinary logistics refusal remain unchanged; the existing test and assertions remain intact.
