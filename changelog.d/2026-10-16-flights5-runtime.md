@@ -14,3 +14,5 @@
 - Update `actual_support_admission_projects_public_strikes_and_owner_cooldowns` to compare the prototype's existing empty owner `air` list alongside its public support state.
 - Update `cmb127_horde_reveals_only_active_final_ground_enemies_and_bosses_to_defenders` to retain its visibility cases and require the precise missing-sortie-metadata refusal for its synthetic plane, with an unchanged tick clock and no fault. Keep this refusal assertion in the required Rust format.
 - Preserve recipient Horde intent through the incoming AI checkpoint codec. Extend `if27_horde_pending_memory_round_trips_order_budget_and_supersession` with a populated delivered plan so its existing round trip also covers recipient-derived intent.
+- Preserve incoming AI mirror facts alongside aircraft readiness: read owner hold-fire, autocast and ability cooldown from delivered rows, mask them for allies, and strengthen `delivered_defender_packet_keeps_own_intent_economy_and_received_terrain` to check both paths.
+- Keep the merged integration-test event assertion for both Horde and authored missions in the required workspace format.

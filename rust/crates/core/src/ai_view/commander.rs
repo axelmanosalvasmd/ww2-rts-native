@@ -316,6 +316,9 @@ impl CommanderMemory {
                     UnitFacts {
                         built: optional_number(&u["built"])?.unwrap_or(1.0),
                         hold_position: own && truth(&u["holdPos"]),
+                        hold_fire: own && truth(&u["holdFire"]),
+                        auto_cast: own && truth(&u["auto"]),
+                        cooldown: if own { number(&u["cd"])? } else { 0.0 },
                         queued_orders: if own { array(&u["orders"])?.len() } else { 0 },
                         auto_retreat: own && truth(&u["autoRetreat"]),
                         convoy: own && trucks.contains(&id),
@@ -565,6 +568,10 @@ mod tests {
     #[test]
     fn delivered_defender_packet_keeps_own_intent_economy_and_received_terrain() {
         let (mut delivery, mut snap) = delivery();
+        for row in snap["units"].as_array_mut().unwrap() {
+            row[11] = json!(7);
+            row[12] = json!(2048 | 4096 | 8192 | 16384);
+        }
         snap["cells"] = json!([[5,"N",2,0,{"ground":"D","object":".","mineOwned":true}]]);
         let view = delivery.decode(&snap).unwrap();
         let result = CommanderMemory::new(0, 40, 40)
@@ -579,6 +586,11 @@ mod tests {
         assert_eq!(input.manpower, 420.0);
         assert_eq!(context.munitions, 160.0);
         assert_eq!(context.support["artillery"], 5.0);
+        assert!(context.units[&1].hold_fire && context.units[&1].auto_cast);
+        assert_eq!(context.units[&1].cooldown, 7.0);
+        assert!(!context.units[&3].hold_fire && !context.units[&3].auto_cast);
+        assert_eq!(context.units[&3].cooldown, 0.0);
+        assert!(!context.units.contains_key(&2));
         assert_eq!(
             input.research.as_ref().unwrap().busy,
             vec![Technology::Guns]
