@@ -19,6 +19,7 @@ pub enum ShotRef<'a> {
     Support(&'a SupportEvent),
     Environment(&'a Effect),
     Scenario(&'a SayAction),
+    AuthoredMission(&'a Value),
 }
 
 impl<'a> TryFrom<&'a TickEvent> for ShotRef<'a> {
@@ -30,6 +31,7 @@ impl<'a> TryFrom<&'a TickEvent> for ShotRef<'a> {
             TickEvent::Support(value) => Ok(Self::Support(value)),
             TickEvent::Environment(value) => Ok(Self::Environment(value)),
             TickEvent::Scenario(value) => Ok(Self::Scenario(value)),
+            TickEvent::AuthoredMission(value) => Ok(Self::AuthoredMission(value)),
             TickEvent::Aviation(_) => Err(SnapshotError::Unsupported {
                 unit: 0,
                 capability: SnapshotCapability::Air,
@@ -76,11 +78,11 @@ impl DeliveryState {
         if selected.is_empty() {
             return Ok(None);
         }
-        self.preflight_selected(state, selected)?;
+        let rows = self.preflight_selected(state, selected)?;
         composition::admit_actors(state, &[])?;
         let projected = project_shots(state, selected, shots)?;
         let frame = self
-            .capture_selected_with_lists(state, selected, &[])?
+            .capture_selected_with_lists_admitted(state, selected, &[], rows)?
             .ok_or(SnapshotError::InvalidRecipient)?;
         Ok(Some(SelectedGroundShotFrame {
             frame,
@@ -202,6 +204,20 @@ fn event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
 
 fn raw_event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
     match shot {
+        ShotRef::AuthoredMission(value) => {
+            let mission = state
+                .authored_mission
+                .as_ref()
+                .ok_or(SnapshotError::Rules)?;
+            if !mission.accepts_shot(value)
+                || value["atTick"]
+                    .as_i64()
+                    .is_none_or(|tick| tick > state.world.game.tick)
+            {
+                return Err(SnapshotError::Rules);
+            }
+            Ok(value.clone())
+        }
         ShotRef::Scenario(value) => {
             validate_public_say(value).map_err(|_| SnapshotError::Rules)?;
             if state.scenario.is_none()
@@ -398,10 +414,26 @@ fn project_shots(
     selected: &[SelectedSeat],
     shots: &[ShotRef<'_>],
 ) -> Result<Vec<(usize, Value)>, SnapshotError> {
+    project_shots_perspective(state, selected, shots, false)
+}
+
+pub(super) fn project_shots_perspective(
+    state: &Match,
+    selected: &[SelectedSeat],
+    shots: &[ShotRef<'_>],
+    full_map: bool,
+) -> Result<Vec<(usize, Value)>, SnapshotError> {
     let events = shots
         .iter()
         .copied()
-        .map(|shot| event(state, shot).map(|row| (matches!(shot, ShotRef::Scenario(_)), row)))
+        .map(|shot| {
+            event(state, shot).map(|row| {
+                (
+                    matches!(shot, ShotRef::Scenario(_) | ShotRef::AuthoredMission(_)),
+                    row,
+                )
+            })
+        })
         .collect::<Result<Vec<_>, _>>()?;
     state
         .routing_fog
@@ -417,10 +449,25 @@ fn project_shots(
         let visible = &fog.team(g, &state.rules, g.players[seat.slot].team).vis;
         let mut rows = Vec::new();
         for (public_say, event) in &events {
-            // Migrated legacy Say is public to each selected commander seat.
-            // It has no geometry and bypasses ordinary identity redaction.
+            // Mission messages have recipient policies instead of ground geometry.
             if *public_say {
-                rows.push(event.clone());
+                let policy = event["scenarioRecipients"]
+                    .as_str()
+                    .ok_or(SnapshotError::Rules)?;
+                let side = event["scenarioSide"].as_u64().ok_or(SnapshotError::Rules)? as usize;
+                let allowed = policy == "public"
+                    || (!full_map
+                        && match policy {
+                            "side" => side == seat.slot,
+                            "team" => g
+                                .players
+                                .get(side)
+                                .is_some_and(|p| p.team == g.players[seat.slot].team),
+                            _ => false,
+                        });
+                if allowed {
+                    rows.push(event.clone());
+                }
                 continue;
             }
             let at = Point {
@@ -429,9 +476,10 @@ fn project_shots(
             };
             let local = event["local"] == true;
             let admitted = if local {
-                flight_visible(state, visible, at)
+                full_map || flight_visible(state, visible, at)
             } else {
-                g.reveal
+                full_map
+                    || g.reveal
                     || vision::team_sees(g, &state.rules, &grid, g.players[seat.slot].team, at)
                     || event["pub"] == true
                     || allied(state, seat.slot, event, "fo")
@@ -445,7 +493,9 @@ fn project_shots(
             let mut row = event.clone();
             let object = row.as_object_mut().ok_or(SnapshotError::Rules)?;
             for (id, owner) in [("f", "fo"), ("t", "to")] {
-                if !seen(state, seat.slot, event, id) {
+                // watchGame supplies EVERYTHING.has, including IDs whose units died.
+                let visible_identity = full_map || seen(state, seat.slot, event, id);
+                if !visible_identity {
                     object.remove(id);
                     if local {
                         object.remove(owner);
@@ -453,7 +503,15 @@ fn project_shots(
                 }
             }
             if local && event["k"] == "flight" {
-                object.insert("until".into(), json!(until(state, visible, event)?));
+                let until = if full_map {
+                    math::min(
+                        event["expires"].as_f64().ok_or(SnapshotError::Rules)?,
+                        event["time"].as_f64().ok_or(SnapshotError::Rules)? + 0.15,
+                    )
+                } else {
+                    until(state, visible, event)?
+                };
+                object.insert("until".into(), json!(until));
             }
             rows.push(row);
         }

@@ -28,6 +28,7 @@ mod native_order_intent_tests;
 pub mod ai_schedule;
 pub mod ai_view;
 pub mod assault_runtime;
+pub mod building_placement;
 pub mod catalog;
 pub mod client_view;
 pub mod combat;
@@ -40,6 +41,7 @@ mod commander_construction;
 mod commander_fortification;
 mod commander_forward_hq;
 pub mod commander_mind;
+mod commander_mirror;
 mod commander_shopping;
 pub mod commander_tactics;
 pub mod companion_ray;
@@ -59,6 +61,7 @@ pub mod formation;
 pub mod game;
 pub mod grid;
 pub mod horde_commander;
+pub mod horde_policy;
 pub mod human_commander;
 pub mod human_commander_inputs;
 pub mod human_commander_policy;
@@ -69,6 +72,7 @@ pub mod recipient_availability;
 
 #[cfg(test)]
 use crate as core_api;
+pub mod authored_mission;
 #[cfg(test)]
 #[path = "../tests/support/human_commander_facts.rs"]
 mod human_commander_test_facts;
@@ -92,6 +96,8 @@ pub mod match_actor;
 pub mod match_aircraft_commands;
 pub mod match_aircraft_ticks;
 pub mod match_aviation;
+#[cfg(test)]
+mod match_base_commands;
 mod match_carrier_tick;
 pub mod match_carriers;
 pub mod match_combat;
@@ -209,6 +215,9 @@ mod engineering_intent_tests;
 mod mov_intent_batch;
 
 #[cfg(test)]
+mod bases_runtime_construction_tests;
+
+#[cfg(test)]
 mod misc_bridge_tests;
 
 #[cfg(test)]
@@ -232,3 +241,7 @@ mod mov_followup_garrison_tests;
 
 mod save_codec;
 mod save_state;
+
+pub mod commander_field_policy;
+pub mod commander_world_policy;
+mod numeric_keys;

@@ -11,7 +11,7 @@ use crate::{
 };
 use serde_json::json;
 
-fn scene(mode: Mode, teams: &[i32]) -> Match {
+pub(super) fn scene(mode: Mode, teams: &[i32]) -> Match {
     let map = AuthoritativeMap::from_json(
         &serde_json::to_vec(&json!({
             "name":"Elimination intent", "w":100,"h":100,
@@ -52,7 +52,7 @@ fn scene(mode: Mode, teams: &[i32]) -> Match {
     }
     .unwrap()
 }
-fn ids(m: &Match, owner: usize, name: &str) -> Vec<u32> {
+pub(super) fn ids(m: &Match, owner: usize, name: &str) -> Vec<u32> {
     m.world
         .game
         .units
@@ -66,7 +66,7 @@ fn destroy(m: &mut Match, owner: usize, name: &str) {
         m.world.game.units.get_mut(&id).unwrap().hp = 0.0;
     }
 }
-fn add(m: &mut Match, owner: usize, name: &str, at: Point) -> u32 {
+pub(super) fn add(m: &mut Match, owner: usize, name: &str, at: Point) -> u32 {
     let id = m.next_unit_id;
     let draft = StagedUnit::ordinary(
         &m.world.game,
@@ -81,6 +81,56 @@ fn add(m: &mut Match, owner: usize, name: &str, at: Point) -> u32 {
     .unwrap();
     m.publish_starting_unit(draft).unwrap();
     id
+}
+
+#[test]
+fn classic_save_load_preserves_elimination_state_and_next_tick() {
+    let mut original = scene(Mode::Classic, &[0, 1]);
+    original.elimination.as_mut().unwrap().time_left = Some(0.05);
+    original.advance_tick().unwrap();
+    let expected = original.elimination.clone().unwrap();
+    assert!(expected.sudden_death);
+    assert!(!expected.nodes.is_empty());
+    original.validate_tick_state().unwrap();
+
+    // Room save admission still excludes Classic. Exercise its full Match checkpoint codec.
+    let pointers = original.save_storage_pointers();
+    let saved = crate::save_codec::to_value(&original).unwrap();
+    let text = serde_json::to_vec(&saved).unwrap();
+    let mut restored: Match =
+        crate::save_codec::from_value(serde_json::from_slice(&text).unwrap()).unwrap();
+    restored.relocate_save_storage(&pointers).unwrap();
+    restored.validate_tick_state().unwrap();
+    assert_eq!(restored.elimination.as_ref().unwrap(), &expected);
+    assert_eq!(
+        crate::save_codec::to_value(&restored.elimination).unwrap(),
+        crate::save_codec::to_value(&original.elimination).unwrap()
+    );
+
+    original.advance_tick().unwrap();
+    restored.advance_tick().unwrap();
+    assert_eq!(restored.elimination, original.elimination);
+    assert_eq!(restored.world.game.tick, original.world.game.tick);
+    assert_eq!(
+        crate::save_codec::to_value(&restored.world.game).unwrap(),
+        crate::save_codec::to_value(&original.world.game).unwrap()
+    );
+    assert_eq!(
+        restored.start.random.snapshot(),
+        original.start.random.snapshot()
+    );
+
+    let mut without_elimination = saved;
+    without_elimination[1]
+        .as_array_mut()
+        .unwrap()
+        .retain(|entry| entry[0] != json!(["string", "elimination"]));
+    let missing: Match = crate::save_codec::from_value(without_elimination).unwrap();
+    assert!(missing.elimination.is_none());
+    assert_eq!(
+        missing.validate_elimination_state().unwrap_err(),
+        "missing elimination state"
+    );
 }
 
 #[test]
@@ -629,3 +679,42 @@ fn classic_support_uses_munitions_and_abilities_refuse_an_empty_munitions_wallet
         Some(Denial::Munitions)
     );
 }
+
+#[test]
+fn if25_elimination_reuses_teammate_sort_order_for_later_equal_distance_transfer() {
+    let mut m = scene(Mode::Annihilation, &[0, 0, 0, 1]);
+    let at = m.start.players[2].spawn;
+    let middle = Point {
+        x: (m.start.players[1].spawn.x + at.x) / 2.0,
+        z: (m.start.players[1].spawn.z + at.z) / 2.0,
+    };
+    let army: Vec<_> = m
+        .world
+        .game
+        .units
+        .values()
+        .filter(|u| u.owner == 0 && !m.rules.kinds[u.kind].building)
+        .map(|u| u.id)
+        .collect();
+    assert!(army.len() >= 2);
+    for id in &army {
+        let u = m.world.game.units.get_mut(id).unwrap();
+        u.x = at.x;
+        u.z = at.z;
+    }
+    let later = m.world.game.units.get_mut(&army[1]).unwrap();
+    later.x = middle.x;
+    later.z = middle.z;
+    m.grid.rebuild(&m.world.game.units);
+    destroy(&mut m, 0, "bunker");
+    m.apply_annihilation_elimination().unwrap();
+    assert_eq!(m.world.game.units[&army[0]].owner, 2);
+    assert_eq!(m.world.game.units[&army[1]].owner, 2);
+    for _ in 0..3 {
+        m.advance_tick().unwrap();
+        assert!(m.tick_state.fault().is_none());
+    }
+}
+
+#[path = "classic_bases_tests.rs"]
+mod classic_bases_tests;

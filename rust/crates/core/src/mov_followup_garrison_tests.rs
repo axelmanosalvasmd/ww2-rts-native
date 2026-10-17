@@ -10,7 +10,7 @@ use crate::{
     recipient_snapshot::DeliveryState,
     unit_publication::StagedUnit,
 };
-use serde_json::Value;
+use serde_json::{Value, json};
 
 struct Arena {
     state: Match,
@@ -114,6 +114,182 @@ impl Arena {
         for _ in 0..8 {
             self.tick();
         }
+    }
+}
+
+#[test]
+fn queued_enter_then_cover_keeps_house_anchor_and_survives_delivery() {
+    let mut arena = Arena::house(Mode::Conquest);
+    let id = arena.add("rifle", point(25., 41.));
+    assert_eq!(
+        arena
+            .state
+            .execute_command(
+                0,
+                &Command::Move {
+                    orders: vec![MoveOrder {
+                        unit: i64::from(id),
+                        at: point(33., 41.)
+                    }],
+                    control_ids: None,
+                    attack_move: false,
+                    queue: false,
+                    together: false,
+                    face: None,
+                },
+                false,
+            )
+            .unwrap(),
+        None
+    );
+    assert_eq!(arena.enter(id, point(41., 41.), true), None);
+    let before = arena.state.world.game.units[&id].path.clone();
+    assert_eq!(
+        arena
+            .state
+            .execute_command(
+                0,
+                &Command::Cover {
+                    ids: vec![i64::from(id)],
+                    queue: true,
+                    at: None
+                },
+                false,
+            )
+            .unwrap(),
+        None
+    );
+    assert_eq!(arena.state.world.game.units[&id].path, before);
+    assert!(matches!(
+        arena.state.commands.units[&id].orders.back(),
+        Some(Command::Cover { queue: false, at: Some(at), .. }) if *at == point(41., 41.)
+    ));
+    arena.snapshots();
+    for _ in 0..400 {
+        arena.tick();
+        if arena.state.commands.units[&id].orders.is_empty()
+            && arena.state.world.game.units[&id].garrison.is_some()
+        {
+            break;
+        }
+    }
+    assert_eq!(
+        arena.state.world.game.units[&id].garrison,
+        Some(20 * 64 + 20)
+    );
+    assert!(arena.state.commands.units[&id].orders.is_empty());
+    assert!(arena.state.world.game.units[&id].path.is_empty());
+    arena.finish();
+}
+
+#[test]
+fn cover_queues_during_entrenchment_and_immediate_cover_cancels_only_its_worker() {
+    let mut rows = vec![".".repeat(64); 64];
+    rows[16].replace_range(14..19, "TTTTT");
+    let mut arena = Arena::new(Mode::Conquest, rows);
+    let id = arena.add("rifle", point(31., 33.));
+    let other = arena.add("rifle", point(35., 33.));
+    let entrench = Command::from_json(&json!({
+        "t":"entrench", "ids":[id,other], "pattern":"line",
+        "x":40, "z":49, "x2":56, "z2":49
+    }))
+    .unwrap();
+    assert_eq!(
+        arena.state.execute_command(0, &entrench, false).unwrap(),
+        None
+    );
+    let project = arena.state.field_works.membership(id).unwrap();
+    arena.tick();
+    assert!(arena.state.field_works.is_active(id));
+    let work = arena.state.field_works.clone();
+    let path = arena.state.world.game.units[&id].path.clone();
+    let cover = |queue| Command::Cover {
+        ids: vec![i64::from(id)],
+        queue,
+        at: None,
+    };
+    assert_eq!(
+        arena.state.execute_command(0, &cover(true), false).unwrap(),
+        None
+    );
+    assert_eq!(arena.state.field_works, work);
+    assert_eq!(arena.state.world.game.units[&id].path, path);
+    assert_eq!(arena.state.commands.units[&id].orders.len(), 1);
+    for _ in 0..3 {
+        arena.tick();
+        assert_eq!(arena.state.commands.units[&id].orders.len(), 1);
+        assert_eq!(arena.state.field_works.membership(id), Some(project));
+    }
+    let wallet = arena.state.start.economy.players[0].mp;
+    assert_eq!(
+        arena
+            .state
+            .execute_command(0, &cover(false), false)
+            .unwrap(),
+        None
+    );
+    assert_eq!(
+        arena.state.start.economy.players[0].mp, wallet,
+        "paid work has no refund"
+    );
+    assert!(!arena.state.world.game.units[&id].entrench);
+    assert!(!arena.state.world.game.units[&id].dig);
+    assert!(!arena.state.field_works.is_active(id));
+    assert_eq!(arena.state.field_works.membership(id), None);
+    assert_eq!(arena.state.field_works.membership(other), Some(project));
+    assert!(arena.state.field_works.is_active(other));
+    assert!(arena.state.commands.units[&id].orders.is_empty());
+    for _ in 0..8 {
+        arena.tick();
+    }
+    arena.finish();
+}
+
+#[test]
+fn enter_caps_raw_selection_before_filtering_for_small_and_large_armies() {
+    for (large, queue) in [(false, false), (false, true), (true, false), (true, true)] {
+        let mut arena = Arena::house(Mode::Conquest);
+        let id = arena.add("rifle", point(31., 41.));
+        if large {
+            while arena.state.world.game.units.len() < 51 {
+                arena.add("rifle", point(91., 91.));
+            }
+        } else {
+            assert!(arena.state.world.game.units.len() < 50);
+        }
+        let limit = 50.max(arena.state.world.game.units.len());
+        let mut ids = vec![-1; limit];
+        ids.push(i64::from(id));
+        let enter = |ids| Command::Enter {
+            ids,
+            at: point(41., 41.),
+            queue,
+        };
+        let control = arena.state.commands.units[&id].clone();
+        let unit = arena.state.world.game.units[&id].clone();
+        assert_eq!(
+            arena
+                .state
+                .execute_command(0, &enter(ids.clone()), false)
+                .unwrap(),
+            Some(Denial::Needs)
+        );
+        assert_eq!(arena.state.commands.units[&id], control);
+        assert_eq!(
+            format!("{:?}", arena.state.world.game.units[&id]),
+            format!("{unit:?}")
+        );
+        ids.remove(0);
+        assert_eq!(
+            arena.state.execute_command(0, &enter(ids), false).unwrap(),
+            None
+        );
+        if queue {
+            assert_eq!(arena.state.commands.units[&id].orders.len(), 1);
+        } else {
+            assert_eq!(arena.state.commands.units[&id].enter, Some(20 * 64 + 20));
+        }
+        arena.snapshots();
     }
 }
 
@@ -404,4 +580,22 @@ fn mov48_eng33_manual_and_wounded_garrisons_exit_then_reach_home_through_finish(
             arena.finish();
         }
     }
+}
+
+#[test]
+fn if25_garrison_equal_distance_keeps_breadth_first_edge_order_through_match() {
+    let mut rows = vec![".".repeat(64); 64];
+    rows[20].replace_range(20..22, "BB");
+    rows[21].replace_range(20..22, "BB");
+    let mut arena = Arena::new(Mode::Conquest, rows);
+    let id = arena.add("rifle", point(42.0, 42.0));
+    assert_eq!(arena.enter(id, point(43.0, 43.0), false), None);
+    // Every edge cell is equally distant. The requested cell starts the BFS.
+    assert_eq!(arena.state.commands.units[&id].enter, Some(21 * 64 + 21));
+    arena.wait_inside(id);
+    assert_eq!(
+        arena.state.world.game.units[&id].garrison,
+        Some(21 * 64 + 21)
+    );
+    arena.finish();
 }

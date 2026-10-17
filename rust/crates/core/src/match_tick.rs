@@ -111,6 +111,7 @@ pub enum TickEvent {
     Aviation(crate::match_aviation::AviationEvent),
     Environment(crate::environment::Effect),
     Scenario(crate::legacy_scenario::SayAction),
+    AuthoredMission(serde_json::Value),
 }
 
 /// A failed phase keeps the effects already emitted at their original boundaries.
@@ -698,6 +699,7 @@ impl crate::match_runtime::Match {
             }
             let moving = !unit.path.is_empty()
                 || crate::math::hypot(unit.x - before.x, unit.z - before.z) > 0.001;
+            self.sync_supply_withdrawal_progress(id);
             let result = self.apply_unit_firing(id, moving, dt);
             self.take_firing_tick_events(events);
             result?;
@@ -771,19 +773,30 @@ impl crate::match_runtime::Match {
         }
 
         if self.options.mode != crate::economy::Mode::World && !winner_decided {
-            crate::legacy_scenario_runtime::step_legacy_scenario_emitting(
-                self,
-                tick as u64,
-                &mut |emission| match emission {
-                    crate::legacy_scenario_runtime::LegacyScenarioEmission::Say(say) => {
-                        events.push(TickEvent::Scenario(say));
-                    }
-                    crate::legacy_scenario_runtime::LegacyScenarioEmission::Environment(effect) => {
-                        events.push(TickEvent::Environment(effect));
-                    }
-                },
-            )
-            .map_err(|error| format!("legacy scenario: {error}"))?;
+            if let Some(mission) = self.authored_mission.as_mut() {
+                events.extend(
+                    mission
+                        .step(tick as u64, self.world.game.players.len())?
+                        .into_iter()
+                        .map(TickEvent::AuthoredMission),
+                );
+            } else {
+                crate::legacy_scenario_runtime::step_legacy_scenario_emitting(
+                    self,
+                    tick as u64,
+                    &mut |emission| match emission {
+                        crate::legacy_scenario_runtime::LegacyScenarioEmission::Say(say) => {
+                            events.push(TickEvent::Scenario(say));
+                        }
+                        crate::legacy_scenario_runtime::LegacyScenarioEmission::Environment(
+                            effect,
+                        ) => {
+                            events.push(TickEvent::Environment(effect));
+                        }
+                    },
+                )
+                .map_err(|error| format!("legacy scenario: {error}"))?;
+            }
             phases.push(TickPhase::Scenario);
         }
 
