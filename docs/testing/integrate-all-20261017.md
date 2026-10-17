@@ -264,3 +264,7 @@ row remain the single projection path.
 ## Cross-chain #430
 
 Merged exact `eeca34057f33cd61aef0136e007e59d156f36489`. Canonical queued command-union admission replaces the older Conquest-only ingress slice; core prospective guards remain authoritative. Retained every existing selected-owner, authored-v2, startup, snapshot and privacy guard. Incoming grenade validation is composed with retired-operative identities and current-pose recipient contacts. Added the incoming standalone support witnesses and preserved the six-tick mode delivery assertions across all admitted modes. The deliberately replaced refusal tests and their positive canonical replacements are listed in the integration changelog. Combined compilation and full qualification remain pending.
+
+## Cross-chain #411
+
+Merged exact `ea9aa761636f5a3ed2a983232958633bed9e1e68`. Retained immediate construction, sandbox, arrival and group-placement caller tests alongside all authored runtime/clock tests. The integrated current-pose flight/contact and recipient owners already subsume the incoming older flight adapter. No startup or complete-delivery mode was narrowed. Full validation remains pending.

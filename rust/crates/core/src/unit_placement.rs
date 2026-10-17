@@ -10,3 +10,6 @@ pub(crate) fn place_unit(grid: &mut SpatialGrid, unit: &mut Unit, fields: impl F
 
 #[cfg(test)]
 pub(crate) mod tests;
+
+#[cfg(test)]
+mod callers;
