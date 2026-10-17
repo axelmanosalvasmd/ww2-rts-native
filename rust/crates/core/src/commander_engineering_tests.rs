@@ -169,7 +169,8 @@ fn ai13_repairs_emit_bridge_fill_demine_and_wait_for_observed_completion() {
         assert_eq!(first.busy, BTreeSet::from([1]));
         assert!(!state.crew.is_empty());
         let expected = state.clone();
-        state = crate::save_codec::from_value(crate::save_codec::to_value(&state).unwrap()).unwrap();
+        state =
+            crate::save_codec::from_value(crate::save_codec::to_value(&state).unwrap()).unwrap();
         assert_eq!(state, expected);
         assert!(
             repairs(

@@ -11,3 +11,4 @@
 - Record every manual current-main integration hunk and keep earlier failed or canceled qualification receipts tied to their producing heads.
 - Bind authored missions with object order intact, refusing a reordered no-English translation that would change its visible announcement. Extend the existing startup admission witness with original-map acceptance and reordered-map refusal.
 - Persist engineering crew memory and remembered armor through main's AI save owner, defaulting those fields for older non-null saves. Extend `if27_field_and_world_policy_memory_round_trip_and_legacy_defaults` and `ai13_repairs_emit_bridge_fill_demine_and_wait_for_observed_completion` to preserve policy memory and tuple-keyed crew suppression across save/restore. Initialize the inherited Horde pending-save fixture's delivered intent explicitly.
+- Apply the pinned Rust formatter to the engineering save-continuation assertion.
