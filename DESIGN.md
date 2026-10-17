@@ -5152,6 +5152,14 @@ Geometry reads the same node positions. Seat scheduling and delivery keep their
 existing implementation. Classic, World and field-work admission guards stay
 closed; this integration changes no public interface or parity status.
 
+## World fort capture follows main's bounded component (2026-10-16)
+
+PR #336 keeps main's World region, elimination and finish behavior from #301, including fort-owner transfers in the bounded component. Tick admission still refuses an imminent fort transfer before commands. The constructor's existing fort ranks retain a read-only regression test. The atomicity witness stages a damaged fort and an eliminated owner's construction plan, then requires the combined income, capture and elimination phase to refuse before changing units, owners, footprints, wallets or regions. World construction, Gate physics, recipient snapshots and hosted admission remain guarded. BASE-54 remains uncounted in this branch.
+
+## Borrowed building placement (2026-10-16)
+
+Ordinary Build admission uses one read-only building-placement query. It borrows terrain, actors, visibility and optional node, territory and rail-yard facts, so previews can use the same rule without adding match state. Equal-distance nodes retain their input index, matching the prototype's stable sort. The query returns the selected footprint and snapped centre even when a later rule refuses it. Visibility precedes territory, rail, node overlap, coast and physical occupancy. World facts are exercised as components; they do not admit World construction, hosted rooms or recipient delivery. Fortifications retain their separate existing query.
+
 ## Horde core reveal, shared facilities and scripted policy (2026-10-16)
 
 `Match::update_horde_vision` refreshes ordinary sight and then adds the existing Horde wave markers in sorted unit-ID order. Only the canonical defender team receives the markers during an active wave. A zero remaining budget and `left <= 3` mark ground attackers; Kaiju markers ignore those two thresholds. Aircraft never gain a wave marker. The component reads existing wave state and changes no fog, recipient or hosting policy.
