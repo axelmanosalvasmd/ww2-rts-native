@@ -98,10 +98,9 @@ impl Match {
         }
         // Contact can change the physical cell. Wear and dust read its new state.
         let g = &self.world.game;
-        let unit = &g.units[&id];
         let ch = g.chars[c];
         let infantry = profile.infantry;
-        if ch == b'N' {
+        let hostile_mine = if ch == b'N' {
             let source_owner = self.world.mines.get(&c).copied().unwrap_or(-1);
             let owner = if source_owner >= 0 {
                 Some(source_owner as usize)
@@ -110,72 +109,85 @@ impl Match {
             } else {
                 None
             };
-            if !owner.is_some_and(|owner| g.allied(owner, unit.owner)) {
+            if owner.is_some_and(|owner| g.allied(owner, g.units[&id].owner)) {
+                None
+            } else {
                 if source_owner < -1
                     || source_owner >= 0 && source_owner as usize >= g.players.len()
                 {
                     return Err("invalid mine layer identity".into());
                 }
-                let ids: Vec<_> = g.units.keys().copied().collect();
-                let (mut damage, retarget) = self.firing_damage_view(&ids);
-                damage
-                    .detonate_mine_emitting(c, source_owner, retarget, out)
-                    .map_err(|e| format!("moved mine detonation: {e}"))?;
-                if self.world.game.units[&id].hp <= 0. {
-                    return Ok(());
-                }
+                Some(source_owner)
             }
-        }
-        if infantry {
-            return Ok(());
-        }
-        let g = &self.world.game;
-        let wet = crate::terrain::wet_at(g, c);
-        if matches!(ch, b'.' | b'M') {
-            let wear = g
-                .wear
-                .as_ref()
-                .and_then(|v| v.get(c))
-                .copied()
-                .ok_or("missing ground-contact wear")?;
-            let traffic = cfg
-                .get("traffic")
-                .and_then(|v| v.number())
-                .ok_or("missing traffic wear rate")?;
-            let wet_wear = cfg
-                .get("weather")
-                .and_then(|v| v.get("wetWear"))
-                .and_then(|v| v.number())
-                .ok_or("missing wet wear rate")?;
-            if ![f64::from(wear), wet, traffic, wet_wear]
-                .iter()
-                .all(|v| v.is_finite() && *v >= 0.0)
-            {
-                return Err("invalid ground-contact wear inputs".into());
-            }
-            let next = math::min(
-                1.0,
-                f64::from(wear)
-                    + moved
-                        * traffic
-                        * if crushes { 1.0 } else { 0.5 }
-                        * if ch == b'M' { 0.5 } else { 1.0 }
-                        * (1.0 + wet_wear * wet),
-            ) as f32;
-            self.world
-                .apply_vehicle_wear(c, next)
-                .map_err(|e| e.to_string())?;
-        }
-        let unit = self.world.game.units.get_mut(&id).unwrap();
-        // The workload mover raises dust before terrain contact. Match applies its
-        // Source decision after contact, so newly made mud preserves prior dust.
-        unit.dust = if wet < 0.3
-            && self.world.game.flags[c] & (crate::game::MUD | crate::game::FORD) == 0
-        {
-            Some(self.world.game.tick as f64)
         } else {
-            before_dust
+            None
         };
+        if let Some(source_owner) = hostile_mine {
+            let ids: Vec<_> = g.units.keys().copied().collect();
+            let (mut damage, _) = self.firing_damage_view(&ids);
+            damage
+                .preflight_mine_detonation(c, source_owner)
+                .map_err(|e| format!("moved mine detonation: {e}"))?;
+        }
+        if !infantry {
+            let g = &self.world.game;
+            let wet = crate::terrain::wet_at(g, c);
+            if matches!(ch, b'.' | b'M') {
+                let wear = g
+                    .wear
+                    .as_ref()
+                    .and_then(|v| v.get(c))
+                    .copied()
+                    .ok_or("missing ground-contact wear")?;
+                let traffic = cfg
+                    .get("traffic")
+                    .and_then(|v| v.number())
+                    .ok_or("missing traffic wear rate")?;
+                let wet_wear = cfg
+                    .get("weather")
+                    .and_then(|v| v.get("wetWear"))
+                    .and_then(|v| v.number())
+                    .ok_or("missing wet wear rate")?;
+                if ![f64::from(wear), wet, traffic, wet_wear]
+                    .iter()
+                    .all(|v| v.is_finite() && *v >= 0.0)
+                {
+                    return Err("invalid ground-contact wear inputs".into());
+                }
+                let next = math::min(
+                    1.0,
+                    f64::from(wear)
+                        + moved
+                            * traffic
+                            * if crushes { 1.0 } else { 0.5 }
+                            * if ch == b'M' { 0.5 } else { 1.0 }
+                            * (1.0 + wet_wear * wet),
+                ) as f32;
+                self.world
+                    .apply_vehicle_wear(c, next)
+                    .map_err(|e| e.to_string())?;
+            }
+            let unit = self.world.game.units.get_mut(&id).unwrap();
+            // The workload mover raises dust before terrain contact. Match applies its
+            // Source decision after contact, so newly made mud preserves prior dust.
+            unit.dust = if wet < 0.3
+                && self.world.game.flags[c] & (crate::game::MUD | crate::game::FORD) == 0
+            {
+                Some(self.world.game.tick as f64)
+            } else {
+                before_dust
+            };
+        }
+        if let Some(source_owner) = hostile_mine {
+            let ids: Vec<_> = self.world.game.units.keys().copied().collect();
+            let (mut damage, retarget) = self.firing_damage_view(&ids);
+            damage
+                .detonate_mine_emitting(c, source_owner, retarget, out)
+                .map_err(|e| format!("moved mine detonation: {e}"))?;
+            if self.world.game.units[&id].hp <= 0. {
+                return Ok(());
+            }
+        }
         Ok(())
     }
 }

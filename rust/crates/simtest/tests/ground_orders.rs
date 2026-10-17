@@ -997,8 +997,8 @@ fn queued_ground_orders_match_original_full_steps_and_arrival_order() {
                             "{name}: GroundAttack remains unavailable"
                         );
                         assert!(
-                            report.unavailable.contains(&TickPhase::GroundEffects),
-                            "excluded ground-effects scope changed"
+                            !report.unavailable.contains(&TickPhase::GroundEffects),
+                            "ground-effects phase must be available"
                         );
                         assert_eq!(
                             report.commands.len(),
