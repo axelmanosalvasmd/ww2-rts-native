@@ -500,6 +500,33 @@ fn if27_field_and_world_policy_memory_round_trip_and_legacy_defaults() {
         panic!("restored seat must use the human brain");
     };
     assert_eq!(policy, &expected);
+    // Main's external v1 AI memory predates the Classic node assignments.
+    fn field_mut<'a>(value: &'a mut Value, name: &str) -> &'a mut Value {
+        &mut value[1]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|entry| entry[0] == serde_json::json!(["string", name]))
+            .unwrap()[1]
+    }
+    let mut legacy_saved = saved.clone();
+    let memory = field_mut(&mut legacy_saved[0], "memory");
+    let human = field_mut(memory, "Human");
+    let policy = field_mut(human, "policy");
+    let tactics = field_mut(policy, "tactics");
+    let fields = tactics[1].as_array_mut().unwrap();
+    let previous_len = fields.len();
+    fields.retain(|entry| entry[0] != serde_json::json!(["string", "node"]));
+    assert_eq!(fields.len() + 1, previous_len);
+    let legacy_restored = game
+        .restore_ai_memories_json(&legacy_saved, &[(0, Level::Hard)])
+        .unwrap();
+    let Brain::Human { policy, .. } = &legacy_restored[0].0.brain else {
+        panic!("legacy seat must use the human brain");
+    };
+    let mut expected_legacy = serde_json::to_value(&expected).unwrap();
+    expected_legacy["tactics"]["node"] = serde_json::json!({});
+    assert_eq!(serde_json::to_value(policy).unwrap(), expected_legacy);
     let tactics = encoded["tactics"].as_object_mut().unwrap();
     tactics.remove("field");
     tactics.remove("world");

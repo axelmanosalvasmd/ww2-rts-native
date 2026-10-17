@@ -387,7 +387,7 @@ fn intent_log45_nonconquest_point_supply_seam_refuses_before_mutation() {
             Mode::Horde,
             ModeKind::Horde,
             "missing Horde state",
-            SnapshotError::UnsupportedMode,
+            SnapshotError::Rules,
         ),
         (
             Mode::Tutorial,

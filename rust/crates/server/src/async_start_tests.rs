@@ -192,7 +192,8 @@ fn net37_real_load_and_creation_failures_restore_lobby_or_previous_match_and_fin
         let (mut hub, [host, _], mut receivers) = room();
         for restart in [false, true] {
             if missing_map {
-                // Lobby metadata is valid; loading the corresponding authored map fails.
+                // Known catalog capacity admits the claim; missing authoring data
+                // still fails in the worker and exercises transactional rollback.
                 hub.maps["missing-authored-map"] = hub.maps["default"].clone();
                 hub.rooms.get_mut("ABC").unwrap().map = "missing-authored-map".into();
             } else {

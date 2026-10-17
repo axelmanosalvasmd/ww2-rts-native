@@ -244,3 +244,19 @@ aviation privacy, support-retirement/cooldown, stock precision and binary Horde
 witnesses are retained in addition to the stronger current suites. The seeded
 long-run test keeps its exact 3,600-tick/every-seat assertions and adds repeat
 input, recipient and RNG equality from the incoming branch.
+
+## Cross-chain #432
+
+Exact parent `bcdb6542c98c9673133fd45ff639ba61bad24a8a`. Adds the full Tutorial
+result/hold and host-End witnesses while retaining existing operative and
+elimination progress tests. Literal Tutorial goals, mode/end/out fields are
+checked on each captured Tutorial frame. Human-only Tutorial startup guards are
+retained; its unattended Enemy is script-driven, not a newly admitted AI seat.
+Horde's independently admitted spectator path is not narrowed.
+
+The existing AI checkpoint test gains the incoming legacy field/World-memory
+fallback checks without losing its full-memory, random-stream and valid-reason
+assertions. Both detached and active delivered adapters are checked against the
+same owner-private control facts. Typed authored-v2 events and every existing
+operative/Sandbox flight witness remain. The selected receiver and common mode
+row remain the single projection path.

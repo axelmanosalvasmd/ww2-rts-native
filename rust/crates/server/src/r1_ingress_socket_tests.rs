@@ -114,6 +114,7 @@ async fn r1_host_pause_freezes_commands_and_ticks_and_only_host_resumes_or_ends(
         {
             clients[0].send(command);
             clients[1].send(json!({"t":"resume"}));
+            clients[1].send(json!({"t":"end"}));
             for client in &mut clients {
                 assert!(
                     !flush(client)

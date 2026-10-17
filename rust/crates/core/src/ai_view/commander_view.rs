@@ -676,6 +676,16 @@ mod tests {
             foreign["auto"] = json!(true);
             foreign["cd"] = json!(99.0);
         }
+        let detached = crate::ai_view::commander::CommanderMemory::new(0, 40, 40)
+            .unwrap()
+            .observe(&view)
+            .unwrap();
+        let controls = detached.packet.input().runtime.as_ref().unwrap();
+        assert!(controls.units[&9].hold_fire && controls.units[&9].auto_cast);
+        assert_eq!(controls.units[&9].cooldown, 2.5);
+        assert!(!controls.units[&4].hold_fire && !controls.units[&4].auto_cast);
+        assert_eq!(controls.units[&4].cooldown, 0.0);
+        assert!(!controls.units.contains_key(&2));
         let human = memory().observe(&view, &snap).unwrap();
         let input = human.packet.input();
         assert_eq!(

@@ -1,0 +1,1 @@
+- Preserve owner hold-fire, automatic ability and cooldown facts in both delivered commander adapters after the main merge. Allied and enemy private facts remain masked, with both adapters checked against the same delivered packet.

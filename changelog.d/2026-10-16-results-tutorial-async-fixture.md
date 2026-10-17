@@ -1,0 +1,1 @@
+- Keep the startup readiness guard and repair the existing async load-failure fixture with catalogued capacity for missing authoring data. Its real worker failure, rollback, identity and full-match assertions remain unchanged.

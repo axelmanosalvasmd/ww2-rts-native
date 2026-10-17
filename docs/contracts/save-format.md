@@ -144,7 +144,7 @@ Loading stages every saved seat and validates its memory before publishing the r
 
 Camera attention, selection, input queues, delivered strategic packets and commander random streams are not saved. Each AI gets a fresh commander and an opening look after load (`shared/ai-human.js:35,55-69`). Restored strategic memory is combined with a newly delivered recipient start snapshot. This intentionally does not promise uninterrupted commander input or random-stream equality. The canonical match checkpoint and already admitted commands remain unchanged.
 
-`ai63_hosted_save_restores_planners_resets_humans_and_restarts_commanders` captures learned memory through the real room save store, checks human reset and fresh commander state, verifies lobby/pause/start ordering, resumes and collects every seat's recipient snapshot on later ticks. Core checkpoint tests exercise nonempty planner fields and wrong-seat refusal. Horde planner persistence and full all-role startup remain outside this ordinary-room extension.
+`ai63_hosted_save_restores_planners_resets_humans_and_restarts_commanders` captures learned memory through the real room save store, checks human reset and fresh commander state, verifies lobby/pause/start ordering, resumes and collects every seat's recipient snapshot on later ticks. Core checkpoint tests exercise nonempty planner fields and wrong-seat refusal. The hosted Horde integration also restores human-seat planner memory; the internal director restarts from its recipient packet. Full all-role startup remains separate.
 
 ## Reconciled save stack (#373, #376, #383, #386)
 
@@ -176,7 +176,7 @@ Ordinary camera attention, motor RNG, pending human input actions and the previo
 
 The AI codec does not increment the envelope version or change its seven keys or `g.state`. Non-authored matches stay version 1 and authored matches use version 2. Existing null-memory v1 saves still load. The external codec adds the representation of a previously refused non-null owner; it changes no previously writable checkpoint. Unknown tags, wrong match/seat binding, duplicate roster seats and mismatched brain kinds are refused. The core codec remains separate from the ordinary room delivered-view codec; both restore transactionally.
 
-Merged policy state also persists field-work bridge, fill and demine crews, armor sightings, World rail timing and fort steps through the same tagged AI codec. Older non-null policy memory lacking the new field and World owners defaults those owners, preserving v1 compatibility. World room admission remains closed.
+Merged policy state also persists field-work bridge, fill and demine crews, armor sightings, World rail timing and fort steps through the same tagged AI codec. Older non-null policy memory lacking node assignments or the field and World owners defaults those records, preserving v1 compatibility. World room admission remains closed.
 Scripted Horde policy remembers its observed stationary positions and timers. Older commander memory without that policy starts it fresh. Its old decoded policy packet is cleared with the old delivered view on load, so the next action still requires a fresh delivered observation.
 
 The native Horde comparison plan also retains its optional `delivered` intent:

@@ -1258,6 +1258,9 @@ impl Hub {
             .is_some_and(|t| t.enemy() == room.players.len());
         let horde = room.mode == "horde" && state.options.mode == Mode::Horde;
         let count = room.players.len() + usize::from(tutorial || horde);
+        if tutorial && (room.players.iter().any(|p| p.ai) || !room.spectators.is_empty()) {
+            return Err("Tutorial needs human commander seats without spectators".into());
+        }
         if state.start.players.len() != count
             || state.options.players.len() != count
             || state.world.game.players.len() != count
@@ -2200,13 +2203,7 @@ impl Hub {
         if self.trusted.is_none() && msg["t"] == "start" {
             // Invalid Start preconditions are ignored, as in the prototype.
             let ready = self.rooms.get(code).is_some_and(|room| {
-                room.is_host(connection_id)
-                    && room.native.is_none()
-                    && !room.players.is_empty()
-                    && room.players.len() <= room.capacity(&self.maps)
-                    && (room.mode != "assault"
-                        || (room.players.iter().any(|p| p.team == room.defender)
-                            && room.players.iter().any(|p| p.team != room.defender)))
+                room.is_host(connection_id) && room.native.is_none() && room.start_ready(&self.maps)
             });
             if ready && let Err(error) = self.start_public(code, now) {
                 if let Some(room) = self.rooms.get_mut(code) {
