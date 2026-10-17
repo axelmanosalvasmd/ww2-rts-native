@@ -1,0 +1,1 @@
+- Prove seated fog starts, XOR deltas, unchanged-version omission and reconnect exploration alongside unmasked spectators through ordinary native ticks. Full startup, authored scenario privacy and AI/spectator save restoration remain incomplete.

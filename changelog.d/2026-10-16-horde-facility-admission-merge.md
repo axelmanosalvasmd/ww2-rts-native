@@ -1,0 +1,2 @@
+- Preserve shared Horde facility construction and assigned repair when merging the Classic and Annihilation runners. Idle Horde construction and standalone repair remain refused, and all existing construction, shared ownership and Gate assertions are retained.
+- Derive save serialization for the retained Classic and Annihilation state so Match compiles after merging save/load support. Existing save/load admission guards are unchanged.
