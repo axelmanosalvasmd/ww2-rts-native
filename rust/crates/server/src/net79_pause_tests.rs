@@ -118,7 +118,10 @@ fn net79_host_pause_freezes_room_ai_armies_and_operatives_with_one_second_frames
         peers[0].send(&mut hub, json!({"t":"pause"}), 12_050);
         let pause = json!({"t":"pause", "paused":true, "by":"Host", "reason":"host", "left":0});
         for peer in &mut peers {
-            assert_eq!(peer.drain(&mut hub, 12_050), [pause.clone()]);
+            assert_eq!(
+                peer.drain(&mut hub, 12_050).as_slice(),
+                std::slice::from_ref(&pause)
+            );
         }
         let frozen = runtime(&hub).state().save_json().unwrap();
         let frozen_ai = commanders(&hub);
