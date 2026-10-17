@@ -49,3 +49,57 @@ Current coordination direction was reread from issue #5, including `axel-ack-jul
 The final Horde rewrites retain all existing assertions and replace only the deliberately superseded blanket attachment boundary: commander dispatch, Horde component/ground production, malformed physical-aircraft visibility, detached Kaiju events and room options. The room-option witness is now `mode11_horde_switches_and_shared_base_support_healthy_hosted_ticks`. A saved-intent test adds the absent delivered-plan field.
 
 The incoming support tests pinned an older aircraft restriction that frozen main already replaced. `hosted_recorded_plane_support_pays_once_and_invalid_kind_preserves_all_state` now requires all five aircraft support kinds to pay and publish exactly, while an invalid kind retains the full unchanged-state refusal tuple. `hosted_recorded_support_pays_once_and_delivers_every_seat_through_cleanup_and_ending` extends the old artillery-only continuation check to all six kinds, natural retirement, exact plane arrival fields, paratrooper identities/metadata, victory and ending delivery. No fixture files were edited.
+
+## Completed logistics-chain validation, 2026-10-17
+
+Qualified source commit: `5d4b586f63c7c545143381c179330bee6e2a00d0`.
+Qualified Rust tree: `38b0006e83077f7a30f824ea21dd97a691f2dd83`.
+Machine: Debian cloud, 9 logical CPUs, 9.7 GiB RAM, no swap. Rust/Cargo 1.99.0,
+cargo-nextest 0.9.148. Other heavy work was paused. Source, Rust tree and
+Cargo.lock remained unchanged throughout qualification.
+
+- Serial prebuild: `cargo test --locked --profile ci-test --no-run -j1 -p ww2-core -p ww2-server -p ww2-simtest`, passed.
+- All four repaired focused regressions passed.
+- Complete nextest: `--locked --cargo-profile ci-test --profile ci -j4` with all three packages and the external resource configuration below: **1,945 passed, zero failures, 10 pre-existing ignored tests**, 692.209 seconds.
+- `cargo fmt --all --check`: passed.
+- `cargo clippy --locked --workspace --all-targets -- -D warnings`: passed.
+- `cargo test --locked --workspace --profile ci-test --doc`: passed; all four crates contain zero runnable doctests.
+
+The cloud-only tool configuration, supplied through
+`--tool-config-file cloud:<absolute-config-path>`, contains only:
+
+```toml
+[[profile.ci.overrides]]
+filter = 'test(engineering_consumers::support_selected::) | test(movement_existing_checks::) | binary(trusted_room_process)'
+threads-required = 'num-test-threads'
+```
+
+This reserves the four slots for large fixture consumers and trusted socket
+process tests while other tests remain parallel. No retries, timeouts,
+fail-fast, default-filter or ignore settings were changed; the repository CI
+profile is unchanged. Build jobs are serialized, debug information and
+incremental compilation are disabled, and the named ci-test profile retains its
+normal assertions and checks.
+
+The earlier complete run at `7597b91095657218873773334a29a9661a7d2489` passed
+1,941 of 1,945 tests and found four failures. Three were obsolete fixture
+expectations: floating JSON zero versus canonical wire zero, Assault refusal
+after admission, and Horde refusal after admission. The fourth was a runtime
+merge regression: away flags incorrectly depended on send readiness instead of
+socket presence. The repair restores `connection.is_none() && !ai`, keeping the
+original absent/unready/expiry regression unchanged. It matches the same
+presence correction already carried by cross-chain #430.
+
+All rewritten tests and preserved assertions are listed in
+`changelog.d/2026-10-17-integrate-logistics-validation.md`. In particular, support
+arrivals retain exact full-object equality and now must arrive exactly once per
+seat; admitted Assault retains every mode/structure/feature check; the Horde
+case becomes real two-socket start and continuing delivery while all remaining
+unsupported settings and weather cases stay checked. Tutorial remains guarded
+on this standalone chain and will be reconciled with the rooms chain during
+final integration. World admission is unchanged.
+
+The initial lint repair in `7597b910` only replaces indexed arrival bookkeeping
+with enumeration and has its own changelog fragment. All seven exact PR heads
+in this chain remain ancestors. This receipt qualifies the chain, not the final
+combined workspace or three-platform main CI.
