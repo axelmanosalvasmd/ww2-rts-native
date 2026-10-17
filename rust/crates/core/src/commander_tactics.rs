@@ -1063,6 +1063,25 @@ fn plan_inner(
             }
         }
     }
+    // The prototype's front includes every ground army unit, even a busy one.
+    let army: Vec<_> = mine
+        .iter()
+        .copied()
+        .filter(|u| !boolean(definition(u), "air"))
+        .collect();
+    let front = if army.is_empty() {
+        me.spawn
+    } else {
+        Point {
+            x: army.iter().map(|u| u.at.x).sum::<f64>() / army.len() as f64,
+            z: army.iter().map(|u| u.at.z).sum::<f64>() / army.len() as f64,
+        }
+    };
+    let seek = catalog
+        .table("CFG")
+        .map_err(|e| e.to_string())?
+        .get("aid")
+        .ok_or("missing medic aid rules")?;
     let mut world_free = BTreeSet::new();
     for u in &mine {
         let d = definition(u);
@@ -1076,7 +1095,24 @@ fn plan_inner(
         if !context.horde && base(u) && u.hp < full(d) && (budget >= 20.0 || hurt(u, d, skill)) {
             continue;
         }
-        if !idle(u) || boolean(d, "medic") {
+        // Chores precede the general busy check in shared/ai.js:673-681.
+        if boolean(d, "medic") {
+            if u.path.is_empty() && dist(u.at, front) > num(seek, "seek") * 0.8 {
+                moves.push((u.id, front));
+            }
+            continue;
+        }
+        if d.get("w").is_some_and(|w| num(w, "shellTerrain") != 0.0)
+            && u.target_id == 0
+            && !u.fire_at
+            && let Some(house) = enemies
+                .iter()
+                .find(|e| watched(e.id) && e.garrison && dist(u.at, e.at) < 60.0)
+        {
+            commands.push(json!({"t":"fireat","ids":[u.id],"x":house.at.x,"z":house.at.z}));
+            continue;
+        }
+        if !idle(u) {
             continue;
         }
         if sit.kind == SituationKind::Defense || (!armor_seen.is_empty() && anti(&u.kind)) {
@@ -1442,6 +1478,10 @@ mod tests;
 #[cfg(test)]
 #[path = "commander_tactics_strategy_tests.rs"]
 mod strategy_tests;
+
+#[cfg(test)]
+#[path = "commander_chores_tests.rs"]
+mod chores_tests;
 
 #[cfg(test)]
 #[path = "commander_batch7_tests.rs"]
