@@ -222,3 +222,9 @@ All parent test bodies and module registrations are retained. Formatting is appl
 Main's external v1 HumanPolicy checkpoint has no tactics.node field. The hosted parent adds that required map. `commander_tactics.rs` now defaults only an absent node map to empty, retaining present assignments. The existing `if27_field_and_world_policy_memory_round_trip_and_legacy_defaults` test now proves a nonempty node round trip, removes exactly node from the actual external tagged checkpoint and restores it through restore_ai_memories_json, comparing the complete policy. Its existing field/World omission assertions remain. The incoming Horde memory test's OwnPlan literal also retains the hosted delivered field with None; no queue assertion changes.
 
 Independent source reviews accepted both the core privacy/event resolutions and the AI/startup/event resolutions after these repairs. The inherited spectator adapter still emits an empty flights array (spectator.rs:110); this file is unchanged by the stream and its live-flight preview limitation remains outside the two result rows.
+
+## Delivered commander adapters after main integration
+
+The fresh source build found both `UnitFacts` initializers in `ai_view/commander.rs` missing incoming `hold_fire`, `auto_cast` and `cooldown` fields. Both now read those values from the detached delivered unit JSON, gated by ownership. The existing delivered-packet test feeds both adapters the same decoded packet and checks fractional owner cooldown, owner flags, allied redaction and excluded enemy units. No server API changes were needed.
+
+The same attempt reported missing public core APIs that are present in this checkout, identifying stale shared-target core artifacts. Qualification now removes this project's core/server/simtest profile artifacts under the exclusive slot lock before rebuilding. The automatic formatter only wrapped the preserved event-family match union in `simtest/tests/match_tick_events.rs`.

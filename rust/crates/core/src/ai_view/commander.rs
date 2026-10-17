@@ -438,6 +438,9 @@ impl CommanderViewMemory {
                             number(&u["built"])?
                         },
                         hold_position: own && truth(&u["holdPos"]),
+                        hold_fire: own && truth(&u["holdFire"]),
+                        auto_cast: own && truth(&u["auto"]),
+                        cooldown: if own { number(&u["cd"])? } else { 0.0 },
                         auto_retreat: own && truth(&u["autoRetreat"]),
                         queued_orders: if own {
                             optional_rows(&u["orders"])?.len()
@@ -585,8 +588,36 @@ mod tests {
         let mut snap = snapshot();
         snap["mun"] = json!(45);
         snap["fuel"] = json!(12);
-        let view = SeatMemory::new(0, map()).unwrap().decode(&snap).unwrap();
+        for row in snap["units"].as_array_mut().unwrap() {
+            row[11] = json!(7.25);
+            row[12] = json!(2048 | 4096 | 16384);
+        }
+        let view = SeatMemory::new(0, map())
+            .unwrap()
+            .with_terrain(vec![b'.'; 1600], Some(vec![0; 1600]), false)
+            .unwrap()
+            .decode(&snap)
+            .unwrap();
         let human = memory().observe(&view, &snap).unwrap();
+        let detached = CommanderMemory::new(0, 40, 40)
+            .unwrap()
+            .observe(&view)
+            .unwrap();
+        for packet in [&human.packet, &detached.packet] {
+            let runtime = packet.input().runtime.as_ref().unwrap();
+            assert!(runtime.units[&9].hold_fire);
+            assert!(runtime.units[&9].auto_cast);
+            assert_eq!(runtime.units[&9].cooldown, 7.25);
+            assert!(!runtime.units[&4].hold_fire);
+            assert!(!runtime.units[&4].auto_cast);
+            assert_eq!(runtime.units[&4].cooldown, 0.0);
+            assert!(!runtime.units.contains_key(&2));
+        }
+        for id in [2, 4] {
+            assert_eq!(view.units[&id]["holdFire"], false);
+            assert_eq!(view.units[&id]["auto"], false);
+            assert_eq!(view.units[&id]["cd"], 0);
+        }
         let input = human.packet.input();
         assert_eq!(
             input.units.iter().map(|u| u.id).collect::<Vec<_>>(),
@@ -1032,6 +1063,9 @@ mod detached {
                         UnitFacts {
                             built: optional_number(&u["built"])?.unwrap_or(1.0),
                             hold_position: own && truth(&u["holdPos"]),
+                            hold_fire: own && truth(&u["holdFire"]),
+                            auto_cast: own && truth(&u["auto"]),
+                            cooldown: if own { number(&u["cd"])? } else { 0.0 },
                             queued_orders: if own { array(&u["orders"])?.len() } else { 0 },
                             auto_retreat: own && truth(&u["autoRetreat"]),
                             convoy: own && trucks.contains(&id),
