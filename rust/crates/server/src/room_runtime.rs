@@ -76,7 +76,6 @@ pub struct RoomRuntime {
     pause_sent_at: u64,
     auto_paused: BTreeSet<usize>,
     held: u16,
-    pub(crate) ai: Option<crate::room_ai::RoomAi>,
     #[cfg(test)]
     snapshot_production_calls: u64,
 }
@@ -110,7 +109,7 @@ impl RoomRuntime {
                 .recipient(slot)
                 .map_err(|e| format!("AI start recipient: {e:?}"))?
                 .into_json();
-            self.delivered_ai.observe(slot, &snapshot)?;
+            self.delivered_ai.observe(slot, &snapshot, true)?;
             messages.push((slot, envelope.message(slot, snapshot)));
         }
         Ok(messages)
@@ -140,6 +139,9 @@ impl RoomRuntime {
     }
     pub fn new(mut state: Match, now_ms: u64) -> Result<Self, String> {
         state.validate_tick_state()?;
+        if state.options.mode == ww2_core::economy::Mode::Horde {
+            state.tick_state.restrict_aircraft_weapons_for_delivery();
+        }
         state
             .restrict_to_ordinary_snapshots()
             .map_err(|e| format!("snapshot admission: {e:?}"))?;
@@ -164,7 +166,6 @@ impl RoomRuntime {
             pause_sent_at: now_ms,
             auto_paused: BTreeSet::new(),
             held: 0,
-            ai: None,
             #[cfg(test)]
             snapshot_production_calls: 0,
         })
@@ -176,12 +177,21 @@ impl RoomRuntime {
     ) -> Option<&ww2_core::human_commander::HumanView<ww2_core::commander_ai::Observation>> {
         self.delivered_ai.delivered_view(slot)
     }
+    #[cfg(test)]
+    pub(crate) fn ai_level(&self, slot: usize) -> Option<ww2_core::commander_ai::Level> {
+        self.delivered_ai.level(slot)
+    }
+    #[cfg(test)]
+    pub(crate) fn ai_decoded_view(&self, slot: usize) -> Option<&ww2_core::ai_view::SeatView> {
+        self.delivered_ai.decoded_view(slot)
+    }
     pub(crate) fn activate_ai(
         &mut self,
         map: &Value,
         slot: usize,
         level: &str,
     ) -> Result<(), String> {
+        #[cfg(test)]
         if self.ai.is_some() {
             return Err("hosted AI owner is already configured".into());
         }
@@ -194,6 +204,7 @@ impl RoomRuntime {
     }
     pub(crate) fn reset_ai(&mut self, slot: usize) {
         self.delivered_ai.reset(slot);
+        #[cfg(test)]
         if let Some(ai) = &mut self.ai {
             ai.reset(slot);
         }
@@ -229,6 +240,7 @@ impl RoomRuntime {
         self.delivered_ai
             .restore_memories(saved, self.state.start.players.len())
     }
+    #[cfg(test)]
     pub(crate) fn configure_ai(
         &mut self,
         seats: &[(usize, ww2_core::commander_ai::Level)],
@@ -247,6 +259,7 @@ impl RoomRuntime {
         )?);
         Ok(())
     }
+    #[cfg(test)]
     pub(crate) fn think(&mut self, sent: bool) -> Result<(), String> {
         self.running()?;
         if let Some(ai) = &mut self.ai {
@@ -420,7 +433,8 @@ impl RoomRuntime {
                 .recipient(seat.slot)
                 .map_err(|e| format!("native recipient: {e:?}"))?
                 .into_json();
-            self.delivered_ai.observe(seat.slot, &message)?;
+            self.delivered_ai
+                .observe(seat.slot, &message, kind == FrameKind::Scheduled)?;
             captured.push(CapturedSeat {
                 slot: seat.slot,
                 batch,

@@ -1174,6 +1174,15 @@ fn ai63_planner_checkpoint_retains_full_memory_without_random_streams() {
     policy.tactics.cleared_sightings.insert(8, 19.);
     policy.tactics.node.insert(9, 2);
     policy.tactics.fort_steps.insert(10, 4);
+    policy.tactics.field = serde_json::from_value(json!({
+        "bridges":[17],"bridge_crew":{"12":{"tick":18,"dug":true}},
+        "fill_crew":{"13":{"tick":19,"dug":false}},
+        "demine_crew":{"14":{"tick":20,"dug":true}},"armor_seen":true
+    }))
+    .unwrap();
+    policy.tactics.world.rail_at.insert(15, 21);
+    policy.tactics.world.fort_steps.insert(16, 3);
+    policy.tactics.world.field = policy.tactics.field.clone();
     policy.tactics.assault.cooldown = 8.;
     policy.tactics.assault.serial = u64::MAX;
     policy.tactics.assault.released.insert(11, 12.);

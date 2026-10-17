@@ -713,5 +713,3 @@ impl crate::match_runtime::Match {
 
 #[cfg(test)]
 mod tests;
-
-pub mod commander;

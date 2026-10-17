@@ -182,3 +182,28 @@ adapter does. Its public terrain comes from the already-redacted startup map;
 no hidden authoritative terrain is read. Stationary and mine/engineering facts
 are completed only from those public/recipient inputs. The former false
 capability assertion now verifies the complete receiver is enabled.
+
+## Cross-chain #423 (supersedes the provisional two-owner production layout)
+
+Exact parent `4453acf5b95fe5303278ef21b80736fa70c276c7` already contains the
+explicit ordinary/Horde delivered-frame owner unification required by the
+handoff's merge list. Applying that change means production now uses one
+room-delivery owner for all admitted AI seats, including Horde's internal enemy.
+The earlier logistics-only adapter is retained only under cfg(test), with all its
+original tests, so it cannot run a second scheduler in a live room. The incoming
+combined-role tests and existing ordinary tests both remain.
+
+The unified owner receives only the canonical selected start/frame snapshots;
+Horde's internal seat is activated at Normal difficulty and included in the
+initial selected capture. It retains the incoming scheduled-frame alert reset
+and queue-full behavior. Independent inactive human helpers still reset on the
+existing seated-token takeover. No new takeover rule is introduced.
+
+The current ordinary adapter additions (delivered strikes, stationary history,
+public initial terrain, mines, wall work and ground-flight capability) compose
+with the incoming owner rather than disappearing through a same-path conflict.
+The incoming full-map spectator contact helper retains current-pose projection
+and operative identity validation; all existing full-map flight tests remain.
+
+Final behavioral verification must cover this explicitly requested cross-chain
+change; the earlier standalone Horde chain pass is not proof of equivalence.

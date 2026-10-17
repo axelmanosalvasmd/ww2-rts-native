@@ -231,6 +231,9 @@ impl Hub {
             person.disconnected = None;
             person.last_match = None;
         }
+        if spectators.len() > MAX_SPECTATORS {
+            return Err("saved room exceeds spectator capacity".into());
+        }
         let mut players = Vec::new();
         for (slot, seat) in seats.iter().enumerate() {
             let team = seat["team"]

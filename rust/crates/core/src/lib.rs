@@ -274,6 +274,9 @@ mod save_codec;
 mod save_state;
 
 pub mod authoring_queries;
+#[cfg(test)]
+mod match_horde_operative_tests;
+
 pub mod commander_field_policy;
 pub mod commander_world_policy;
 mod match_terrain_orders;

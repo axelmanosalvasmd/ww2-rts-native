@@ -7,7 +7,7 @@ use ww2_core::{
     commander_ai::Level,
     match_commands::Command,
     match_runtime::Match,
-    orders::OrderKey,
+    orders::{OrderKey, QueueError},
     recipient_snapshot::SelectedSeat,
     seat_commander::{Advance, Delivered, SeatCommander},
 };
@@ -21,6 +21,8 @@ struct Consumer {
     shots: Vec<ww2_core::match_human_observation::HumanShot>,
     generation: u64,
     cells: BTreeMap<u64, Value>,
+    #[cfg(test)]
+    decoded: Option<ww2_core::ai_view::SeatView>,
 }
 #[derive(Default)]
 pub(super) struct RoomAi {
@@ -81,6 +83,10 @@ impl RoomAi {
                 .restore_planner_memory(&memory["planner"])?;
             consumer.cells = serde_json::from_value(memory["cells"].clone())
                 .map_err(|e| format!("saved planner terrain deltas: {e}"))?;
+            #[cfg(test)]
+            {
+                consumer.decoded = None;
+            }
         }
         self.consumers = staged;
         // Packets and attention state restart with an opening look after load.
@@ -89,6 +95,14 @@ impl RoomAi {
             entry.view = None;
         }
         Ok(())
+    }
+
+    #[cfg(test)]
+    pub fn level(&self, slot: usize) -> Option<Level> {
+        self.delivered
+            .iter()
+            .find(|entry| entry.seat.slot == slot)
+            .map(|entry| entry.seat.level)
     }
 
     #[cfg(test)]
@@ -126,6 +140,11 @@ impl RoomAi {
             Delivered::Horde(_) | Delivered::HordePolicy { .. } => None,
         }
     }
+    #[cfg(test)]
+    pub fn decoded_view(&self, slot: usize) -> Option<&ww2_core::ai_view::SeatView> {
+        self.consumers.get(&slot)?.decoded.as_ref()
+    }
+
     pub fn activate(
         &mut self,
         state: &Match,
@@ -133,6 +152,8 @@ impl RoomAi {
         slot: usize,
         level: Level,
     ) -> Result<(), String> {
+        let horde = state.horde.as_ref().is_some_and(|horde| horde.slot == slot);
+        let level = if horde { Level::Normal } else { level };
         let public = PublicMap {
             width: state.world.game.w,
             height: state.world.game.h,
@@ -192,6 +213,8 @@ impl RoomAi {
                 shots: Vec::new(),
                 generation: 0,
                 cells: BTreeMap::new(),
+                #[cfg(test)]
+                decoded: None,
             },
         );
         self.delivered.retain(|entry| entry.seat.slot != slot);
@@ -199,7 +222,11 @@ impl RoomAi {
             seat: Seat {
                 slot,
                 level,
-                brain: Brain::Commander,
+                brain: if horde {
+                    Brain::Horde
+                } else {
+                    Brain::Commander
+                },
             },
             view: None,
         });
@@ -223,10 +250,20 @@ impl RoomAi {
             })
             .collect()
     }
-    pub fn observe(&mut self, slot: usize, snapshot: &Value) -> Result<(), String> {
+    pub fn observe(
+        &mut self,
+        slot: usize,
+        snapshot: &Value,
+        scheduled: bool,
+    ) -> Result<(), String> {
         let Some(consumer) = self.consumers.get_mut(&slot) else {
             return Ok(());
         };
+        // Current/catch-up frames may seed a newly activated seat, but later
+        // observations belong to the room's actual scheduled delivery beat.
+        if !scheduled && consumer.generation > 0 {
+            return Ok(());
+        }
         let tick = snapshot["tick"]
             .as_i64()
             .ok_or("AI snapshot clock missing")?;
@@ -271,9 +308,20 @@ impl RoomAi {
             let mut observation = snapshot.clone();
             observation["cells"] = json!(consumer.cells.values().collect::<Vec<_>>());
             let view = consumer.memory.decode(&observation)?;
-            let packet = consumer.policy_view.observe(&view, &observation)?;
+            let delivered = if entry.seat.brain == Brain::Horde {
+                let (view, facts) = view.horde_packet(slot)?;
+                Delivered::HordePolicy {
+                    view,
+                    facts: Box::new(facts),
+                }
+            } else {
+                Delivered::Human(Box::new(consumer.policy_view.observe(&view, &observation)?))
+            };
+            #[cfg(test)]
+            {
+                consumer.decoded = Some(view);
+            }
             consumer.cells.clear();
-            let delivered = Delivered::Human(Box::new(packet));
             entry.view = Some(delivered.clone());
             self.fresh.insert(slot, delivered);
         }
@@ -289,7 +337,7 @@ impl RoomAi {
             .map(|(&slot, _)| slot)
             .collect::<BTreeSet<_>>();
         let fresh = self.fresh.keys().copied().collect::<BTreeSet<_>>();
-        let mut active = Vec::new();
+        let mut active = BTreeSet::new();
         self.schedule
             .tick(
                 Beat {
@@ -304,9 +352,23 @@ impl RoomAi {
                         .remove(&seat.slot)
                         .expect("selected AI snapshot delivered before planning")
                 },
-                |seat, _| active.push(seat.slot),
+                |seat, _| {
+                    active.insert(seat.slot);
+                },
             )
             .map_err(|e| format!("room AI schedule: {e:?}"))?;
+        // Every Horde delivery drains pending ground orders, including deliveries
+        // between the director's Normal think ticks.
+        if sent && state.finish.is_none() {
+            active.extend(
+                self.delivered
+                    .iter()
+                    .filter(|entry| {
+                        entry.seat.brain == Brain::Horde && fresh.contains(&entry.seat.slot)
+                    })
+                    .map(|entry| entry.seat.slot),
+            );
+        }
         for slot in active {
             let packet = fresh
                 .contains(&slot)
@@ -336,7 +398,7 @@ impl RoomAi {
                 Advance::Horde(commands) => commands,
             };
             for command in commands {
-                let next = tick as u64 + 1;
+                let next = (tick as u64).checked_add(1).ok_or("AI tick exhausted")?;
                 let sequence = state
                     .commands
                     .pending_tick(next)
@@ -346,16 +408,17 @@ impl RoomAi {
                     .unwrap_or(0)
                     .checked_add(1)
                     .ok_or("AI sequence exhausted")?;
-                state
-                    .enqueue_command(
-                        OrderKey {
-                            tick: next,
-                            issuer: slot as u32,
-                            sequence,
-                        },
-                        command,
-                    )
-                    .map_err(|e| format!("room AI admission: {e:?}"))?;
+                match state.enqueue_command(
+                    OrderKey {
+                        tick: next,
+                        issuer: slot as u32,
+                        sequence,
+                    },
+                    command,
+                ) {
+                    Ok(()) | Err(QueueError::Full) => {}
+                    Err(error) => return Err(format!("room AI admission: {error:?}")),
+                }
             }
         }
         self.fresh.clear();

@@ -140,7 +140,6 @@ fn mode41_horde_maps_select_preserve_ignore_and_reread_start_restart_atomically(
             let sent = native
                 .runtime
                 .should_snapshot(native.runtime.state().world.game.tick);
-            native.runtime.think(sent).unwrap();
             assert_eq!(
                 native
                     .runtime
@@ -149,6 +148,7 @@ fn mode41_horde_maps_select_preserve_ignore_and_reread_start_restart_atomically(
                     .len(),
                 3
             );
+            native.runtime.tick_ai(sent).unwrap();
         }
         hub.rooms.get_mut("ABC").unwrap().native = None;
         outputs(&mut hub, &mut ra, 0);

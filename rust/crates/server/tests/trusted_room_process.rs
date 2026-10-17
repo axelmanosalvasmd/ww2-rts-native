@@ -574,3 +574,29 @@ fn mode01_mode04_binary_ordinary_modes_start_snapshot_and_restart() {
         }
     }
 }
+
+#[test]
+fn room_ai_horde_binary_starts_selected_level_and_internal_horde_views() {
+    let server = BinaryServer::start(true, SEED);
+    let mut host = Client::join(server.address, "a");
+    host.send(json!({"t":"addAi"}));
+    host.until(|m| m["t"] == "lobby" && m["players"].as_array().is_some_and(|p| p.len() == 2));
+    host.send(json!({"t":"level","slot":1,"v":"hard"}));
+    host.until(|m| m["t"] == "lobby" && m["players"][1]["level"] == "hard");
+    host.send(json!({"t":"mode","v":"horde"}));
+    host.until(|m| m["t"] == "lobby" && m["mode"] == "horde");
+    host.send(json!({"t":"start"}));
+    let start = host.until(|m| m["t"] == "start");
+    assert_eq!(start["names"], json!(["a", "AI 1", "Horde"]));
+    assert_eq!(start["teams"], json!([0, 0, 1]));
+    assert_eq!(start["spawns"].as_array().unwrap().len(), 3);
+    for _ in 0..4 {
+        let snapshot = host.until(|m| m["t"] == "s");
+        assert_eq!(snapshot["mode"]["kind"], "horde");
+        assert_eq!(snapshot["mode"]["slot"], 2);
+        assert_eq!(snapshot["online"], json!([true, true]));
+        assert_eq!(snapshot["ping"][1].as_f64(), Some(-1.0));
+    }
+    host.barrier();
+    assert!(!server.log().contains("NATIVE_FAULT"));
+}

@@ -1275,7 +1275,7 @@ fn base21_hosted_classic_aircraft_train_fifo_at_exact_times_and_pause_without_lo
 
 #[test]
 fn paused_scheduled_event_clear_resets_ai_alert_cursor_before_resume() {
-    use ww2_core::{commander_ai::Level, seat_commander::Brain};
+    use ww2_core::seat_commander::Brain;
     let selected = [SelectedSeat {
         slot: 0,
         full: false,
@@ -1284,12 +1284,15 @@ fn paused_scheduled_event_clear_resets_ai_alert_cursor_before_resume() {
     // A paused frame replaces the event batch even when every socket is backed up.
     for seats in [selected.as_slice(), &[]] {
         let mut runtime = section_runtime();
-        runtime.configure_ai(&[(0, Level::Normal)]).unwrap();
-        runtime.think(false).unwrap();
+        let game = &runtime.state().world.game;
+        let map = json!({"rows": vec![".".repeat(game.w); game.h]});
+        runtime.activate_ai(&map, 0, "normal").unwrap();
+        runtime
+            .collect_frame(&selected, FrameKind::Scheduled)
+            .unwrap();
+        runtime.tick_ai(false).unwrap();
         let cursor = |runtime: &RoomRuntime| {
-            let Brain::Human { state, .. } =
-                runtime.ai.as_ref().unwrap().commander(0).unwrap().brain()
-            else {
+            let Brain::Human { state, .. } = runtime.ai_commander(0).unwrap().brain() else {
                 panic!("expected the human commander");
             };
             let snapshot = state.snapshot().unwrap();
@@ -1301,7 +1304,7 @@ fn paused_scheduled_event_clear_resets_ai_alert_cursor_before_resume() {
         };
         assert_eq!(
             cursor(&runtime),
-            (Some(0), 1, 1),
+            (Some(1), 1, 1),
             "the AI read the real section hurt before any send"
         );
         runtime.pause(0, "A", PauseReason::Host, 10).unwrap();
@@ -1309,12 +1312,12 @@ fn paused_scheduled_event_clear_resets_ai_alert_cursor_before_resume() {
         assert!(pause.blocked && pause.send_frame);
         runtime.collect_frame(seats, FrameKind::Current).unwrap();
         assert_eq!(
-            runtime.event_generation, 0,
+            runtime.event_generation, 1,
             "catch-up keeps the current event batch"
         );
         runtime.collect_frame(seats, FrameKind::Scheduled).unwrap();
         assert!(runtime.pending_events.is_empty());
-        assert_eq!(runtime.event_generation, 1);
+        assert_eq!(runtime.event_generation, 2);
         runtime.resume(1011);
         runtime.advance_tick(&[false; 2]).unwrap();
         assert!(
@@ -1322,9 +1325,13 @@ fn paused_scheduled_event_clear_resets_ai_alert_cursor_before_resume() {
             "the replacement batch is shorter than the old cursor"
         );
         runtime
-            .think(false)
+            .collect_frame(&selected, FrameKind::Scheduled)
+            .unwrap();
+        runtime
+            .tick_ai(false)
             .expect("resume must reset the alert cursor instead of refusing a shorter batch");
-        assert_eq!(cursor(&runtime), (Some(1), 0, 1));
+        let expected_generation = if seats.is_empty() { 2 } else { 3 };
+        assert_eq!(cursor(&runtime), (Some(expected_generation), 0, 1));
         assert!(runtime.fault().is_none());
         assert!(runtime.state().tick_state.fault().is_none());
     }

@@ -2,6 +2,8 @@
 use super::*;
 use crate::room_runtime::{FrameKind, RoomRuntime};
 use serde_json::json;
+use std::collections::BTreeSet;
+use ww2_core::match_commands::Command;
 use ww2_core::{
     economy::{Faction, Mode},
     economy_state::ArmySize,
@@ -54,16 +56,13 @@ fn hosted_horde_ai_grenade_survives_every_seat_delivery_until_natural_detonation
     // Prototype shared/ai.js:309,656-659,682:
     // the scripted director uses its delivered enemy sightings to throw at
     // infantry other than exposed rifles, through ordinary command admission.
-    let map = AuthoritativeMap::from_json(
-        &serde_json::to_vec(&json!({
-            "name":"Hosted Horde grenade lifecycle", "w":80, "h":80,
-            "rows":vec![".".repeat(80);80],
-            "spawns":[{"x":40,"y":5},{"x":10,"y":74},{"x":70,"y":74}],
-            "defend":[0], "points":[{"x":40,"y":30}]
-        }))
-        .unwrap(),
-    )
-    .unwrap();
+    let public_map = json!({
+        "name":"Hosted Horde grenade lifecycle", "w":80, "h":80,
+        "rows":vec![".".repeat(80);80],
+        "spawns":[{"x":40,"y":5},{"x":10,"y":74},{"x":70,"y":74}],
+        "defend":[0], "points":[{"x":40,"y":30}]
+    });
+    let map = AuthoritativeMap::from_json(&serde_json::to_vec(&public_map).unwrap()).unwrap();
     let mut state = Match::new_horde(
         &map,
         MatchOptions {
@@ -120,7 +119,11 @@ fn hosted_horde_ai_grenade_survives_every_seat_delivery_until_natural_detonation
         .initialize_tick_scene(25, TickPathConfig::default())
         .unwrap();
     let mut runtime = RoomRuntime::new(state, 0).unwrap();
-    runtime.configure_ai(&[(0, Level::Hard)]).unwrap();
+    runtime.activate_ai(&public_map, 0, "hard").unwrap();
+    runtime.activate_ai(&public_map, horde, "normal").unwrap();
+    runtime
+        .collect_frame(&runtime.ai_selected(), FrameKind::Current)
+        .unwrap();
     let mut aimed = BTreeSet::new();
     let mut accepted = BTreeSet::new();
     let mut flights = BTreeSet::new();
@@ -181,24 +184,6 @@ fn hosted_horde_ai_grenade_survives_every_seat_delivery_until_natural_detonation
             after_expiration += 1;
         }
         let sent = runtime.should_snapshot(report.tick);
-        runtime.think(sent).unwrap();
-        for (key, command) in runtime
-            .state()
-            .commands
-            .pending_tick(report.tick as u64 + 1)
-        {
-            if key.issuer as usize == horde
-                && let Command::Ability {
-                    ids,
-                    at: Some(_),
-                    automatic: false,
-                    ..
-                } = command
-                && ids.contains(&i64::from(rifle))
-            {
-                aimed.insert(*key);
-            }
-        }
         let selected = (0..runtime.state().world.game.players.len())
             .map(|slot| SelectedSeat {
                 slot,
@@ -216,6 +201,24 @@ fn hosted_horde_ai_grenade_survives_every_seat_delivery_until_natural_detonation
                 },
             )
             .unwrap();
+        runtime.tick_ai(sent).unwrap();
+        for (key, command) in runtime
+            .state()
+            .commands
+            .pending_tick(report.tick as u64 + 1)
+        {
+            if key.issuer as usize == horde
+                && let Command::Ability {
+                    ids,
+                    at: Some(_),
+                    automatic: false,
+                    ..
+                } = command
+                && ids.contains(&i64::from(rifle))
+            {
+                aimed.insert(*key);
+            }
+        }
         assert_eq!(frames.len(), selected.len());
         for frame in frames {
             assert_eq!(frame.message["tick"], report.tick);

@@ -6,6 +6,11 @@ use crate::{
 };
 
 impl Match {
+    pub(crate) fn companion_mode_supported(&self) -> bool {
+        ordinary_ground_mode(&self.world.game, self.options.mode)
+            && (self.options.mode != Mode::Horde || self.validate_horde_economy().is_ok())
+    }
+
     /// Validate the identity join and next clock before a tick publishes phases.
     /// The empty registry leaves the ordinary runner's existing clock bounds intact.
     pub(crate) fn prepare_companion_tick(&self) -> Result<(), String> {
@@ -20,7 +25,7 @@ impl Match {
             }
             return Ok(());
         }
-        if !ordinary_ground_mode(&self.world.game, self.options.mode)
+        if !self.companion_mode_supported()
             || !(0..SAFE_INTEGER - RESPAWN_TICKS).contains(&self.world.game.tick)
         {
             return Err("invalid operative tick mode or clock".into());

@@ -26,15 +26,21 @@ pub(super) fn shooter(state: &Match, id: u32, owner: usize) -> Result<(), Snapsh
 
 pub(super) fn validate(state: &Match) -> Result<(), SnapshotError> {
     for (id, flight) in &state.firing.flights {
-        let operative = state
+        if !state
             .commands
             .units
             .get(&flight.shooter)
-            .is_some_and(|control| control.operative)
-            || state.companions.soldiers.contains_key(&flight.shooter);
-        if operative {
-            shooter(state, flight.shooter, flight.owner)?;
+            .is_some_and(|c| c.operative)
+            && !state.companions.soldiers.contains_key(&flight.shooter)
+            && !state
+                .companions
+                .records
+                .values()
+                .any(|op| op.unit_id == flight.shooter)
+        {
+            continue;
         }
+        shooter(state, flight.shooter, flight.owner)?;
         if *id == 0
             || *id != flight.id
             || *id > 9_007_199_254_740_991

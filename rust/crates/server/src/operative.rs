@@ -156,10 +156,16 @@ impl Room {
         let snapshot = stream
             .capture(state, true, &[])
             .map_err(|error| format!("operative start delivery: {error:?}"))?;
-        let names = self
+        let names = state
+            .start
             .players
             .iter()
-            .map(|person| person.name.clone())
+            .enumerate()
+            .map(|(slot, player)| {
+                self.players
+                    .get(slot)
+                    .map_or_else(|| player.config.name.clone(), |person| person.name.clone())
+            })
             .collect::<Vec<_>>();
         let envelope = native.startup.envelope(state, &names, native.epoch)?;
         let mut start = envelope.message(slot, snapshot);

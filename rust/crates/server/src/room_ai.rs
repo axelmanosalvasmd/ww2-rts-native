@@ -223,7 +223,7 @@ impl RoomAi {
 mod tests;
 
 #[cfg(test)]
-#[path = "room_ai_combat_tests.rs"]
+#[path = "room_hosted_ai_combat_tests.rs"]
 mod combat_tests;
 
 #[cfg(test)]

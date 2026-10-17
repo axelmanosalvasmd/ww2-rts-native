@@ -1315,30 +1315,22 @@ impl Hub {
         levels.resize(state.start.players.len(), None);
         let helpers = crate::room_helpers::RoomHelpers::new(&state, &levels)?;
         let mut runtime = RoomRuntime::new(state, now)?;
-        let ai = room
-            .players
-            .iter()
-            .enumerate()
-            .filter(|(_, p)| p.ai)
-            .map(|(slot, p)| {
-                (
-                    slot,
-                    ww2_core::commander_ai::Level::from_key(p.level).unwrap(),
-                )
-            })
-            .collect::<Vec<_>>();
-        if horde {
-            runtime.configure_ai(&ai)?;
-        }
         let resume = runtime.resume(now);
         for (slot, person) in room.players.iter().enumerate() {
-            if person.ai && !horde {
+            if person.ai {
                 runtime.activate_ai(startup.public_map(), slot, person.level)?;
-            } else if !person.online() {
+            } else if person
+                .connection
+                .as_ref()
+                .is_none_or(|connection| !connection.ready())
+            {
                 runtime.auto_pause(slot, &person.name, now)?;
             }
         }
-        let slots = (0..room.players.len()).collect::<Vec<_>>();
+        if horde {
+            runtime.activate_ai(startup.public_map(), count - 1, "normal")?;
+        }
+        let slots = (0..count).collect::<Vec<_>>();
         let names = runtime
             .state()
             .start
@@ -1413,7 +1405,7 @@ impl Hub {
             }
         }
         for (slot, start) in starts {
-            if let Some(connection) = &room.players[slot].connection {
+            if let Some(connection) = room.players.get(slot).and_then(|p| p.connection.as_ref()) {
                 connection.send(start);
                 self.accounts.get_mut(&connection.id).unwrap().full_terrain = false;
             }
@@ -1696,7 +1688,7 @@ impl Hub {
             return None;
         }
         for mut frame in captured {
-            if room.players[frame.slot].ai {
+            if room.players.get(frame.slot).is_none_or(|p| p.ai) {
                 continue;
             }
             let build_at = Instant::now();
@@ -1959,12 +1951,6 @@ impl Hub {
                     }
                 }
                 let sent = native.runtime.should_snapshot(report.tick);
-                let think_at = Instant::now();
-                if let Err(error) = native.runtime.think(sent) {
-                    native.runtime.fault_stop(format!("AI scheduling: {error}"));
-                    continue;
-                }
-                let think = think_at.elapsed().as_secs_f64() * 1000.0;
                 let snapshot_at = Instant::now();
                 let mut costs = (0.0, 0.0);
                 if sent {
@@ -1996,7 +1982,7 @@ impl Hub {
                         .fault_stop(format!("room AI: {error}"));
                     continue;
                 }
-                let think = think + think_at.elapsed().as_secs_f64() * 1000.0;
+                let think = think_at.elapsed().as_secs_f64() * 1000.0;
                 let sample = TickSample {
                     sent,
                     durations: [
@@ -3220,3 +3206,11 @@ mod scenario_start_tests;
 #[cfg(test)]
 #[path = "tutorial_room_tests.rs"]
 mod tutorial_room_tests;
+
+#[cfg(test)]
+#[path = "room_ai_combat_tests.rs"]
+mod room_ai_combat_tests;
+
+#[cfg(test)]
+#[path = "room_ai3_tests.rs"]
+mod room_ai3_tests;

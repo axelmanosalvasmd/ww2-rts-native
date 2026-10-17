@@ -90,9 +90,18 @@ impl TickPathConfig {
 pub struct TickState {
     pub(crate) fault: Option<String>,
     started: bool,
+    #[serde(default)]
+    aircraft_weapons_restricted: bool,
     paths: TickPathConfig,
 }
 impl TickState {
+    /// Hosted modes without aircraft projectile delivery retain this restriction.
+    pub fn restrict_aircraft_weapons_for_delivery(&mut self) {
+        self.aircraft_weapons_restricted = true;
+    }
+    pub(crate) fn aircraft_weapons_allowed(&self) -> bool {
+        !self.aircraft_weapons_restricted
+    }
     pub fn fault(&self) -> Option<&str> {
         self.fault.as_deref()
     }
