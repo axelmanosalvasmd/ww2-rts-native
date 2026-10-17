@@ -638,7 +638,7 @@ fn plan_inner(
     let construction = if world_policy {
         crate::commander_world_policy::construction(
             &construction_view,
-            &mirrored_units(&construction_view, &construction_units),
+            &mirrored_units(&construction_view, &construction_crew),
             budget,
         )?
     } else {
