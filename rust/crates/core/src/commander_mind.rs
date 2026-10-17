@@ -407,3 +407,26 @@ mod tests {
         assert_eq!(mind.respect["mg"], 1);
     }
 }
+
+#[cfg(test)]
+mod checkpoint_tests {
+    use super::*;
+    #[test]
+    fn ai63_mind_checkpoint_retains_every_notice_and_lesson() {
+        let at = Point { x: -0.0, z: 42. };
+        let mind = Mind {
+            roster: BTreeMap::from([(1, at)]),
+            respect: BTreeMap::from([("tank".into(), 3)]),
+            noticed: BTreeMap::from([(2, 12.)]),
+            last_seen: BTreeMap::from([(2, 13.)]),
+            losses: BTreeMap::from([(3, (at, 14.))]),
+            failures: vec![4],
+            lost_points: vec![true],
+            owned: vec![None, Some(false), Some(true)],
+            point_seen: vec![None, Some(15.)],
+        };
+        let value = crate::save_codec::to_value(&mind).unwrap();
+        let restored: Mind = crate::save_codec::from_value(value.clone()).unwrap();
+        assert_eq!(crate::save_codec::to_value(&restored).unwrap(), value);
+    }
+}

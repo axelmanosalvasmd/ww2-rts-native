@@ -131,6 +131,7 @@ fn known_string(value: &str) -> Option<&'static str> {
         "nade",
         "arty",
         "bomb",
+        "boom",
         "flame",
         "grenade",
         "artillery",
@@ -191,7 +192,8 @@ pub(crate) fn static_string<'de, D: serde::Deserializer<'de>>(
     d: D,
 ) -> Result<&'static str, D::Error> {
     let value = <String as serde::Deserialize>::deserialize(d)?;
-    known_string(&value).ok_or_else(|| serde::de::Error::custom("unknown compiled save string"))
+    known_string(&value)
+        .ok_or_else(|| serde::de::Error::custom(format!("unknown compiled save string: {value}")))
 }
 
 pub(crate) fn optional_static_string<'de, D: serde::Deserializer<'de>>(
@@ -200,7 +202,9 @@ pub(crate) fn optional_static_string<'de, D: serde::Deserializer<'de>>(
     let value = <Option<String> as serde::Deserialize>::deserialize(d)?;
     value
         .map(|v| {
-            known_string(&v).ok_or_else(|| serde::de::Error::custom("unknown compiled save string"))
+            known_string(&v).ok_or_else(|| {
+                serde::de::Error::custom(format!("unknown compiled save string: {v}"))
+            })
         })
         .transpose()
 }

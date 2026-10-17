@@ -273,14 +273,14 @@ impl Room {
     fn host(&self) -> Option<usize> {
         self.players
             .iter()
-            .position(|p| !p.ai && p.connection.is_some())
+            .position(|p| !p.ai && p.online())
             .or_else(|| self.players.iter().position(|p| !p.ai))
     }
     fn is_host(&self, id: u64) -> bool {
         let person = self
             .host()
             .map(|i| &self.players[i])
-            .or_else(|| self.spectators.iter().find(|p| p.connection.is_some()));
+            .or_else(|| self.spectators.iter().find(|p| p.online()));
         person.is_some_and(|p| p.connection.as_ref().is_some_and(|c| c.id == id))
     }
     fn capacity(&self, maps: &Value) -> usize {
@@ -499,6 +499,30 @@ impl Room {
         }
         v
     }
+    fn hand_to_ai(&mut self, slot: usize, now: u64) -> Result<(), String> {
+        let native = self.native.as_mut().ok_or("handover requires play")?;
+        native
+            .runtime
+            .activate_ai(native.startup.public_map(), slot, "normal")?;
+        let person = &mut self.players[slot];
+        person.ai = true;
+        person.level = "normal";
+        person.connection = None;
+        person.token.clear();
+        person.name.push_str(" (AI)");
+        person.disconnected = None;
+        if let Some(message) = native.runtime.resume_drop(slot, now)? {
+            for person in self.people() {
+                if let Some(connection) = &person.connection {
+                    connection.send(message.clone());
+                }
+            }
+        }
+        if !self.people().any(|p| p.connection.is_some()) {
+            self.empty_since = Some(now);
+        }
+        Ok(())
+    }
     fn command(&mut self, id: u64, msg: &Value, maps: &Value, now: u64, diagnostics: bool) -> bool {
         let Some(t) = msg["t"].as_str() else {
             return false;
@@ -516,6 +540,36 @@ impl Room {
         }
         let host = self.is_host(id);
         let attached = self.native.is_some();
+        if attached && (t == "leave" || t == "handAi") {
+            let target = if t == "leave" {
+                seated.filter(|slot| !self.players[*slot].ai)
+            } else if host {
+                integer(&msg["slot"])
+                    .and_then(|slot| usize::try_from(slot).ok())
+                    .filter(|slot| {
+                        self.players
+                            .get(*slot)
+                            .is_some_and(|p| !p.ai && !p.online())
+                    })
+            } else {
+                None
+            };
+            let Some(slot) = target else {
+                return false;
+            };
+            let departing = (t == "leave")
+                .then(|| self.players[slot].connection.clone())
+                .flatten();
+            if let Err(error) = self.hand_to_ai(slot, now) {
+                self.native.as_mut().unwrap().runtime.fault_stop(error);
+                return false;
+            }
+            if let Some(connection) = departing {
+                connection.send(json!({"t":"left"}));
+                connection.close(1000, "");
+            }
+            return true;
+        }
         let me = if let Some(i) = seated {
             &mut self.players[i]
         } else {
@@ -1050,8 +1104,8 @@ impl Hub {
         if room.native.is_some() && !replace {
             return Err("room already has a native runtime".into());
         }
-        if room.players.is_empty() || room.players.iter().any(|p| p.ai) {
-            return Err("native attachment needs human commander seats".into());
+        if room.players.is_empty() {
+            return Err("native attachment needs commander seats".into());
         }
         if state.start.players.len() != room.players.len()
             || state.options.players.len() != room.players.len()
@@ -1091,7 +1145,9 @@ impl Hub {
         let mut runtime = RoomRuntime::new(state, now)?;
         let resume = runtime.resume(now);
         for (slot, person) in room.players.iter().enumerate() {
-            if person
+            if person.ai {
+                runtime.activate_ai(startup.public_map(), slot, person.level)?;
+            } else if person
                 .connection
                 .as_ref()
                 .is_none_or(|connection| !connection.ready())
@@ -1151,12 +1207,16 @@ impl Hub {
             }
         }
         room.broadcast(&self.maps, &self.public_url);
+        if let Some(pause) = &pause {
+            for person in room.people() {
+                if let Some(connection) = &person.connection {
+                    connection.send(pause.clone());
+                }
+            }
+        }
         for (slot, start) in starts {
             if let Some(connection) = &room.players[slot].connection {
                 connection.send(start);
-                if let Some(pause) = &pause {
-                    connection.send(pause.clone());
-                }
                 self.accounts.get_mut(&connection.id).unwrap().full_terrain = false;
             }
         }
@@ -1370,6 +1430,10 @@ impl Hub {
                 omit: false,
             });
         }
+        if backed_up {
+            selected.extend(native.runtime.ai_selected());
+        }
+        selected.sort_by_key(|seat| seat.slot);
         Ok(selected)
     }
     fn send_native_frame(
@@ -1450,6 +1514,9 @@ impl Hub {
             return None;
         }
         for mut frame in captured {
+            if room.players[frame.slot].ai {
+                continue;
+            }
             let build_at = Instant::now();
             let scope = match native.runtime.list_scope(frame.batch) {
                 Ok(scope) if scope == ListScope::Shared(frame.list_versions) => scope,
@@ -1586,11 +1653,7 @@ impl Hub {
                     native.ingress.discard_feedback();
                     continue;
                 }
-                let connected = room
-                    .players
-                    .iter()
-                    .map(|p| p.connection.as_ref().is_some_and(Connection::ready))
-                    .collect::<Vec<_>>();
+                let connected = room.players.iter().map(Person::online).collect::<Vec<_>>();
                 let pause = match native.runtime.poll_pause(&connected, now_ms) {
                     Ok(pause) => pause,
                     Err(error) => {
@@ -1625,7 +1688,7 @@ impl Hub {
                 let away = room
                     .players
                     .iter()
-                    .map(|person| person.connection.is_none())
+                    .map(|person| person.connection.is_none() && !person.ai)
                     .collect::<Vec<_>>();
                 let native = room.native.as_mut().unwrap();
                 if let Err(error) = native.runtime.set_away(&away) {
@@ -1719,12 +1782,22 @@ impl Hub {
                         }
                     }
                 }
+                let think_at = Instant::now();
+                if let Err(error) = room.native.as_mut().unwrap().runtime.tick_ai(sent) {
+                    room.native
+                        .as_mut()
+                        .unwrap()
+                        .runtime
+                        .fault_stop(format!("room AI: {error}"));
+                    continue;
+                }
+                let think = think_at.elapsed().as_secs_f64() * 1000.0;
                 let sample = TickSample {
                     sent,
                     durations: [
                         began.elapsed().as_secs_f64() * 1000.0,
                         step,
-                        0.0,
+                        think,
                         snapshot_at.elapsed().as_secs_f64() * 1000.0,
                         costs.0,
                         costs.1,
@@ -1839,11 +1912,13 @@ impl Hub {
             return Err("R1 requires private Conquest and sandbox off".into());
         }
         if room.players.len() != 2
-            || room.players.iter().any(|p| p.ai || p.token.is_empty())
+            || room.players.iter().any(|p| !p.ai && p.token.is_empty())
             || room.players[0].team == room.players[1].team
-            || room.players[0].token == room.players[1].token
+            || (!room.players[0].ai
+                && !room.players[1].ai
+                && room.players[0].token == room.players[1].token)
         {
-            return Err("R1 requires exactly two human commander tokens on opposing teams".into());
+            return Err("R1 requires exactly two commander seats on opposing teams".into());
         }
         if !matches!(
             room.army.as_str(),
@@ -1916,7 +1991,6 @@ impl Hub {
             {
                 return true;
             }
-            "addAi" | "level" => Err("R1 admits human commanders only".into()),
             _ => return false,
         };
         if let Err(error) = result {
@@ -2124,6 +2198,7 @@ impl Hub {
         if let Some(slot) = returning
             && let Some(native) = &mut room.native
         {
+            native.runtime.reset_ai(slot);
             let mut names = room
                 .players
                 .iter()
@@ -2407,8 +2482,8 @@ mod tests {
     #[test]
     fn observer_hosts_ai_room_and_cannot_change_another_humans_faction() {
         let mut h = Hub::new(32, String::new());
-        let (a, _) = client(1);
-        let (b, _) = client(2);
+        let (a, _ra) = client(1);
+        let (b, _rb) = client(2);
         join(&mut h, &a, "a", false, 0);
         join(&mut h, &b, "b", false, 0);
         h.message(
@@ -2778,6 +2853,10 @@ mod operative_tests;
 #[cfg(test)]
 #[path = "spectator_tests.rs"]
 mod spectator_tests;
+
+#[cfg(test)]
+#[path = "room_ai_tests.rs"]
+mod room_ai_tests;
 
 #[cfg(test)]
 #[path = "save_load_tests.rs"]

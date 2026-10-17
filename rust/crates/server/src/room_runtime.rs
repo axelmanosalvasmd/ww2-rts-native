@@ -56,7 +56,11 @@ pub(crate) fn end_horde_break(state: &mut Match, host: bool, paused: bool) -> Re
 
 /// A caller-owned output batch retains real tick effects until a scheduled send.
 /// It is not another simulation state or producer event authority.
+#[path = "room_ai.rs"]
+mod ai;
+
 pub struct RoomRuntime {
+    ai: ai::RoomAi,
     state: Match,
     delivery: DeliveryState,
     watchers: ww2_core::recipient_snapshot::SpectatorDelivery,
@@ -98,16 +102,16 @@ impl RoomRuntime {
             .capture_selected_with_lists(&mut self.state, &selected, &[])
             .map_err(|e| format!("native startup delivery: {e:?}"))?
             .ok_or("native startup has no seats")?;
-        Ok(slots
-            .iter()
-            .map(|&slot| {
-                let snapshot = frame
-                    .recipient(slot)
-                    .expect("admitted startup seat")
-                    .into_json();
-                (slot, envelope.message(slot, snapshot))
-            })
-            .collect())
+        let mut messages = Vec::new();
+        for &slot in slots {
+            let snapshot = frame
+                .recipient(slot)
+                .map_err(|e| format!("AI start recipient: {e:?}"))?
+                .into_json();
+            self.ai.observe(slot, &snapshot)?;
+            messages.push((slot, envelope.message(slot, snapshot)));
+        }
+        Ok(messages)
     }
     pub(crate) fn collect_watcher_start(
         &self,
@@ -143,6 +147,7 @@ impl RoomRuntime {
         let meter = TickMeter::new(now_ms).map_err(|e| e.to_string())?;
         Ok(Self {
             state,
+            ai: ai::RoomAi::default(),
             delivery,
             watchers: Default::default(),
             lists: RoomListCache::default(),
@@ -159,6 +164,58 @@ impl RoomRuntime {
             #[cfg(test)]
             snapshot_production_calls: 0,
         })
+    }
+    #[cfg(test)]
+    pub(crate) fn ai_delivered_view(
+        &self,
+        slot: usize,
+    ) -> Option<&ww2_core::human_commander::HumanView<ww2_core::commander_ai::Observation>> {
+        self.ai.delivered_view(slot)
+    }
+    pub(crate) fn activate_ai(
+        &mut self,
+        map: &Value,
+        slot: usize,
+        level: &str,
+    ) -> Result<(), String> {
+        self.ai.activate(
+            &self.state,
+            map,
+            slot,
+            ww2_core::commander_ai::Level::from_key(level).unwrap_or_default(),
+        )
+    }
+    pub(crate) fn reset_ai(&mut self, slot: usize) {
+        self.ai.reset(slot);
+    }
+    pub(crate) fn ai_selected(&self) -> Vec<SelectedSeat> {
+        if self.state.finish.is_some() {
+            Vec::new()
+        } else {
+            self.ai.selected(self.state.world.game.tick)
+        }
+    }
+    pub(crate) fn tick_ai(&mut self, sent: bool) -> Result<(), String> {
+        self.running()?;
+        self.ai.tick(&mut self.state, sent)
+    }
+    #[cfg(test)]
+    pub(crate) fn ai_commander(
+        &self,
+        slot: usize,
+    ) -> Option<&ww2_core::seat_commander::SeatCommander> {
+        self.ai.commander(slot)
+    }
+    #[cfg(test)]
+    pub(crate) fn ai_clone_failure(&self) -> Value {
+        self.ai.clone_failure(self.state.start.players.len())
+    }
+    pub(crate) fn save_ai_memories(&self) -> Value {
+        self.ai.save_memories(self.state.start.players.len())
+    }
+    pub(crate) fn restore_ai_memories(&mut self, saved: &Value) -> Result<(), String> {
+        self.ai
+            .restore_memories(saved, self.state.start.players.len())
     }
     pub(crate) fn save_json(&self) -> Result<Value, String> {
         self.running()?;
@@ -311,14 +368,16 @@ impl RoomRuntime {
             .ok_or("selected native frame unexpectedly absent")?;
         let mut captured = Vec::with_capacity(selected.len());
         for seat in selected {
+            let message = frame
+                .recipient(seat.slot)
+                .map_err(|e| format!("native recipient: {e:?}"))?
+                .into_json();
+            self.ai.observe(seat.slot, &message)?;
             captured.push(CapturedSeat {
                 slot: seat.slot,
                 batch,
                 list_versions: versions,
-                message: frame
-                    .recipient(seat.slot)
-                    .map_err(|e| format!("native recipient: {e:?}"))?
-                    .into_json(),
+                message,
             });
         }
         drop(frame);

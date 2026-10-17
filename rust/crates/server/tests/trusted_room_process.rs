@@ -110,7 +110,11 @@ fn ordinary_binary_opt_in_admits_spectators_and_retains_other_refusals() {
     assert_eq!(watching["spectator"], true);
     assert_eq!(watching["you"], -1);
     host.send(json!({"t":"addAi"}));
-    host.deny("addAi");
+    let lobby =
+        host.until(|m| m["t"] == "lobby" && m["players"].as_array().is_some_and(|p| p.len() == 3));
+    assert_eq!(lobby["players"][2]["ai"], true);
+    host.send(json!({"t":"kick","slot":2}));
+    host.until(|m| m["t"] == "lobby" && m["players"].as_array().is_some_and(|p| p.len() == 2));
     host.send(json!({"t":"spectate"}));
     let released = host.until(|m| m["t"] == "lobby" && m["spectator"] == true);
     assert_eq!(released["players"].as_array().unwrap().len(), 1);
@@ -211,12 +215,17 @@ fn ordinary_binary_absent_seat_start_and_restart_auto_pause_then_same_token_resu
     let lobby = host.until(|m| m["t"] == "lobby" && m["players"][1]["connected"] == false);
     assert_eq!(lobby["players"].as_array().unwrap().len(), 2);
     host.send(json!({"t":"start"}));
-    let first = host.until(|m| m["t"] == "start");
     assert_eq!(
         host.until(|m| m["t"] == "pause" && m["paused"] == true)["reason"],
         "drop"
     );
-    assert!(host.barrier().iter().all(|m| m["t"] != "s"));
+    let first = host.until(|m| m["t"] == "start");
+    assert!(
+        host.barrier()
+            .iter()
+            .filter(|m| m["t"] == "s")
+            .all(|m| m["tick"] == 0)
+    );
     let mut guest = Client::open(
         server.address,
         "ABC",
@@ -234,9 +243,9 @@ fn ordinary_binary_absent_seat_start_and_restart_auto_pause_then_same_token_resu
     drop(guest);
     host.until(|m| m["t"] == "lobby" && m["players"][1]["connected"] == false);
     host.send(json!({"t":"restart"}));
+    host.until(|m| m["t"] == "pause" && m["paused"] == true);
     let second = host.until(|m| m["t"] == "start");
     assert!(second["matchId"].as_u64().unwrap() > first["matchId"].as_u64().unwrap());
-    host.until(|m| m["t"] == "pause" && m["paused"] == true);
     let mut guest = Client::open(
         server.address,
         "ABC",
@@ -454,4 +463,27 @@ fn mode06_binary_named_armies_start_and_deliver_to_both_sockets() {
         assert_eq!(server.receipts()[0]["options"]["army"], key);
         assert!(!server.log().contains("NATIVE_FAULT"));
     }
+}
+
+#[test]
+fn room_ai_binary_starts_selected_difficulty_and_delivers_recipient_snapshots() {
+    let server = BinaryServer::start(true, SEED);
+    let mut host = Client::join(server.address, "a");
+    host.send(json!({"t":"addAi"}));
+    host.until(|m| m["t"] == "lobby" && m["players"].as_array().is_some_and(|p| p.len() == 2));
+    host.send(json!({"t":"level","slot":1,"v":"hard"}));
+    let lobby = host.until(|m| m["t"] == "lobby" && m["players"][1]["level"] == "hard");
+    assert_eq!(
+        lobby["players"][1],
+        json!({"name":"AI 1","connected":true,"ai":true,"team":1,"faction":1,"level":"hard"})
+    );
+    host.send(json!({"t":"start"}));
+    let start = host.until(|m| m["t"] == "start");
+    assert_eq!(start["names"], json!(["a", "AI 1"]));
+    for _ in 0..4 {
+        let snapshot = host.until(|m| m["t"] == "s");
+        assert_eq!(snapshot["online"], json!([true, true]));
+        assert_eq!(snapshot["ping"][1].as_f64(), Some(-1.0));
+    }
+    assert_eq!(server.receipts().len(), 1);
 }
