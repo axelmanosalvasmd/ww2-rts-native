@@ -38,3 +38,5 @@ The repaired four-merge checkpoint at `3a12e1ad` passed all 1,883 tests, with 10
 - #424 tactics/fortifications: combine node assignments with mirrored construction input, retain engineering state, medic/front logic and aircraft dispatch. Preserve World's early HQ skip while ordinary HQs sort crews before skipping, matching repeated IF-25 ties.
 
 The eight-merge focused build found a missing `VBLOCK` import: main had extracted runtime geography validation, while #409 adds a separate editor route validator using that flag. Restore the import without changing either validator.
+
+The next focused build found #415's new test Person initializer missing main's `map_pings` field. Initialize it to the same empty history as ordinary Person creation; runtime and assertions are unchanged.

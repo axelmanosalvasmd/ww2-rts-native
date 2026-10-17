@@ -231,6 +231,7 @@ fn net92_ai_memory_human_reset_and_surplus_watchers_restore_transactionally_thro
         level: "hard",
         disconnected: None,
         denies: Vec::new(),
+        map_pings: Vec::new(),
         rtt: None,
         diagnostics: Default::default(),
         last_match: None,

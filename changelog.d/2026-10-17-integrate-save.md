@@ -8,3 +8,4 @@
 - Combine Classic commander observations and per-seat construction RNG with existing adaptive observation cadence, World policy planning and all test registrations.
 - Port IF-25 Classic privacy assertions into the existing field-work and multi-leg retreat witnesses, retaining exact partial-capability checks. Keep aircraft cleanup alongside Classic Depot-node release.
 - Restore the vehicle-blocking flag import needed by editor route validation after composing it with the extracted runtime geography validator.
+- Initialize the existing empty map-ping history in the AI restore test fixture after composing it with main's Person fields.
