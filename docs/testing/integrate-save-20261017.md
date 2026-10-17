@@ -17,6 +17,8 @@ Ordinary saves remain v1 and authored saves remain v2 under `docs/contracts/save
 - `authored_scenarios_validate_ordinary_sides_and_localization_before_startup`: groups and reinforcement are admitted by the full engine; invalid sides, localization and World targets remain refused.
 - `map15_map_loading_uses_the_existing_complete_scenario_validator`: the validated authored group now publishes and survives ordinary ticks and both recipient snapshots instead of being refused by the timed subset.
 
+- `localization_side_key_is_text_and_not_an_authored_side_reference`: retain the translation-key check with the required English fallback.
+
 ## Verification
 
-Pending integration checkpoints and final-head checks.
+The first checkpoint at `9fd2f291` compiled and ran 28 tests: 26 passed and two engine startup tests failed because the old timed validator rejected areas/groups. Independent source review identified the same gate. The repair uses the full ordinary engine validator while retaining the English-fallback restriction. Rerun pending.

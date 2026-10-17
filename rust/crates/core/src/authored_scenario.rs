@@ -163,8 +163,10 @@ where
     <Option<T> as serde::Deserialize>::deserialize(deserializer)
 }
 fn supported_localization(text: &Value) -> bool {
-    text.as_object()
-        .is_none_or(|m| m.len() == 1 || m.contains_key("en"))
+    text.is_string()
+        || text
+            .as_object()
+            .is_some_and(|m| m.get("en").is_some_and(Value::is_string))
 }
 fn localized_text(text: &Value) -> Option<String> {
     text.as_str().map(str::to_owned).or_else(|| {
@@ -211,7 +213,7 @@ pub(crate) fn validate_definition(data: &Value, count: usize, mode: Mode) -> Res
         || !matches!(mode, Mode::Default | Mode::Conquest)
         || list(data, "objectives")
             .iter()
-            .any(|o| !side_exists(o, count))
+            .any(|o| !side_exists(o, count) || !supported_localization(&o["text"]))
         || list(data, "groups")
             .iter()
             .flat_map(|g| list(g, "units"))

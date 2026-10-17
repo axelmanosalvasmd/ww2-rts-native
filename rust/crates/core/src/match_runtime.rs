@@ -208,11 +208,12 @@ impl StartPlan {
         }
         let world_mode = matches!(&profile, StartupProfile::World(_));
         let tutorial = matches!(&profile, StartupProfile::Tutorial);
-        // Admit only the timed message/objective subset owned by this runtime.
-        if crate::authored_mission::AuthoredMission::from_map(map)?.is_some()
-            && !matches!(options.mode, Mode::Default | Mode::Conquest)
-        {
-            return Err("authored missions require ordinary Conquest admission".into());
+        if let Some(data) = map.source().get("scenario") {
+            crate::authored_scenario::validate_definition(
+                data,
+                options.players.len(),
+                options.mode,
+            )?;
         }
         let horde_mode = matches!(&profile, StartupProfile::Horde);
         let defender_team = match &profile {

@@ -27,13 +27,19 @@ fn authored_scenarios_validate_ordinary_sides_and_localization_before_startup() 
     assert!(validate_definition(&data, 2, Mode::Conquest).is_err());
     data["triggers"][0]["condition"]["target"] = json!("ordinary-point");
     assert!(validate_definition(&data, 2, Mode::Conquest).is_ok());
+    for text in [json!({"es":"Hold"}), json!(["Hold"])] {
+        data["objectives"] = json!([{"id":"hold","text":text}]);
+        assert!(validate_definition(&data, 2, Mode::Conquest).is_err());
+    }
+    data["objectives"] = json!([{"id":"hold","text":{"en":"Hold","es":"Aguanta"}}]);
+    assert!(validate_definition(&data, 2, Mode::Conquest).is_ok());
 }
 
 #[test]
 fn localization_side_key_is_text_and_not_an_authored_side_reference() {
     let data = json!({"version":1.0,"groups":[],"objectives":[],"triggers":[
         {"id":"intro","scope":"match","condition":{"kind":"time","seconds":0.0},
-         "actions":[{"kind":"say","text":{"side":"A translation"}}]}]});
+         "actions":[{"kind":"say","text":{"en":"Default","side":"A translation"}}]}]});
     assert!(validate_definition(&data, 2, Mode::Conquest).is_ok());
 }
 
