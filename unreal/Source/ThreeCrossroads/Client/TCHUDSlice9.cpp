@@ -366,17 +366,20 @@ FTCPaint FTCHudFit::ScoreCard(const FTCScoreStrip& S, float ViewW, const FTCMeas
 	return P;
 }
 
-float ATCHUD::DrawScoreStrip(UFont* Font, UFont* Big)
+float ATCHUD::DrawScoreStrip(UFont* Font, UFont* Big, FTCHudFit::FBottomLayout Sandbox)
 {
 	using namespace TCHudSlice9;
 	ATCGameMode* M = GetWorld()->GetAuthGameMode<ATCGameMode>();
 	const FTCMatchState& S = M->State;
 	const FTCScoreStrip Strip = S.Objectives.ScoreStrip(S, &M->UnitTable);
 	StripCard = FBox2D(ForceInit);
-	if (!Strip.bValid) return 8.f;
+	if (!Strip.bValid) { DrawBottomLayout(Sandbox,Font); return 8.f; }
 	const FTCMeasure Measure = FTCType::IsLoaded() ? FTCType::Measure() : FTCPaint::CanvasMeasure(Font);
 	const FTCControlButton NextWave = M->Controls.NextWaveButton();
 	const FTCPaint Scores = FTCHudFit::ScoreCard(Strip, Canvas->ClipX, Measure, Strip.Lead.bShown && NextWave.bShown, UiNow);
+	// index.html puts #sandbox before #top. Hidden middle controls do not receive clicks through the score card.
+	FTCHudFit::BehindPanels(Sandbox,Scores.Panels);
+	DrawBottomLayout(Sandbox,Font);
 	FTCType::Draw(Scores, Canvas, Font, UiNow);
 	for (const FTCPaintItem& I : Scores.Items)
 	 if (I.Role.StartsWith(TEXT("scores:faction:"))) DrawHudIcon(TEXT("faction-")+I.Role.RightChop(15),FBox2D(I.Pos,I.Pos+I.Size),FLinearColor::White);
@@ -566,7 +569,7 @@ void ATCHUD::DrawHealthBars()
 		const float PxPerM = BadgePxPerM; // main.js bars and stars keep their world dimensions
 		const float BgW = 2.4f * PxPerM, BgH = FMath::Max(3.f, 0.42f * PxPerM), BarW = 2.3f * PxPerM;
 		// round 17: not under the score strip's card (last frame's, screen pixels); the stars alone neither
-		if (StripCard.bIsValid && StripCard.Intersect(FBox2D(FVector2D(C.X - BgW / 2, C.Y - BgH / 2), FVector2D(C.X + BgW / 2, C.Y + BgH / 2)))) continue;
+		if (bShowHUD && StripCard.bIsValid && StripCard.Intersect(FBox2D(FVector2D(C.X - BgW / 2, C.Y - BgH / 2), FVector2D(C.X + BgW / 2, C.Y + BgH / 2)))) continue;
 		TCMarkersHud::DrawBadge(Canvas, U.Type, U.Owner, FVector2D(C.X, C.Y), BadgePxPerM);
 		TCMarkersHud::DrawCoverShield(Canvas, FVector2D(C.X, C.Y), BadgePxPerM, U.Cover, bGarr, W);
 		if (!bBar) { TCMarkersHud::DrawStars(Canvas, FVector2D(C.X, C.Y), PxPerM, U.Stars); continue; }

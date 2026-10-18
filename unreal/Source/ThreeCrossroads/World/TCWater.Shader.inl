@@ -8,14 +8,14 @@
 // source DFG lookup supplied by TCLookIndirect. Included by make-fog-materials.py.
 inline constexpr const char* TCWaterDirectShader = R"TCWATER(
 struct TCWaterLight {
-    float Compare(Texture2D Atlas, int2 P, int2 Size, float Depth) {
-        return Depth < Atlas.Load(int3(clamp(P, int2(0,0), Size-1),0)).r ? 1.0 : 0.0;
+    float Compare(Texture2D Atlas, int2 P, int2 First, int2 Last, float Depth) {
+        return Depth < Atlas.Load(int3(clamp(P, First, Last),0)).r ? 1.0 : 0.0;
     }
-    float Bilinear(Texture2D Atlas, float2 UV, float2 Size, float Depth) {
+    float Bilinear(Texture2D Atlas, float2 UV, float2 Size, int2 First, int2 Last, float Depth) {
         float2 P = UV * Size - .5, F = frac(P);
-        int2 I = int2(floor(P)), S = int2(Size);
-        return lerp(lerp(Compare(Atlas,I,S,Depth),Compare(Atlas,I+int2(1,0),S,Depth),F.x),
-                    lerp(Compare(Atlas,I+int2(0,1),S,Depth),Compare(Atlas,I+int2(1,1),S,Depth),F.x),F.y);
+        int2 I = int2(floor(P));
+        return lerp(lerp(Compare(Atlas,I,First,Last,Depth),Compare(Atlas,I+int2(1,0),First,Last,Depth),F.x),
+                    lerp(Compare(Atlas,I+int2(0,1),First,Last,Depth),Compare(Atlas,I+int2(1,1),First,Last,Depth),F.x),F.y);
     }
     float2 Vogel(int I, float Phi) {
         float R = sqrt((float(I) + .5) / 5.0), A = float(I) * 2.399963229728653 + Phi;
@@ -49,19 +49,25 @@ if (cascade<TranslucentBasePass.Shared.ForwardDirLightShadow.NumDirectionalLight
     float4 sp=mul(float4(translated,1),TranslucentBasePass.Shared.ForwardDirLightShadow.DirectionalLightTranslatedWorldToShadowMatrix[cascade]);
     float2 uv=sp.xy/sp.w;
     float4 bounds=TranslucentBasePass.Shared.ForwardDirLightShadow.DirectionalLightShadowmapMinMax[cascade];
-    if (all(uv>=bounds.xy) && all(uv<=bounds.zw)) {
+    // getShadow's frustum test includes the biased receiver depth. Without it,
+    // offshore water beyond the light volume compares against every caster as dark.
+    float depth=1.0-sp.z+TranslucentBasePass.Shared.ForwardDirLightShadow.DirectionalLightDepthBias.x;
+    if (all(uv>=bounds.xy) && all(uv<=bounds.zw) && depth<=1.0) {
         float2 size=TranslucentBasePass.Shared.ForwardDirLightShadow.DirectionalLightShadowmapAtlasBufferSize.xy;
+        int2 first=clamp(int2(ceil(bounds.xy*size-.5)),int2(0,0),int2(size)-1);
+        int2 last=clamp(int2(floor(bounds.zw*size-.5)),first,int2(size)-1);
         // ForwardShadowingCommon: 1-sp.z < sampledDepth-bias.x. Move the
         // receiver bias to the left before the source comparison filter.
-        float depth=1.0-sp.z+TranslucentBasePass.Shared.ForwardDirLightShadow.DirectionalLightDepthBias.x;
-        if (Low>.5) shadow=waterLight.Compare(TranslucentBasePass.Shared.ForwardDirLightShadow.DirectionalLightShadowmapAtlas,int2(uv*size),int2(size),depth);
+        // Every tap stays inside this tile, matching source ClampToEdge rather
+        // than reading the neighbouring native atlas allocation at large radii.
+        if (Low>.5) shadow=waterLight.Compare(TranslucentBasePass.Shared.ForwardDirLightShadow.DirectionalLightShadowmapAtlas,int2(uv*size),first,last,depth);
         else {
             // WebGL gl_FragCoord has its origin at the bottom left.
             float2 pixel=float2(Parameters.SvPosition.x,View.ViewSizeAndInvSize.y-Parameters.SvPosition.y);
             float phi=frac(52.9829189*frac(dot(pixel,float2(.06711056,.00583715))))*6.283185307179586;
             shadow=0;
             [unroll] for (int i=0;i<5;i++)
-                shadow+=waterLight.Bilinear(TranslucentBasePass.Shared.ForwardDirLightShadow.DirectionalLightShadowmapAtlas,uv+waterLight.Vogel(i,phi)*ShadowRadius/size,size,depth)*.2;
+                shadow+=waterLight.Bilinear(TranslucentBasePass.Shared.ForwardDirLightShadow.DirectionalLightShadowmapAtlas,uv+waterLight.Vogel(i,phi)*ShadowRadius/size,size,first,last,depth)*.2;
         }
     }
 }

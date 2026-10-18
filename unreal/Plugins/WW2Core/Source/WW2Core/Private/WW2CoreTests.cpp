@@ -51,6 +51,8 @@ bool FWW2CoreBridgeTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("ww2_abi_version() is the wrapper's version"), FWW2Core::LibraryAbiVersion(), FWW2Core::WrapperAbiVersion);
 	TestEqual(TEXT("ww2_abi_version() is 2 (PR #16 at 03a49ac)"), FWW2Core::LibraryAbiVersion(), 2u);
 	TestEqual(TEXT("wrapper written for ABI 2"), FWW2Core::WrapperAbiVersion, 2u);
+	TestTrue(TEXT("provider supports the adopted minor revision"), FWW2Core::LibraryAbiMinorVersion() >= FWW2Core::RequiredAbiMinorVersion);
+	TestTrue(TEXT("header declares the adopted minor revision"), FWW2Core::HeaderAbiMinorVersion() >= FWW2Core::RequiredAbiMinorVersion);
 	const uint64 Hash = FWW2Core::RulesHash();
 	AddInfo(FString::Printf(TEXT("ww2_rules_hash() = 0x%016llx, computed here from shared/formation.js = 0x%016llx"), (unsigned long long)Hash, (unsigned long long)ExpectedRulesHash()));
 	TestEqual(TEXT("ww2_rules_hash() is the FNV-1a of the pinned formation constants"), Hash, ExpectedRulesHash());
@@ -360,8 +362,12 @@ bool FWW2CoreViewEdgesTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("poisoned: rows untouched"), Rows.Num(), 1);
 	bool bResync = false;
 	TestEqual(TEXT("poisoned: needs_resync refused"), View.NeedsResync(bResync).Code, FWW2Core::ErrPoisoned);
+	TArray<UTF8CHAR> QueryOut = { (UTF8CHAR)'x' };
+	TestEqual(TEXT("poisoned: placement refused before calling Rust"), View.PlacementCheck({}, QueryOut).Code, FWW2Core::ErrPoisoned);
+	TestEqual(TEXT("poisoned: placement output untouched"), QueryOut.Num(), 1);
 	TestEqual(TEXT("poisoned: free still accepted"), View.Close().Code, FWW2Core::Ok);
 	TestFalse(TEXT("closed"), View.IsOpen());
+	TestEqual(TEXT("closed: placement refused"), View.PlacementCheck({}, QueryOut).Code, FWW2Core::ErrClosed);
 #else
 	AddInfo(FString(TEXT("not linked, nothing to call: ")) + FWW2Core::Describe());
 #endif

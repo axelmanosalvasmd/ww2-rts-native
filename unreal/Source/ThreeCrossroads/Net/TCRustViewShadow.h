@@ -112,6 +112,9 @@ public:
 	// Logs the totals (and the current segment's) with a reason.
 	void LogTotals(const TCHAR* Why) const;
 	void End();
+	// Query only the same fully applied recipient state that currently supplies Units. Refused/demoted/World paths
+	// stay explicit errors for the caller's C++ fallback. The handle never escapes this owner.
+	FWW2Result PlacementCheck(const FTCMatchState& State, TConstArrayView<UTF8CHAR> Json, TArray<UTF8CHAR>& Out);
 
 	static constexpr int32 RefusalsBeforeDemotion = 3;
 
@@ -158,5 +161,6 @@ private:
 	FCounts All, Segment;
 	int32 SegmentNumber = 0;
 	FString SegmentLabel;
+	int32 PlacementQueries = 0, PlacementErrors = 0;
 	int32 WarnedSnapshots = 0, WarnedNotFed = 0;
 };

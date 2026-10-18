@@ -458,8 +458,6 @@ private:
 // canvas from the game mode's terrain and the canvas's scene view.
 namespace TCMarkersHud
 {
-	void SetHudExclusion(const FBox2D& Bounds);
-	FVector2D ClearHud(FVector2D Origin, FVector2D Size, const FBox2D& Bounds);
 	// Canvas->Project, the terrain's height (0 without terrain), the scene view's camera.
 	FTCMarkerPainter Painter(UCanvas* Canvas, const ATCGameMode& M);
 	// The weapon range and minimum range of a type (pinned shared/sim.js UNITS, TCMarkers.Ranges.inl); false when

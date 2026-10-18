@@ -4,6 +4,7 @@
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "Modules/ModuleManager.h"
+#include <type_traits>
 
 DEFINE_LOG_CATEGORY(LogWW2Core);
 
@@ -11,6 +12,18 @@ DEFINE_LOG_CATEGORY(LogWW2Core);
 #include "ww2_core.h"
 
 static_assert(WW2_ABI_VERSION == FWW2Core::WrapperAbiVersion, "ww2_core.h is another interface version than WW2Core is written for: update the wrapper with the install");
+static_assert(WW2_ABI_MINOR_VERSION >= FWW2Core::RequiredAbiMinorVersion, "ww2_core.h lacks the approved ABI 2.1 queries");
+using FJsonQuery = int32_t (*)(const char*, size_t, char*, size_t, size_t*);
+static_assert(std::is_same_v<decltype(&ww2_abi_minor_version), uint32_t (*)(void)>);
+static_assert(std::is_same_v<decltype(&ww2_view_placement_check), int32_t (*)(ww2_view*, const char*, size_t, char*, size_t, size_t*)>);
+static_assert(std::is_same_v<decltype(&ww2_authoring_validate_map), FJsonQuery>
+	&& std::is_same_v<decltype(&ww2_authoring_migrate_scenario), FJsonQuery>
+	&& std::is_same_v<decltype(&ww2_authoring_migrate_map), FJsonQuery>
+	&& std::is_same_v<decltype(&ww2_authoring_spawns_for), FJsonQuery>
+	&& std::is_same_v<decltype(&ww2_authoring_create_preview), FJsonQuery>
+	&& std::is_same_v<decltype(&ww2_authoring_find_path), FJsonQuery>
+	&& std::is_same_v<decltype(&ww2_authoring_house_kinds), FJsonQuery>
+	&& std::is_same_v<decltype(&ww2_authoring_play_match), FJsonQuery>, "approved JSON query signature changed");
 static_assert(WW2_OK == FWW2Core::Ok && WW2_ERR_PANIC == FWW2Core::ErrPanic && WW2_ERR_NULL_POINTER == FWW2Core::ErrNullPointer
 	&& WW2_ERR_BAD_ARGUMENT == FWW2Core::ErrBadArgument && WW2_ERR_CAPACITY == FWW2Core::ErrCapacity && WW2_ERR_PARSE == FWW2Core::ErrParse
 	&& WW2_ERR_WRONG_STATE == FWW2Core::ErrWrongState && WW2_ERR_POISONED == FWW2Core::ErrPoisoned, "ww2_core.h status codes moved");
@@ -44,6 +57,7 @@ namespace
 	{
 		EWW2CoreState State = EWW2CoreState::NotLinked;
 		uint32 Library = 0;
+		uint32 Minor = 0;
 	};
 
 	// Asked once: the library's version cannot change while the process runs.
@@ -54,7 +68,10 @@ namespace
 			FProbe R;
 #if WITH_WW2_FFI
 			R.Library = ww2_abi_version();
-			R.State = R.Library == WW2_ABI_VERSION && R.Library == FWW2Core::WrapperAbiVersion ? EWW2CoreState::Ready : EWW2CoreState::AbiMismatch;
+			// A major mismatch stops before calling an additive symbol. Old major-2 archives without the minor symbol
+			// fail at link time, as the retained previous-library rejection check demonstrates.
+			if (R.Library == FWW2Core::WrapperAbiVersion) R.Minor = ww2_abi_minor_version();
+			R.State = FWW2Core::AcceptsAbi(R.Library, R.Minor) ? EWW2CoreState::Ready : EWW2CoreState::AbiMismatch;
 #endif
 			return R;
 		}();
@@ -69,7 +86,7 @@ namespace
 			return true;
 		case EWW2CoreState::AbiMismatch:
 			R.Code = FWW2Core::ErrRefused;
-			R.Error = FString::Printf(TEXT("ww2-ffi refused: the library is interface version %u, the header and this wrapper %u"), FWW2Core::LibraryAbiVersion(), FWW2Core::HeaderAbiVersion());
+			R.Error = FString::Printf(TEXT("ww2-ffi refused: library %u.%u, header %u.%u, wrapper requires %u.%u"), FWW2Core::LibraryAbiVersion(), FWW2Core::LibraryAbiMinorVersion(), FWW2Core::HeaderAbiVersion(), FWW2Core::HeaderAbiMinorVersion(), FWW2Core::WrapperAbiVersion, FWW2Core::RequiredAbiMinorVersion);
 			return false;
 		default:
 			R.Code = FWW2Core::ErrNotLinked;
@@ -89,6 +106,30 @@ namespace
 		R.Error = FWW2Core::LastError();
 		if (R.Error.IsEmpty()) R.Error = FString::Printf(TEXT("ww2-ffi returned %d without a message"), Code);
 	}
+
+#if WITH_WW2_FFI
+	FWW2Result JsonCall(TConstArrayView<UTF8CHAR> Json, TArray<UTF8CHAR>& Out, TFunctionRef<int32(char*, size_t, size_t*)> Call)
+	{
+		FWW2Result R;
+		if (Json.Num() > FWW2Core::MaxQueryInputBytes)
+			return { FWW2Core::ErrBadArgument, TEXT("JSON query input exceeds 16 MiB") };
+		size_t Needed = 0;
+		const int32 ProbeCode = Call(nullptr, 0, &Needed);
+		if (ProbeCode == WW2_OK) return { FWW2Core::ErrContract, TEXT("JSON capacity probe succeeded without reporting a required buffer") };
+		if (ProbeCode != WW2_ERR_CAPACITY) { Fail(R, ProbeCode); return R; }
+		if (!Needed) return { FWW2Core::ErrContract, TEXT("JSON query reported zero output bytes") };
+		if (Needed > (size_t)MAX_int32)
+			return { FWW2Core::ErrRange, TEXT("JSON query output does not fit an Unreal byte array") };
+		TArray<UTF8CHAR> Buffer;
+		Buffer.SetNumUninitialized((int32)Needed);
+		size_t Written = 0;
+		const int32 Code = Call(reinterpret_cast<char*>(Buffer.GetData()), Needed, &Written);
+		if (Code != WW2_OK) { Fail(R, Code); return R; }
+		if (Written != Needed) return { FWW2Core::ErrContract, TEXT("deterministic JSON query changed size between calls") };
+		Out = MoveTemp(Buffer);
+		return R;
+	}
+#endif
 }
 
 EWW2CoreState FWW2Core::State() { return Probe().State; }
@@ -104,6 +145,16 @@ const TCHAR* FWW2Core::StateName(EWW2CoreState S)
 }
 
 uint32 FWW2Core::LibraryAbiVersion() { return Probe().Library; }
+uint32 FWW2Core::LibraryAbiMinorVersion() { return Probe().Minor; }
+
+uint32 FWW2Core::HeaderAbiMinorVersion()
+{
+#if WITH_WW2_FFI
+	return WW2_ABI_MINOR_VERSION;
+#else
+	return 0;
+#endif
+}
 
 uint32 FWW2Core::HeaderAbiVersion()
 {
@@ -152,8 +203,8 @@ FString FWW2Core::LibrarySha256()
 FString FWW2Core::Describe()
 {
 #if WITH_WW2_FFI
-	return FString::Printf(TEXT("ww2-ffi %s: library interface version %u, header %u, wrapper %u; rules hash 0x%016llx; native %s, rustc %s, %s, libww2_ffi.a sha256 %s"),
-		StateName(State()), LibraryAbiVersion(), HeaderAbiVersion(), WrapperAbiVersion, (unsigned long long)RulesHash(), TEXT(WW2_FFI_NATIVE_REV), TEXT(WW2_FFI_RUSTC),
+	return FString::Printf(TEXT("ww2-ffi %s: library interface version %u.%u, header %u.%u, wrapper requires %u.%u; rules hash 0x%016llx; native %s, rustc %s, %s, libww2_ffi.a sha256 %s"),
+		StateName(State()), LibraryAbiVersion(), LibraryAbiMinorVersion(), HeaderAbiVersion(), HeaderAbiMinorVersion(), WrapperAbiVersion, RequiredAbiMinorVersion, (unsigned long long)RulesHash(), TEXT(WW2_FFI_NATIVE_REV), TEXT(WW2_FFI_RUSTC),
 		TEXT(WW2_FFI_TARGET), *FString(TEXT(WW2_FFI_LIB_SHA256)).Left(12));
 #else
 	return FString(TEXT("ww2-ffi not linked: ")) + TEXT(WW2_FFI_MISSING);
@@ -163,6 +214,7 @@ FString FWW2Core::Describe()
 FString FWW2Core::LastError()
 {
 #if WITH_WW2_FFI
+	if (!IsReady()) return FString(); // A version mismatch never calls a non-version export.
 	// Length first (capacity 0), then the bytes; the library never changes the stored message while reading it.
 	size_t Len = 0;
 	const int32 First = ww2_last_error(nullptr, 0, &Len);
@@ -446,6 +498,52 @@ FWW2Result FWW2View::NeedsResync(bool& Out)
 	Out = Flag != 0;
 #endif
 	return R;
+}
+
+FWW2Result FWW2Core::AuthoringQuery(EWW2AuthoringQuery Query, TConstArrayView<UTF8CHAR> Json, TArray<UTF8CHAR>& Out)
+{
+	FWW2Result R;
+	if (!Gate(R)) return R;
+	if (Query == EWW2AuthoringQuery::PlayMatch && IsInGameThread())
+		return { ErrWrongThread, TEXT("play_match blocks, including capacity discovery; run it on a worker thread") };
+#if WITH_WW2_FFI
+	FJsonQuery Call = nullptr;
+	switch (Query)
+	{
+	case EWW2AuthoringQuery::ValidateMap: Call = ww2_authoring_validate_map; break;
+	case EWW2AuthoringQuery::MigrateScenario: Call = ww2_authoring_migrate_scenario; break;
+	case EWW2AuthoringQuery::MigrateMap: Call = ww2_authoring_migrate_map; break;
+	case EWW2AuthoringQuery::SpawnsFor: Call = ww2_authoring_spawns_for; break;
+	case EWW2AuthoringQuery::CreatePreview: Call = ww2_authoring_create_preview; break;
+	case EWW2AuthoringQuery::FindPath: Call = ww2_authoring_find_path; break;
+	case EWW2AuthoringQuery::HouseKinds: Call = ww2_authoring_house_kinds; break;
+	case EWW2AuthoringQuery::PlayMatch: Call = ww2_authoring_play_match; break;
+	default: return { ErrBadArgument, TEXT("unknown authoring query") };
+	}
+	return JsonCall(Json, Out, [&](char* Buffer, size_t Capacity, size_t* Count)
+	{
+		return Call(Json.Num() ? reinterpret_cast<const char*>(Json.GetData()) : nullptr, (size_t)Json.Num(), Buffer, Capacity, Count);
+	});
+#else
+	return R;
+#endif
+}
+
+FWW2Result FWW2View::PlacementCheck(TConstArrayView<UTF8CHAR> Json, TArray<UTF8CHAR>& Out)
+{
+	FWW2Result R;
+	if (!Enter(R)) return R;
+#if WITH_WW2_FFI
+	return JsonCall(Json, Out, [&](char* Buffer, size_t Capacity, size_t* Count)
+	{
+		const int32 Code = ww2_view_placement_check(Handle, Json.Num() ? reinterpret_cast<const char*>(Json.GetData()) : nullptr,
+			(size_t)Json.Num(), Buffer, Capacity, Count);
+		Note(Code);
+		return Code;
+	});
+#else
+	return R;
+#endif
 }
 
 class FWW2CoreModule : public IModuleInterface

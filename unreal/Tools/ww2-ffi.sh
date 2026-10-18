@@ -10,11 +10,14 @@
 #                                    panic boundary) and the C example against the formation fixture and every
 #                                    protocol stream; needs crates.io once
 #   unreal/Tools/ww2-ffi.sh status   what is installed, and whether the files still match their STAMP
+#   unreal/Tools/ww2-ffi.sh install-staged PATH   verify a staged install and install it without rebuilding
 #   unreal/Tools/ww2-ffi.sh remove   delete the installed files (the plugin then builds without the Rust core)
 #
 # Environment (all optional):
-#   WW2_FFI_REV      native commit to build (default below: main at 9e618217, approved after slice 1s; ABI 2 and the
-#                    six ww2_view_* calls stay unchanged)
+#   WW2_FFI_REV      full native commit (default: approved 8f37717c, ABI 2 with additive IF-04/IF-12 queries)
+#   WW2_FFI_WORK     isolated build/check scratch directory (default: unreal/Saved/WW2Ffi)
+#   WW2_FFI_DEST     install directory (default: the plugin's Linux install; set to stage before integration)
+#   CARGO_BUILD_JOBS build concurrency, 1 through 8 (default: 8)
 #   WW2_NATIVE_SRC   an existing clone of axelmanosalvasmd/ww2-rts-native to build in. It must be clean; it is checked
 #                    out at WW2_FFI_REV (detached). Default: a clone this script makes in unreal/Saved/WW2Ffi/native
 #                    (git ignores Saved/), fetched over HTTPS (the repository is public)
@@ -27,20 +30,24 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$HERE/.." && pwd)"
-REV="${WW2_FFI_REV:-9e618217de2ac1d0a806c6804eda50c1c9da497f}"
+REV="${WW2_FFI_REV:-8f37717cb0b78fca9786ae0bd1188160504ccdf4}"
 TRIPLE="x86_64-unknown-linux-gnu"
 # What `cargo rustc -p ww2-ffi --release --target $TRIPLE -- --print native-static-libs` must list. WW2Core.Build.cs
 # links exactly these; a build that needs others stops here instead of linking short.
 EXPECTED_LIBS="-lgcc_s -lutil -lrt -lpthread -lm -ldl -lc"
 # Every symbol WW2Core calls. ABI 1: version, rules hash, last error and the two formation calls. ABI 2 adds the six
-# recipient-view calls (docs/contracts/rust-unreal-abi.md, "Recipient-view calls").
+# recipient-view calls (docs/contracts/rust-unreal-abi.md, "Recipient-view calls"). The approved ABI 2.1 consumer adds
+# the minor probe, placement and eight authoring queries. Minor-2 IF-11 exports are deliberately not required here.
 SYMBOLS="ww2_abi_version ww2_rules_hash ww2_last_error ww2_formation_slot_size ww2_formation_spots
-	ww2_view_new ww2_view_free ww2_view_apply ww2_view_unit_count ww2_view_units ww2_view_needs_resync"
+	ww2_view_new ww2_view_free ww2_view_apply ww2_view_unit_count ww2_view_units ww2_view_needs_resync
+	ww2_abi_minor_version ww2_view_placement_check ww2_authoring_validate_map ww2_authoring_migrate_scenario
+	ww2_authoring_migrate_map ww2_authoring_spawns_for ww2_authoring_create_preview ww2_authoring_find_path
+	ww2_authoring_house_kinds ww2_authoring_play_match"
 # The recorded server-message streams (harness/protocol-record.mjs) and the browser oracle's report after each message
 # (harness/view-check.mjs), from rust/crates/core/tests/fixtures. Installed decompressed for the plugin's replay check.
 PROTOCOL_STREAMS="protocol-conquest-p0 protocol-conquest-p1 protocol-world-p0 protocol-world-p1"
-DEST="$PROJECT_DIR/Plugins/WW2Core/ThirdParty/ww2_ffi/Linux/$TRIPLE"
-WORK="$PROJECT_DIR/Saved/WW2Ffi"
+DEST="${WW2_FFI_DEST:-$PROJECT_DIR/Plugins/WW2Core/ThirdParty/ww2_ffi/Linux/$TRIPLE}"
+WORK="${WW2_FFI_WORK:-$PROJECT_DIR/Saved/WW2Ffi}"
 SRC="${WW2_NATIVE_SRC:-$WORK/native}"
 REMOTE="https://github.com/axelmanosalvasmd/ww2-rts-native.git"
 
@@ -54,9 +61,12 @@ sha() { sha256sum "$1" | cut -d' ' -f1; }
 # The STAMP key for an installed protocol file: its name with '-' and '.' as '_', then _sha256 (WW2Core.Build.cs agrees).
 protocol_key() { echo "$(echo "$1" | tr -- '-.' '__')_sha256"; }
 protocol_files() { local s; for s in $PROTOCOL_STREAMS; do echo "$s.jsonl"; echo "$s.expected.jsonl"; done; }
+prepare_work() { mkdir -p "$WORK/tmp"; export TMPDIR="$WORK/tmp"; }
 
 [[ "$(uname -s)" == Linux && "$(uname -m)" == x86_64 ]] || die "only Linux x86_64 is supported; Win64 and macOS arm64 are pending"
 [[ "$REV" =~ ^[0-9a-f]{40}$ ]] || die "WW2_FFI_REV must be a full 40-character commit id, got '$REV'"
+export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-8}"
+[[ "$CARGO_BUILD_JOBS" =~ ^[1-8]$ ]] || die "CARGO_BUILD_JOBS must be 1 through 8"
 
 checkout() {
 	if [[ -z "${WW2_NATIVE_SRC:-}" && ! -d "$SRC/.git" ]]; then
@@ -76,6 +86,7 @@ checkout() {
 }
 
 build() { # sets LIB, HEADER, FIXTURE, RUSTC_VV
+	prepare_work
 	local rust="$SRC/rust"
 	[[ -f "$rust/rust-toolchain.toml" ]] || die "$rust/rust-toolchain.toml missing: not a native commit with the Rust workspace"
 	[[ -f "$rust/crates/ffi/include/ww2_core.h" ]] || die "no ww2-ffi crate at $REV"
@@ -101,7 +112,7 @@ build() { # sets LIB, HEADER, FIXTURE, RUSTC_VV
 	# Last, so the installed archive is the one the documented command makes.
 	say "building ww2-ffi at $REV with rustc $channel for $TRIPLE"
 	(cd "$rust" && touch crates/ffi/src/lib.rs && "$rustup" run "$channel" cargo build --locked -p ww2-ffi --release --target "$TRIPLE") || die "cargo build failed"
-	LIB="$rust/target/$TRIPLE/release/libww2_ffi.a"
+	LIB="${CARGO_TARGET_DIR:-$rust/target}/$TRIPLE/release/libww2_ffi.a"
 	HEADER="$rust/crates/ffi/include/ww2_core.h"
 	FIXTURE="$rust/crates/core/tests/fixtures/formation.txt"
 	PROTOCOL_SRC="$rust/crates/core/tests/fixtures"
@@ -113,6 +124,10 @@ build() { # sets LIB, HEADER, FIXTURE, RUSTC_VV
 	for fn in $SYMBOLS; do
 		nm -g --defined-only "$LIB" 2>/dev/null | grep " T $fn$" >/dev/null || die "$LIB does not define $fn"
 	done
+	# Run against the actual archive, not just the header. ABI 2.0 archives fail to link this guard.
+	mkdir -p "$WORK"
+	cc -std=c11 -Wall -Wextra -Werror -pedantic -I "$rust/crates/ffi/include" "$HERE/ffi/abi_guard.c" "$LIB" $EXPECTED_LIBS -o "$WORK/abi_guard"
+	"$WORK/abi_guard" || die "the linked archive does not support ABI 2.1"
 }
 
 c_example() {
@@ -140,9 +155,13 @@ install_files() {
 	local f
 	for f in $(protocol_files); do gzip -dc "$PROTOCOL_SRC/$f.gz" >"$DEST/fixtures/protocol/$f"; done
 	# STAMP last: WW2Core.Build.cs reads it, checks the three files against it, and lists it as a dependency so
-	# UnrealBuildTool notices a new install.
+# UnrealBuildTool notices a new install. It retains the existing keys as well as source/reference/minor provenance.
 	{
 		echo "native_rev=$REV"
+		echo "reference_rev=$(git -C "$SRC" rev-parse HEAD:reference/ww2-rts)"
+		echo "abi_major=2"
+		echo "abi_minor_required=1"
+		echo "abi_minor_header=$(sed -n 's/^#define WW2_ABI_MINOR_VERSION //p' "$HEADER")"
 		echo "target=$TRIPLE"
 		echo "rustc=$(echo "$RUSTC_VV" | sed -n 's/.*release: \([^;]*\);.*/\1/p')"
 		echo "rustc_commit=$(echo "$RUSTC_VV" | sed -n 's/.*commit-hash: \([^;]*\);.*/\1/p')"
@@ -160,6 +179,8 @@ install_files() {
 status() {
 	[[ -f "$DEST/STAMP" ]] || { say "not installed ($DEST/STAMP missing): the plugin builds without the Rust core"; return 1; }
 	cat "$DEST/STAMP"
+	[[ "$(sed -n 's/^native_rev=//p' "$DEST/STAMP")" == "$REV" ]] || die "installed source differs from requested $REV"
+	[[ "$(sed -n 's/^abi_major=//p' "$DEST/STAMP")" == 2 && "$(sed -n 's/^abi_minor_required=//p' "$DEST/STAMP")" == 1 ]] || die "install predates the ABI 2.1 consumer guard; rebuild it"
 	local bad=0 key file
 	local checks=(lib_sha256:lib/libww2_ffi.a header_sha256:include/ww2_core.h fixture_sha256:fixtures/formation.txt) f
 	for f in $(protocol_files); do checks+=("$(protocol_key "$f"):fixtures/protocol/$f"); done
@@ -171,10 +192,49 @@ status() {
 	[[ $bad == 0 ]] && say "installed files match their STAMP" || die "installed files do not match their STAMP: run build again"
 }
 
+no_engine_clients() {
+	# Do not replace the installed archive while an old engine client or a shared build may be using it.
+	python3 - <<'PY'
+from pathlib import Path
+import sys
+found = []
+for proc in Path('/proc').iterdir():
+    if not proc.name.isdigit():
+        continue
+    try:
+        args = proc.joinpath('cmdline').read_bytes().split(b'\0')
+        name = Path(args[0].decode(errors='replace')).name
+    except (OSError, IndexError):
+        continue
+    if name.startswith(('UnrealEditor', 'ThreeCrossroads', 'UnrealBuildTool', 'AutomationTool')) or (name == 'dotnet' and any(b'UnrealBuildTool' in a or b'AutomationTool' in a for a in args)):
+        found.append((proc.name, name))
+if found:
+    print('ww2-ffi: installation refused while engine clients/builds are running: ' + str(found), file=sys.stderr)
+    sys.exit(1)
+PY
+}
+
+install_staged() {
+	local staged="${1:?install-staged needs a directory}"
+	[[ "$(realpath "$staged")" != "$(realpath -m "$DEST")" ]] || die "stage and destination are the same"
+	(DEST="$staged"; status) || die "staged install failed validation"
+	prepare_work
+	cc -std=c11 -Wall -Wextra -Werror -pedantic -I "$staged/include" "$HERE/ffi/abi_guard.c" "$staged/lib/libww2_ffi.a" $EXPECTED_LIBS -o "$WORK/abi_guard-install"
+	"$WORK/abi_guard-install" || die "staged ABI guard failed"
+	no_engine_clients
+	local next="$DEST.install-$$"
+	mkdir -p "$(dirname "$DEST")"
+	cp -a "$staged" "$next"
+	rm -rf "$DEST"
+	mv "$next" "$DEST"
+	status
+}
+
 case "${1:-}" in
-	build) checkout; build; install_files ;;
-	verify) checkout; VERIFY=1 build; c_example; install_files ;;
+	build) checkout; build; no_engine_clients; install_files ;;
+	verify) checkout; VERIFY=1 build; c_example; no_engine_clients; install_files ;;
 	status) status ;;
+	install-staged) install_staged "${2:-}" ;;
 	remove) rm -rf "$DEST"; say "removed $DEST" ;;
 	*) sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac

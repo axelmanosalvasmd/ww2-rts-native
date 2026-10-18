@@ -216,10 +216,18 @@ verify() {
 	# (the executable exports its symbols dynamically, as Unreal links it; strings is the fallback for a stripped one)
 	local syms; syms="$({ nm -D --defined-only "$bin" 2>/dev/null || true; } | awk '$2 == "T" && $3 ~ /^ww2_/ {print $3}' | sort -u | tr '\n' ' ')"
 	if [[ -z "$syms" ]]; then
-		syms="$({ strings -a "$bin" || true; } | grep -oE '\bww2_(abi_version|rules_hash|last_error|formation_slot_size|formation_spots)\b' | sort -u | tr '\n' ' ' || true)"
+		syms="$({ strings -a "$bin" || true; } | grep -oE '\bww2_[a-z_]+\b' | sort -u | tr '\n' ' ' || true)"
 		[[ -n "$syms" ]] && syms="$syms(from strings: no dynamic symbols)"
 	fi
-	[[ "$syms" == *ww2_abi_version* && "$syms" == *ww2_formation_spots* ]] || die "verify: no ww2_* entry points in the executable: the Rust core is not linked"
+	# Require every adopted call, including approved IF-04/IF-12. IF-11 remains outside this consumer.
+	local required
+	for required in ww2_abi_version ww2_rules_hash ww2_last_error ww2_formation_slot_size ww2_formation_spots \
+		ww2_view_new ww2_view_free ww2_view_apply ww2_view_unit_count ww2_view_units ww2_view_needs_resync \
+		ww2_abi_minor_version ww2_view_placement_check ww2_authoring_validate_map ww2_authoring_migrate_scenario \
+		ww2_authoring_migrate_map ww2_authoring_spawns_for ww2_authoring_create_preview ww2_authoring_find_path \
+		ww2_authoring_house_kinds ww2_authoring_play_match; do
+		[[ " $syms " == *" $required "* ]] || die "verify: adopted Rust entry point $required is missing from the executable"
+	done
 	say "verify: Rust core entry points: $syms"
 	if [[ -n "$rev" ]]; then
 		{ strings -a -el "$bin" || true; } | grep -qF "$rev" || die "verify: WW2Core was not compiled with ww2-ffi native $rev (WITH_WW2_FFI=0?)"
@@ -271,6 +279,10 @@ verify() {
 		ThreeCrossroads/Content/Markers/M_TCMarkerGround.uasset ThreeCrossroads/Content/Markers/M_TCMarkerThrough.uasset ThreeCrossroads/Content/Markers/T_TCUnitBadges.uasset \
 		ThreeCrossroads/Content/Markers/M_TCMarkerBillboard.uasset ThreeCrossroads/Content/Fog/M_TCFogOverlay.uasset ThreeCrossroads/Content/Fog/MPC_TCFog.uasset \
 		ThreeCrossroads/Content/World/Materials/Instances/MI_TCWorld_Surface_canvas_Painted.uasset ThreeCrossroads/Content/World/Materials/Instances/MI_TCWorld_Surface_darkwood_Painted.uasset \
+		ThreeCrossroads/Content/World/Materials/Instances/MI_TCWorld_Surface_burlap.uasset ThreeCrossroads/Content/World/Materials/Instances/MI_TCWorld_Surface_wood.uasset \
+		ThreeCrossroads/Content/World/Materials/Instances/MI_TCWorld_Surface_wood_Painted.uasset \
+		ThreeCrossroads/Content/Models/Textures/Surfaces/T_Surface_burlap.uasset ThreeCrossroads/Content/Models/Textures/Surfaces/T_Surface_planks.uasset \
+		ThreeCrossroads/Content/Models/Textures/Surfaces/T_Surface_canvas.uasset \
 		ThreeCrossroads/Content/Effects/Materials/M_TCFxSection.uasset \
 		ThreeCrossroads/Content/Effects/Textures/T_HQCloth.uasset ThreeCrossroads/Content/Effects/Materials/M_TCHQCloth.uasset \
 		ThreeCrossroads/Content/Models/Motion/MI_InfantryFarLook.uasset ThreeCrossroads/Content/Models/Motion/MI_InfantryFarLookFaded.uasset \

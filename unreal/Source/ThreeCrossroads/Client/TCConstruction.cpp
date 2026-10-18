@@ -1,4 +1,5 @@
 #include "Client/TCConstruction.h"
+#include "Client/TCRustQueries.h"
 #include "Client/TCOrders.h"
 #include "Net/TCMatchState.h"
 #include "Dom/JsonObject.h"
@@ -845,6 +846,27 @@ FTCPlacement FTCConstruction::Placement(const FTCMatchState& State, const FStrin
 		return P;
 	}
 	TCBuild::FPlacementView View(*this, State);
+	FTCRustPlacement Rust;
+	const FWW2Result Query = FTCRustQueries::Placement(State, Kind, At, {}, State.TeamOf(State.You), Rust);
+	if (Query.IsOk())
+	{
+		P.bOk = Rust.bOk;
+		P.Reason = FTCRustQueries::ReasonCode(Rust.Reason);
+		P.At = Rust.At;
+		P.Cell = Rust.Cell.Get(-1);
+		if (Rust.Cell.IsSet()) if (const FTCBuildDef* Def = Find(Kind)) P.Size = Def->Size;
+		P.bHasFootprint = Rust.bHasCells;
+		for (const FTCRustPlacementCell& Cell : Rust.Cells) P.Cells.Add(Cell.Cell);
+		if (Rust.Node.IsValid())
+		{
+			double NodeX = 0, NodeZ = 0;
+			if (Rust.Node->TryGetNumberField(TEXT("x"), NodeX) && Rust.Node->TryGetNumberField(TEXT("z"), NodeZ))
+				for (int32 I = 0; I < View.Nodes.Num(); I++) if (View.Nodes[I].X == NodeX && View.Nodes[I].Z == NodeZ) { P.Node = I; break; }
+		}
+		return P;
+	}
+	// No library/adopted view, World history, unsupported recipient inputs or an ABI error retain the C++ mirror.
+	// A successful Rust refusal is returned above and is never replaced by a permissive C++ answer.
 	return View.Check(Kind, At);
 }
 

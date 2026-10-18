@@ -115,6 +115,8 @@ struct FTCMapPreviewSource
 	bool bWater = false;          // some row holds a 'W' cell, for 'rivers'
 	TArray<FPoint> Points;
 	TArray<FSpawn> Spawns;
+	// ABI IF-12 results cached once per public map, before rendering. Empty means the explicit C++ fallback.
+	TMap<FString, TArray<int32>> RustSpawnIndices;
 	bool bHasDefend = false;      // the map lists defender spawns (Horde-capable, 'built for Assault')
 	TArray<int32> Defend;         // spawn numbers
 	int32 AssaultTime = 0;        // seconds; 0 when the map has no Assault clock of its own

@@ -16,3 +16,20 @@ Linux/x86_64-unknown-linux-gnu/
 `WW2Core.Build.cs` links the library only when all of them are present and the files match the STAMP. With none of
 them it builds without the Rust core and says so (set `TC_REQUIRE_WW2_FFI=1` to make that an error). A partial or
 changed install is always an error. Win64 and macOS arm64 folders are planned, not built or verified.
+
+The approved default source is `8f37717cb0b78fca9786ae0bd1188160504ccdf4`, reference
+`e4e579a838aabae3b1d9dadbc17a0a87147bc52d`. The Unreal consumer requires major 2 and minor at least 1
+for placement and eight detached authoring queries. This provider reports minor 2; its five IF-11 exports are
+not adopted. An old ABI-2.0 archive has no minor/query symbols and fails the new consumer link. The wrapper
+checks major before minor, preserves the old row layouts, and refuses query calls on an incompatible version.
+
+`WW2_FFI_WORK` and `WW2_FFI_DEST` select isolated scratch and staging folders. `CARGO_BUILD_JOBS` defaults
+to eight and must be one through eight. After `verify` succeeds against a staging destination,
+`ww2-ffi.sh install-staged PATH` checks the staged STAMP and C guard and replaces the installed files only
+with no engine clients/builds running. `status` checks the requested source and every installed file hash.
+The STAMP includes the full native/reference revisions, provider minor and required consumer minor.
+
+`Tools/ffi/check-compatibility.sh OLD_INSTALL NEW_INSTALL` keeps the previous-header compile and
+previous-archive link rejections. Set `WW2_FFI_WORK` to isolated scratch for its outputs. Its committed old
+header fixture is unmodified; archives remain generated output. Real Unreal/editor/package acceptance
+is separate from these build, C-link and Rust fixture checks.

@@ -141,6 +141,7 @@ bool FTCRustViewShadow::BeginMode(ETCDecoder InRequested, FTCMatchState* State, 
 	All = FCounts(); Segment = FCounts();
 	Messages = ApplyErrors = SegmentNumber = WarnedSnapshots = WarnedNotFed = RefusedRun = 0;
 	FirstError.Reset();
+	PlacementQueries = PlacementErrors = 0;
 	Demoted.Reset(); LastApply = FWW2Result(); bPending = bComparedInState = false;
 	Requested_ = InRequested;
 	Effective = ETCDecoder::Cpp;
@@ -415,6 +416,24 @@ void FTCRustViewShadow::LogTotals(const TCHAR* Why) const
 	UE_LOG(LogTC, Log, TEXT("rust view shadow: segment %d (%s) so far: %s"), SegmentNumber, *SegmentLabel, *CountsText(Segment));
 	UE_LOG(LogTC, Log, TEXT("rust view decoder (%s): requested %s, in effect %s%s; %s"), Why, DecoderName(Requested_), bActive ? DecoderName(Effective) : TEXT("cpp (view off)"),
 		Demoted.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" (demoted: %s)"), *Demoted), *AdoptionText(All));
+	UE_LOG(LogTC, Log, TEXT("rust queries (%s): placement %d completed, %d errors; ordinary unsupported cases use the C++ placement fallback"), Why, PlacementQueries, PlacementErrors);
+}
+
+FWW2Result FTCRustViewShadow::PlacementCheck(const FTCMatchState& State, TConstArrayView<UTF8CHAR> Json, TArray<UTF8CHAR>& Out)
+{
+	if (!bActive || Effective != ETCDecoder::Rust || Attached != &State || !State.bHasMatch || !State.UnitsFromRustView()
+		|| bPending || !LastApply.IsOk())
+		return { FWW2Core::ErrWrongState, TEXT("placement has no current adopted Rust recipient; use the C++ fallback") };
+	const FWW2Result R = View.PlacementCheck(Json, Out);
+	if (R.IsOk())
+	{
+		if (++PlacementQueries == 1) UE_LOG(LogTC, Log, TEXT("rust query: ww2_view_placement_check completed on the actual recipient (capacity and fill)"));
+	}
+	else
+	{
+		if (++PlacementErrors <= 3) UE_LOG(LogTC, Log, TEXT("rust query: placement fallback: %d %s"), R.Code, *R.Error);
+	}
+	return R;
 }
 
 void FTCRustViewShadow::End()

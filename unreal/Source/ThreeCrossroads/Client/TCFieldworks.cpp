@@ -1,4 +1,5 @@
 #include "Client/TCFieldworks.h"
+#include "Client/TCRustQueries.h"
 #include "Client/TCOrders.h"
 #include "Net/TCMatchState.h"
 #include "Dom/JsonObject.h"
@@ -956,6 +957,23 @@ FTCFortPlacement FTCFieldworks::Place(const FTCMatchState& State, const FString&
 		P.NativeReason = FString::Printf(TEXT("'%s' is not a fortification (FTCConstruction places buildings)"), *Kind);
 		return P;
 	}
+	if (bSight)
+	{
+		FTCRustPlacement Rust;
+		// Direct footAt passes team; entrenchment/work callers omit it, as in the reference.
+		const TOptional<int32> Team = bTeam ? TOptional<int32>(State.TeamOf(State.You)) : TOptional<int32>();
+		if (FTCRustQueries::Placement(State, Kind, At, Dir, Team, Rust).IsOk())
+		{
+			P.bOk = Rust.bOk; P.Reason = FTCRustQueries::ReasonCode(Rust.Reason); P.At = Rust.At;
+			for (const FTCRustPlacementCell& Cell : Rust.Cells)
+			{
+				P.Cells.Add(Cell.Cell);
+				P.CellChars.Add(Cell.Character.IsSet() ? Cell.Character.GetValue()[0] : 0);
+			}
+			return P;
+		}
+	}
+	// Sight-free cost/planning calls, World and unavailable/unsupported recipient queries retain the existing mirror.
 	TCField::FView View(*this, State);
 	return View.Check(K, At.X, At.Y, Dir, bTeam, bSight);
 }

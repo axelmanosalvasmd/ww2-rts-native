@@ -99,6 +99,23 @@ namespace TCTerrainFormulas
 		T.Require(Relief.FrontierSeal(1).Idx.empty(), "undiscovered cells contribute no secret geometry");
 		Relief.InKnown = {1, 1}; Relief.Build();
 		T.Require(Relief.FrontierSeal(0).Idx.empty(), "a discovered neighbour removes the seal");
+		// The public placeholder and its translucent overlay must share bounded,
+		// complete coverage. Source relief.js planRow caps each flat run at 32 cells.
+		const int CoverW = 512, CoverH = 3;
+		std::vector<uint8_t> Known(CoverW * CoverH, 0), Covered(Known.size(), 0);
+		Known[CoverW + 1] = Known[CoverW + 31] = Known[CoverW + 32] = Known[CoverW + 479] = 1;
+		int Runs = 0;
+		UnknownRuns(CoverW, CoverH, [&](int C) { return Known[C] != 0; }, [&](int X, int End, int Y)
+		{
+			Runs++;
+			T.Require(End > X && End - X <= 32, "source-sized placeholder triangles avoid map-wide coplanar fog runs");
+			for (int K = X; K < End; K++) Covered[Y * CoverW + K]++;
+		});
+		for (int C = 0; C < CoverW * CoverH; C++) T.Require(Covered[C] == (Known[C] ? 0 : 1), "placeholder runs cover every unknown cell exactly once and exclude known cells");
+		T.Require(Runs > 48, "known holes split the source-sized runs instead of bridging them");
+		int EmptyRuns = 0;
+		UnknownRuns(8, 1, [](int) { return true; }, [&](int, int, int) { EmptyRuns++; });
+		T.Require(EmptyRuns == 0, "a discovered map leaves no placeholder geometry");
 		// The same alpha state drives both ground/water overlay and instanced surfaces throughout a fade.
 		uint8_t Seen[] = { 0, 1 }, Ever[] = { 1, 1 };
 		FFog F; F.Start(2, 1, Seen, Ever, false, false);
@@ -441,6 +458,13 @@ namespace TCTerrainFormulas
 		const double AtlasCases[][4] = { {.5,.125,.625,0}, {.5,.125,.5625,0}, {.5,.125,.75,1}, {.75,0,.375,1} };
 		for (const auto& S : AtlasCases)
 			T.Near(ShadowReceiverDepth(S[0],S[1]) < S[2] ? 1 : 0,S[3],0,"native shadow receiver bias and strict depth comparison");
+		#include "World/TCWater.ShadowOracle.inl"
+		for (const auto& S : WaterShadowFrustumOracle)
+			T.Near(ShadowInMap(S[0],S[1],S[2],0,0,1,1) ? 1 : 0,S[3],0,"source getShadow frustum includes the receiver's far plane on High and Low");
+		for (const auto& S : WaterShadowTexelOracle)
+			T.Near(ShadowAtlasTexel((int)S[0],(int)S[1],S[2],S[3]),S[4],0,"source ClampToEdge stays within one atlas allocation for every PCF tap");
+		T.Require(!ShadowInMap(.5,.5,ShadowReceiverDepth(-.01,0),0,0,1,1), "water beyond the native light depth cannot turn into an offshore shadow patch");
+		T.Require(!ShadowInMap(.5,.5,ShadowReceiverDepth(.01,.02),0,0,1,1), "frustum uses the biased comparison depth as the source does");
 		for (const int Resolution : {917,987,2048})
 		{
 			const double SourceTexel=.03125, CascadeRadius=31.0, SourceRadius=4.0;
@@ -680,6 +704,32 @@ bool FTCFogOverlayContract::RunTest(const FString& Parameters)
 		TestTrue(TEXT("at least one real scenery material is checked"), Bound > 0);
 	}
 	View.Detach();
+	// Exercise the actual procedural upload with a Huge World row. A small fixture
+	// cannot catch an accidentally restored map-wide unknown-ground triangle.
+	FTCMatchState Wide;
+	Wide.Map.W = 512; Wide.Map.H = 2; Wide.Map.bWorld = true;
+	Wide.Map.Chars.Init('.', 1024); Wide.Map.Levels.Init(0, 1024); Wide.Map.Known.Init(false, 1024);
+	Wide.FogVisible.Init(false, 1024); Wide.FogExplored.Init(false, 1024);
+	Terrain->ResetFrom(Wide); Fog.Start(Wide); Fog.Frame(0, false, Wide);
+	if (UProceduralMeshComponent* WideOverlay = Fog.UnknownOverlayForTests())
+	{
+		if (const FProcMeshSection* Section = WideOverlay->GetProcMeshSection(0))
+		{
+			TestEqual(TEXT("two Huge rows use source-sized fog quads"), Section->ProcIndexBuffer.Num(), 32 * 6);
+			for (int32 K = 0; K < Section->ProcIndexBuffer.Num(); K += 3)
+			{
+				double Lo = std::numeric_limits<double>::infinity(), Hi = -Lo;
+				for (int32 J = 0; J < 3; J++)
+				{
+					const double X = Section->ProcVertexBuffer[Section->ProcIndexBuffer[K + J]].Position.X;
+					Lo = FMath::Min(Lo, X); Hi = FMath::Max(Hi, X);
+				}
+				TestTrue(TEXT("uploaded placeholder fog never spans more than 64 metres"), Hi - Lo <= 6400.0);
+			}
+		}
+		else AddError(TEXT("wide placeholder overlay missing"));
+	}
+	else AddError(TEXT("wide placeholder overlay component missing"));
 	Fog.Detach(); TCFogLook::SetActive(Previous); GEngine->DestroyWorldContext(World); World->DestroyWorld(false);
 	return true;
 }

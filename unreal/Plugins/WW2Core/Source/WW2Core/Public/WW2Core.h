@@ -6,12 +6,13 @@
 // FWW2View owns), turns status codes into FWW2Result with the library's message, and checks the interface version once
 // at startup.
 //
-// Status: ABI 2 from native 03a49ac (PR #16): version, rules hash, slot size, formation spots (ABI 1, unchanged) and the
-// six recipient-view calls (ww2_view_*). Linux x86_64 only; Win64 and macOS arm64 build without the library
+// Status: ABI 2.1 consumer at approved native 8f37717c: formation, recipient units, placement and detached authoring
+// queries. The pinned provider also has additive minor-2 exports, which this consumer does not adopt.
+// Linux x86_64 only; Win64 and macOS arm64 build without the library
 // (State() == NotLinked). Values are simulation units (metres, radians, x east, z south); nothing here converts to
 // Unreal space. The view exposes only the fixed unit columns in ABI 2: fog, cells, regions, HUD fields, tables and the
-// other rules queries are later slices, so the client's C++ decoder stays. The client runs the view beside it
-// (TC_DECODER=shadow, the default) or takes its unit rows from the view (TC_DECODER=rust); see the client's
+// other rules queries beyond placement are later slices, so the client's C++ decoder stays. The client runs the view
+// beside it (TC_DECODER=shadow) or takes its unit rows from the view (TC_DECODER=rust, the default); see the client's
 // Net/TCRustViewShadow.h.
 //
 // Threads: the formation calls may run on any thread; the library's last error message is per thread. A view handle
@@ -27,9 +28,9 @@ enum class EWW2CoreState : uint8
 {
 	// Built without the library (no install for this platform). Every call returns ErrNotLinked.
 	NotLinked,
-	// Linked, and ww2_abi_version() equals the header's WW2_ABI_VERSION and the version this wrapper was written for.
+	// Linked, major matches the header/wrapper, and the library supports the required additive minor revision.
 	Ready,
-	// Linked, but the library reports another interface version. Every call returns ErrRefused; nothing else is called.
+	// Linked, but major differs or the minor is too old. Every call returns ErrRefused; no query is called.
 	AbiMismatch,
 };
 
@@ -70,11 +71,22 @@ struct FWW2Result
 	bool IsOk() const { return Code == 0; }
 };
 
+// IF-12 works only on an author's document, never a private authoritative map obtained from a live room.
+// This is an interface layer, not an editor UI. CreatePreview returns JSON and creates no persistent handle.
+enum class EWW2AuthoringQuery : uint8
+{
+	ValidateMap, MigrateScenario, MigrateMap, SpawnsFor, CreatePreview, FindPath, HouseKinds, PlayMatch,
+};
+
 class WW2CORE_API FWW2Core
 {
 public:
 	// The interface version this wrapper is written against. A header with another WW2_ABI_VERSION does not compile.
 	static constexpr uint32 WrapperAbiVersion = 2;
+	static constexpr uint32 RequiredAbiMinorVersion = 1;
+	static constexpr int32 MaxQueryInputBytes = 16 * 1024 * 1024;
+	// Pure version gate, also used by the previous-version regression. Major must match exactly; minors are additive.
+	static bool AcceptsAbi(uint32 Major, uint32 Minor) { return Major == WrapperAbiVersion && Minor >= RequiredAbiMinorVersion; }
 
 	// The library's status codes (ww2_core.h; checked against the header at compile time when linked).
 	static constexpr int32 Ok = 0;
@@ -90,7 +102,7 @@ public:
 	static constexpr int32 ErrRefused = -1001;
 	static constexpr int32 ErrContract = -1002; // the library answered outside its documented contract
 	static constexpr int32 ErrRange = -1003;    // a value does not fit the C type (more than SIZE_MAX items)
-	static constexpr int32 ErrWrongThread = -1004; // a view called from a thread that does not own it (not passed on)
+	static constexpr int32 ErrWrongThread = -1004; // wrong recipient owner, or blocking PlayMatch on the game thread
 	static constexpr int32 ErrClosed = -1005;   // a view that is not open (never opened, closed, or moved from)
 
 	// WW2_SHAPE_*: the Formation menu's shapes.
@@ -108,6 +120,8 @@ public:
 	// ww2_abi_version() and the header's WW2_ABI_VERSION; 0 when not linked.
 	static uint32 LibraryAbiVersion();
 	static uint32 HeaderAbiVersion();
+	static uint32 LibraryAbiMinorVersion();
+	static uint32 HeaderAbiMinorVersion();
 	// ww2_rules_hash(); 0 when not ready.
 	static uint64 RulesHash();
 	// The native commit, rustc release and archive sha256 recorded by ww2-ffi.sh; empty when not linked.
@@ -122,6 +136,10 @@ public:
 	// unknown shape comes back as the library's ErrBadArgument.
 	static FWW2Result FormationSpots(TConstArrayView<FWW2FormationItem> Items, double AtX, double AtZ, double Face, double Reach,
 		int32 Shape, double Spread, TArray<FWW2FormationSpot>& Out);
+	// Two real calls: capacity discovery, then fill. UTF-8 JSON, explicit lengths, no terminator or returned allocation.
+	// Input/output storage never overlap at the C boundary. Out changes only on complete success.
+	// PlayMatch is synchronous, including its capacity probe. It is refused on the game thread before either call.
+	static FWW2Result AuthoringQuery(EWW2AuthoringQuery Query, TConstArrayView<UTF8CHAR> Json, TArray<UTF8CHAR>& Out);
 	// ww2_last_error for the calling thread: the message of the last failed library call, or empty.
 	static FString LastError();
 	// A status code's name (WW2_ERR_* or this wrapper's), for logs.
@@ -169,6 +187,9 @@ public:
 	FWW2Result Units(TArray<FWW2ViewUnit>& Out);
 	// ww2_view_needs_resync: the latest snapshot's held count or id XOR disagrees with the rows held.
 	FWW2Result NeedsResync(bool& Out);
+	// IF-04 uses only delivered recipient state. Same ownership, poison and thread rules as every other view call.
+	// World and unsupported recipient cases return errors; they never become invented placement reason values.
+	FWW2Result PlacementCheck(TConstArrayView<UTF8CHAR> Json, TArray<UTF8CHAR>& Out);
 
 #if WITH_DEV_AUTOMATION_TESTS
 	// The library's panic path cannot be reached from outside (no input makes ww2-ffi panic), so the tests feed this

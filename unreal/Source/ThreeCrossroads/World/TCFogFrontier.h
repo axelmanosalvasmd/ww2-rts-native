@@ -35,6 +35,22 @@ namespace TCFogFrontierCore
 	inline constexpr int Shade = 10;             // the overlay's colour (near black)
 	inline constexpr int Frontier = 4;           // World: cells over which explored ground darkens toward unseen ground
 	inline constexpr double Cell = 2.0;          // shared/sim.js CELL
+	// relief.js planRow merges at most 32 flat cells. Keep the public placeholder
+	// on that same lattice: a map-wide, two-metre-thin triangle gives the separately
+	// drawn fog an unnecessarily ill-conditioned coplanar depth comparison.
+	inline constexpr int PlaceholderRunCells = 32;
+	template <typename KnownFn, typename EmitFn>
+	void UnknownRuns(int W, int H, KnownFn Known, EmitFn Emit)
+	{
+		for (int Y = 0; Y < H; Y++) for (int X = 0; X < W;)
+		{
+			if (Known(Y * W + X)) { X++; continue; }
+			int End = X + 1;
+			while (End < W && End - X < PlaceholderRunCells && !Known(Y * W + End)) End++;
+			Emit(X, End, Y);
+			X = End;
+		}
+	}
 	inline double JsRound(double V) { return std::floor(V + 0.5); }
 	// surfaces.js MIST and fogOverlayShader, in reference metres. Texture coordinates in the native
 	// upload run north to south, so x / (w * CELL), z / (h * CELL) samples the same texel as three.

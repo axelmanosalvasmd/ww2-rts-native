@@ -16,8 +16,8 @@
 // with a native reason (bNative), so a moved pin cannot silently price units with stale numbers. The per-match facts
 // come from the start and every snapshot (ApplyStart, ApplySnapshot); unit rows come from FTCMatchState.
 //
-// Not ported (restricted, see ETCCardKind::NotPorted): the Engineers' build card, World recovery, the truck logistics
-// card, faction unit names (FACTIONS[f].names: the reference's generic names are used), tooltips and the card letters.
+// The HUD supplies faction names and draws the card letters. UnitTip and CardTip preserve the source role text.
+// ETCCardKind::NotPorted delegates the Engineers' build card, World recovery and truck logistics to the HUD's modules.
 #pragma once
 
 #include "CoreMinimal.h"
@@ -149,6 +149,9 @@ public:
 	// The reference commit the built-in recruit table was generated from.
 	static const TCHAR* const ReferencePin;
 	static const FTCRecruitDef* Find(const FString& Type);
+	// client/hud.js unitTip and client/unit-roles.js, before the original English-keyed translation.
+	static FString UnitTip(const FString& Type, const FString& DisplayName, const FString& Extra = FString());
+	FString CardTip(const FTCRecruitCard& Card, const FString& DisplayName) const;
 	// hud.js GROUPS and shared/tech.js TIER_NAMES.
 	static const TCHAR* GroupName(int32 Group);
 	static FString TierName(int32 Tier);

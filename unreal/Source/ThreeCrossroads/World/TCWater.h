@@ -98,6 +98,21 @@ namespace TCWaterCore
 	{
 		return 1.0 - ShadowZ + Bias;
 	}
+	// three getShadow: receivers past the light's far plane are unshadowed.
+	// The native forward path assumes that receivers fit its caster volume, while
+	// source water extends 900 metres beyond the map. UV bounds alone are insufficient.
+	inline bool ShadowInMap(double U, double V, double Depth, double MinU, double MinV, double MaxU, double MaxV)
+	{
+		return U >= MinU && U <= MaxU && V >= MinV && V <= MaxV && Depth <= 1.0;
+	}
+	// A standalone source map uses ClampToEdge. In a native shared atlas this must
+	// clamp to the selected tile's texel centres, never another cascade's texels.
+	inline int ShadowAtlasTexel(int Texel, int Size, double Min, double Max)
+	{
+		const int First = std::clamp((int)std::ceil(Min * Size - .5), 0, Size - 1);
+		const int Last = std::clamp((int)std::floor(Max * Size - .5), First, Size - 1);
+		return std::clamp(Texel, First, Last);
+	}
 	inline double ShadowAtlasRadius(double SourceRadius, double SourceTexel, int Resolution, double CascadeRadius)
 	{
 		return CascadeRadius > 0 ? SourceRadius * (SourceTexel * Resolution / (2 * CascadeRadius)) : SourceRadius;

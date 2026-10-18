@@ -135,7 +135,6 @@ namespace
 	const FLinearColor TagPlate = SrgbA(22, 25, 27, 0.88f);       // rgba(22, 25, 27, 0.88)
 	const FLinearColor TagHairline = SrgbA(176, 164, 122, 0.55f); // rgba(176, 164, 122, 0.55)
 	const FLinearColor TagText = FLinearColor(FColor(0xe2, 0xdf, 0xd3));
-	FBox2D MarkerHudExclusion(ForceInit);
 
 	const UWorld* MarkerWorld(const UCanvas* Canvas)
 	{
@@ -563,7 +562,8 @@ bool FTCMarkerPainter::Tag(UFont* Font, const FString& Text, double X, double Z,
 	{ Px -= 2; TextW = TCMarkerText::Width(Text, Px, Tracking); }
 	const double Bh = St.H - 12, Y0 = 6, Pad = 16, Sw = St.bSwatch && Swatch ? Bh - 22 : 0, LeadIn = Sw > 0 ? Sw + 14 : 0;
 	const double Bw = FMath::Min(Cw - 4, TextW + 2 * Pad + LeadIn), X0 = (Cw - Bw) / 2;
-	const FVector2D Origin = TCMarkersHud::ClearHud(FVector2D(At.X - Cw * K / 2, At.Y - St.H * K / 2), FVector2D(Cw * K, St.H * K), MarkerHudExclusion);
+	// markers.js screenSized keeps the projected world anchor. The later HUD panels cover it naturally.
+	const FVector2D Origin(At.X - Cw * K / 2, At.Y - St.H * K / 2);
 	auto Rect = [&](double Cx0, double Cy0, double Cw0, double Ch0, FLinearColor C)
 	{
 		C.A *= Alpha;
@@ -607,14 +607,6 @@ bool FTCMarkerPainter::Tag(UFont* Font, const FString& Text, double X, double Z,
 }
 
 // ------------------------------------------------------------------------------------------------ TCMarkersHud
-
-void TCMarkersHud::SetHudExclusion(const FBox2D& Bounds) { MarkerHudExclusion = Bounds; }
-
-FVector2D TCMarkersHud::ClearHud(FVector2D Origin, FVector2D Size, const FBox2D& Bounds)
-{
-	if (Bounds.bIsValid && Bounds.Intersect(FBox2D(Origin, Origin + Size))) Origin.Y = Bounds.Max.Y + 8;
-	return Origin;
-}
 
 namespace
 {
@@ -1073,9 +1065,6 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCMarkersGeometryTest, "ThreeCrossroads.Marker
 
 bool FTCMarkersGeometryTest::RunTest(const FString& Parameters)
 {
-	const FBox2D Scores(FVector2D(400, 8), FVector2D(880, 130));
-	TestTrue(TEXT("HQ tag moves below scores and its rate row"), TCMarkersHud::ClearHud(FVector2D(570, 115), FVector2D(156, 34), Scores).Equals(FVector2D(570, 138)));
-	TestTrue(TEXT("a tag beside scores retains its world anchor"), TCMarkersHud::ClearHud(FVector2D(80, 115), FVector2D(128, 32), Scores).Equals(FVector2D(80, 115)));
 	// every ring and line against the pinned overlay.js Builder (TCMarkers.Oracle.inl, ribbon-oracle.mjs)
 	for (const TCMarkersOracle::FCase& C : TCMarkersOracle::Cases)
 	{

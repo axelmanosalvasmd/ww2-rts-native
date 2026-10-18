@@ -1232,6 +1232,24 @@ void ATCGameMode::ControlsFrame()
 				PC->PressCommand(Cmd);
 				Did = FString::Printf(TEXT("press %s%s (%s)"), *Key, Slot >= 0 ? *FString::Printf(TEXT(" #%d"), Slot) : TEXT(""), bDrawn ? TEXT("through the hit test") : TEXT("not drawn: straight to the command"));
 			}
+			else if ((St.Action == TEXT("hudhover") || St.Action == TEXT("hudpress") || St.Action == TEXT("hudshift")) && PC)
+			{
+				// Verification only: consume command fields from TCHudAudit and require the complete real drawn hit.
+				TArray<FString> Fields; St.Arg.ParseIntoArray(Fields,TEXT("|"),false);
+				const int32 Action=Fields.Num()==5?FCString::Atoi(*Fields[0]):0;
+				FTCUiCommand Wanted(Action>0 && Action<=int32(ETCUiAction::MatchControl)?ETCUiAction(Action):ETCUiAction::None), Hit;
+				if (Fields.Num()==5) { Wanted.Unit=Fields[1]; Wanted.Building=FCString::Atoi(*Fields[2]); Wanted.Job=FCString::Atoi(*Fields[3]); Wanted.Group=FCString::Atoi(*Fields[4]); }
+				const ATCHUD* Hud=Cast<ATCHUD>(PC->GetHUD()); FVector2D At;
+				const bool Drawn=Wanted.Action!=ETCUiAction::None && Hud && Hud->CommandCentre(Wanted,At) && Hud->CommandAt(At,Hit)
+					&& Hit.Action==Wanted.Action && Hit.Unit==Wanted.Unit && Hit.Building==Wanted.Building && Hit.Job==Wanted.Job && Hit.Group==Wanted.Group;
+				if (!Drawn) { Did=TEXT("HUD acceptance target is absent or covered: ")+St.Arg; UE_LOG(LogTC,Error,TEXT("%s"),*Did); }
+				else
+				{
+					PC->SetMouseLocation(FMath::RoundToInt(At.X),FMath::RoundToInt(At.Y));
+					const bool Hover=St.Action==TEXT("hudhover"), Ran=Hover || PC->PressCommand(Wanted,St.Action==TEXT("hudshift"));
+					Did=FString::Printf(TEXT("%s %s at drawn hit %.1f,%.1f, handled=%d"),*St.Action,*Wanted.Describe(),At.X,At.Y,Ran);
+				}
+			}
 			else if (St.Action == TEXT("type") && PC && Form.bCharInput && FSlateApplication::IsInitialized())
 			{
 				// round 16: each character through Slate's own text input path (FSlateApplication::ProcessKeyCharEvent, as

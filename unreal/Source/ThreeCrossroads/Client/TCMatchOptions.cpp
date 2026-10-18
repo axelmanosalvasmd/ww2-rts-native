@@ -1,4 +1,6 @@
 #include "Client/TCMatchOptions.h"
+#include "Client/TCRustQueries.h"
+#include "Policies/CondensedJsonPrintPolicy.h"
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
 #include "Serialization/JsonReader.h"
@@ -848,6 +850,38 @@ bool FTCMatchOptions::ParseMapFile(const FString& Key, const FJsonObject& M, FTC
 	TCMOptL::Str(M, TEXT("mood"), Mood);
 	TCMOptL::Str(M, TEXT("weather"), WeatherField);
 	S.Weather = MapWeather(S.Name, Key, Mood, WeatherField);
+	// These are already public /maps documents, never authoritative hidden maps from a live recipient.
+	// Cache the two distinct source spawn filters once, so drawing performs no JSON query or simulation.
+	const auto SpawnMap = MakeShared<FJsonObject>();
+	SpawnMap->SetArrayField(TEXT("spawns"), *Spawns);
+	for (const FString& QueryMode : { FString(TEXT("conquest")), FString(TEXT("assault")) })
+	{
+		const auto Request = MakeShared<FJsonObject>();
+		Request->SetObjectField(TEXT("map"), SpawnMap);
+		Request->SetStringField(TEXT("mode"), QueryMode);
+		FString Json;
+		FJsonSerializer::Serialize(Request, TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&Json));
+		TSharedPtr<FJsonValue> Result;
+		const FWW2Result R = FTCRustQueries::Authoring(EWW2AuthoringQuery::SpawnsFor, Json, Result);
+		if (R.IsOk() && Result.IsValid() && Result->Type == EJson::Array)
+		{
+			TArray<int32> Indices;
+			bool bValid = true;
+			for (const auto& Entry : Result->AsArray())
+			{
+				double Index = -1;
+				if (!Entry.IsValid() || !Entry->TryGetNumber(Index) || !FMath::IsFinite(Index) || Index != FMath::FloorToDouble(Index)
+					|| Index < 0 || Index >= S.Spawns.Num() || (Indices.Num() && Index <= Indices.Last())) { bValid = false; break; }
+				Indices.Add((int32)Index);
+			}
+			if (bValid)
+			{
+				S.RustSpawnIndices.Add(QueryMode, MoveTemp(Indices));
+				UE_LOG(LogTC, Log, TEXT("rust query: ww2_authoring_spawns_for public map %s, mode %s completed; cached for actual preview"), *Key, *QueryMode);
+			}
+		}
+		else UE_LOG(LogTC, Log, TEXT("rust query: public map %s spawn filter uses C++ fallback (%d %s)"), *Key, R.Code, *R.Error);
+	}
 	Out = MoveTemp(S);
 	OutError.Reset();
 	return true;
@@ -941,9 +975,10 @@ FTCMapPreview FTCMatchOptions::BuildPreview(const FTCMapPreviewSource* Source, c
 	for (int32 I = 0; I < M.Points.Num(); I++)
 		if (!bNoVp || M.Points[I].Mp > 0.0) P.Points.Add({ I, M.Points[I].X, M.Points[I].Y });
 	// spawns: Assault-only spawns only in Assault; red defend, blue attack when the map lists defenders
+	const TArray<int32>* RustSpawns = M.RustSpawnIndices.Find(Md == TEXT("assault") ? TEXT("assault") : TEXT("conquest"));
 	for (int32 I = 0; I < M.Spawns.Num(); I++)
 	{
-		if (Md != TEXT("assault") && M.Spawns[I].bAssault) continue;
+		if (RustSpawns ? !RustSpawns->Contains(I) : (Md != TEXT("assault") && M.Spawns[I].bAssault)) continue;
 		FTCMapPreviewSpawn Sp;
 		Sp.Index = I;
 		Sp.X = M.Spawns[I].X;

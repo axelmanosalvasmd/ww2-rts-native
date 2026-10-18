@@ -99,6 +99,42 @@ namespace
 	// client/hud.js drawQueue and availability: a Classic building trains five at most
 	constexpr int32 QueuePlaces = 5;
 
+	// Generated from client/unit-roles.js. Regenerate with unreal/Tools/export-hud-roles.mjs (lead tool patch).
+	// BEGIN GENERATED SOURCE ROLES e4e579a
+	struct FRole { const TCHAR* Type; const TCHAR* Text; };
+	const FRole SourceRoles[] = {
+		{ TEXT("rifle"), TEXT("Captures, all-round") },
+		{ TEXT("mg"), TEXT("Pins infantry, sets up") },
+		{ TEXT("at"), TEXT("Kills tanks, sets up") },
+		{ TEXT("tank"), TEXT("Kills infantry, weak rear") },
+		{ TEXT("rocket"), TEXT("Rocket salvos, breaks garrisons") },
+		{ TEXT("flak"), TEXT("Shoots down enemy air support") },
+		{ TEXT("fighter"), TEXT("Clears the sky, escorts") },
+		{ TEXT("attacker"), TEXT("Rockets and bombs on ground targets") },
+		{ TEXT("flaktrack"), TEXT("Flak that keeps up with the army") },
+		{ TEXT("mortar"), TEXT("Arcing fire, out-ranges MGs") },
+		{ TEXT("sniper"), TEXT("One shot, one kill; hides when still") },
+		{ TEXT("armoredcar"), TEXT("Fast scout and raider") },
+		{ TEXT("medium"), TEXT("Mainline tank") },
+		{ TEXT("halftrack"), TEXT("Carries one squad; infantry reinforce beside it") },
+		{ TEXT("lorry"), TEXT("Carries three squads fast; unarmed, thin-skinned") },
+		{ TEXT("lcvp"), TEXT("Carries one squad over water, lands it on a beach") },
+		{ TEXT("gunboat"), TEXT("Fast; hunts boats, torpedoes ships") },
+		{ TEXT("destroyer"), TEXT("Shells whatever your side spots, 120 m (max 2)") },
+		{ TEXT("medic"), TEXT("Unarmed; heals squads out of the fight") },
+		{ TEXT("tankdestroyer"), TEXT("Long gun, hunts tanks; weak vs infantry") },
+		{ TEXT("howitzer"), TEXT("Heavy shells at 95 m; slow, sets up, blind up close") },
+		{ TEXT("flamer"), TEXT("Burns out houses and trenches; short range") },
+		{ TEXT("bomber"), TEXT("Drops bomb sticks on crowds and dug-in positions") },
+		{ TEXT("ranger"), TEXT("Elite, bazookas, satchel charges") },
+		{ TEXT("tiger"), TEXT("Heavy tank, thick front armor (max 1)") },
+		{ TEXT("conscript"), TEXT("Cheap waves, Ura! sprint") },
+		{ TEXT("churchill"), TEXT("Slow infantry tank, thickest front armor (max 1)") },
+		{ TEXT("commando"), TEXT("Raiders, Stens and satchels; hide when still") },
+		{ TEXT("engineer"), TEXT("Builds depots, weak rifles") },
+	};
+	// END GENERATED SOURCE ROLES
+
 	struct FTable
 	{
 		TArray<FTCRecruitDef> Defs;
@@ -173,6 +209,29 @@ const FTCRecruitDef* FTCRecruitment::Find(const FString& Type)
 {
 	const int32* At = Table().Index.Find(Type);
 	return At ? &Table().Defs[*At] : nullptr;
+}
+
+FString FTCRecruitment::UnitTip(const FString& Type, const FString& DisplayName, const FString& Extra)
+{
+	const FTCRecruitDef* D=Find(Type);
+	if (!D) return DisplayName+Extra;
+	FString Tip=DisplayName;
+	if (!DisplayName.Equals(D->Name,ESearchCase::CaseSensitive)) Tip+=TEXT(" (")+D->Name+TEXT(")");
+	for (const FRole& R : SourceRoles) if (Type.Equals(R.Type,ESearchCase::CaseSensitive)) { Tip+=TEXT(": ")+FString(R.Text); break; }
+	return Tip+Extra;
+}
+
+FString FTCRecruitment::CardTip(const FTCRecruitCard& Card, const FString& DisplayName) const
+{
+	// feedback.js replaces an unavailable card's whole tooltip with its refusal reason.
+	if (!Card.Check.bOk) return Card.Check.Reason;
+	const FTCRecruitDef* D=Find(Card.Type);
+	if (!D) return DisplayName;
+	const FTCPrice P=PriceOf(Card.Type);
+	const FString Extra=Classic()
+		? FString::Printf(TEXT(". %d MP%s, trains in %ds"),P.Mp,P.Fuel?*FString::Printf(TEXT(" + %d Fuel"),P.Fuel):TEXT(""),D->Train)
+		: FString::Printf(TEXT(". %d MP"),D->Cost);
+	return UnitTip(Card.Type,DisplayName,Extra);
 }
 
 const TCHAR* FTCRecruitment::GroupName(int32 Group)
@@ -730,6 +789,76 @@ FTCCommandCard FTCRecruitment::Card(const FTCMatchState& State, const TSet<int32
 #include "Misc/AutomationTest.h"
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
+#include "Client/TCLocale.h"
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCRecruitTooltipsTest, "ThreeCrossroads.Recruitment.Tooltips", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)
+bool FTCRecruitTooltipsTest::RunTest(const FString&)
+{
+ // Exact original hud.js unitTip and feedback.js replacement, with no added purchase instructions.
+ TestEqual(TEXT("generic names show the original role"),FTCRecruitment::UnitTip(TEXT("rifle"),TEXT("Rifle Squad")),FString(TEXT("Rifle Squad: Captures, all-round")));
+ TestEqual(TEXT("faction names retain the generic name in parentheses"),FTCRecruitment::UnitTip(TEXT("rifle"),TEXT("Grenadiers")),FString(TEXT("Grenadiers (Rifle Squad): Captures, all-round")));
+ TestEqual(TEXT("a type without a role keeps its name"),FTCRecruitment::UnitTip(TEXT("hq"),TEXT("HQ")),FString(TEXT("HQ")));
+ FTCRecruitment R;
+ auto Parse=[](const FString& Text) { TSharedPtr<FJsonObject> O; FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text),O); return O; };
+ R.ApplyStart(*Parse(TEXT(R"({"factions":[0,1],"map":{}})")));
+ FTCRecruitCard Card; Card.Type=TEXT("rifle"); Card.Check.bOk=true;
+ R.ApplySnapshot(*Parse(TEXT(R"({"mode":{"kind":"conquest"}})")));
+ const FString Recruit=R.CardTip(Card,TEXT("Rifle Squad"));
+ TestEqual(TEXT("Conquest suffix is the original MP price"),Recruit,FString(TEXT("Rifle Squad: Captures, all-round. 100 MP")));
+ R.ApplySnapshot(*Parse(TEXT(R"({"mode":{"kind":"classic"}})")));
+ Card.Type=TEXT("tank");
+ TestEqual(TEXT("Classic suffix has the source fuel and training sentence"),R.CardTip(Card,TEXT("M5 Stuart")),FString(TEXT("M5 Stuart (Light Tank): Kills infantry, weak rear. 200 MP + 60 Fuel, trains in 35s")));
+ Card.Check.bOk=false; Card.Check.Reason=TEXT("The training queue is full");
+ TestEqual(TEXT("an unavailable card shows only its original reason"),R.CardTip(Card,TEXT("M5 Stuart")),Card.Check.Reason);
+ for (ETCLanguage Language : {ETCLanguage::English,ETCLanguage::Spanish})
+ {
+  FTCLocale::FScopedLanguage Lang(Language);
+  TestEqual(TEXT("the original English-keyed role and price translate together"),TC_T(Recruit),Language==ETCLanguage::English?Recruit:FString(TEXT("Pelotón de fusileros: Captura, polivalente. 100 MO")));
+ }
+ return !HasAnyErrors();
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCRecruitPurchasesTest, "ThreeCrossroads.Recruitment.Purchases", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)
+bool FTCRecruitPurchasesTest::RunTest(const FString&)
+{
+ // The original availability.js and hud.js oracle exercises these same buys and the waiting-job cancellation.
+ FTCMatchState S; S.bHasMatch=true; S.You=0; S.LobbySeat=0; S.bLobbySinceOpen=true;
+ FTCRecruitment R; R.SetUnitTableReference(FTCRecruitment::ReferencePin);
+ auto Parse=[](const FString& Text) { TSharedPtr<FJsonObject> O; FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text),O); return O; };
+ R.ApplyStart(*Parse(TEXT(R"({"factions":[0,1],"map":{"naval":true}})")));
+ FTCBuy Rifle; Rifle.Unit=TEXT("rifle");
+ TestEqual(TEXT("before any snapshot, a buy explains waiting"),R.Buy(S,Rifle,false).Check.Reason,FString(TEXT("Waiting for the army")));
+ auto Snap=[&](const TCHAR* Text) { R.ApplySnapshot(*Parse(Text)); };
+ Snap(TEXT(R"({"mp":476,"mode":{"kind":"conquest"},"units":[],"queues":[]})"));
+ TestEqual(TEXT("Conquest still needs a production building"),R.CheckBuy(S,Rifle).Reason,FString(TEXT("Needs a HQ")));
+ FTCUnit Hq; Hq.Id=1; Hq.Type=TEXT("hq"); Hq.Owner=0; Hq.Hp=100; Hq.Built=1; S.Units.Add(1,Hq);
+ Rifle.From=1; Rifle.bHasFrom=true;
+ Snap(TEXT(R"({"mp":500,"mode":{"kind":"classic"},"units":[[1]],"queues":[[1,0,-1,-1]]})"));
+ const FTCBuyResult Five=R.Buy(S,Rifle,true),One=R.Buy(S,Rifle,false);
+ TestTrue(TEXT("a click buys one and Shift buys five"),Five.Check.bOk && Five.Messages.Num()==5 && One.Messages.Num()==1);
+ for (const TSharedRef<FJsonObject>& M : Five.Messages) TestTrue(TEXT("every card purchase names its selected building in the real buy envelope"),M->GetStringField(TEXT("t"))==TEXT("buy") && M->GetStringField(TEXT("unit"))==TEXT("rifle") && M->GetNumberField(TEXT("from"))==1);
+ Snap(TEXT(R"({"mp":99,"mode":{"kind":"classic"},"units":[[1]],"queues":[]})"));
+ const FTCBuyResult Broke=R.Buy(S,Rifle,true);
+ TestTrue(TEXT("unavailable cards explain instead of sending purchases"),Broke.Messages.IsEmpty() && Broke.Check.Reason==TEXT("Needs 100 MP"));
+ Snap(TEXT(R"({"mp":1000,"fuel":59,"mode":{"kind":"classic"},"units":[[1]],"queues":[]})"));
+ FTCBuy Tank; Tank.Unit=TEXT("tank");
+ TestEqual(TEXT("Classic prices check fuel before a missing maker"),R.CheckBuy(S,Tank).Reason,FString(TEXT("Needs 60 fuel")));
+ Snap(TEXT(R"({"mp":1000,"mode":{"kind":"classic"},"units":[[1]],"queues":[[1,0.5,-1,-1,"rifle","rifle","rifle","rifle","rifle"]],"productionJobs":[[1,[{"id":11,"type":"rifle","status":"active","mp":100,"fuel":0},{"id":12,"type":"rifle","status":"waiting","mp":100,"fuel":0}]]]})"));
+ TestEqual(TEXT("full production queue refuses the buy"),R.CheckBuy(S,Rifle).Reason,FString(TEXT("The training queue is full")));
+ Hq.Id=2; S.Units.Add(2,Hq);
+ TestEqual(TEXT("a selected full building does not redirect to a free producer"),R.CheckBuy(S,Rifle).Reason,FString(TEXT("The training queue is full")));
+ const FTCBuyResult Cancel=R.CancelProduction(S,1,12);
+ TestTrue(TEXT("a waiting job cancels through the real envelope"),Cancel.Check.bOk && Cancel.Messages.Num()==1 && Cancel.Messages[0]->GetStringField(TEXT("t"))==TEXT("cancelProduction") && Cancel.Messages[0]->GetNumberField(TEXT("id"))==1 && Cancel.Messages[0]->GetNumberField(TEXT("job"))==12);
+ TestFalse(TEXT("the active job cannot be refunded"),R.CancelProduction(S,1,11).Check.bOk);
+ Snap(TEXT(R"({"mp":1000,"mode":{"kind":"classic","suddenDeath":true},"units":[[1]],"queues":[]})"));
+ TestEqual(TEXT("Sudden Death disables purchases"),R.CheckBuy(S,Rifle).Reason,FString(TEXT("Not during Sudden Death")));
+ Snap(TEXT(R"({"mp":1000,"tech":{"tier":1},"mode":{"kind":"conquest"},"units":[[1]],"queues":[]})"));
+ FTCBuy Fighter; Fighter.Unit=TEXT("fighter");
+ TestEqual(TEXT("aircraft tiers use the source HQ name"),R.CheckBuy(S,Fighter).Reason,FString(TEXT("Needs Battalion HQ")));
+ S.bSpectator=true;
+ TestTrue(TEXT("a spectator cannot purchase"),R.Buy(S,Rifle,true).Messages.IsEmpty() && R.CheckBuy(S,Rifle).Reason==TEXT("You are spectating"));
+ return !HasAnyErrors();
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCRecruitArmyCountTest, "ThreeCrossroads.Recruitment.ArmyCount", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)
 bool FTCRecruitArmyCountTest::RunTest(const FString&)

@@ -93,10 +93,13 @@ namespace FTCHudFit
 	// HUD controls keep their complete tooltip even when the visible caption is elided.
 	THREECROSSROADS_API FString ControlTip(const FControl& Control);
 	THREECROSSROADS_API FBottomLayout Tooltip(const FString& Shown, const FBox2D& Anchor, FVector2D View, const FTCMeasure& Measure);
-	THREECROSSROADS_API FBottomLayout IconBar(bool bMenu, bool bCaptured, const FTCMeasure& Measure, float Scale = 1.f);
+	THREECROSSROADS_API FBottomLayout IconBar(bool bMenu, bool bCaptured, const FTCMeasure& Measure, float Scale = 1.f,
+		bool bLogistics = false, bool bSupplyOverlay = false, bool bTruckSelect = false);
+	// A source DOM panel painted later also intercepts clicks on the controls underneath it.
+	THREECROSSROADS_API void BehindPanels(FBottomLayout& Layout, const TArray<FBox2D>& Foreground);
 	THREECROSSROADS_API FBottomLayout Toolbar(float MaxW, const TArray<FControl>& Controls, const FTCMeasure& Measure, float Scale = 1.f);
 	THREECROSSROADS_API FBottomLayout SandboxToolbar(FVector2D View, float CornerRight, float ScoreLeft,
-		const TArray<FControl>& Controls, const TArray<FBox2D>& Avoid, const FTCMeasure& Measure, float Scale = 1.f);
+		const TArray<FControl>& Controls, const TArray<FBox2D>& Avoid, const FTCMeasure& Measure, float Scale = 1.f, bool bShown = true);
 	// The browser's central boss frame and padding, including its overlaps in a crowded viewport.
 	THREECROSSROADS_API FTCPaint BossCard(const FTCBossBar& Boss, FVector2D View, float Top, const FBox2D& Economy,
 		const TArray<FBox2D>& Avoid, double Now, const FTCMeasure& Measure, float Scale = 1.f);
@@ -173,7 +176,10 @@ public:
 	FTCMinimap Minimap;
 
 private:
-	struct FButton { FBox2D Rect; FTCUiCommand Command; FString Label; bool bEnabled = true; };
+	struct FButton { FBox2D Rect; FTCUiCommand Command; FString Label; bool bEnabled = true; FString Hover; };
+	// Opt-in integration evidence from the actual drawn controls. Does not synthesize clicks or purchases.
+	void WriteAcceptanceAudit();
+	FString AcceptanceSignature;
 	// client/hud.js UI scale (#hud { zoom: var(--ui) }): the panels, buttons and text are drawn at UiNow through a canvas
 	// transform, laid out in a window of ClipX / UiNow by ClipY / UiNow; the world's own overlays, the minimap (drawn
 	// at its own size here) and the Controls sheet (a dialog outside #hud) are not. Buttons and panels are recorded in
@@ -275,7 +281,7 @@ private:
 	void DrawWorldOverlays(UFont* Font);
 	void DrawMinimapOverlays();
 	// Slice 9 (see the file comment). Each returns or draws only what this recipient's messages delivered.
-	float DrawScoreStrip(UFont* Font, UFont* Big);
+	float DrawScoreStrip(UFont* Font, UFont* Big, FTCHudFit::FBottomLayout Sandbox);
 	// Round 17: the strip's one card in screen pixels as last drawn (invalid without a strip)
 	FBox2D StripCard = FBox2D(ForceInit);
 	// Round 17: the alert history box as last drawn (UI pixels; DrawAlertFeed), which the sandbox panel keeps clear of

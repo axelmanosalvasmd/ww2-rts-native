@@ -295,28 +295,23 @@ void FTCFogFrontier::RebuildCover(const FTCMatchState& State)
 		CoverOverlay.Clear();
 		return;
 	}
-	// One quad per run of unknown cells in a row, flat at level 0 (the start map's '.' at level 0), facing up: the
-	// browser's public placeholder ground under its filtered overlay (fog.js dark 255 on World).
+	// The source relief limits flat runs to 32 cells. Use the same cap for both the
+	// public level-zero ground and its fog, rather than map-wide coplanar triangles.
 	TArray<FVector> Verts, Normals;
 	TArray<int32> Tris;
 	const int32 W = Core.W, H = Core.H;
 	const double M = TCFogFrontierCore::Cell * 100.0;
-	for (int32 Y = 0; Y < H; Y++)
+	TCFogFrontierCore::UnknownRuns(W, H,
+		[&](int32 C) { return State.Map.Known[C]; },
+		[&](int32 X, int32 E, int32 Y)
 	{
-		for (int32 X = 0; X < W;)
-		{
-			if (State.Map.Known[Y * W + X]) { X++; continue; }
-			int32 E = X;
-			while (E < W && !State.Map.Known[Y * W + E]) E++;
-			CoverCells += E - X;
-			const int32 B = Verts.Num();
-			// three (x, 0, z) -> Unreal (x, z, 0): p00, p10, p01, p11; (p00, p01, p11) and (p00, p11, p10) face up in three
-			Verts.Add(FVector(X * M, Y * M, 0)); Verts.Add(FVector(E * M, Y * M, 0)); Verts.Add(FVector(X * M, (Y + 1) * M, 0)); Verts.Add(FVector(E * M, (Y + 1) * M, 0));
-			for (int32 K = 0; K < 4; K++) Normals.Add(FVector::UpVector);
-			Tris.Append({ B, B + 2, B + 3, B, B + 3, B + 1 });
-			X = E;
-		}
-	}
+		CoverCells += E - X;
+		const int32 B = Verts.Num();
+		// three (x, 0, z) -> Unreal (x, z, 0): p00, p10, p01, p11; both triangles face up.
+		Verts.Add(FVector(X * M, Y * M, 0)); Verts.Add(FVector(E * M, Y * M, 0)); Verts.Add(FVector(X * M, (Y + 1) * M, 0)); Verts.Add(FVector(E * M, (Y + 1) * M, 0));
+		for (int32 K = 0; K < 4; K++) Normals.Add(FVector::UpVector);
+		Tris.Append({ B, B + 2, B + 3, B, B + 3, B + 1 });
+	});
 	CoverMesh->ClearAllMeshSections();
 	if (!Tris.Num()) { CoverMesh->SetVisibility(false); CoverOverlay.Clear(); return; }
 	CoverMesh->CreateMeshSection_LinearColor(0, Verts, Tris, Normals, TArray<FVector2D>(), TArray<FLinearColor>(), TArray<FProcMeshTangent>(), false);
@@ -333,6 +328,9 @@ void FTCFogFrontier::RebuildCover(const FTCMatchState& State)
 	}
 	CoverMesh->SetMaterial(0, Underlay);
 	CoverMesh->SetVisibility(true);
+	if (FParse::Param(FCommandLine::Get(), TEXT("TCFogAudit")))
+		UE_LOG(LogTC, Log, TEXT("fog unknown geometry: %d public cells, %d quads, at most %d cells per run, material %s"),
+			CoverCells, Tris.Num() / 6, TCFogFrontierCore::PlaceholderRunCells, *GetPathNameSafe(Underlay));
 	// Water is translucent and sits above this opaque placeholder. As in main.js, the fog must draw
 	// after that water, including its foam over undiscovered cells at the edge of a known river.
 	CoverOverlay.SetSection(0, Verts, Tris, Normals);

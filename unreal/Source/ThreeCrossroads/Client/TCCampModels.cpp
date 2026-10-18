@@ -16,6 +16,7 @@
 #include "Materials/Material.h"
 #include "ProceduralMeshComponent.h"
 #include "StaticMeshAttributes.h"
+#include "StaticMeshResources.h"
 #include "Misc/AutomationTest.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
@@ -23,6 +24,14 @@
 
 namespace
 {
+	const FName CampSurfaceSlot(TEXT("CampSurface"));
+	bool HasCampSurfaceSlot(const UStaticMesh* Mesh)
+	{
+		const FStaticMeshRenderData* Data = Mesh ? Mesh->GetRenderData() : nullptr;
+		return Data && Data->LODResources.Num() == 1 && Data->LODResources[0].Sections.Num() == 1 &&
+			Data->LODResources[0].Sections[0].MaterialIndex == 0 && Mesh->GetStaticMaterials().Num() == 1 &&
+			Mesh->GetStaticMaterials()[0].MaterialSlotName == CampSurfaceSlot;
+	}
 	UInstancedStaticMeshComponent* InstanceComponent(AActor* A, UStaticMesh* Mesh, const TArray<UMaterialInterface*>& Materials)
 	{
 		auto* C = NewObject<UInstancedStaticMeshComponent>(A);
@@ -40,6 +49,15 @@ namespace
 			C->SetMaterial(I, Materials[I]);
 		}
 		A->AddInstanceComponent(C); C->RegisterComponent();
+		// The component override alone cannot repair an invalid render-section material index in a cooked build.
+		static const bool bAudit = FParse::Param(FCommandLine::Get(), TEXT("TCCampMaterialAudit"));
+		if (bAudit && Mesh && Mesh->GetRenderData())
+			for (const FStaticMeshLODResources& Lod : Mesh->GetRenderData()->LODResources)
+				for (const FStaticMeshSection& S : Lod.Sections)
+					UE_LOG(LogTC, Log, TEXT("camp material: section %d, resolved %s, default %d, instanced %d"),
+						S.MaterialIndex, *GetPathNameSafe(C->GetMaterial(S.MaterialIndex)),
+						C->GetMaterial(S.MaterialIndex) == UMaterial::GetDefaultMaterial(MD_Surface),
+						C->GetMaterial(S.MaterialIndex) && C->GetMaterial(S.MaterialIndex)->CheckMaterialUsage_Concurrent(MATUSAGE_InstancedStaticMeshes));
 		return C;
 	}
 	UMaterialInterface* Surface(const TCHAR* Name)
@@ -55,6 +73,18 @@ namespace
 		const float D[6] = { Tint.R, Tint.G, Tint.B, 1, 1, 1 };
 		C->SetCustomData(I, MakeArrayView(D), true);
 	}
+	UInstancedStaticMeshComponent* CastWithoutReceiving(AActor* A, UInstancedStaticMeshComponent* Visible, bool bUnitSun)
+	{
+		// main.js mesh() sets castShadow=true on the HQ cloth and node box. receiveShadow keeps Three's false
+		// default. The visible pieces use the unshadowed unit sun, with hidden scenery-channel casters.
+		Visible->SetCastShadow(!bUnitSun);
+		if (!bUnitSun) return nullptr;
+		Visible->SetLightingChannels(false, true, false);
+		auto* Caster = InstanceComponent(A, Visible->GetStaticMesh(), { Visible->GetMaterial(0) });
+		Caster->SetCastShadow(true); Caster->bCastHiddenShadow = true;
+		Caster->SetHiddenInGame(true); Caster->SetVisibility(false);
+		return Caster;
+	}
 	template <size_t N> UStaticMesh* ReferenceMesh(UObject* Outer, const double (&V)[N][8], UMaterialInterface* Mat)
 	{
 		FMeshDescription D; FStaticMeshAttributes Attr(D); Attr.Register();
@@ -63,6 +93,9 @@ namespace
 		auto Uv = Attr.GetVertexInstanceUVs(); Uv.SetNumChannels(4);
 		auto Col = Attr.GetVertexInstanceColors();
 		const FPolygonGroupID Group = D.CreatePolygonGroup();
+		// BuildFromMeshDescription resolves this name against FStaticMaterial::MaterialSlotName at runtime.
+		// An unnamed group with a non-null material resolves to INDEX_NONE, then the default grey surface.
+		Attr.GetPolygonGroupMaterialSlotNames()[Group] = CampSurfaceSlot;
 		for (size_t I = 0; I < N; I += 3)
 		{
 			TArray<FVertexInstanceID> Tri;
@@ -80,9 +113,17 @@ namespace
 			}
 			D.CreateTriangle(Group, Tri);
 		}
-		auto* Mesh = NewObject<UStaticMesh>(Outer); Mesh->GetStaticMaterials().Add(FStaticMaterial(Mat));
+		auto* Mesh = NewObject<UStaticMesh>(Outer); Mesh->GetStaticMaterials().Add(FStaticMaterial(Mat, CampSurfaceSlot));
 		UStaticMesh::FBuildMeshDescriptionsParams P; P.bBuildSimpleCollision = false; P.bFastBuild = true;
 		if (!Mesh->BuildFromMeshDescriptions({ &D }, P)) return nullptr;
+		if (!HasCampSurfaceSlot(Mesh))
+		{
+			UE_LOG(LogTC, Error, TEXT("camp models: runtime mesh did not bind CampSurface to render section 0 (%s)"), *GetPathNameSafe(Mat));
+			return nullptr;
+		}
+		if (FParse::Param(FCommandLine::Get(), TEXT("TCCampMaterialAudit")))
+			UE_LOG(LogTC, Log, TEXT("camp runtime surface: %s; section 0; slot CampSurface; UV channels %d"),
+				*GetPathNameSafe(Mat), Mesh->GetRenderData()->LODResources[0].GetNumTexCoords());
 		for (FStaticMaterial& M : Mesh->GetStaticMaterials()) M.UVChannelData = FMeshUVChannelInfo(1.f);
 		return Mesh;
 	}
@@ -272,8 +313,8 @@ void FTCMarkerScene::SyncModels(const ATCGameMode& M)
 			auto* FlagMat = UMaterialInstanceDynamic::Create(FlagBase, A);
 			FlagMat->SetVectorParameterValue(TEXT("Color"), ATCUnitRenderer::SeatColor(Slot));
 			auto* Flag = InstanceComponent(A, FlagMesh, { FlagMat }); Models.Add(Flag);
-			Flag->SetCastShadow(false); // main.js buildHQ's flag does not cast a shadow
-			if (TCLook::HasUnitSun(M.GetWorld())) Flag->SetLightingChannels(false, true, false);
+			auto* Caster = CastWithoutReceiving(A, Flag, TCLook::HasUnitSun(M.GetWorld()));
+			if (Caster) { Models.Add(Caster); Add(Caster, FTransform(Origin)); }
 			Add(Flag, FTransform(Origin));
 		}
 		else UE_LOG(LogTC, Error, TEXT("camp models: missing M_TCHQCloth; run Tools/bridge-replay/make-lookfx-assets.py"));
@@ -297,15 +338,115 @@ void FTCMarkerScene::SyncModels(const ATCGameMode& M)
 		}
 	}
 	auto* Nodes = InstanceComponent(A, ReferenceMesh(A, NodeVertices, WoodMat), { WoodMat }); Models.Add(Nodes);
+	auto* NodeCaster = CastWithoutReceiving(A, Nodes, TCLook::HasUnitSun(M.GetWorld()));
+	if (NodeCaster) Models.Add(NodeCaster);
 	for (const FTCResourceNode& N : M.Markers.ResourceNodes())
 	{
 		const double H = M.Terrain ? M.Terrain->HeightAt(N.X, N.Z) : 0;
-		Add(Nodes, FTransform(FVector(N.X * 100, N.Z * 100, (H + 0.3) * 100)));
+		const FTransform At(FVector(N.X * 100, N.Z * 100, (H + 0.3) * 100));
+		Add(Nodes, At);
+		if (NodeCaster) Add(NodeCaster, At);
 	}
 	UE_LOG(LogTC, Log, TEXT("camp models: %d sandbags, %d resource boxes, tent %d; reference e4e579a"), BagCount, M.Markers.ResourceNodes().Num(), bTent);
 }
 
 #if WITH_DEV_AUTOMATION_TESTS
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCCampMaterialSectionsTest, "ThreeCrossroads.Markers.CampMaterialSections", (EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext) | EAutomationTestFlags::EngineFilter)
+bool FTCCampMaterialSectionsTest::RunTest(const FString&)
+{
+	// Inspect the actual render sections, which survive cooking. Editor mesh descriptions and null materials
+	// missed the unnamed polygon-group versus auto-named material-slot mismatch in the old camp test.
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, TEXT("TCCampMaterials"));
+	if (!TestNotNull(TEXT("camp material fixture world"), World)) return false;
+	AActor* Actor = World->SpawnActor<AActor>();
+	if (TestNotNull(TEXT("camp material fixture actor"), Actor))
+	{
+		auto* Root = NewObject<USceneComponent>(Actor);
+		Actor->SetRootComponent(Root); Actor->AddInstanceComponent(Root); Root->RegisterComponent();
+		auto Check = [&](const TCHAR* Name, const auto& Vertices, UMaterialInterface* Base)
+		{
+			if (!TestNotNull(Name, Base)) return;
+			// Real play wraps the burlap/wood surfaces in dynamic fog instances.
+			auto* Material = UMaterialInstanceDynamic::Create(Base, Actor);
+			UStaticMesh* Mesh = ReferenceMesh(Actor, Vertices, Material);
+			if (!TestNotNull(TEXT("reference runtime mesh builds with a real material"), Mesh)) return;
+			TestTrue(TEXT("render section resolves the named material slot to zero"), HasCampSurfaceSlot(Mesh));
+			if (!HasCampSurfaceSlot(Mesh)) return;
+			const FStaticMeshLODResources& Lod = Mesh->GetRenderData()->LODResources[0];
+			// The fast runtime builder pads its vertex buffer to eight channels. Check the consumed data.
+			TestTrue(TEXT("source UV0 and colour scale UV3 are available"), Lod.GetNumTexCoords() >= 4);
+			bool bSourceUVs = Lod.GetNumVertices() > 0, bColourScale = true;
+			for (uint32 I = 0; I < Lod.GetNumVertices(); I++)
+			{
+				const FVector3f Position = Lod.VertexBuffers.PositionVertexBuffer.VertexPosition(I);
+				const FVector2f UV = Lod.VertexBuffers.StaticMeshVertexBuffer.GetVertexUV(I, 0);
+				bool bMatchesSource = false;
+				for (const auto& Source : Vertices)
+					if (Position.Equals(FVector3f(Source[0], Source[1], Source[2]), 0.001f) &&
+						UV.Equals(FVector2f(Source[6], Source[7]), 0.001f)) { bMatchesSource = true; break; }
+				bSourceUVs &= bMatchesSource;
+				bColourScale &= Lod.VertexBuffers.StaticMeshVertexBuffer.GetVertexUV(I, 3).Equals(FVector2f(1, 0), 0.001f);
+			}
+			TestTrue(TEXT("every rendered UV0 matches an original vertex"), bSourceUVs);
+			TestTrue(TEXT("every rendered UV3 retains the source colour scale"), bColourScale);
+			auto* Component = InstanceComponent(Actor, Mesh, { Material });
+			Add(Component, FTransform::Identity);
+			UMaterialInterface* Resolved = Component->GetMaterial(Lod.Sections[0].MaterialIndex);
+			TestTrue(TEXT("actual section consumes the requested dynamic material"), Resolved == Material);
+			TestTrue(TEXT("resolved camp material supports instanced static meshes"), Resolved && Resolved->CheckMaterialUsage_Concurrent(MATUSAGE_InstancedStaticMeshes));
+			TestTrue(TEXT("grey default material is never substituted"), Resolved != UMaterial::GetDefaultMaterial(MD_Surface));
+			TestEqual(TEXT("reference instance tint custom data survives"), Component->PerInstanceSMCustomData.Num(), 6);
+		};
+		Check(TEXT("source burlap surface"), BagVertices, Surface(TEXT("burlap")));
+		Check(TEXT("source wood surface"), NodeVertices, Surface(TEXT("wood")));
+		Check(TEXT("source HQ cloth"), FlagVertices, LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Effects/Materials/M_TCHQCloth.M_TCHQCloth")));
+	}
+	World->DestroyWorld(false);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCCampMeshShadowsTest, "ThreeCrossroads.Markers.CampMeshShadows", (EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext) | EAutomationTestFlags::EngineFilter)
+bool FTCCampMeshShadowsTest::RunTest(const FString&)
+{
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, TEXT("TCCampMeshShadows"));
+	if (!TestNotNull(TEXT("camp shadow fixture world"), World)) return false;
+	AActor* Actor = World->SpawnActor<AActor>();
+	if (TestNotNull(TEXT("camp shadow fixture actor"), Actor))
+	{
+		auto* Root = NewObject<USceneComponent>(Actor);
+		Actor->SetRootComponent(Root); Actor->AddInstanceComponent(Root); Root->RegisterComponent();
+		auto Check = [&](const auto& Vertices, UMaterialInterface* Material)
+		{
+			if (!TestNotNull(TEXT("original mesh material"), Material)) return;
+			UStaticMesh* Mesh = ReferenceMesh(Actor, Vertices, Material);
+			if (!TestNotNull(TEXT("reference shadow mesh"), Mesh)) return;
+			auto* Visible = InstanceComponent(Actor, Mesh, { Material });
+			auto* Caster = CastWithoutReceiving(Actor, Visible, true);
+			TestFalse(TEXT("visible source mesh does not receive scenery-channel shadows"), Visible->LightingChannels.bChannel0);
+			TestTrue(TEXT("visible source mesh uses the unshadowed unit sun"), Visible->LightingChannels.bChannel1);
+			TestFalse(TEXT("visible mesh delegates ground casting to its twin"), Visible->CastShadow);
+			if (TestNotNull(TEXT("mesh() casts its shadow through a hidden twin"), Caster))
+			{
+				const FTransform At(FVector(1100, 4300, 65));
+				Add(Visible, At); Add(Caster, At);
+				TestTrue(TEXT("twin casts onto scenery"), Caster->CastShadow && Caster->bCastHiddenShadow && Caster->LightingChannels.bChannel0);
+				TestTrue(TEXT("twin never draws a second mesh"), Caster->bHiddenInGame && !Caster->IsVisible());
+				TestTrue(TEXT("twin uses the original material and geometry"), Caster->GetMaterial(0) == Material && Caster->GetStaticMesh() == Mesh);
+				FTransform ShownAt, ShadowAt;
+				Visible->GetInstanceTransform(0, ShownAt, true); Caster->GetInstanceTransform(0, ShadowAt, true);
+				TestTrue(TEXT("ground caster has exactly the displayed source pose"), ShownAt.Equals(ShadowAt));
+			}
+			auto* SingleSun = InstanceComponent(Actor, Mesh, { Material });
+			TestNull(TEXT("single-sun fixtures do not need a duplicate caster"), CastWithoutReceiving(Actor, SingleSun, false));
+			TestTrue(TEXT("single-sun mesh still casts the source shadow"), SingleSun->CastShadow);
+		};
+		Check(FlagVertices, LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Effects/Materials/M_TCHQCloth.M_TCHQCloth")));
+		Check(NodeVertices, Surface(TEXT("wood")));
+	}
+	World->DestroyWorld(false);
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCMarkerDepthTest, "ThreeCrossroads.Markers.DepthPolicy", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FTCMarkerDepthTest::RunTest(const FString&)
 {
