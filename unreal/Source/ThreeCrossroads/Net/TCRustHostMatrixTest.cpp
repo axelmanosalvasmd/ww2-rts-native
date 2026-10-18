@@ -61,16 +61,18 @@ bool FTCRustHostMatrixTest::RunTest(const FString&)
 	using namespace TCRustHostMatrixTest;
 	FTCLobbySettings L; FTCMatchOptions Options;
 	const auto Base = Lobby();
+	const FString ProfileRefusal = FTCConnection::RequiredRustProfileRefusal();
 	TestTrue(TEXT("valid lobby accepted"), L.ApplyLobby(*Base));
-	TestTrue(TEXT("R1 starts"), L.StartAllowed()); TestEqual(TEXT("no refusal"), L.StartLine(), FString());
+	TestFalse(TEXT("valid roster alone cannot qualify R1"), L.StartAllowed());
+	TestEqual(TEXT("required profile remains unverified"), L.StartLine(), ProfileRefusal);
 	Options.ApplyLobby(*Base);
-	TestEqual(TEXT("097 fixed line"), Options.LogisticsLine(), FString(TEXT("Logistics: off (temporary)")));
+	TestEqual(TEXT("required logistics is not an observed host option"), Options.LogisticsLine(), FString(TEXT("R1 requires logistics off; host unverified.")));
 	TestFalse(TEXT("Sandbox on refused"), Options.PlanSandbox(true).Message.IsValid());
 	TestFalse(TEXT("Sandbox off fixed control"), Options.Control(ETCMatchOption::Sandbox).bEditable);
 	for (const FString& Weather : FTCMatchOptions::WeatherChoices())
 	{
 		const auto O = Lobby(); O->SetStringField(TEXT("weather"), Weather); L.ApplyLobby(*O);
-		TestTrue(TEXT("all existing weather choices admitted"), L.StartAllowed());
+		TestEqual(TEXT("existing weather choice cannot qualify the private profile"), L.RustStartRefusal(), ProfileRefusal);
 		Options.ApplyLobby(*O); TestTrue(TEXT("weather remains editable"), Options.Control(ETCMatchOption::Weather).bEditable);
 	}
 	// Full committed public map catalogue at d2911267. A lobby-advertised custom map is still refused.
@@ -80,7 +82,8 @@ TEXT("ardennes-crossing"), TEXT("bastogne"), TEXT("bocage"), TEXT("crater-field"
 	{
 		const auto O = Lobby(); O->SetStringField(TEXT("mapName"), Map);
 		O->SetArrayField(TEXT("maps"), { MakeShared<FJsonValueString>(Map) });
-		L.ApplyLobby(*O); TestTrue(*Map, L.StartAllowed());
+		L.ApplyLobby(*O); TestFalse(*Map, L.StartAllowed());
+		TestEqual(TEXT("public map passes roster checks but profile is unverified"), L.RustStartRefusal(), ProfileRefusal);
 	}
 	auto Refused = [&](const TCHAR* Expected, TFunction<void(FJsonObject&)> Change)
 	{
@@ -122,9 +125,9 @@ TEXT("ardennes-crossing"), TEXT("bastogne"), TEXT("bocage"), TEXT("crater-field"
 	Refused(TEXT("Waiting for the host to start..."), [](FJsonObject& O) { O.SetNumberField(TEXT("you"), 1); });
 	Refused(TEXT("Rust host: exactly 2 human commanders required."), [](FJsonObject& O) { O.SetArrayField(TEXT("players"), {}); });
 	const auto Swapped = Lobby(); Swapped->GetArrayField(TEXT("players"))[0]->AsObject()->SetNumberField(TEXT("team"), 1); Swapped->GetArrayField(TEXT("players"))[1]->AsObject()->SetNumberField(TEXT("team"), 0);
-	L.ApplyLobby(*Swapped); TestTrue(TEXT("one commander per team in either seat order"), L.StartAllowed());
+	L.ApplyLobby(*Swapped); TestEqual(TEXT("either seat order passes roster checks, profile still unverified"), L.RustStartRefusal(), ProfileRefusal);
 	const auto Offline = Lobby(); Offline->GetArrayField(TEXT("players"))[1]->AsObject()->SetBoolField(TEXT("connected"), false);
-	L.ApplyLobby(*Offline); TestTrue(TEXT("097 offline seat does not block start"), L.StartAllowed());
+	L.ApplyLobby(*Offline); TestEqual(TEXT("097 offline seat adds no readiness refusal"), L.RustStartRefusal(), ProfileRefusal);
 	L.ApplyLobby(*Base);
 	for (const TPair<FString, FString>& Pair : TArray<TPair<FString, FString>>{
 		{ TEXT("addAi"), TEXT("Rust host: no AI commanders.") }, { TEXT("handAi"), TEXT("Rust host: no AI commanders.") }, { TEXT("spectate"), TEXT("Rust host: no spectators.") }, { TEXT("fps"), TEXT("Rust host: no operatives.") } })
@@ -133,7 +136,11 @@ TEXT("ardennes-crossing"), TEXT("bastogne"), TEXT("bocage"), TEXT("crater-field"
 		TestEqual(TEXT("raw command refusal matches UI"), L.RustCommandRefusal(*C), Pair.Value);
 	}
 	const auto Start = MakeShared<FJsonObject>(); Start->SetStringField(TEXT("t"), TEXT("start"));
-	TestEqual(TEXT("admitted start command passes"), L.RustCommandRefusal(*Start), FString());
+	TestEqual(TEXT("unverified start command refused"), L.RustCommandRefusal(*Start), ProfileRefusal);
+	Start->SetStringField(TEXT("t"), TEXT("restart"));
+	TestEqual(TEXT("unverified healthy restart refused"), L.RustCommandRefusal(*Start), ProfileRefusal);
+	Start->SetStringField(TEXT("t"), TEXT("loadSave"));
+	TestEqual(TEXT("load cannot bypass the profile gate"), L.RustCommandRefusal(*Start), ProfileRefusal);
 	const auto Play = Lobby(); Play->SetStringField(TEXT("state"), TEXT("play")); L.ApplyLobby(*Play);
 	Start->SetStringField(TEXT("t"), TEXT("sit")); TestEqual(TEXT("late seat refused"), L.RustCommandRefusal(*Start), L.StartLine());
 	L.ApplyLobby(*Base);

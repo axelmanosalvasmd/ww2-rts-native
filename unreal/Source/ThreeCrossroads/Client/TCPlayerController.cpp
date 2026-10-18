@@ -733,7 +733,7 @@ bool ATCPlayerController::HandleHudPress(bool bLeft, bool bRight, FVector2D Mous
 	FTCUiCommand Command;
 	if (bLeft && Hud->CommandAt(Mouse, Command))
 	{
-		RunCommand(Command, IsInputKeyDown(EKeys::LeftShift) || IsInputKeyDown(EKeys::RightShift));
+		RunCommand(Command, Command.Action != ETCUiAction::Recruit && (IsInputKeyDown(EKeys::LeftShift) || IsInputKeyDown(EKeys::RightShift)));
 		return true;
 	}
 	// client/hud.js drawOrders: a right click on an ability button switches its autocast (oncontextmenu)
@@ -745,7 +745,7 @@ bool ATCPlayerController::HandleHudPress(bool bLeft, bool bRight, FVector2D Mous
 		return true;
 	}
 	// a right click on a lobby setting's button steps back (the browser's select lists every choice; this HUD cycles)
-	if (bRight && Hud->CommandAt(Mouse, Command) && (Command.Action == ETCUiAction::LobbySetting || Command.Action == ETCUiAction::MatchControl || Command.Action == ETCUiAction::Volume || Command.Action == ETCUiAction::UiScale || (Command.Action == ETCUiAction::MatchOption && Command.Unit == LexToString(ETCMatchOption::Weather))))
+	if (bRight && Hud->CommandAt(Mouse, Command) && FTCHudFit::RightStepsBack(Command, Mode() && Mode()->State.bHasMatch))
 	{
 		Command.Job = -1;
 		RunCommand(Command);
@@ -1081,6 +1081,9 @@ bool ATCPlayerController::RunAbilityPlan(const FTCAbilityPlan& Plan)
 		if (!Plan.Note.IsEmpty()) NoteOrder(false, FString::Printf(TEXT("%s: %s%s"), *Name, *Plan.Note, Plan.bNative ? TEXT(" (this client's own check)") : TEXT("")));
 		return false;
 	}
+	// autocast.js toggle stores the choice before send, even when the command is refused or disconnected.
+	if (Plan.Kind == ETCAbilityCommand::Autocast)
+		if (ATCGameMode* M = Mode()) FTCSettingsStore::Game().Set(FTCAbilities::AutocastStorageKey(), M->Abilities.Autocast.Save());
 	if (!Plan.PredictedDeny.IsEmpty()) UE_LOG(LogTC, Log, TEXT("%s: the server is expected to answer '%s' (client prediction only; sent as the browser sends it)"), *Name, *Plan.PredictedDeny);
 	const FString What = Plan.Kind == ETCAbilityCommand::Autocast ? FString::Printf(TEXT("Autocast %s %s"), *Name, Plan.bAutocastOn ? TEXT("on") : TEXT("off"))
 		: Plan.Kind == ETCAbilityCommand::Throw ? FString::Printf(TEXT("%s thrown"), *Name) : Name;
@@ -2333,7 +2336,7 @@ bool ATCPlayerController::RunCommand(const FTCUiCommand& Command, bool bShift)
 			if (!Arm.Check.bOk) NoteOrder(false, FString::Printf(TEXT("%s: %s%s"), *Command.Describe(), Arm.Feedback.IsEmpty() ? *Arm.Check.Reason : *Arm.Feedback, Arm.Check.bNative ? TEXT(" (this client's own check)") : TEXT("")));
 			return false;
 		}
-		bBuildMenuOpen = bTrenchMenuOpen = false;
+		// hud.js data-a dispatch keeps the selected Build/Trench submenu open.
 		if (!SetAim(ETCAim::Field, FieldAim.Hint)) { FieldAim.Cancel(); return false; }
 		return true;
 	}
@@ -2564,13 +2567,14 @@ bool ATCPlayerController::RunCommand(const FTCUiCommand& Command, bool bShift)
 	}
 	case ETCUiAction::RecruitGroup:
 		// client/hud.js: a group tab shows its cards and hides the others; a second click closes it
-		RecruitGroupOpen = RecruitGroupOpen == Command.Group ? -1 : Command.Group;
+		if (ATCHUD* H = Cast<ATCHUD>(GetHUD())) H->ToggleRecruitGroup(Command.Group);
+		else RecruitGroupOpen = RecruitGroupOpen == Command.Group ? -1 : Command.Group;
 		return true;
 	case ETCUiAction::Recruit:
 	case ETCUiAction::CancelJob:
 	{
 		if (!S.bHasMatch) { NoteOrder(false, TEXT("Recruit: no match")); return false; }
-		const FTCRecruitment& R = M->Recruit;
+		FTCRecruitment& R = M->Recruit;
 		FTCBuyResult Res;
 		FString What;
 		if (Action == ETCUiAction::Recruit)
@@ -2589,6 +2593,7 @@ bool ATCPlayerController::RunCommand(const FTCUiCommand& Command, bool bShift)
 			What = FString::Printf(TEXT("Cancel queued recruit (job %d)"), Command.Job);
 			Res = R.CancelProduction(S, Command.Building, Command.Job);
 		}
+		if (Res.bPending) return true; // source disabled slot: no duplicate wire or local refusal
 		// refused by the browser's availability check: its sentence, and nothing is sent (client/hud.js attempt)
 		if (!Res.Check.bOk) { NoteOrder(false, FString::Printf(TEXT("%s: %s%s"), *What, *Res.Check.Reason, Res.Check.bNative ? TEXT(" (this client's own check)") : TEXT(""))); Feedback(TEXT("error")); return false; }
 		if (!S.CanOrder()) { NoteOrder(false, FString::Printf(TEXT("%s not sent: %s"), *What, WhyNoOrders(S))); return false; }
@@ -2605,6 +2610,7 @@ bool ATCPlayerController::RunCommand(const FTCUiCommand& Command, bool bShift)
 			NoteOrder(false, FString::Printf(TEXT("%s: %d of %d sent, then %s"), *What, Sent, Res.Messages.Num(), *M->LastSendProblem()));
 			return Sent > 0;
 		}
+		if (Action == ETCUiAction::CancelJob && Sent > 0) R.NoteCancelSent(Command.Building, Command.Job);
 		// sent is not accepted: a refusal comes back as a deny, shown in the browser's words
 		NoteOrder(true, FString::Printf(TEXT("%s sent%s: '%s' message%s"), *What, Sent > 1 ? *FString::Printf(TEXT(" x%d"), Sent) : TEXT(""), *Wire, Sent > 1 ? TEXT("s") : TEXT("")));
 		if (Action == ETCUiAction::Recruit) Feedback(TEXT("recruit")); // client/hud.js buy: ctx.act('blip', 'recruit') after the sends

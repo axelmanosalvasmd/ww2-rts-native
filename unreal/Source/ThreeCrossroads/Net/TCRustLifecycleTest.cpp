@@ -4,6 +4,8 @@
 #include "Net/TCConnection.h"
 #include "Client/TCPersistence.h"
 #include "Client/TCKeys.h"
+#include "Client/TCAbilities.h"
+#include "Client/TCAudio.h"
 #include "Misc/Paths.h"
 #include "HAL/FileManager.h"
 #include "Misc/FileHelper.h"
@@ -69,9 +71,9 @@ bool FTCSessionPreferencesTest::RunTest(const FString&)
 	const TMap<FString,FString> Values = {
 		{TEXT("ww2-name"),TEXT("Fern Álvarez")}, {TEXT("ww2-edge"),TEXT("False")}, {TEXT("ww2-pan"),TEXT("2")},
 		{TEXT("ww2-capture"),TEXT("always")}, {TEXT("ww2-volume"),TEXT("0.35")}, {TEXT("ww2-muted"),TEXT("1")},
-		{TEXT("ww2-ui-scale"),TEXT("150")}, {TEXT("ww2-stats"),TEXT("{\"on\":true,\"position\":\"bottom-left\"}")},
+		{TEXT("ww2-ui-scale"),TEXT("150")}, {TEXT("ww2-stats"),TEXT("{\"show\":true,\"stats\":[\"fps\",\"ping\"],\"pos\":\"tr\",\"layout\":\"line\",\"size\":\"s\",\"bg\":\"clear\",\"warn\":false}")},
 		{TEXT("ww2-cover"),TEXT("False")}, {TEXT("ww2-controls-seen"),TEXT("1")}, {TEXT("ww2rts-lang"),TEXT("es")},
-		{TEXT("ww2-autocast"),TEXT("{\"classic:rifle\":false,\"rifle\":true}")}, {TEXT("ww2-gfx"),TEXT("high")},
+		{TEXT("ww2-autocast"),TEXT("{\"classic\":{\"rifle\":false},\"free\":{\"rifle\":true}}")}, {TEXT("ww2-gfx"),TEXT("high")},
 		{TEXT("ww2-gfx-auto"),TEXT("1")}, {TEXT("ww2-gore"),TEXT("off")}
 	};
 	{
@@ -91,6 +93,12 @@ bool FTCSessionPreferencesTest::RunTest(const FString&)
 	TestEqual(TEXT("UI consumed after restart"), FTCSettingsStore::ReadUIScale(Restart.Get(TEXT("ww2-ui-scale"))), 150);
 	TestEqual(TEXT("volume consumed after restart"), FTCSettingsStore::ReadVolume(Restart.Get(TEXT("ww2-volume")), Restart.Get(TEXT("ww2-muted"))), 0.35);
 	TestEqual(TEXT("language consumed after restart"), FTCSettingsStore::ReadLanguage(Restart.Get(TEXT("ww2rts-lang")), TEXT("en")), FString(TEXT("es")));
+	FTCAudioMixer Audio; Audio.InitPreferences(Restart);
+	TestEqual(TEXT("audio startup consumes saved preferences"), Audio.Volume(), 0.35, 1e-12);
+	FTCStatsOverlay Stats; Stats.Load(Restart.Get(TEXT("ww2-stats")));
+	TestTrue(TEXT("source-shaped stats preference is consumed"), Stats.Settings().bShow && !Stats.Settings().bWarn && Stats.Settings().Pos == TEXT("tr") && Stats.Settings().Layout == TEXT("line") && Stats.Settings().Stats == TArray<FString>{ TEXT("fps"), TEXT("ping") });
+	FTCAutocastMemory Autocast; Autocast.Load(Restart.Get(TEXT("ww2-autocast")).Get(FString()));
+	TestTrue(TEXT("source-shaped autocast preferences keep mode buckets apart"), Autocast.Preference(TEXT("rifle"), false) == TOptional<bool>(true) && Autocast.Preference(TEXT("rifle"), true) == TOptional<bool>(false));
 	IFileManager::Get().Delete(*File);
 	return true;
 }

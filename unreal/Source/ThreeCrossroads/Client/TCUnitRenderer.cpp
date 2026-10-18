@@ -20,6 +20,20 @@
 #include "Serialization/JsonWriter.h"
 #include "Misc/FileHelper.h"
 #include "StaticMeshResources.h"
+#include "Client/TCUnitRenderer.Visibility.h"
+
+const TCBodyControl::FControl& TCBodyControl::Get()
+{
+	static const FControl Control = []
+	{
+		FControl Out;
+		FParse::Value(FCommandLine::Get(), TEXT("TCBodyOnlyUnit="), Out.Unit);
+		FParse::Value(FCommandLine::Get(), TEXT("TCBodyOnlySlot="), Out.Slot);
+		if (Out.Unit >= 0) UE_LOG(LogTemp, Log, TEXT("look body control: only unit %d slot %d bodies; source owner/selection rings retained; presentation diagnostic"), Out.Unit, Out.Slot);
+		return Out;
+	}();
+	return Control;
+}
 
 // The engine's basic shapes are 100 cm across (cylinder and cone 100 cm tall, centred; the cone's apex is at +Z).
 
@@ -130,30 +144,32 @@ void ATCUnitRenderer::Draw(const FTCMatchState& State, const FTCUnitTable& Table
 		const float Ground = Terrain ? Terrain->HeightAt(S.X, S.Z) : 0.f;
 		const FQuat Facing(FVector::UpVector, S.Rot);
 		const FVector At = ATCTerrain::ToWorld(S.X, S.Z, Ground);
-		if (Def && Def->bInfantry)
+		const bool bBody = TCBodyControl::Get().Keep(FTCInstanceHistory::PartKey(U.Id, 0));
+		if (bBody && Def && Def->bInfantry)
 		{
 			// the men still standing, in ranks of three across the facing (presentation only)
 			const int32 Alive = U.Flags & TCFlags::Operative ? 1 : Def->HpPer > 0 ? FMath::Clamp(FMath::DivideAndRoundUp(U.Hp, Def->HpPer), 1, Def->Models) : Def->Models;
 			for (int32 I = 0; I < Alive; I++)
 			{
+				if (!TCBodyControl::Get().Keep(FTCInstanceHistory::ManKey(U.Id, I))) continue;
 				const float Across = ((I % 3) - 1) * 1.3f, Behind = (I / 3) * 1.3f;
 				const FVector Local(-Behind * 100.f, Across * 100.f, 85.f);
 				Frames.FindOrAdd(Batch(U.Owner, Man)).Add(FTransform(Facing, At + Facing.RotateVector(Local), FVector(0.45f, 0.45f, 1.7f)));
 				FrameKeys.FindOrAdd(Batch(U.Owner, Man)).Add(FTCInstanceHistory::ManKey(U.Id, I));
 			}
 		}
-		else if (Def && Def->bAir)
+		else if (bBody && Def && Def->bAir)
 		{
 			FrameKeys.FindOrAdd(Batch(U.Owner, Air)).Add(FTCInstanceHistory::PartKey(U.Id, 0));
 			// +90 degrees about +Y turns the cone's apex from +Z to +X, the heading every other unit faces along
 			Frames.FindOrAdd(Batch(U.Owner, Air)).Add(FTransform(FQuat(FVector::UpVector, S.Rot) * FQuat(FVector::RightVector, PI / 2), At + FVector(0, 0, LiftMetres(Def) * 100.f), FVector(Radius, Radius, Radius * 1.6f)));
 		}
-		else if (Def && Def->bStructure)
+		else if (bBody && Def && Def->bStructure)
 		{
 			FrameKeys.FindOrAdd(Batch(U.Owner, Structure)).Add(FTCInstanceHistory::PartKey(U.Id, 0));
 			Frames.FindOrAdd(Batch(U.Owner, Structure)).Add(FTransform(Facing, At + FVector(0, 0, 200.f * FMath::Max(0.15f, U.Built)), FVector(Radius * 2.f, Radius * 2.f, 4.f * FMath::Max(0.15f, U.Built))));
 		}
-		else
+		else if (bBody)
 		{
 			FrameKeys.FindOrAdd(Batch(U.Owner, Vehicle)).Add(FTCInstanceHistory::PartKey(U.Id, 0));
 			Frames.FindOrAdd(Batch(U.Owner, Vehicle)).Add(FTransform(Facing, At + FVector(0, 0, 110.f), FVector(Radius * 2.f, Radius * 1.3f, 2.2f)));
@@ -227,6 +243,9 @@ FString ATCUnitRenderer::VisibilityAudit(const FTCMatchState& State, const ATCTe
 	TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
 	Root->SetNumberField(TEXT("tick"), State.Tick);
 	Root->SetStringField(TEXT("coordinates"), TEXT("Unreal world centimetres: X=source x, Y=source z, Z=height"));
+	Root->SetStringField(TEXT("evidenceKind"), TEXT("submitted components and pose inputs; no pixel visibility or deformed-body clearance claim"));
+	Root->SetNumberField(TEXT("bodyControlUnit"), TCBodyControl::Get().Unit);
+	Root->SetNumberField(TEXT("bodyControlSlot"), TCBodyControl::Get().Slot);
 	TArray<int32> Ids; State.Units.GetKeys(Ids); Ids.Sort();
 	TArray<TSharedPtr<FJsonValue>> Units;
 	for (int32 Id : Ids)
@@ -237,6 +256,12 @@ FString ATCUnitRenderer::VisibilityAudit(const FTCMatchState& State, const ATCTe
 		Row->SetNumberField(TEXT("owner"), U.Owner); Row->SetNumberField(TEXT("hp"), U.Hp);
 		Row->SetNumberField(TEXT("flags"), U.Flags); Row->SetNumberField(TEXT("x"), U.X); Row->SetNumberField(TEXT("z"), U.Z);
 		Row->SetBoolField(TEXT("drawnPolicy"), IsDrawn(U));
+		Row->SetNumberField(TEXT("cover"), U.Cover); Row->SetNumberField(TEXT("suppression"), U.Supp);
+		if (const FShown* S = Shown.Find(Id))
+		{
+			Row->SetBoolField(TEXT("far"), S->bFar); Row->SetNumberField(TEXT("rotation"), S->Rot);
+			Row->SetNumberField(TEXT("aim"), S->Aim);
+		}
 		TArray<TSharedPtr<FJsonValue>> Instances;
 		auto Append = [&](UInstancedStaticMeshComponent* C, const auto& B, const TCHAR* Path)
 		{
@@ -252,10 +277,32 @@ FString ATCUnitRenderer::VisibilityAudit(const FTCMatchState& State, const ATCTe
 				Instance->SetStringField(TEXT("mesh"), C->GetStaticMesh()->GetPathName());
 				Instance->SetNumberField(TEXT("slot"), (Key >> 4) & 0xffff);
 				Instance->SetNumberField(TEXT("kind"), Key & 15);
+				if (Crowd && FString(Path) == TEXT("crowd") && (Key & 15) == 1)
+				{
+					const int32 Man = (Key >> 4) & 0xffff;
+					if (const auto* Squad = Crowd->Squads.Find(Id); Squad && Squad->Men.IsValidIndex(Man) && Squad->Men[Man].bSet)
+					{
+						const auto& Figure = Squad->Men[Man];
+						Instance->SetStringField(TEXT("figureType"), Figure.FigureType);
+						Instance->SetNumberField(TEXT("figureFaction"), Figure.Faction);
+						Instance->SetNumberField(TEXT("figureSlot"), Figure.Slot);
+					}
+				}
 				Instance->SetNumberField(TEXT("componentInstances"), C->GetInstanceCount());
 				Instance->SetBoolField(TEXT("visible"), C->IsVisible() && !C->bHiddenInGame);
 				Instance->SetArrayField(TEXT("origin"), Vector(Xf.GetLocation()));
+				Instance->SetArrayField(TEXT("scale"), Vector(Xf.GetScale3D()));
+				const FQuat Q = Xf.GetRotation();
+				Instance->SetArrayField(TEXT("quaternion"), {MakeShared<FJsonValueNumber>(Q.X), MakeShared<FJsonValueNumber>(Q.Y), MakeShared<FJsonValueNumber>(Q.Z), MakeShared<FJsonValueNumber>(Q.W)});
+				TArray<TSharedPtr<FJsonValue>> Custom;
+				for (int32 D = 0; D < C->NumCustomDataFloats; D++)
+				{
+					const int32 Offset = I * C->NumCustomDataFloats + D;
+					if (C->PerInstanceSMCustomData.IsValidIndex(Offset)) Custom.Add(MakeShared<FJsonValueNumber>(C->PerInstanceSMCustomData[Offset]));
+				}
+				Instance->SetArrayField(TEXT("submittedCustomData"), Custom);
 				const FBox Bounds = C->GetStaticMesh()->GetBoundingBox().TransformBy(Xf);
+				Instance->SetStringField(TEXT("boundsKind"), TEXT("undeformed static mesh; not the skinned body"));
 				Instance->SetArrayField(TEXT("boundsMin"), Vector(Bounds.Min)); Instance->SetArrayField(TEXT("boundsMax"), Vector(Bounds.Max));
 				if (const FStaticMeshRenderData* Data = C->GetStaticMesh()->GetRenderData(); Data && Data->LODResources.Num())
 				{

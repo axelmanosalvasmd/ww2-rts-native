@@ -1,5 +1,6 @@
 #include "Client/TCPersistence.h"
 #include "Net/TCMatchState.h"
+#include "Net/TCConnection.h"
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
 #include "Misc/DateTime.h"
@@ -376,6 +377,7 @@ bool FTCPersistence::ReadRow(const TSharedPtr<FJsonValue>& Entry, TFunctionRef<F
 
 void FTCPersistence::ApplyLobby(const FJsonObject& M)
 {
+	bRustHost = FTCConnection::HostKindOf(M) == ETCHostKind::Rust;
 	// server.js lobby: role: p.role ?? 'commander'
 	Role = TEXT("commander");
 	M.TryGetStringField(TEXT("role"), Role);
@@ -458,7 +460,7 @@ FTCSaveListView FTCPersistence::SaveList(const FTCMatchState& State) const
 	// $('saves').classList.toggle('hidden', !lobby || !saves.length); host ? Load button : nothing
 	V.bShown = State.RoomState == TEXT("lobby") && SaveRows.Num() > 0;
 	V.Heading = ListHeading();
-	V.bLoadButtons = State.bAmHost;
+	V.bLoadButtons = State.bAmHost && !bRustHost;
 	V.LoadLabel = LoadLabel();
 	V.Rows = SaveRows;
 	return V;
@@ -496,6 +498,7 @@ FTCPersistencePlan FTCPersistence::PlanSave(const FTCMatchState& State) const
 FTCPersistencePlan FTCPersistence::PlanLoad(const FTCMatchState& State, const FString& Id) const
 {
 	FTCPersistencePlan P;
+	if (bRustHost) { P.Note = FTCConnection::RequiredRustProfileRefusal(); return P; }
 	if (State.RoomState != TEXT("lobby") || SaveRows.Num() == 0) { P.Note = TEXT("the saves panel shows only in the lobby, with saves listed"); return P; }
 	if (!State.bAmHost) { P.Note = TEXT("Load buttons are the host's"); return P; }
 	const FTCSaveRow* Row = FindRow(Id);
@@ -717,15 +720,15 @@ TArrayView<const FTCSettingsStore::FEntry> FTCSettingsStore::Entries()
 		{ TEXT("ww2-pan"), TEXT("PanSpeed"), TEXT("client/camera.js panButton"), TEXT("/^[012]$/ else 1") },
 		{ TEXT("ww2-capture"), TEXT("CaptureMode"), TEXT("client/pointer.js"), TEXT("one of MODES else 'fullscreen'") },
 		{ TEXT("ww2-volume"), TEXT("Volume"), TEXT("client/audio.js setVolume"), TEXT("parseFloat clamped to [0, 1]") },
-		{ TEXT("ww2-muted"), TEXT("Muted"), TEXT("client/audio.js (read only: an older key)"), TEXT("'1': start at volume 0 when no volume is saved") },
+		{ TEXT("ww2-muted"), TEXT("Muted"), TEXT("client/audio.js (read only: an older key)"), TEXT("'1': start at volume 0 when saved volume is not finite") },
 		{ TEXT("ww2-ui-scale"), TEXT("UIScale"), TEXT("client/hud.js uiScale onchange"), TEXT("range input 75..150 step 5, default 100") },
-		{ TEXT("ww2-stats"), TEXT("StatsOverlay"), TEXT("client/stats.js (main.js createStats storage)"), TEXT("the overlay switch") },
+		{ TEXT("ww2-stats"), TEXT("StatsOverlay"), TEXT("client/stats.js (main.js createStats storage)"), TEXT("validated JSON: show, stats, pos, layout, size, bg, warn") },
 		{ TEXT("ww2-cover"), TEXT("CoverPreview"), TEXT("client/cover-preview.js"), TEXT("on unless '0' (stored here as True/False)") },
 		{ TEXT("ww2-controls-seen"), TEXT("ControlsSeen"), TEXT("client/main.js openControls onboarding"), TEXT("'1': the Controls sheet does not open by itself") },
 		{ TEXT("ww2rts-lang"), TEXT("Language"), TEXT("client/i18n.js setLang"), TEXT("'es' or 'en', else the system language") },
-		{ TEXT("ww2-autocast"), TEXT("Autocast"), TEXT("client/abilities.js (TCAbilitiesData::AutocastStorageKey)"), TEXT("JSON of the choices per type") },
+		{ TEXT("ww2-autocast"), TEXT("Autocast"), TEXT("client/autocast.js"), TEXT("JSON choices per type in free and classic buckets") },
 		{ TEXT("ww2-gfx"), TEXT("Graphics"), TEXT("client/gfx.js set"), TEXT("'low' is Low, anything else High") },
-		{ TEXT("ww2-gfx-auto"), TEXT("GraphicsAutoDropped"), TEXT("client/gfx.js watchFps"), TEXT("any value: the automatic drop has happened") },
+		{ TEXT("ww2-gfx-auto"), TEXT("GraphicsAutoDropped"), TEXT("client/gfx.js watchFps"), TEXT("non-empty value: the automatic drop has happened") },
 		{ TEXT("ww2-gore"), TEXT("Gore"), TEXT("client/gfx.js setGore"), TEXT("on unless 'off'") },
 	};
 	return MakeArrayView(Table);

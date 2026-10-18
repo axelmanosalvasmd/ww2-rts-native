@@ -497,8 +497,8 @@ void FTCType::Draw(const FTCPaint& P, UCanvas* Canvas, UFont* Fallback, float Ov
 	{
 		if (I.Kind != ETCPaintKind::Text) { One.Items[0] = I; One.Draw(Canvas, Fallback); continue; }
 		if (I.Text.IsEmpty() || I.Colour.A <= 0.f) continue;
-		// an h2 (the sheet's title) is the browser's default bold, 700; other bold texts are 600
-		const bool bHeading = I.bBold && ((I.Role.EndsWith(TEXT(":title")) && !I.Role.StartsWith(TEXT("bottom:"))) || I.Role == TEXT("boss:name") || I.Role == TEXT("alert:loss-heading") || I.Role == TEXT("alert:loss-detail"));
+		// Source headings and the queue's hover cross use 700. Other bold text uses 600.
+		const bool bHeading = I.bBold && ((I.Role.EndsWith(TEXT(":title")) && !I.Role.StartsWith(TEXT("bottom:"))) || I.Role == TEXT("boss:name") || I.Role == TEXT("alert:loss-heading") || I.Role == TEXT("alert:loss-detail") || I.Role == TEXT("bottom:queue-cancel"));
 		const FTCTypeFace* Face = bHeading ? HeadingFace() : FTCType::Face(I.bBold);
 		FTCType::Pens(*Face,I.Text,I.FontPx,I.Tracking,Pens,bTabular);
 		const float W = Pens.Last();
@@ -508,15 +508,17 @@ void FTCType::Draw(const FTCPaint& P, UCanvas* Canvas, UFont* Fallback, float Ov
 		const float Y = I.Pos.Y + (LineH - GlyphH) / 2;
 		// Slate sizes are points at 96 dpi (a CSS pixel is 0.75 pt); made K times larger and drawn at 1 / K
 		const FSlateFontInfo Info(TypeFont, I.FontPx * 0.75f * K, TypefaceName(bHeading ? HeadingWeight : I.bBold ? BoldWeight : BodyWeight));
+		TArray<FBox2D> Occlusions=P.TextOcclusions;
+		Occlusions.Append(I.TextOcclusions);
 		for (int32 C = 0; C < I.Text.Len(); C++)
 		{
 			if (FChar::IsWhitespace(I.Text[C])) continue;
             if (DrawHudSymbol(I.Text[C],Canvas,FVector2D(X0+Pens[C],Y),I.FontPx,I.Colour)) continue;
 			FSlateFontInfo GlyphInfo=Info;
 			if (!Face->Glyph(I.Text[C]) && SymbolsFace() && SymbolsFace()->Glyph(I.Text[C])) GlyphInfo.TypefaceFontName=TEXT("HudSymbols");
-			if (I.Clip.bIsValid || P.TextOcclusions.Num())
+			if (I.Clip.bIsValid || Occlusions.Num())
 			{
-				ClippedGlyph(Canvas,I.Text[C],GlyphInfo,FVector2D(X0+Pens[C],Y),1.f/K,I.Colour,I.Clip,P.TextOcclusions);
+				ClippedGlyph(Canvas,I.Text[C],GlyphInfo,FVector2D(X0+Pens[C],Y),1.f/K,I.Colour,I.Clip,Occlusions);
 				continue;
 			}
 			FCanvasTextItem T(FVector2D(X0 + Pens[C], Y), FText::FromString(FString::Chr(I.Text[C])), GlyphInfo, I.Colour);

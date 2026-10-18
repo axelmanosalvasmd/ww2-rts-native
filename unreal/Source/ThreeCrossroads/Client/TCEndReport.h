@@ -30,7 +30,7 @@ struct FTCMatchResult;
 // A draw list in UI pixels: what a HUD piece wants on screen, built by a pure layout function (tests read it without a
 // canvas) and painted by FTCPaint::Draw on the HUD's canvas. Hits are the clickable rectangles with a tag the
 // controller understands; Panels are rectangles that must keep a click from reaching the world.
-enum class ETCPaintKind : uint8 { Rect, Gradient, Frame, Line, Text };
+enum class ETCPaintKind : uint8 { Rect, Gradient, Frame, Line, Text, LossShadow };
 enum class ETCPaintAlign : uint8 { Left, Centre, Right };
 
 struct FTCPaintItem
@@ -47,6 +47,7 @@ struct FTCPaintItem
 	ETCPaintAlign Align = ETCPaintAlign::Left;
 	FString Role;                            // what the item is, for tests and logs ('alert:text', 'report:th', ...)
 	FBox2D Clip = FBox2D(ForceInit);           // optional CSS overflow crop, in the item's UI coordinates
+	TArray<FBox2D> TextOcclusions;            // later siblings can cover this text without covering their own labels
 };
 
 struct FTCPaintHit
@@ -69,6 +70,8 @@ public:
 	TArray<FBox2D> TextOcclusions;
 
 	FTCPaintItem& Rect(float X, float Y, float W, float H, const FLinearColor& C, const TCHAR* Role = TEXT(""));
+	// Original alerts.css shadow converted by Tools/compare/export-loss-shadow.mjs, stretched as nine slices.
+	FTCPaintItem& LossShadow(float X, float Y, float W, float H);
 	FTCPaintItem& Gradient(float X, float Y, float W, float H, const FLinearColor& Top, const FLinearColor& Bottom, const TCHAR* Role = TEXT(""));
 	FTCPaintItem& Frame(float X, float Y, float W, float H, const FLinearColor& C, float Thickness = 1.f, const TCHAR* Role = TEXT(""));
 	FTCPaintItem& Line(FVector2D A, FVector2D B, const FLinearColor& C, float Thickness = 1.f, const TCHAR* Role = TEXT(""));

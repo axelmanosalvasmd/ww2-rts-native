@@ -430,8 +430,12 @@ void FTCAtmosphere::SyncGround(const ATCTerrain* Terrain, bool bForce)
 				FProcMeshSection* From = Src->GetProcMeshSection(S);
 				FProcMeshSection* To = S < Dst->GetNumSections() ? Dst->GetProcMeshSection(S) : nullptr;
 				const int32 NV = From ? From->ProcVertexBuffer.Num() : 0;
-				bool bSame = To && To->ProcVertexBuffer.Num() == NV && To->ProcIndexBuffer.Num() == (From ? From->ProcIndexBuffer.Num() : 0);
-				for (int32 K = 0; bSame && K < NV; K++) bSame = To->ProcVertexBuffer[K].Position == From->ProcVertexBuffer[K].Position;
+				// Digging and discovery can change normals or triangle connections while
+				// retaining all vertex positions. Snow and puddles read those normals.
+				bool bSame = From && To && To->ProcVertexBuffer.Num() == NV && To->ProcIndexBuffer == From->ProcIndexBuffer;
+				for (int32 K = 0; bSame && K < NV; K++)
+					bSame = To->ProcVertexBuffer[K].Position == From->ProcVertexBuffer[K].Position
+						&& To->ProcVertexBuffer[K].Normal == From->ProcVertexBuffer[K].Normal;
 				if (!bSame)
 				{
 					if (!From || NV == 0) { if (To) Dst->ClearMeshSection(S); continue; }
@@ -503,9 +507,7 @@ void FTCAtmosphere::Update(float Dt, const FTCMatchState& State, const ATCTerrai
 	}
 	// fade the fall out and the next one in
 	const FString Want = FallFor(WxNow, ShowerRain, MoodRow.Weather);
-	if (!FallNow.IsEmpty() && FallNow != Want) { FallA = FMath::Max(0.f, FallA - Dt / 3.f); if (FallA == 0.f) SwapFall(Want); }
-	else if (FallNow.IsEmpty() && !Want.IsEmpty()) SwapFall(Want);
-	else FallA = FMath::Min(1.f, FallA + Dt / 3.f);
+	if (AdvanceFall(FallA, !FallNow.IsEmpty(), FallNow == Want, !Want.IsEmpty(), Dt)) SwapFall(Want);
 
 	bCoverShown = Cur.Wet + Cur.Sheen + Cur.Mud + Cur.Cover > 0.004f;
 	bCloudsShown = MoodRow.Clouds > 0.f && FTCGraphics::Get().Budget().bCloudShadows; // Low hides the cloud shadows
@@ -1025,6 +1027,46 @@ bool FTCAtmosphereOracleTest::RunTest(const FString& Parameters)
 	for (int32 I = 0; I < 80; I++) View.Update(0.1f, State, Terrain, nullptr, FVector2D(90, 100));
 	TestEqual(TEXT("snow after the turn"), View.FallKind(), FString(TEXT("snow")));
 	TestTrue(TEXT("lying snow eases in"), View.Look().Cover > 0.9f);
+	// Production adapter at the source's exact 3-second boundary, on both tiers.
+	for (const ETCGraphicsLevel Level : { ETCGraphicsLevel::High, ETCGraphicsLevel::Low })
+	{
+		const FTCGraphicsLevelScope LevelScope(Level);
+		State.Weather.Now = TEXT("rain");
+		View.StartMatch(State, TEXT("pegasus-bridge"), Terrain);
+		State.Weather.Now = TEXT("snow");
+		for (int32 I = 0; I < 11; I++) View.Update(.25f, State, Terrain, nullptr, FVector2D(90, 100));
+		TestEqual(TEXT("old rain remains at 2.75 seconds"), View.FallKind(), FString(TEXT("rain")));
+		View.Update(.25f, State, Terrain, nullptr, FVector2D(90, 100));
+		TestEqual(TEXT("snow replaces rain at 3 seconds"), View.FallKind(), FString(TEXT("snow")));
+		TestEqual(TEXT("the replacement begins transparent"), View.FallA, 0.0);
+	}
+	// Source update swaps the whole ground geometry. A position-only native cache
+	// misses a changed normal or index buffer with the same number of vertices.
+	AActor* ProbeActor = Scratch.World->SpawnActor<AActor>(AActor::StaticClass(), FTransform::Identity);
+	if (!TestNotNull(TEXT("weather ground probe actor"), ProbeActor)) return false;
+	UProceduralMeshComponent* Probe = NewObject<UProceduralMeshComponent>(ProbeActor);
+	ProbeActor->SetRootComponent(Probe);
+	ProbeActor->AddInstanceComponent(Probe);
+	Probe->RegisterComponent();
+	const TArray<FVector> ProbeVertices = { FVector(0,0,0), FVector(100,0,0), FVector(0,100,0), FVector(100,100,0) };
+	const TArray<int32> FirstIndices = { 0,2,1, 1,2,3 }, NextIndices = { 0,2,3, 0,3,1 };
+	TArray<FVector> ProbeNormals; ProbeNormals.Init(FVector::UpVector, 4);
+	Probe->CreateMeshSection_LinearColor(0, ProbeVertices, FirstIndices, ProbeNormals, {}, {}, {}, false);
+	View.AddGroundActor(ProbeActor);
+	View.SyncGround(Terrain, true);
+	const TWeakObjectPtr<UProceduralMeshComponent>* MirrorSlot = View.Overlays.Find(TWeakObjectPtr<UProceduralMeshComponent>(Probe));
+	UProceduralMeshComponent* Mirror = MirrorSlot ? MirrorSlot->Get() : nullptr;
+	if (!TestNotNull(TEXT("weather ground probe mirror"), Mirror)) return false;
+	ProbeNormals.Init(FVector(0,.6,.8), 4);
+	Probe->UpdateMeshSection_LinearColor(0, ProbeVertices, ProbeNormals, {}, {}, {});
+	View.SyncGround(Terrain, true);
+	const FProcMeshSection* Mirrored = Mirror->GetProcMeshSection(0);
+	if (!TestNotNull(TEXT("mirrored weather section"), Mirrored)) return false;
+	TestTrue(TEXT("weather snow/puddles consume changed ground normals"), Mirrored->ProcVertexBuffer[0].Normal.Equals(ProbeNormals[0]));
+	Probe->CreateMeshSection_LinearColor(0, ProbeVertices, NextIndices, ProbeNormals, {}, {}, {}, false);
+	View.SyncGround(Terrain, true);
+	Mirrored = Mirror->GetProcMeshSection(0);
+	TestTrue(TEXT("weather overlay follows changed triangle connections"), Mirrored && Mirrored->ProcIndexBuffer == Probe->GetProcMeshSection(0)->ProcIndexBuffer);
 	View.StopMatch();
 	View.Detach();
 	return true;

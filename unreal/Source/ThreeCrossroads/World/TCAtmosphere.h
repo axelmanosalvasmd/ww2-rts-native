@@ -16,6 +16,7 @@
 // the reference's own functions (unreal/Tools/atmosphere). Define TC_ATMOS_CORE_ONLY before including this header for that.
 #pragma once
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <functional>
@@ -268,6 +269,21 @@ namespace TCAtmosCore
 		if (MoodWeather == "dust" && WeatherNow == "clear") return "dust";
 		return "";
 	}
+	// atmosphere.js update: fade the old fall out over three seconds before swapFall.
+	// Keep the accumulator and division in JS number precision. A float accumulator
+	// leaves a positive remainder after twelve 0.25-second steps and swaps a frame late.
+	// True asks the caller to swap to the wanted kind (which resets Alpha to zero).
+	inline bool AdvanceFall(double& Alpha, bool HasFall, bool Matches, bool WantsFall, double Dt)
+	{
+		if (HasFall && !Matches)
+		{
+			Alpha = std::max(0.0, Alpha - Dt / 3.0);
+			return Alpha == 0.0;
+		}
+		if (!HasFall && WantsFall) { Alpha = 0.0; return true; }
+		Alpha = std::min(1.0, Alpha + Dt / 3.0);
+		return false;
+	}
 	// swapFall: the velocity a fall keeps (the wind it started in, at the table's horizontal speed)
 	inline void FallVelocity(const FFall& F, double WindX, double WindZ, double Out[3])
 	{
@@ -459,7 +475,7 @@ private:
 	bool GfxLow = false;
 	int32 MistBuilt = 0, BanksBuilt = 0, FallDrawn = 0, LevelSwitches = 0;
 	FString FallNow;      // the fall drawn now ('' none)
-	float FallA = 0.f;    // how far it has faded in
+	double FallA = 0.0;   // how far it has faded in (atmosphere.js number precision)
 	double FallVel[3] = { 0, 0, 0 };
 	FTCCellFogMap Fog;
 	bool bFogParamsStale = true; // a material made after the fog texture still needs it

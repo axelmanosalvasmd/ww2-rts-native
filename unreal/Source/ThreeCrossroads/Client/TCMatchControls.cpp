@@ -7,6 +7,7 @@
 #include "Math/UnrealMathUtility.h"
 #include "Containers/StringConv.h"
 #include "Misc/AutomationTest.h"
+#include "TimerManager.h"
 
 namespace TCCtlL
 {
@@ -475,6 +476,11 @@ FTCControlButton FTCMatchControls::MenuControl(ETCMatchControl Kind, int32 Slot,
 		B.Label = TEXT("Click again to confirm");
 	if (!B.bShown) B.Why = Kind == ETCMatchControl::Leave ? TEXT("a spectator has no army to hand over") : Kind == ETCMatchControl::HandAi ? TEXT("only the host, in a match, for an offline player") : TEXT("only the host");
 	else if (!Sendable(Type)) { B.bEnabled = false; B.Why = TEXT("an operative sends no match controls"); }
+	else if (bRustHost && Kind == ETCMatchControl::Restart)
+	{
+		B.bEnabled = false;
+		B.Why = FTCConnection::RequiredRustProfileRefusal();
+	}
 	else if (bRustHost && Kind == ETCMatchControl::HandAi)
 	{
 		B.bEnabled = false;
@@ -1232,7 +1238,7 @@ void ATCGameMode::ControlsFrame()
 				PC->PressCommand(Cmd);
 				Did = FString::Printf(TEXT("press %s%s (%s)"), *Key, Slot >= 0 ? *FString::Printf(TEXT(" #%d"), Slot) : TEXT(""), bDrawn ? TEXT("through the hit test") : TEXT("not drawn: straight to the command"));
 			}
-			else if ((St.Action == TEXT("hudhover") || St.Action == TEXT("hudpress") || St.Action == TEXT("hudshift")) && PC)
+			else if ((St.Action == TEXT("hudhover") || St.Action == TEXT("hudpress") || St.Action == TEXT("hudshift") || St.Action == TEXT("hudclick") || St.Action == TEXT("hudshiftclick") || St.Action == TEXT("hudctrlclick") || St.Action == TEXT("hudrightclick")) && PC)
 			{
 				// Verification only: consume command fields from TCHudAudit and require the complete real drawn hit.
 				TArray<FString> Fields; St.Arg.ParseIntoArray(Fields,TEXT("|"),false);
@@ -1246,8 +1252,31 @@ void ATCGameMode::ControlsFrame()
 				else
 				{
 					PC->SetMouseLocation(FMath::RoundToInt(At.X),FMath::RoundToInt(At.Y));
-					const bool Hover=St.Action==TEXT("hudhover"), Ran=Hover || PC->PressCommand(Wanted,St.Action==TEXT("hudshift"));
-					Did=FString::Printf(TEXT("%s %s at drawn hit %.1f,%.1f, handled=%d"),*St.Action,*Wanted.Describe(),At.X,At.Y,Ran);
+					const bool Click=St.Action.EndsWith(TEXT("click"));
+					if (Click)
+					{
+						// Actual engine input polling, held across a player tick. No direct command fallback.
+						const FKey Modifier=St.Action==TEXT("hudshiftclick")?EKeys::LeftShift:St.Action==TEXT("hudctrlclick")?EKeys::LeftControl:FKey();
+						const FKey Mouse=St.Action==TEXT("hudrightclick")?EKeys::RightMouseButton:EKeys::LeftMouseButton;
+						if (Modifier.IsValid()) PC->InjectKey(Modifier,true);
+						PC->InjectKey(Mouse,true);
+						const TWeakObjectPtr<ATCPlayerController> WeakPC(PC);
+						FTimerHandle Release;
+						GetWorld()->GetTimerManager().SetTimer(Release,FTimerDelegate::CreateLambda([WeakPC,Modifier,Mouse]()
+						{
+							if (ATCPlayerController* Controller=WeakPC.Get())
+							{
+								Controller->InjectKey(Mouse,false);
+								if (Modifier.IsValid()) Controller->InjectKey(Modifier,false);
+							}
+						}),.1f,false);
+						Did=FString::Printf(TEXT("%s %s at drawn hit %.1f,%.1f through held engine input; verify the next HUD audit and wire"),*St.Action,*Wanted.Describe(),At.X,At.Y);
+					}
+					else
+					{
+						const bool Hover=St.Action==TEXT("hudhover"), Ran=Hover || PC->PressCommand(Wanted,St.Action==TEXT("hudshift"));
+						Did=FString::Printf(TEXT("%s %s at drawn hit %.1f,%.1f, handled=%d"),*St.Action,*Wanted.Describe(),At.X,At.Y,Ran);
+					}
 				}
 			}
 			else if (St.Action == TEXT("type") && PC && Form.bCharInput && FSlateApplication::IsInitialized())
@@ -1299,6 +1328,11 @@ void ATCGameMode::ControlsFrame()
 				Did = FString::Printf(TEXT("Backspace x%s (field %s: '%s')"), *St.Arg, LexToString(Form.Active), *Form.Buffer);
 			}
 			else if (St.Action == TEXT("key") && PC) { const FKey K(*St.Arg); PC->InjectKey(K, true); PC->InjectKey(K, false); Did = TEXT("key ") + St.Arg; }
+			else if ((St.Action == TEXT("keydown") || St.Action == TEXT("keyup")) && PC)
+			{
+				PC->InjectKey(FKey(*St.Arg),St.Action==TEXT("keydown"));
+				Did=St.Action+TEXT(" ")+St.Arg;
+			}
 			else if (St.Action == TEXT("gate"))
 			{
 				auto Probe = MakeShared<FJsonObject>(); Probe->SetStringField(TEXT("t"), St.Arg);

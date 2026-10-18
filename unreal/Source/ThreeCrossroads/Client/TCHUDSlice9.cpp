@@ -548,6 +548,7 @@ void ATCHUD::DrawHealthBars()
 	ATCGameMode* M = GetWorld()->GetAuthGameMode<ATCGameMode>();
 	ATCPlayerController* PC = Cast<ATCPlayerController>(GetOwningPlayerController());
 	if (!M || !PC || !M->Terrain || !PC->PlayerCameraManager) return;
+	TArray<TCMarkersHud::FUnitBillboard> Billboards;
 	const FVector Right = FRotationMatrix(PC->PlayerCameraManager->GetCameraRotation()).GetUnitAxis(EAxis::Y);
 	for (const auto& Pair : M->State.Units)
 	{
@@ -558,7 +559,7 @@ void ATCHUD::DrawHealthBars()
 		const float Frac = FMath::Max(0.f, (float)U.Hp / D->MaxHp());
 		const bool bSel = PC->Selected.Contains(U.Id);
 		// round 17 (markers): the veterancy stars sit in the bar group and show whether or not the bar does
-		const bool bBar = bSel || PC->HoverEnemy == U.Id || 2.3f * Frac < 2.299f || U.Supp > 0 || bGarr;
+		const bool bBar = TCMarkersCore::HealthBarShown(Frac, U.Supp, bSel, PC->HoverEnemy == U.Id, bGarr);
 		// The reference role badge remains visible when a healthy unit has no bar.
 		FVector2D At(U.X, U.Z);
 		if (M->Units) M->Units->DrawnAt(U.Id, At);
@@ -567,15 +568,16 @@ void ATCHUD::DrawHealthBars()
 		if (C.Z <= 0 || E.Z <= 0 || C.X < 0 || C.Y < 0 || C.X > Canvas->ClipX || C.Y > Canvas->ClipY) continue;
 		const float BadgePxPerM = (float)FVector2D::Distance(FVector2D(C.X, C.Y), FVector2D(E.X, E.Y)) / 1.2f;
 		const float PxPerM = BadgePxPerM; // main.js bars and stars keep their world dimensions
-		const float BgW = 2.4f * PxPerM, BgH = FMath::Max(3.f, 0.42f * PxPerM), BarW = 2.3f * PxPerM;
+		const float BgW = 2.4f * PxPerM, BgH = 0.42f * PxPerM;
 		// round 17: not under the score strip's card (last frame's, screen pixels); the stars alone neither
 		if (bShowHUD && StripCard.bIsValid && StripCard.Intersect(FBox2D(FVector2D(C.X - BgW / 2, C.Y - BgH / 2), FVector2D(C.X + BgW / 2, C.Y + BgH / 2)))) continue;
-		TCMarkersHud::DrawBadge(Canvas, U.Type, U.Owner, FVector2D(C.X, C.Y), BadgePxPerM);
-		TCMarkersHud::DrawCoverShield(Canvas, FVector2D(C.X, C.Y), BadgePxPerM, U.Cover, bGarr, W);
-		if (!bBar) { TCMarkersHud::DrawStars(Canvas, FVector2D(C.X, C.Y), PxPerM, U.Stars); continue; }
-		TCMarkersHud::DrawHealthBar(Canvas, FVector2D(C.X, C.Y), PxPerM, U.Owner, Frac, U.Supp, W);
-		TCMarkersHud::DrawStars(Canvas, FVector2D(C.X, C.Y), PxPerM, U.Stars); // over the bar (renderOrder 4)
+		auto& Billboard = Billboards.AddDefaulted_GetRef();
+		Billboard.Type = U.Type; Billboard.Owner = U.Owner; Billboard.Centre = FVector2D(C.X, C.Y);
+		Billboard.PxPerMetre = PxPerM; Billboard.World = W; Billboard.Health = Frac;
+		Billboard.Suppression = U.Supp; Billboard.Cover = U.Cover; Billboard.Stars = U.Stars;
+		Billboard.bHealthBar = bBar; Billboard.bGarrisoned = bGarr;
 	}
+	TCMarkersHud::DrawUnitBillboards(Canvas, Billboards);
 }
 
 namespace

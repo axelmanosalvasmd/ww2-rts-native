@@ -402,8 +402,8 @@ FTCPaint FTCAlerts::Layout(const FTCAlertViewInput& In, const FTCMeasure& Measur
 				const float A = ShownAlpha(*F.L, Now, &Slide);
 				const int32 First = Out.Items.Num();
 				const bool bHover = Hover(X, Y, W, F.H);
-				// box-shadow: 0 3px 14px rgba(0, 0, 0, 0.4), as three soft layers
-				for (int32 K = 3; K >= 1; K--) Out.Rect(X - 3.f * K, Y + 3 - 3.f * K, W + 6.f * K, F.H + 6.f * K, TCCss::Rgba(0, 0, 0, 0.4f / (K + 2)), TEXT("alert:loss-shadow"));
+				// Use the original CSS raster. Three flat rectangles left abrupt, bright price fragments in card gaps.
+				Out.LossShadow(X,Y,W,F.H);
 				const FLinearColor Edge = bHover ? TCCss::Rgba(214, 178, 94, 0.8f) : TCCss::Hex(0xc66a57);
 				Out.Rect(X, Y, W, F.H, bHover ? TCCss::Rgba(46, 51, 55, 0.94f) : TCCss::Rgba(73, 24, 21, 0.97f), TEXT("alert:loss"));
 				Out.Frame(X, Y, W, F.H, Edge, Border, TEXT("alert:loss-frame"));
@@ -611,11 +611,9 @@ FTCPaint FTCAlerts::Layout(const FTCAlertViewInput& In, const FTCMeasure& Measur
     float Y = Bottom - Total;
     for (const FBlock& Block : Blocks) { Block.Paint(P, Right - Block.W, Y); Y += Block.H + Gap; }
 
-    for (FTCPaintItem& Item : P.Items) if (Item.Role==TEXT("alert:loss-shadow"))
-    {
-        const FVector2D End(FMath::Min(double(In.ViewW),Item.Pos.X+Item.Size.X),FMath::Min(double(In.ViewH),Item.Pos.Y+Item.Size.Y));
-        Item.Pos=FVector2D(FMath::Max(0.0,Item.Pos.X),FMath::Max(0.0,Item.Pos.Y)); Item.Size=End-Item.Pos;
-    }
+    for (FTCPaintItem& Item : P.Items) if (Item.Kind==ETCPaintKind::LossShadow)
+        Item.Clip=FBox2D(FVector2D::ZeroVector,FVector2D(In.ViewW,In.ViewH));
+
 	return P;
 }
 
@@ -1414,6 +1412,9 @@ bool FTCAlertsViewTest::RunTest(const FString&)
 	const FTCPaintItem* Loss = P.Find(TEXT("alert:loss"));
 	const FTCPaintItem* Newest = P.Find(TEXT("alert:text-newest"));
 	const FTCPaintItem* Hist = P.Find(TEXT("alert:history"));
+	const FTCPaintItem* Shadow=P.Find(TEXT("alert:loss-shadow"));
+	TestTrue(TEXT("loss uses the converted source CSS shadow at the unchanged card bounds"),Shadow && Loss && Shadow->Kind==ETCPaintKind::LossShadow && Shadow->Pos.Equals(Loss->Pos) && Shadow->Size.Equals(Loss->Size));
+	TestTrue(TEXT("source shadow clips at the viewport without shortening its blur"),Shadow && Shadow->Clip.bIsValid && Shadow->Clip.Max.Equals(FVector2D(In.ViewW,In.ViewH)));
 	TestTrue(TEXT("stacked: loss, routine, history"), Loss && Newest && Hist && Loss->Pos.Y < Newest->Pos.Y && Newest->Pos.Y < Hist->Pos.Y);
 	TestTrue(TEXT("history bottom = minimap top - 5 - 8"), Hist && FMath::IsNearlyEqual(Hist->Pos.Y + Hist->Size.Y, 528.f - 13.f, 0.01f));
 	TestTrue(TEXT("right edges on the minimap's"), Loss && Hist && FMath::IsNearlyEqual(Loss->Pos.X + Loss->Size.X, 1272.f, 0.01f) && FMath::IsNearlyEqual(Hist->Pos.X + Hist->Size.X, 1272.f, 0.01f));

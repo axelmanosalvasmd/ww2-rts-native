@@ -50,6 +50,8 @@ void ATCGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 	BeganAt = FPlatformTime::Seconds();
+	// autocast.js createAutocast reads the saved free/Classic choices once; match starts reset only fixed ids.
+	Abilities.Autocast.Load(FTCSettingsStore::Game().Get(FTCAbilities::AutocastStorageKey()).Get(FString()));
 	FString Error;
 	if (!UnitTable.Load(Error)) { UE_LOG(LogTC, Error, TEXT("unit table: %s"), *Error); }
 	else UE_LOG(LogTC, Log, TEXT("unit table: %d types from reference %s"), UnitTable.Num(), *UnitTable.Reference);

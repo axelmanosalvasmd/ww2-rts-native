@@ -1,0 +1,37 @@
+[
+  {
+    "delay": 0.3,
+    "action": "hudhover",
+    "target": {
+      "action": "CancelJob",
+      "unit": "",
+      "building": "$producer",
+      "job": "$job"
+    }
+  },
+  {
+    "delay": 0.3,
+    "action": "shot",
+    "arg": "cancel-hover"
+  },
+  {
+    "delay": 0.3,
+    "action": "hudclick",
+    "target": {
+      "action": "CancelJob",
+      "unit": "",
+      "building": "$producer",
+      "job": "$job"
+    }
+  },
+  {
+    "delay": 0.15,
+    "action": "shot",
+    "arg": "cancel-sent"
+  },
+  {
+    "delay": 0.5,
+    "action": "shot",
+    "arg": "refunded-queue"
+  }
+]

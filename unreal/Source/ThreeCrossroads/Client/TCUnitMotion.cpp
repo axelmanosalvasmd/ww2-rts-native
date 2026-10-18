@@ -4,6 +4,7 @@
 // compiles without the engine. The Unreal adapters and the soldier crowd follow it.
 #ifndef TC_UNIT_MOTION_STANDALONE
 #include "Client/TCUnitMotion.h"
+#include "Client/TCUnitRenderer.Visibility.h"
 #include "Client/TCModelLibrary.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
@@ -1323,6 +1324,7 @@ void UTCSoldierCrowd::EndFrame(float Dt, const FVector& Eye, TFunctionRef<double
 		if (bDrawn) { Now.Corpses++; (C.bFar ? Now.FarCorpses : Now.NearCorpses)++; }
 	}
 	// write every component's instances, with last frame's transforms (round 17: motion vectors)
+	for (auto& B : Frame) TCBodyControl::Get().Filter(B.Value);
 	History.ResetCounts();
 	for (UInstancedStaticMeshComponent* Ism : AllBatches)
 	{

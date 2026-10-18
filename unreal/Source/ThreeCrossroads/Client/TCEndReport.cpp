@@ -6,6 +6,10 @@
 #include "Engine/Font.h"
 #include "CanvasItem.h"
 #include "GlobalRenderResources.h"
+#include "ImageUtils.h"
+#include "Engine/Texture2D.h"
+#include "Misc/Base64.h"
+#include "UObject/StrongObjectPtr.h"
 
 // ---------------------------------------------------------------------------------------------------------------------
 // CSS colours and timing curves
@@ -53,6 +57,56 @@ float TCCss::EaseInOut(float T) { return Bezier(T, 0.42f, 0.f, 0.58f, 1.f); }
 // ---------------------------------------------------------------------------------------------------------------------
 // FTCPaint
 
+namespace
+{
+ // BEGIN GENERATED SOURCE LOSS SHADOW e4e579a
+ // alerts.css: 0 3px 14px rgba(0,0,0,.4), radius 2px. Original Chromium raster, transparent fill/border.
+ // PNG sha256: a255b718850f6db0a88a092a538505bfe5d2844f348bda1fa61b23eb2179b8c8
+ const TCHAR* SourceLossShadowPng = TEXT("iVBORw0KGgoAAAANSUhEUgAAAMAAAADACAYAAABS3GwHAAAG20lEQVR4nOzd3W7jNhCGYUoOCrSnvf+r7Ona6gpbouPJkFQ2JCXhex+A0K+VpJlPJGU3uyZA2JoAYQQA0ggApBEASCMAkEYAII0AQBoBgDQCAGkEANIIAKQRAEgjAJBGACCNAEAaAYA0AgBpBADSCACkfaRrWRIUbOkiziw4ih3WKaGYXYRLp3NwX1unc7qYVWzLwWNHvx9Cck1HC3c7+JrhQZhRSEtj3/KFY7inWsG3wjA0BKMLrFTcy8F90TVwL1tjvbUv2u5mZHG1in8p7IuWteviWmp38dqydKx23W8b9Rg0Kv5SAEqBaPUMuK7SXd2vL+n4HKB17m8ZUVCt4veFv7plFAx/XYJwTbXhzJbeQ/Byyy04Z0uDe4LRb4TVij+3tXKMnuBeand+35ZUHu4kc07peBcjA+ALNip6v6wFwl8zVfZhntaY37eXW1/MvlfhOkOGP7veASgNf3zxr259DY7lbXudlOphwHlqE1tf9Hk7F39Kn4dG0bVT6hyGkZPgqAdYg/bjZ/vnZ3smKHn8bH+lXzVog5DS51AMGwo9Uj9HhzyP9B4Ail/TXsz77/3PYH9Lt95/9iTYD3X2MFD8uvbfvb0J78W/pveJct4/xIgARBPXaJz/SH17INyTD0AOwc7OFew53czoAey6H/8TAOw1ED0tyoY9AdqN/D/CoqGPnRPkuQC02VqI5o0pDXziN3IIFK3TA8DLPUCuCft+QK6fYfOBWXfg6H2A3KDN14OfQw7/4j2UPq4QdWk+BNAWFX/0aYCs67BoVAFGQcjr/j0BaLPjfz/ujwq/q9lPgUqTHOg6escfYsZToLweNYZAqH0aOLvVUyCvFQRoO6Xws1l/GCv6wQgAdqXCv9VTIKv2g9ADwGv1AEN7hJl/GnE5uA9aTq2LM/42KEWPkum1MXMO4LcJArKoHqbUx+wegKJHy9QaOfvPoxMInFoDvBEFaQQA0ggApBEASCMAkEYAII0AQBoBgDQCAGkEANIIAKQRAEgjAJBGACCNAEAaAYA0AgBpBADSCACkEQBIIwCQRgAgjQBAGgGANAIAaQQA0ggApBEASCMAkEYAII0AQBoBgDQCAGkEANIIAKQRAEgjAJBGACCNAEAaAYA0AgBpBADSCACkEQBIIwCQRgAgjQBAGgGANAIAaQQA0ggApBEASCMAkEYAII0AQBoBgDQCAGkEANIIAKQRAEgjAJBGACCNAEAaAYA0AgBpBADSCACkEQBIIwCQRgAgjQBAGgGANAIAaQQA0ggApBEASCMAkEYAII0AQBoBgDQCAGkEANIIAKQRAEgjAJBGACCNAEAaAYA0AgBpBADSCACkEQBIIwCQRgAgjQBA2kc615ag7tQamB0ACh4tU2tkVgC2YJswIIvqYUp9nDEEovBRMr02ZgZgO7gPWk6tixFPgTa3Hm1viWEQfqnVRLTd1cw5QCkI0Hak8IeZEQB6ANS0eoChRgagVfh7eyWo22ugVB/ZsCCM7gFqIXglegC818L0XmDURyFK4zn7w+7LZ4K6vQZsTdhaGR6EXgHY3DKvR3f8vJ7bHwmq9t+9rYWoVkpB6BKIWR+G80Gw7e9ECBTtv/P9d+/rISr6YZbUz2KWe1vN8mGWe/v4r9n1D3P8YV6zmmvl6/mviXPZYi319E/Xfpj2dOtP8xo/POraA4x+CrSk/7/5vG7H/4tZpvS5p3ik9zAt6T1ouA4/drdFawvaN1/o0UOSWz8FssWdg5Db053ri9+en+/8NgQpEYSzlR54+J6gFQI/DIqu392IANhv2PYAeTsXtX+N/Y+1mvP83Z/iv54jDz9sofu7vz22pc9BGDYvmPU+gB8KvQrn7cs85m/d/Sn+a4keX5bmA75H8MUfXWuIngGwwx27zy9fhdfa4o8mvRT/9X01BFHbglb6Ot82qgewd367/XLnREOfo8VPCK4lutnVQuAD4Y+V5hZd9Q6A7wWib9rOB/I5+XU5BEuKx/1R0ROEc9Xu0NHdPHrDK3rUWeoBugZhxmPQvG7Zx6KrOddOkmvFT9Ff0xasb432qhyLrtvV7Elw6fjOD3dqQx4CcE2lAOSlHxbZZVT8w4Y+2ahCWoLtqKCXYLt0fnRdXFOtJyit1+YQ0XW7GDkJbs0F/Ln2NYz576s1JygtS8dq1/220cW0FLaXg/uia+BetsZ6a1+03c2M4mrdxZcvHMM91Sa0rcnuLecAX/k6v1PwBOOajhbr0Sc8Q4t/N7uQlk7n4L62Tud08UjnodBhTSt668wARAiFhlOKPULBQRr/QAakEQBIIwCQRgAgjQBAGgGANAIAaQQA0ggApBEASCMAkEYAII0AQNq/AAAA//8MmbRHAAAABklEQVQDANXuT58TxQJwAAAAAElFTkSuQmCC");
+ // END GENERATED SOURCE LOSS SHADOW
+
+ UTexture2D* LossShadowTexture()
+ {
+  static TStrongObjectPtr<UTexture2D> Texture;
+  static bool Tried=false;
+  if (!Tried)
+  {
+   Tried=true; TArray<uint8> Bytes;
+   if (FBase64::Decode(SourceLossShadowPng,Bytes)) Texture.Reset(FImageUtils::ImportBufferAsTexture2D(Bytes));
+   if (Texture.IsValid()) { Texture->Filter=TF_Bilinear; Texture->SRGB=false; Texture->UpdateResource(); }
+  }
+  return Texture.Get();
+ }
+ void DrawLossShadow(UCanvas* Canvas,const FTCPaintItem& I)
+ {
+  UTexture2D* Texture=LossShadowTexture();
+  if (!Texture || !Texture->GetResource()) return;
+  // Keep only 8px inside each edge, so even the source's short loss cards have nonoverlapping slices.
+  const float UV[]={0,40.f/192,152.f/192,1};
+  const float X[]={float(I.Pos.X-32),float(I.Pos.X+8),float(I.Pos.X+I.Size.X-8),float(I.Pos.X+I.Size.X+32)};
+  const float Y[]={float(I.Pos.Y-32),float(I.Pos.Y+8),float(I.Pos.Y+I.Size.Y-8),float(I.Pos.Y+I.Size.Y+32)};
+  for (int32 Row=0; Row<3; Row++) for (int32 Col=0; Col<3; Col++)
+  {
+   if (Row==1 && Col==1) continue;
+   const FBox2D Full(FVector2D(X[Col],Y[Row]),FVector2D(X[Col+1],Y[Row+1]));
+   const FBox2D B=I.Clip.bIsValid?Full.Overlap(I.Clip):Full;
+   if (!B.bIsValid || B.GetSize().X<=0 || B.GetSize().Y<=0) continue;
+   const FVector2D Start(UV[Col],UV[Row]), Span(UV[Col+1]-UV[Col],UV[Row+1]-UV[Row]);
+   const FVector2D UV0=Start+(B.Min-Full.Min)/Full.GetSize()*Span;
+   const FVector2D UV1=Start+(B.Max-Full.Min)/Full.GetSize()*Span;
+   FCanvasTileItem Tile(B.Min,Texture->GetResource(),B.GetSize(),UV0,UV1,FLinearColor(1,1,1,I.Colour.A));
+   Tile.BlendMode=SE_BLEND_Translucent; Canvas->DrawItem(Tile);
+  }
+ }
+}
+
+FTCPaintItem& FTCPaint::LossShadow(float X, float Y, float W, float H)
+{
+ FTCPaintItem& I=Items.AddDefaulted_GetRef(); I.Kind=ETCPaintKind::LossShadow;
+ I.Pos=FVector2D(X,Y); I.Size=FVector2D(W,H); I.Colour=FLinearColor::White; I.Role=TEXT("alert:loss-shadow");
+ return I;
+}
+
 FTCPaintItem& FTCPaint::Rect(float X, float Y, float W, float H, const FLinearColor& C, const TCHAR* Role)
 {
 	FTCPaintItem& I = Items.AddDefaulted_GetRef();
@@ -95,6 +149,7 @@ void FTCPaint::Shift(int32 First, FVector2D By)
 	{
 		Items[I].Pos += By;
 		if (Items[I].Clip.bIsValid) Items[I].Clip = FBox2D(Items[I].Clip.Min + By, Items[I].Clip.Max + By);
+		for (FBox2D& Cover : Items[I].TextOcclusions) Cover=FBox2D(Cover.Min+By,Cover.Max+By);
 		if (Items[I].Kind == ETCPaintKind::Line) Items[I].Size += By;
 	}
 }
@@ -198,6 +253,7 @@ void FTCPaint::Draw(UCanvas* Canvas, UFont* Font) const
 			Canvas->DrawItem(T);
 			break;
 		}
+		case ETCPaintKind::LossShadow: DrawLossShadow(Canvas,I); break;
 		case ETCPaintKind::Gradient:
 		{
 			// a vertical linear-gradient, one strip per pixel row

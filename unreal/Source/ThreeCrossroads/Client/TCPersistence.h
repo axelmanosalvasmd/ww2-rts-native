@@ -99,7 +99,7 @@ struct FTCSaveListView
 {
 	bool bShown = false;     // in the lobby (state 'lobby') with at least one row
 	FString Heading;         // "Saved matches"
-	bool bLoadButtons = false; // the host gets a Load button on every row (others see the rows only)
+	bool bLoadButtons = false; // the reference host gets a Load button; an unverified Rust profile keeps rows only
 	FString LoadLabel;       // "Load"
 	TArray<FTCSaveRow> Rows; // newest first, as the server sent them
 };
@@ -239,6 +239,7 @@ public:
 	// A Load click on the row with this id (client/main.js saveList button): { t: 'loadSave', id }. Nothing goes out
 	// when the panel or the button is not drawn (not the lobby, not the host) or no row has the id. Expect is Ignored
 	// when server.js will drop it (an id that fails validSaveId or does not start with this room's code and '-').
+	// Rust load is refused until the required R1 launch profile is verified, like Start and Restart.
 	FTCPersistencePlan PlanLoad(const FTCMatchState& State, const FString& Id) const;
 	// The caller sent the plan's message (bSent: the socket took it). A request that went out becomes Pending.
 	void NoteSent(const FTCPersistencePlan& Plan, bool bSent, double Now);
@@ -255,6 +256,7 @@ private:
 	FString Role, Malformed, SavedId;
 	FTCPersistenceStatus LastRequest;
 	TArray<FTCPersistenceFeedback> Pending;
+	bool bRustHost = false;
 };
 
 // ---------------------------------------------------------------------------------------------------------------------

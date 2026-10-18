@@ -230,8 +230,9 @@ public:
 	// The lobby's weather choice as the browser shows it ('map' when the lobby's value is not one of the choices).
 	FString WeatherChoice() const;
 	bool IsRustHost() const { return bRustHost; }
-	// Owner decision 097: fixed presentation only, never sent as a room option.
-	FString LogisticsLine() const { return bRustHost ? FString(TEXT("Logistics: off (temporary)")) : FString(); }
+	// Owner decision 097 requires logistics off. The lobby does not prove the actual host profile.
+	// Requirement and uncertainty only, never sent as a room option or localized with invented text.
+	FString LogisticsLine() const { return bRustHost ? FString(TEXT("R1 requires logistics off; host unverified.")) : FString(); }
 	bool SandboxOn() const { return bHasLobby && bSandbox; }
 	const TArray<FTCOptionSeat>& Seats() const { return SeatList; }
 	// Requests the lobby has shown since this object was made, for logs.

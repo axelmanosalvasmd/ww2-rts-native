@@ -68,6 +68,7 @@ struct FTCBuyResult
 {
 	FTCRecruitCheck Check;
 	TArray<TSharedRef<FJsonObject>> Messages;
+	bool bPending = false; // drawQueue's disabled waiting slot, until the next HUD snapshot update
 };
 
 // A training job of an own Production Building (snapshot productionJobs).
@@ -114,6 +115,7 @@ struct FTCQueueSlot
 	int32 RefundMp = 0, RefundFuel = 0;
 	FTCRecruitCheck Check; // cancelProduction's availability when Job != 0
 	TSharedPtr<FJsonObject> Cancel; // { t: 'cancelProduction', id, job } when Job != 0
+	bool bPending = false;
 };
 
 enum class ETCCardKind : uint8
@@ -141,6 +143,27 @@ struct FTCCommandCard
 	bool bTraining = false;
 	double Progress = 0;
 	TArray<FTCQueueSlot> Slots;
+};
+
+// client/hud.js setRecruit, recruitBack, pressCard and drawRecruit's facility transition.
+// Kept outside the renderer so mouse, keys and native transition tests use the same state.
+struct THREECROSSROADS_API FTCRecruitNavigation
+{
+	bool bLetters = false;
+	int32 Group = -1;
+	bool bAutoOpened = false;
+	bool bTruckCard = false;
+	FString FacilityKey;
+
+	void SetRecruit(bool bOn, bool bClassic = false);
+	void Back();
+	void ToggleGroup(int32 Index) { Group = Group == Index ? -1 : Index; }
+	void ObserveFacility(const FString& Key, int32 SuggestedGroup);
+	// drawLogistics replaces the DOM card for enabled all-truck selections, then rebuilds it on exit.
+	void ObserveTruckCard(bool bShown);
+	// Index is zero based. A group consumes the key without a buy; a card returns its real purchase.
+	bool PressCard(int32 Index, const FTCCommandCard& Card, TOptional<FTCBuy>& Purchase);
+	int32 LetterCount(const FTCCommandCard& Card) const;
 };
 
 class FTCRecruitment
@@ -191,6 +214,8 @@ public:
 	FTCBuyResult Buy(const FTCMatchState& State, const FTCBuy& Action, bool bMany) const;
 	// client/hud.js cancel of a waiting queued unit (drawQueue): refused with the reason, or the one message.
 	FTCBuyResult CancelProduction(const FTCMatchState& State, int32 BuildingId, int32 Job) const;
+	// Call only after the cancel was sent. The next snapshot re-enables the slot, as hud.js drawQueue does.
+	void NoteCancelSent(int32 BuildingId, int32 Job) { PendingCancels.FindOrAdd(BuildingId).Add(Job); }
 	// The Command Card the browser would draw for this selection, with each card's availability.
 	FTCCommandCard Card(const FTCMatchState& State, const TSet<int32>& Selected) const;
 	// The army against its limit as client/hud.js drawEcon shows it ("pop/cap units"): popTotal of own units on the
@@ -216,6 +241,7 @@ private:
 	TArray<bool> OutSeats;
 	TMap<int32, FTCProductionQueue> Queues;
 	TMap<int32, TArray<FTCProductionJob>> Jobs;
+	TMap<int32, TSet<int32>> PendingCancels;
 	// client/world-state.js row order (a Map: rows keep their place, new ones go last, a full resend restarts it)
 	TArray<int32> RowOrder;
 	TSet<int32> RowIds;

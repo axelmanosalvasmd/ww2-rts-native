@@ -7,6 +7,81 @@
 
 const TCHAR* const FTCRecruitment::ReferencePin = TEXT("e4e579a");
 
+void FTCRecruitNavigation::SetRecruit(bool bOn, bool bClassic)
+{
+	bLetters = bOn && !bClassic;
+	Group = -1;
+}
+
+void FTCRecruitNavigation::Back()
+{
+	if (Group < 0) SetRecruit(false);
+	else Group = -1;
+}
+
+void FTCRecruitNavigation::ObserveFacility(const FString& Key, int32 SuggestedGroup)
+{
+	if (FacilityKey == Key) return;
+	FacilityKey = Key;
+	if (SuggestedGroup >= 0)
+	{
+		SetRecruit(true);
+		Group = SuggestedGroup;
+		bAutoOpened = true;
+	}
+	else if (bAutoOpened)
+	{
+		bAutoOpened = false;
+		SetRecruit(false);
+	}
+}
+
+void FTCRecruitNavigation::ObserveTruckCard(bool bShown)
+{
+	if (bTruckCard == bShown) return;
+	bTruckCard = bShown;
+	SetRecruit(false);
+	FacilityKey.Reset();
+	bAutoOpened = false;
+}
+
+bool FTCRecruitNavigation::PressCard(int32 Index, const FTCCommandCard& Card, TOptional<FTCBuy>& Purchase)
+{
+	Purchase.Reset();
+	if (Index < 0 || Index >= 15) return false;
+	if (Card.Kind == ETCCardKind::Building)
+	{
+		for (const FTCRecruitGroup& G : Card.Groups)
+		{
+			if (G.Cards.IsValidIndex(Index)) { Purchase = G.Cards[Index].Action; return true; }
+			Index -= G.Cards.Num();
+		}
+		return false;
+	}
+	if (!bLetters || Card.Kind != ETCCardKind::Recruit) return false;
+	if (Group < 0)
+	{
+		if (!Card.Groups.IsValidIndex(Index)) return false;
+		Group = Index;
+		return true;
+	}
+	if (!Card.Groups.IsValidIndex(Group) || !Card.Groups[Group].Cards.IsValidIndex(Index)) return false;
+	Purchase = Card.Groups[Group].Cards[Index].Action;
+	return true;
+}
+
+int32 FTCRecruitNavigation::LetterCount(const FTCCommandCard& Card) const
+{
+	if (Card.Kind == ETCCardKind::Building)
+	{
+		int32 Count = 0;
+		for (const FTCRecruitGroup& G : Card.Groups) Count += G.Cards.Num();
+		return FMath::Min(15, Count);
+	}
+	if (!bLetters || Card.Kind != ETCCardKind::Recruit) return 0;
+	return FMath::Min(15, Group < 0 ? Card.Groups.Num() : Card.Groups.IsValidIndex(Group) ? Card.Groups[Group].Cards.Num() : 0);
+}
+
 const TCHAR* LexToString(ETCCardKind Kind)
 {
 	switch (Kind)
@@ -268,7 +343,7 @@ void FTCRecruitment::Clear()
 	SnapMp = 0; SnapFuel.Reset();
 	ModeKind.Reset(); bSuddenDeath = false; ModeSlot.Reset();
 	TechTier.Reset(); ArmyPop.Reset(); WorldCap.Reset(); bWorldRecovery = false;
-	OutSeats.Reset(); Queues.Reset(); Jobs.Reset();
+	OutSeats.Reset(); Queues.Reset(); Jobs.Reset(); PendingCancels.Reset();
 	RowOrder.Reset(); RowIds.Reset();
 }
 
@@ -298,6 +373,7 @@ void FTCRecruitment::ApplyStart(const FJsonObject& M)
 void FTCRecruitment::ApplySnapshot(const FJsonObject& M)
 {
 	if (!bStarted) return;
+	PendingCancels.Reset();
 	bHasSnapshot = true;
 	double D;
 	SnapMp = NumField(M, TEXT("mp"), D) ? D : 0; // snapshotFor always sends mp (Math.floor of the wallet)
@@ -647,6 +723,7 @@ FTCBuyResult FTCRecruitment::CancelProduction(const FTCMatchState& State, int32 
 	FTCBuyResult R;
 	R.Check = CheckCancel(State, BuildingId, Job);
 	if (!R.Check.bOk) return R;
+	if (const TSet<int32>* Pending=PendingCancels.Find(BuildingId); Pending && Pending->Contains(Job)) { R.bPending=true; return R; }
 	TSharedRef<FJsonObject> M = MakeShared<FJsonObject>();
 	M->SetStringField(TEXT("t"), TEXT("cancelProduction"));
 	M->SetNumberField(TEXT("id"), BuildingId);
@@ -772,6 +849,7 @@ FTCCommandCard FTCRecruitment::Card(const FTCMatchState& State, const TSet<int32
 			S.Job = Job->Id; S.RefundMp = Job->Mp; S.RefundFuel = Job->Fuel;
 			const FTCBuyResult Cancel = CancelProduction(State, Bld->Id, Job->Id);
 			S.Check = Cancel.Check;
+			S.bPending = Cancel.bPending;
 			TSharedRef<FJsonObject> M = MakeShared<FJsonObject>();
 			M->SetStringField(TEXT("t"), TEXT("cancelProduction"));
 			M->SetNumberField(TEXT("id"), Bld->Id);
@@ -835,7 +913,7 @@ bool FTCRecruitPurchasesTest::RunTest(const FString&)
  Rifle.From=1; Rifle.bHasFrom=true;
  Snap(TEXT(R"({"mp":500,"mode":{"kind":"classic"},"units":[[1]],"queues":[[1,0,-1,-1]]})"));
  const FTCBuyResult Five=R.Buy(S,Rifle,true),One=R.Buy(S,Rifle,false);
- TestTrue(TEXT("a click buys one and Shift buys five"),Five.Check.bOk && Five.Messages.Num()==5 && One.Messages.Num()==1);
+ TestTrue(TEXT("a click buys one and Shift letter buys five"),Five.Check.bOk && Five.Messages.Num()==5 && One.Messages.Num()==1);
  for (const TSharedRef<FJsonObject>& M : Five.Messages) TestTrue(TEXT("every card purchase names its selected building in the real buy envelope"),M->GetStringField(TEXT("t"))==TEXT("buy") && M->GetStringField(TEXT("unit"))==TEXT("rifle") && M->GetNumberField(TEXT("from"))==1);
  Snap(TEXT(R"({"mp":99,"mode":{"kind":"classic"},"units":[[1]],"queues":[]})"));
  const FTCBuyResult Broke=R.Buy(S,Rifle,true);
@@ -849,14 +927,69 @@ bool FTCRecruitPurchasesTest::RunTest(const FString&)
  TestEqual(TEXT("a selected full building does not redirect to a free producer"),R.CheckBuy(S,Rifle).Reason,FString(TEXT("The training queue is full")));
  const FTCBuyResult Cancel=R.CancelProduction(S,1,12);
  TestTrue(TEXT("a waiting job cancels through the real envelope"),Cancel.Check.bOk && Cancel.Messages.Num()==1 && Cancel.Messages[0]->GetStringField(TEXT("t"))==TEXT("cancelProduction") && Cancel.Messages[0]->GetNumberField(TEXT("id"))==1 && Cancel.Messages[0]->GetNumberField(TEXT("job"))==12);
+ R.NoteCancelSent(1,12);
+ const FTCBuyResult Pending=R.CancelProduction(S,1,12);
+ TestTrue(TEXT("a sent cancel disables that waiting slot until a snapshot, without another wire"),Pending.bPending && Pending.Messages.IsEmpty() && R.Card(S,{1}).Slots[1].bPending);
+ TestEqual(TEXT("sending cancel does not invent the refund locally"),R.Mp(),1000.0);
  TestFalse(TEXT("the active job cannot be refunded"),R.CancelProduction(S,1,11).Check.bOk);
+ Snap(TEXT(R"({"mp":1100,"mode":{"kind":"classic"},"units":[[1]],"queues":[[1,0.5,-1,-1,"rifle"]],"productionJobs":[[1,[{"id":11,"type":"rifle","status":"active","mp":100,"fuel":0}]]]})"));
+ const FTCCommandCard Refunded=R.Card(S,{1});
+ TestTrue(TEXT("the authoritative refund snapshot removes the waiting slot and preserves the active job"),R.Mp()==1100 && Refunded.Slots[0].bTraining && Refunded.Slots[1].Type.IsEmpty() && !Refunded.Slots[1].bPending);
+ TestTrue(TEXT("a stale cancellation cannot send after the queue snapshot"),R.CancelProduction(S,1,12).Messages.IsEmpty());
+ Snap(TEXT(R"({"mp":1100,"mode":{"kind":"classic"},"units":[[1]],"queues":[[1,0,-1,-1]],"productionJobs":[]})"));
+ TestTrue(TEXT("completion restores the idle queue presentation"),!R.Card(S,{1}).bTraining && R.Card(S,{1}).QueueLine==TEXT("Idle: click a unit to train it"));
  Snap(TEXT(R"({"mp":1000,"mode":{"kind":"classic","suddenDeath":true},"units":[[1]],"queues":[]})"));
  TestEqual(TEXT("Sudden Death disables purchases"),R.CheckBuy(S,Rifle).Reason,FString(TEXT("Not during Sudden Death")));
  Snap(TEXT(R"({"mp":1000,"tech":{"tier":1},"mode":{"kind":"conquest"},"units":[[1]],"queues":[]})"));
  FTCBuy Fighter; Fighter.Unit=TEXT("fighter");
  TestEqual(TEXT("aircraft tiers use the source HQ name"),R.CheckBuy(S,Fighter).Reason,FString(TEXT("Needs Battalion HQ")));
+ FTCUnit Airfield; Airfield.Id=5; Airfield.Type=TEXT("airfield"); Airfield.Owner=0; Airfield.Built=1; Airfield.Hp=100; S.Units.Add(5,Airfield);
+ Snap(TEXT(R"({"mp":2000,"fuel":1000,"tech":{"tier":3},"mode":{"kind":"conquest"},"units":[[1],[5]],"queues":[]})"));
+ const FTCBuy CallIn=R.RecruitAction(S,TEXT("fighter"),{5});
+ const FTCBuyResult Aircraft=R.Buy(S,CallIn,false);
+ TestTrue(TEXT("an available aircraft card sends the real selected Airfield purchase"),Aircraft.Check.bOk && Aircraft.Messages.Num()==1 && Aircraft.Messages[0]->GetStringField(TEXT("unit"))==TEXT("fighter") && Aircraft.Messages[0]->GetNumberField(TEXT("from"))==5);
  S.bSpectator=true;
  TestTrue(TEXT("a spectator cannot purchase"),R.Buy(S,Rifle,true).Messages.IsEmpty() && R.CheckBuy(S,Rifle).Reason==TEXT("You are spectating"));
+ return !HasAnyErrors();
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCRecruitNavigationTest, "ThreeCrossroads.Recruitment.Navigation", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)
+bool FTCRecruitNavigationTest::RunTest(const FString&)
+{
+ // Source oracle drives these transitions through the original DOM handlers at EN/ES UI100/UI150.
+ FTCMatchState S; S.bHasMatch=true; S.You=0; S.LobbySeat=0; S.bLobbySinceOpen=true;
+ FTCRecruitment R; R.SetUnitTableReference(FTCRecruitment::ReferencePin);
+ auto Parse=[](const TCHAR* Text) { TSharedPtr<FJsonObject> O; FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text),O); return O; };
+ R.ApplyStart(*Parse(TEXT(R"({"factions":[0,1],"map":{"naval":true}})")));
+ FTCUnit Hq; Hq.Id=1; Hq.Type=TEXT("hq"); Hq.Owner=0; Hq.Hp=500; Hq.Built=1; S.Units.Add(1,Hq);
+ R.ApplySnapshot(*Parse(TEXT(R"({"mp":476,"mode":{"kind":"conquest"},"units":[[1]],"queues":[]})")));
+ FTCRecruitNavigation N; const FTCCommandCard Card=R.Card(S,{1});
+ N.ObserveFacility(TEXT("1:1:1"),Card.SuggestedGroup);
+ TestTrue(TEXT("selecting a finished producer enters letter mode on its group"),N.bLetters && N.Group==Card.SuggestedGroup && N.Group>=0);
+ N.Back(); TestTrue(TEXT("first Esc keeps letter mode and restores group badges"),N.bLetters && N.Group==-1 && N.LetterCount(Card)==Card.Groups.Num());
+ N.Back(); TestFalse(TEXT("second Esc stops recruiting"),N.bLetters);
+ N.SetRecruit(true); TOptional<FTCBuy> Purchase;
+ TestTrue(TEXT("first Q opens Infantry without a wire purchase"),N.PressCard(0,Card,Purchase) && N.Group==0 && !Purchase.IsSet());
+ TestTrue(TEXT("second Q returns the actual selected producer purchase"),N.PressCard(0,Card,Purchase) && Purchase.IsSet() && Purchase->Unit==TEXT("rifle") && Purchase->bHasFrom && Purchase->From==1);
+ if (Purchase.IsSet()) TestEqual(TEXT("Shift letter is limited by the delivered wallet"),R.Buy(S,Purchase.GetValue(),true).Messages.Num(),4);
+ N.SetRecruit(false);
+ TestTrue(TEXT("right click stops and closes the group"),!N.bLetters && N.Group==-1);
+ N.ObserveFacility(TEXT("1:1:1"),Card.SuggestedGroup);
+ TestFalse(TEXT("a snapshot of the same producer does not reopen manual closure"),N.bLetters);
+ N.ObserveFacility(TEXT(""),-1);
+ TestTrue(TEXT("leaving an auto-opened producer clears its navigation"),!N.bLetters && N.Group==-1 && !N.bAutoOpened);
+ N.SetRecruit(true); N.ToggleGroup(1); N.ObserveFacility(TEXT("7:0:1"),-1);
+ TestTrue(TEXT("manual navigation survives a different nonproducer selection"),N.bLetters && N.Group==1);
+ N.ToggleGroup(1); TestEqual(TEXT("clicking the open group closes it"),N.Group,-1);
+ N.ObserveFacility(TEXT("1:1:1"),Card.SuggestedGroup);
+ N.ObserveTruckCard(true);
+ TestTrue(TEXT("the all-truck card clears producer letter navigation"),N.bTruckCard && !N.bLetters && N.FacilityKey.IsEmpty());
+ N.ObserveTruckCard(false); N.ObserveFacility(TEXT("1:1:1"),Card.SuggestedGroup);
+ TestTrue(TEXT("returning from trucks to the same producer rebuilds and auto-opens its group"),!N.bTruckCard && N.bLetters && N.Group==Card.SuggestedGroup);
+ R.ApplySnapshot(*Parse(TEXT(R"({"mp":500,"mode":{"kind":"classic"},"units":[[1]],"queues":[[1,0,-1,-1]]})")));
+ const FTCCommandCard Classic=R.Card(S,{1}); N.SetRecruit(true,true);
+ TestTrue(TEXT("Classic uses direct card letters without recruit mode"),!N.bLetters && N.LetterCount(Classic)==2 && N.PressCard(0,Classic,Purchase) && Purchase.IsSet() && Purchase->Unit==TEXT("rifle"));
+ TestFalse(TEXT("a missing card falls through to the ordinary binding"),N.PressCard(14,Classic,Purchase));
  return !HasAnyErrors();
 }
 

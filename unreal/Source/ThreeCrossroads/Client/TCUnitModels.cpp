@@ -12,6 +12,7 @@
 // Axes as everywhere in this client: reference (x, y, z) metres -> Unreal (x, z, y) * 100; three's rotation.y = a is
 // an Unreal yaw of -a.
 #include "Client/TCUnitRenderer.h"
+#include "Client/TCUnitRenderer.Visibility.h"
 #include "Client/TCUnitTable.h"
 #include "Net/TCMatchState.h"
 #include "World/TCTerrain.h"
@@ -762,6 +763,7 @@ void ATCUnitRenderer::DrawSquadMen(const FTCModelEntry& Entry, const FTCUnit& U,
 
 void ATCUnitRenderer::FlushModelFrame()
 {
+	for (auto& B : Frame) TCBodyControl::Get().Filter(B.Value);
 	TArray<UInstancedStaticMeshComponent*, TInlineAllocator<256>> All;
 	for (const auto& P : PartBatches) if (P.Value) All.Add(P.Value);
 	for (const auto& P : RingBatches) if (P.Value) All.Add(P.Value);

@@ -16,6 +16,7 @@ enum class ETCSendResult : uint8
 	NotOpen,          // no open socket (connecting, retrying or stopped)
 	Unserializable,   // the JSON writer refused the message
 	TooLarge,         // over the server's 16 KB maxPayload in UTF-8 bytes; ws would close the socket
+	ProfileRefused,   // the required Rust R1 launch profile has not been verified
 };
 const TCHAR* LexToString(ETCSendResult Result);
 
@@ -69,10 +70,10 @@ public:
 
 	// Called on the game thread for every JSON message with a string "t". Bytes: the message's length in UTF-8.
 	TFunction<void(const FJsonObject& Message, int32 Bytes)> OnMessage;
-	// Called on the game thread with every text message of the current socket as received, before it is parsed and
-	// before OnMessage for the same text, with nothing in between (the Rust view, TC_DECODER=shadow or rust, feeds it to
+	// Called on the game thread with admitted text from the current socket, before OnMessage for the same text,
+	// with no intervening callback (the Rust view, TC_DECODER=shadow or rust, feeds it to
 	// ww2_view_apply unchanged; under rust FTCMatchState then reads the view's rows for that very message, so this
-	// order is part of the contract, Net/TCRustViewShadow.h).
+	// order is part of the contract, Net/TCRustViewShadow.h). Profile refusal precedes both decoder callbacks.
 	TFunction<void(const FString& Text)> OnText;
 	// Called on the game thread when a new socket opens, just before its hello goes out.
 	TFunction<void(int32 OpenNumber)> OnOpened;
@@ -119,12 +120,22 @@ public:
 	// deny {cmd:'join', reason:'version'} (protocol.md addition 1; only a Rust server sends it): the connection stops
 	// for good instead of retrying with the same hello.
 	static bool IsVersionDeny(const FJsonObject& Message);
+	// Owner R1 is unchanged. No supported exact launch is currently verified. Proto, rules and version are not
+	// profile proof. Keep this refusal until the host-private launch/profile check is resolved with the Rust owner.
+	static const TCHAR* RequiredRustProfileRefusal();
+	static bool RustProfileCommandBlocked(ETCHostKind Kind, const FString& Type);
+	static FString MatchAdmissionRefusal(ETCHostKind Kind, const FString& Type);
 	static bool ValidRoom(const FString& Room);
 	static int32 Utf8Length(const FString& Text);
 	// The initial spectator request is replaced by the server-confirmed role after sit/spectate.
 	static TSharedRef<FJsonObject> Hello(const FSettings& Settings, bool bWatching);
 
 private:
+	// Same receive path for the socket and the deterministic admission test. Never feeds a refused match to a view.
+	void ReceiveText(const FString& Text, uint64 ExpectedGeneration);
+#if WITH_DEV_AUTOMATION_TESTS
+	friend class FTCSessionRustProfileAdmissionTest;
+#endif
 	void Open();
 	void Lost();
 	void Retry(double Seconds, const TCHAR* Why);
@@ -145,5 +156,8 @@ private:
 	ETCHostKind Host = ETCHostKind::Unknown;
 	int32 HostProtoValue = -1;
 	FString HostRulesValue;
+	// server.js lobby() awaits its map list, so a fresh reference reconnect may receive start first.
+	TArray<FString> PendingHostMessages;
+	int64 PendingHostBytes = 0;
 	FTCConnectionNotice Banner;
 };

@@ -922,21 +922,48 @@ void TCMarkersHud::DrawBadge(UCanvas* Canvas, const FString& Type, int32 Owner, 
 	}
 }
 
+namespace
+{
+	void HealthBarLayer(UCanvas* Canvas, const TCMarkersHud::FUnitBillboard& Unit, bool bBackdrop)
+	{
+		if (!Canvas || Unit.PxPerMetre <= 0 || !Unit.bHealthBar) return;
+		auto Rect = [&](const MC::FBarRect& R, FLinearColor Colour)
+		{
+			FCanvasTileItem Tile(Unit.Centre + FVector2D(R.X, R.Y) * Unit.PxPerMetre,
+				FVector2D(R.W, R.H) * Unit.PxPerMetre, TCMarkersHud::WorldColour(Canvas, Colour, Unit.World));
+			Tile.BlendMode = SE_BLEND_Translucent; Canvas->DrawItem(Tile);
+		};
+		if (bBackdrop) { Rect(MC::HealthBackdrop, FLinearColor(FColor(0x11,0x11,0x11))); return; }
+		const FLinearColor Hp = Unit.Health > .5f ? ATCUnitRenderer::SeatColor(Unit.Owner) :
+			FTCMarkerPainter::Colour(MC::HealthHex(Unit.Health, 0), 1);
+		Rect(MC::HealthFill(Unit.Health), Hp);
+		if (Unit.Suppression > 0) Rect(MC::SuppressionFill(Unit.Suppression),
+			FTCMarkerPainter::Colour(MC::SuppressionHex(Unit.Suppression), 1));
+	}
+}
+
 void TCMarkersHud::DrawHealthBar(UCanvas* Canvas, FVector2D Centre, float Scale, int32 Owner, float Fraction, int32 Suppression, const FVector& World)
 {
-	if (!Canvas || Scale <= 0) return;
-	auto Rect = [&](double X, double Y, double W, double H, FLinearColor Colour)
+	FUnitBillboard Unit;
+	Unit.Centre = Centre; Unit.PxPerMetre = Scale; Unit.Owner = Owner; Unit.Health = Fraction;
+	Unit.Suppression = Suppression; Unit.World = World; Unit.bHealthBar = true;
+	HealthBarLayer(Canvas, Unit, true);
+	HealthBarLayer(Canvas, Unit, false);
+}
+
+void TCMarkersHud::DrawUnitBillboards(UCanvas* Canvas, const TArray<FUnitBillboard>& Units)
+{
+	// Three sorts main.js's opaque bars across all units by renderOrder. Drawing a complete group per unit
+	// lets the next black backdrop erase an earlier fill. Keep these passes at the current HUD sort key,
+	// so the later HTML-equivalent HUD panels still cover every world billboard.
+	for (const FUnitBillboard& U : Units) HealthBarLayer(Canvas, U, true);
+	for (const FUnitBillboard& U : Units)
 	{
-		FCanvasTileItem Tile(Centre + FVector2D(X, Y) * Scale, FVector2D(W, H) * Scale, WorldColour(Canvas, Colour, World));
-		Tile.BlendMode = SE_BLEND_Translucent; Canvas->DrawItem(Tile);
-	};
-	// main.js makeUnit and applySnapshot. These are world metres, with no minimum pixel size.
-	Rect(-1.2, -.21, 2.4, .42, FLinearColor(FColor(0x11,0x11,0x11)));
-	const FLinearColor Hp = Fraction > .5f ? ATCUnitRenderer::SeatColor(Owner) : Fraction > .25f ?
-		FLinearColor(FColor(0xe0,0x8a,0x2a)) : FLinearColor(FColor(0xd0,0x2a,0x1a));
-	Rect(-1.15, -.17, 2.3 * FMath::Clamp(Fraction,0.f,1.f), .2, Hp);
-	if (Suppression > 0) Rect(-1.15, .06, 2.3 * FMath::Min(1.f,Suppression / 100.f), .1,
-		Suppression >= 90 ? FLinearColor(FColor(0xff,0x3b,0x2a)) : FLinearColor(FColor(0xff,0xd2,0x3a)));
+		HealthBarLayer(Canvas, U, false);
+		DrawStars(Canvas, U.Centre, U.PxPerMetre, U.Stars);
+	}
+	for (const FUnitBillboard& U : Units) DrawCoverShield(Canvas, U.Centre, U.PxPerMetre, U.Cover, U.bGarrisoned, U.World);
+	for (const FUnitBillboard& U : Units) DrawBadge(Canvas, U.Type, U.Owner, U.Centre, U.PxPerMetre);
 }
 
 void TCMarkersHud::DrawStars(UCanvas* Canvas, FVector2D BarCentre, float PxPerMetre, int32 Stars)
@@ -963,6 +990,11 @@ void TCMarkersHud::DrawStars(UCanvas* Canvas, FVector2D BarCentre, float PxPerMe
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCMarkerBillboardMaterialTest, "ThreeCrossroads.Markers.BillboardMaterial", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FTCMarkerBillboardMaterialTest::RunTest(const FString&)
 {
+	if (GUsingNullRHI)
+	{
+		AddWarning(TEXT("BillboardMaterial requires a rendering RHI; no rendered assertion ran"));
+		return true;
+	}
 	UMaterial* Base = LoadObject<UMaterial>(nullptr, TEXT("/Game/Markers/M_TCMarkerBillboard.M_TCMarkerBillboard"));
 	if (!TestNotNull(TEXT("generated source badge fog material"), Base)) return false;
 	TestTrue(TEXT("badge draws after world tone mapping in the UI domain"), Base->MaterialDomain == MD_UI);

@@ -174,7 +174,8 @@ public:
 	FString StartLabel() const;
 	bool StartAllowed() const;
 	FString StartLine() const;
-	// Owner decisions 090 R1 and 097. Empty only for the admitted trusted matrix. No readiness requirement.
+	// Owner decisions 090 R1 and 097. Checks the roster, then refuses the unverified required host profile.
+	// No new readiness requirement and no inference from proto/rules/version.
 	FString RustStartRefusal() const;
 	// Shared guard for button and unattended send paths. Reference returns empty for every message.
 	FString RustCommandRefusal(const FJsonObject& Message) const;

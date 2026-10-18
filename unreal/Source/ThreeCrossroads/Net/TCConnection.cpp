@@ -19,6 +19,7 @@ const TCHAR* LexToString(ETCSendResult Result)
 	case ETCSendResult::NotOpen: return TEXT("not sent: socket not open");
 	case ETCSendResult::Unserializable: return TEXT("not sent: could not write the JSON");
 	case ETCSendResult::TooLarge: return TEXT("not sent: over the server's 16 KB message limit");
+	case ETCSendResult::ProfileRefused: return FTCConnection::RequiredRustProfileRefusal();
 	}
 	return TEXT("not sent");
 }
@@ -47,6 +48,24 @@ ETCHostKind FTCConnection::HostKindOf(const FJsonObject& Message, int32* OutProt
 	double Number = 0.0;
 	if (OutProto && Proto->Type == EJson::Number && Proto->TryGetNumber(Number) && FMath::IsFinite(Number) && Number == FMath::FloorToDouble(Number) && FMath::Abs(Number) < 1e9) *OutProto = (int32)Number;
 	return ETCHostKind::Rust;
+}
+
+const TCHAR* FTCConnection::RequiredRustProfileRefusal()
+{
+	return TEXT("Rust host: required R1 profile unverified. Start, Restart and Load are disabled.");
+}
+
+bool FTCConnection::RustProfileCommandBlocked(ETCHostKind Kind, const FString& Type)
+{
+	return Kind == ETCHostKind::Rust && (Type == TEXT("start") || Type == TEXT("restart") || Type == TEXT("loadSave"));
+}
+
+FString FTCConnection::MatchAdmissionRefusal(ETCHostKind Kind, const FString& Type)
+{
+	if (Type != TEXT("start") && Type != TEXT("s")) return FString();
+	if (Kind == ETCHostKind::Rust) return RequiredRustProfileRefusal();
+	if (Kind == ETCHostKind::Unknown) return TEXT("Match refused: waiting for the host's lobby.");
+	return FString();
 }
 
 FTCConnection::FTCConnection(const FSettings& InSettings) : Settings(InSettings), bWatching(InSettings.bSpectate) {}
@@ -129,6 +148,7 @@ void FTCConnection::Stop()
 void FTCConnection::Retire(bool bClose)
 {
 	Generation++;
+	PendingHostMessages.Reset(); PendingHostBytes = 0;
 	if (!Socket.IsValid()) return;
 	// This may run inside the socket's own callback: keep it alive until the next Tick, and leave its delegates bound
 	// (the generation check above already ignores them). Unbinding a delegate mid-broadcast frees the running lambda.
@@ -188,50 +208,101 @@ void FTCConnection::Open()
 	Current->OnMessage().AddLambda([Weak, Gen](const FString& Text)
 	{
 		TSharedPtr<FTCConnection> Self = Weak.Pin();
-		if (!Self || Gen != Self->Generation || !Self->bRunning) return;
-		// First the raw text (the Rust view applies it), then, for the same text, OnMessage below (TCConnection.h OnText).
-		if (Self->OnText) Self->OnText(Text);
-		if (Gen != Self->Generation || !Self->bRunning) return; // OnText stopped or restarted us
-		TSharedPtr<FJsonObject> Message;
-		TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Text);
-		FString Type;
-		if (!FJsonSerializer::Deserialize(Reader, Message) || !Message.IsValid() || !Message->TryGetStringField(TEXT("t"), Type)) return;
-		Self->Banner.Receive(*Message);
-		if (Type == TEXT("replaced"))
-		{
-			// Another client took this seat with the same token: stop for good (connection.js)
-			Self->bRunning = false; Self->RetryAt = -1.0; Self->Retire();
-			Self->StatusText = TEXT("replaced by another client with this token");
-		}
-		else if (Type == TEXT("left"))
-		{
-			// This seat went to an AI (server.js leave, handToAi clears the token): reconnecting would only come back
-			// as a spectator, so stop like the browser does (client/main.js on left)
-			Self->bRunning = false; Self->RetryAt = -1.0; Self->Retire();
-			Self->StatusText = TEXT("left the match: an AI took over this army");
-		}
-		else if (Type == TEXT("deny") && Self->IsVersionDeny(*Message))
-		{
-			// protocol.md addition 1: a Rust server that does not speak this proto answers deny {cmd:'join',
-			// reason:'version'} and closes with 1008; retrying cannot help. The reference never sends 'version'.
-			Self->bRunning = false; Self->RetryAt = -1.0; Self->Retire();
-			Self->StatusText = TEXT("the server does not speak this client's protocol version");
-			UE_LOG(LogTC, Warning, TEXT("%s (hello proto %d): stopped"), *Self->StatusText, FTCConnection::ProtocolVersion);
-		}
-		else if (Type == TEXT("full"))
-		{
-			Self->bWaitingForRoom = true; Self->Attempts = 0;
-			Self->Retire(); Self->Retry(10.0, TEXT("room full"));
-		}
-		else
-		{
-			Self->Attempts = 0; Self->bWaitingForRoom = false;
-			if (!Self->bAnswered) { Self->bAnswered = true; Self->StatusText = TEXT("in room"); }
-			if (Type == TEXT("lobby")) Self->NoteLobby(*Message);
-		}
-		if (Self->OnMessage) Self->OnMessage(*Message, Utf8Length(Text));
+		if (Self) Self->ReceiveText(Text, Gen);
 	});
 	Current->Connect();
+}
+
+void FTCConnection::ReceiveText(const FString& Text, uint64 ExpectedGeneration)
+{
+	if (ExpectedGeneration != Generation || !bRunning) return;
+	TSharedPtr<FJsonObject> Message;
+	const TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Text);
+	FString Type;
+	const bool bParsed = FJsonSerializer::Deserialize(Reader, Message) && Message.IsValid() && Message->TryGetStringField(TEXT("t"), Type);
+	FString RefusedPendingMatch;
+	if (Host == ETCHostKind::Unknown)
+	{
+		if (bParsed && Type == TEXT("lobby"))
+		{
+			NoteLobby(*Message);
+			TArray<FString> Pending = MoveTemp(PendingHostMessages); PendingHostMessages.Reset(); PendingHostBytes = 0;
+			if (Host == ETCHostKind::Reference)
+			{
+				// Preserve the reference's exact bytes and receive order after classification, before this lobby.
+				for (const FString& Earlier : Pending)
+				{
+					ReceiveText(Earlier, ExpectedGeneration);
+					if (ExpectedGeneration != Generation || !bRunning) return;
+				}
+			}
+			else if (Pending.Num()) RefusedPendingMatch = MoveTemp(Pending[0]);
+		}
+		else if (PendingHostMessages.Num() || (bParsed && (Type == TEXT("start") || Type == TEXT("s"))))
+		{
+			// Do not infer a host profile from a start packet. Bound the wait by the existing socket text limit.
+			const int64 Bytes = Utf8Length(Text);
+			if (PendingHostMessages.Num() >= 64 || PendingHostBytes + Bytes > 64 * 1024 * 1024)
+			{
+				bRunning = false; RetryAt = -1; Banner = FTCConnectionNotice(); Retire();
+				StatusText = TEXT("Match refused: host lobby did not arrive within the receive limit.");
+				UE_LOG(LogTC, Log, TEXT("%s"), *StatusText);
+				return;
+			}
+			PendingHostBytes += Bytes; PendingHostMessages.Add(Text);
+			StatusText = TEXT("Waiting for the host's lobby before admitting the match.");
+			return;
+		}
+	}
+	if (bParsed)
+	{
+		const FString Refusal = MatchAdmissionRefusal(Host, Type);
+		if (!Refusal.IsEmpty())
+		{
+			// A remote start or reconnect must not bypass the local Start/Restart gate. Stop before either decoder
+			// observes the match. Retry cannot establish the host-private profile and must not loop on refusal.
+			bRunning = false; RetryAt = -1.0; Banner = FTCConnectionNotice(); Retire();
+			StatusText = Refusal;
+			UE_LOG(LogTC, Log, TEXT("%s Match not admitted; connection stopped."), *Refusal);
+			return;
+		}
+	}
+	// Keep the original text and raw-before-parsed callback order, including malformed reference messages.
+	if (OnText) OnText(Text);
+	if (ExpectedGeneration != Generation || !bRunning || !bParsed) return;
+	Banner.Receive(*Message);
+	if (Type == TEXT("replaced"))
+	{
+		bRunning = false; RetryAt = -1.0; Retire();
+		StatusText = TEXT("replaced by another client with this token");
+	}
+	else if (Type == TEXT("left"))
+	{
+		bRunning = false; RetryAt = -1.0; Retire();
+		StatusText = TEXT("left the match: an AI took over this army");
+	}
+	else if (Type == TEXT("deny") && IsVersionDeny(*Message))
+	{
+		// protocol.md addition 1: retrying the same unsupported hello cannot help.
+		bRunning = false; RetryAt = -1.0; Retire();
+		StatusText = TEXT("the server does not speak this client's protocol version");
+		UE_LOG(LogTC, Warning, TEXT("%s (hello proto %d): stopped"), *StatusText, ProtocolVersion);
+	}
+	else if (Type == TEXT("full"))
+	{
+		bWaitingForRoom = true; Attempts = 0;
+		Retire(); Retry(10.0, TEXT("room full"));
+	}
+	else
+	{
+		Attempts = 0; bWaitingForRoom = false;
+		if (!bAnswered) { bAnswered = true; StatusText = TEXT("in room"); }
+		if (Type == TEXT("lobby")) NoteLobby(*Message);
+	}
+	if (OnMessage) OnMessage(*Message, Utf8Length(Text));
+	// Keep a Rust lobby inspectable, then refuse its queued match before either decoder sees that match.
+	if (!RefusedPendingMatch.IsEmpty() && ExpectedGeneration == Generation && bRunning)
+		ReceiveText(RefusedPendingMatch, ExpectedGeneration);
 }
 
 bool FTCConnection::IsVersionDeny(const FJsonObject& Message)
@@ -279,6 +350,9 @@ void FTCConnection::Tick(double Now)
 ETCSendResult FTCConnection::TrySend(const TSharedRef<FJsonObject>& Message, int32* OutBytes)
 {
 	if (OutBytes) *OutBytes = 0;
+	FString Type;
+	Message->TryGetStringField(TEXT("t"), Type);
+	if (RustProfileCommandBlocked(Host, Type)) return ETCSendResult::ProfileRefused;
 	if (!IsOpen()) return ETCSendResult::NotOpen;
 	FString Out;
 	TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> Writer = TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&Out);
@@ -288,8 +362,6 @@ ETCSendResult FTCConnection::TrySend(const TSharedRef<FJsonObject>& Message, int
 	if (OutBytes) *OutBytes = Bytes;
 	if (Bytes > MaxSendBytes)
 	{
-		FString Type;
-		Message->TryGetStringField(TEXT("t"), Type);
 		UE_LOG(LogTC, Warning, TEXT("'%s' message of %d UTF-8 bytes (%d characters) is over the server's %d byte limit: not sent"), *Type.Left(16), Bytes, Out.Len(), MaxSendBytes);
 		return ETCSendResult::TooLarge;
 	}

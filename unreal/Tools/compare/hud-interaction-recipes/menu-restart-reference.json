@@ -1,0 +1,55 @@
+[
+  {
+    "delay": 1,
+    "action": "hudclick",
+    "target": {
+      "action": "MatchControl",
+      "unit": "Menu"
+    },
+    "condition": "play"
+  },
+  {
+    "delay": 0.3,
+    "action": "hudclick",
+    "target": {
+      "action": "MatchControl",
+      "unit": "Restart"
+    }
+  },
+  {
+    "delay": 0.3,
+    "action": "shot",
+    "arg": "restart-armed"
+  },
+  {
+    "delay": 3.2,
+    "action": "shot",
+    "arg": "restart-expired"
+  },
+  {
+    "delay": 0.3,
+    "action": "hudclick",
+    "target": {
+      "action": "MatchControl",
+      "unit": "Restart"
+    }
+  },
+  {
+    "delay": 0.3,
+    "action": "shot",
+    "arg": "restart-rearmed"
+  },
+  {
+    "delay": 0.3,
+    "action": "hudclick",
+    "target": {
+      "action": "MatchControl",
+      "unit": "Restart"
+    }
+  },
+  {
+    "delay": 1,
+    "action": "shot",
+    "arg": "fresh-start"
+  }
+]

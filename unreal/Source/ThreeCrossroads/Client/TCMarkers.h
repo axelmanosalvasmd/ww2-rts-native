@@ -285,6 +285,19 @@ namespace TCMarkersCore
 	inline int StarsShown(int Vet) { return Vet <= 0 ? 0 : Vet >= 3 ? 3 : Vet; }
 	inline double StarX(int I) { return -0.5 + 0.5 * I; }
 
+	// main.js makeUnit/applySnapshot/frame: opaque backdrops render at 3, fills at 4, badges at 5.
+	// A later unit's backdrop must never cover an earlier unit's health fill.
+	inline bool HealthBarShown(double Fraction, int Suppression, bool Selected, bool Hovered, bool Garrisoned)
+	{
+		return Selected || Hovered || 2.3 * Fraction < 2.299 || Suppression > 0 || Garrisoned;
+	}
+	struct FBarRect { double X, Y, W, H; };
+	inline constexpr FBarRect HealthBackdrop = { -1.2, -.21, 2.4, .42 };
+	inline FBarRect HealthFill(double Fraction) { return { -1.15, -.17, 2.3 * std::fmax(0.0, Fraction), .2 }; }
+	inline FBarRect SuppressionFill(double Suppression) { return { -1.15, .06, 2.3 * Suppression / 100, .1 }; }
+	inline uint32_t HealthHex(double Fraction, uint32_t Owner) { return Fraction > .5 ? Owner : Fraction > .25 ? 0xe08a2a : 0xd02a1a; }
+	inline uint32_t SuppressionHex(int Suppression) { return Suppression >= 90 ? 0xff3b2a : 0xffd23a; }
+
 	// ---- HQ (buildHQ, hqRing) ----
 	inline FRibbon HqRingRibbon() { FRibbon R; R.W = 0.36; R.Y = 0.1; return R; }
 	inline double HqRingRadius() { return ReinforceRadius - 0.35; }
@@ -486,6 +499,17 @@ namespace TCMarkersHud
 	void DrawBadge(UCanvas* Canvas, const FString& Type, int32 Owner, FVector2D BarCentre, float PxPerMetre);
 	// Source makeUnit bars. All colours pass through the same depth fog as the badge and stars.
 	void DrawHealthBar(UCanvas* Canvas, FVector2D Centre, float PxPerMetre, int32 Owner, float Fraction, int32 Suppression, const FVector& World);
+	struct FUnitBillboard
+	{
+		FString Type;
+		int32 Owner = -1, Suppression = 0, Cover = 0, Stars = 0;
+		FVector2D Centre = FVector2D::ZeroVector;
+		FVector World = FVector::ZeroVector;
+		float PxPerMetre = 0, Health = 1;
+		bool bHealthBar = false, bGarrisoned = false;
+	};
+	// Gather the visible units first. Source renderOrder applies across the whole scene, not once per unit.
+	void DrawUnitBillboards(UCanvas* Canvas, const TArray<FUnitBillboard>& Units);
 	void DrawCoverShield(UCanvas* Canvas, FVector2D BarCentre, float PxPerMetre, int32 Cover, bool bGarrisoned, const FVector& World);
 	FLinearColor WorldColour(UCanvas* Canvas, const FLinearColor& Colour, const FVector& World);
 	void DrawStars(UCanvas* Canvas, FVector2D BarCentre, float PxPerMetre, int32 Stars);

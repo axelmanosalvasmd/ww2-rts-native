@@ -35,6 +35,7 @@
 #include "Client/TCMinimap.h"
 #include "Client/TCEndReport.h"
 #include "Client/TCMatchControls.h"
+#include "Client/TCRecruitment.h"
 #include "TCHUD.generated.h"
 
 class UFont;
@@ -55,6 +56,9 @@ namespace FTCHudFit
 		FTCUiCommand Command;
 		bool bEnabled = true, bOn = false;
 		bool bSubmenu = false;
+		FString Sub;
+		bool bBroke = false;
+		bool bPending = false;
 	};
 	struct FSelection
 	{
@@ -67,6 +71,32 @@ namespace FTCHudFit
 	struct FIcon { FString Key; FBox2D Box; FLinearColor Colour; bool bPortrait = false; int32 Owner = -1; FBox2D Clip = FBox2D(ForceInit); };
 	struct FHit { FBox2D Box; FControl Control; };
 	struct FTextFit { FString Text; FBox2D Box, Clip; };
+	struct FProductionInfo
+	{
+		FString Name, Icon, Status;
+		TArray<FControl> Slots, Research;
+		FString Tier;
+		float Progress = 0;
+		bool bTraining = false;
+	};
+	struct FTooltipInteraction
+	{
+		FBox2D Dismissed = FBox2D(ForceInit);
+		bool bPressed = false;
+		void Frame(FVector2D Pointer, bool bPointerDown, const FBox2D& PreviousAnchor)
+		{
+			bPressed = bPointerDown;
+			if (Dismissed.bIsValid && !Dismissed.IsInsideOrOn(Pointer)) Dismissed=FBox2D(ForceInit);
+			if (bPointerDown && PreviousAnchor.bIsValid && PreviousAnchor.IsInsideOrOn(Pointer)) Dismissed=PreviousAnchor;
+		}
+		bool Allows(FVector2D Pointer) const { return !Dismissed.bIsValid || !Dismissed.IsInsideOrOn(Pointer); }
+		bool Allows(FVector2D Pointer, const FBox2D& Anchor)
+		{
+			// A click can enter a new button before its first tooltip frame.
+			if (bPressed && Anchor.IsInsideOrOn(Pointer)) Dismissed=Anchor;
+			return Allows(Pointer);
+		}
+	};
 	struct FBottomLayout
 	{
 		FTCPaint Paint;
@@ -75,23 +105,37 @@ namespace FTCHudFit
 		TArray<FTextFit> TextBounds;
 		int32 SelectionMax = 0;
 		FBox2D SelectionList = FBox2D(ForceInit);
-		int32 MenuMax = 0, AirMax = 0, RecruitMax = 0;
+		int32 MenuMax = 0, AirMax = 0, RecruitMax = 0, LogisticsMax = 0;
 		FBox2D MenuList = FBox2D(ForceInit), AirList = FBox2D(ForceInit), RecruitList = FBox2D(ForceInit);
 		FBox2D Selection = FBox2D(ForceInit), Orders = FBox2D(ForceInit), Recruit = FBox2D(ForceInit), Economy = FBox2D(ForceInit);
+		FBox2D Logistics = FBox2D(ForceInit), LogisticsList = FBox2D(ForceInit);
 	};
+	// Original index.html button/uc/ob hover rules, applied to the same visible hit boxes as input.
+	THREECROSSROADS_API void ApplyPointer(FBottomLayout& Layout, FVector2D Pointer, bool bHeld = false);
 	THREECROSSROADS_API FBottomLayout LeftPanel(float ViewH, const FString& Title, const TArray<FSelection>& Selection,
 		const TArray<FString>& Details, const TArray<FControl>& Orders, const TArray<FControl>& Menu, const FTCMeasure& Measure, float Scale = 1.f,
 		int32 Idle = 0, int32 Destination = 1, bool bTransfer = false, bool bDropdown = false, int32 SelectionFirst = 0, float TopLimit = 80.f,
 		int32 MenuFirst = 0, const TArray<FControl>& MenuTabs = {}, float Width = LeftW);
 	THREECROSSROADS_API FBottomLayout RecruitPanel(float ViewW, float ViewH, float Right, const TArray<FString>& Headings,
 		const TArray<FControl>& Tabs, const TArray<TArray<FControl>>& Lists, const TArray<FControl>& Above, const FTCMeasure& Measure, float Scale = 1.f,
-		const TArray<FString>& Logistics = {}, int32 TotalCards = 0, int32 First = 0, float TopLimit = 80.f, const FBox2D& Economy = FBox2D(ForceInit));
+		const TArray<FString>& Logistics = {}, int32 TotalCards = 0, int32 First = 0, float TopLimit = 80.f, const FBox2D& Economy = FBox2D(ForceInit), int32 LogisticsFirst = 0);
 	THREECROSSROADS_API FBottomLayout EconomyPanel(float ViewW, const FString& Money, const FString& Income, const FString& Population,
 		const TArray<FControl>& Support, const FTCMeasure& Measure, float Scale = 1.f, const TArray<FControl>& Resources = {}, const TArray<FControl>& Air = {},
 		float MaxH = 0.f, int32 AirFirst = 0);
+	THREECROSSROADS_API FBottomLayout ProductionPanel(FVector2D View, float Right, const FProductionInfo& Info,
+		const TArray<FString>& GroupNames, const TArray<TArray<FControl>>& Groups, const TArray<FString>& Logistics,
+		const FTCMeasure& Measure, float Scale, FVector2D Pointer = FVector2D(-1,-1), int32 LogisticsFirst = 0);
+	struct THREECROSSROADS_API FPlaneInteraction
+	{
+		int32 LastId = 0;
+		double LastAt = -1;
+		TSet<int32> Press(const class FTCMatchState& State, const TSet<int32>& Current, int32 Id, bool bToggle, double Now);
+	};
 	THREECROSSROADS_API TSet<int32> PlaneSelection(const class FTCMatchState& State, const TSet<int32>& Current, int32 Id, bool bToggle, bool bDouble);
 	// HUD controls keep their complete tooltip even when the visible caption is elided.
 	THREECROSSROADS_API FString ControlTip(const FControl& Control);
+	// A match HUD right press is swallowed, except the ability's separate context action.
+	THREECROSSROADS_API bool RightStepsBack(const FTCUiCommand& Command, bool bHasMatch);
 	THREECROSSROADS_API FBottomLayout Tooltip(const FString& Shown, const FBox2D& Anchor, FVector2D View, const FTCMeasure& Measure);
 	THREECROSSROADS_API FBottomLayout IconBar(bool bMenu, bool bCaptured, const FTCMeasure& Measure, float Scale = 1.f,
 		bool bLogistics = false, bool bSupplyOverlay = false, bool bTruckSelect = false);
@@ -141,8 +185,9 @@ public:
 	bool RunPanelCommand(const FTCUiCommand& Command, bool bShift, bool bCtrl = false);
 	bool RecruitKey(const FString& Code, bool bShift, bool bCtrl, bool bAlt);
 	bool ScrollSelection(FVector2D Pixel, int32 Notch);
-	bool Recruiting() const { return bRecruitLetters; }
-	void StopRecruiting() { bRecruitLetters=false; }
+	bool Recruiting() const { return RecruitNavigation.bLetters; }
+	void StopRecruiting();
+	void ToggleRecruitGroup(int32 Group);
 	// Round 16 (controls): client/index.html #roomBanners (the pause banner) under the score strip, in screen pixels
 	// (Client/TCMatchControls.cpp, FTCRoomBanners)
 #define TC_HAS_ROOM_BANNERS 1
@@ -264,16 +309,20 @@ private:
 	bool bLossFixtureDrawn = false;
 	FString PendingTooltip;
 	FBox2D TooltipAnchor = FBox2D(ForceInit);
+	FTCHudFit::FTooltipInteraction TooltipInteraction;
 	FBox2D SelectionScrollBox = FBox2D(ForceInit), CornerBox = FBox2D(ForceInit);
 	int32 SelectionFirst = 0, SelectionMax = 0;
 	int32 MenuFirst = 0, MenuMax = 0, AirFirst = 0, AirMax = 0, RecruitFirst = 0, RecruitMax = 0, BuildTab = 0;
 	FString MenuContext, RecruitContext;
 	FBox2D EconomyBox = FBox2D(ForceInit);
 	FBox2D MenuScrollBox = FBox2D(ForceInit), AirScrollBox = FBox2D(ForceInit), RecruitScrollBox = FBox2D(ForceInit);
-	int32 LastPlane = 0;
-	double LastPlanePress = -1.0;
+	FBox2D LogisticsScrollBox = FBox2D(ForceInit);
+	int32 LogisticsFirst = 0, LogisticsMax = 0;
+	FTCHudFit::FPlaneInteraction PlaneInteraction;
 	int32 GroupDestination = 1;
-	bool bGroupDropdown = false, bRecruitLetters = false;
+	bool bGroupDropdown = false;
+	FTCRecruitNavigation RecruitNavigation;
+	void UpdateRecruitNavigation();
 	// A line over the ground through metre points (each leg split every 2 m so it follows the relief), Lift metres up.
 	void GroundLine(const ATCTerrain& T, const TArray<FVector2D>& Points, bool bClosed, const FLinearColor& Colour, float Thickness, float Lift = 0.3f);
 	void GroundRing(const ATCTerrain& T, FVector2D At, float Radius, const FLinearColor& Colour, float Thickness);

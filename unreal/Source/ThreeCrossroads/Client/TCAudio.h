@@ -55,6 +55,7 @@ class USoundWaveProcedural;
 class USoundWave;
 class FTCMatchState;
 class FTCUnitTable;
+class FTCSettingsStore;
 struct FTCShot;
 struct FTCSoundCue;
 
@@ -275,6 +276,7 @@ public:
 	void End();                    // back to the lobby: everything fades out over 0.4 s
 
 	void InitVolume(TOptional<double> Saved);  // firstVolume, then bind()'s setVolume(volume)
+	void InitPreferences(const FTCSettingsStore& Preferences); // shared parseFloat and legacy ww2-muted fallback
 	void SetVolume(double V);
 	void ToggleMute();             // M: mute, or back to the volume before muting
 	double Volume() const { return VolumeLevel; }

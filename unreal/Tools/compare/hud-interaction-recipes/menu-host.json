@@ -1,0 +1,113 @@
+[
+  {
+    "delay": 1,
+    "action": "hudhover",
+    "target": {
+      "action": "MatchControl",
+      "unit": "Menu"
+    },
+    "condition": "play"
+  },
+  {
+    "delay": 0.3,
+    "action": "hudrightclick",
+    "target": {
+      "action": "MatchControl",
+      "unit": "Menu"
+    }
+  },
+  {
+    "delay": 0.3,
+    "action": "shot",
+    "arg": "right-keeps-menu-closed"
+  },
+  {
+    "delay": 0.3,
+    "action": "hudclick",
+    "target": {
+      "action": "MatchControl",
+      "unit": "Menu"
+    }
+  },
+  {
+    "delay": 0.3,
+    "action": "shot",
+    "arg": "menu-open"
+  },
+  {
+    "delay": 0.3,
+    "action": "hudclick",
+    "target": {
+      "action": "MatchControl",
+      "unit": "Menu"
+    }
+  },
+  {
+    "delay": 0.3,
+    "action": "shot",
+    "arg": "menu-closed"
+  },
+  {
+    "delay": 0.3,
+    "action": "hudclick",
+    "target": {
+      "action": "MatchControl",
+      "unit": "Menu"
+    }
+  },
+  {
+    "delay": 0.3,
+    "action": "hudclick",
+    "target": {
+      "action": "MatchControl",
+      "unit": "Pause"
+    }
+  },
+  {
+    "delay": 0.3,
+    "action": "shot",
+    "arg": "paused-menu-closed"
+  },
+  {
+    "delay": 0.3,
+    "action": "hudclick",
+    "target": {
+      "action": "MatchControl",
+      "unit": "Menu"
+    }
+  },
+  {
+    "delay": 0.3,
+    "action": "shot",
+    "arg": "resume-visible"
+  },
+  {
+    "delay": 0.3,
+    "action": "hudclick",
+    "target": {
+      "action": "MatchControl",
+      "unit": "Pause"
+    }
+  },
+  {
+    "delay": 0.3,
+    "action": "hudclick",
+    "target": {
+      "action": "MatchControl",
+      "unit": "Menu"
+    }
+  },
+  {
+    "delay": 0.3,
+    "action": "hudclick",
+    "target": {
+      "action": "MatchControl",
+      "unit": "Save"
+    }
+  },
+  {
+    "delay": 0.3,
+    "action": "shot",
+    "arg": "save-menu-closed"
+  }
+]

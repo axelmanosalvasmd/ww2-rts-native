@@ -1,0 +1,90 @@
+[
+  {
+    "delay": 1,
+    "action": "hudhover",
+    "target": {
+      "action": "Recruit",
+      "unit": "rifle",
+      "building": "$producer"
+    },
+    "condition": "play"
+  },
+  {
+    "delay": 0.3,
+    "action": "hudclick",
+    "target": {
+      "action": "Recruit",
+      "unit": "rifle",
+      "building": "$producer"
+    }
+  },
+  {
+    "delay": 0.3,
+    "action": "hudshiftclick",
+    "target": {
+      "action": "Recruit",
+      "unit": "rifle",
+      "building": "$producer"
+    }
+  },
+  {
+    "delay": 0.3,
+    "action": "keydown",
+    "arg": "LeftShift"
+  },
+  {
+    "delay": 0.15,
+    "action": "keydown",
+    "arg": "Q"
+  },
+  {
+    "delay": 0.15,
+    "action": "keyup",
+    "arg": "Q"
+  },
+  {
+    "delay": 0.15,
+    "action": "keyup",
+    "arg": "LeftShift"
+  },
+  {
+    "delay": 0.3,
+    "action": "shot",
+    "arg": "purchased"
+  },
+  {
+    "delay": 0.3,
+    "action": "key",
+    "arg": "Escape"
+  },
+  {
+    "delay": 0.3,
+    "action": "shot",
+    "arg": "group-badges"
+  },
+  {
+    "delay": 0.3,
+    "action": "key",
+    "arg": "Escape"
+  },
+  {
+    "delay": 0.3,
+    "action": "shot",
+    "arg": "recruit-off"
+  },
+  {
+    "delay": 0.3,
+    "action": "key",
+    "arg": "Tab"
+  },
+  {
+    "delay": 0.3,
+    "action": "key",
+    "arg": "Q"
+  },
+  {
+    "delay": 0.3,
+    "action": "shot",
+    "arg": "infantry-open"
+  }
+]
