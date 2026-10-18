@@ -1,0 +1,21 @@
+# Combined hosted AI startup on JSON WebSocket v0
+
+Baseline: prototype `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`. Owner decisions L, K, G and J authorize recipient-only AI, hosted Horde, operatives and ordinary spectator views. This extends the existing room AI, Horde, operative and spectator implementations without adding message keys or ABI calls. World admission stays closed.
+
+`server.js:392-413` establishes every AI recipient view, clears the old result and pause allowance, advances match identity, resets snapshot cadence to 2 and sends the playing lobby before starts. A loaded match sends its host pause after that lobby and before any role's start. Canonical names, teams, factions and spawns include the internal Horde seat (`server.js:401-404,455-466`; `shared/sim.js:690-693`). Commander, watcher and operative envelopes retain the exact shapes documented in the existing contracts. The native Hub completes preparation and publication synchronously under one mutable room owner, so the tick driver cannot interleave a snapshot before those starts.
+
+A defender AI retains its chosen Easy, Normal or Hard level. The internal Horde uses Normal regardless of a requested level; it has no lobby Person, socket, reconnect token, online entry or ping entry. Every policy receives its decoded recipient rows and public starting facts only. All requested observations refresh before any policy acts, using the room's actual adaptive snapshot beat (`server/room-tick.js:12-21`; `shared/ai-schedule.js:18-40`). Initialized catch-up frames do not refresh AI strategic observations.
+
+Leaving or handing over an offline commander resets its AI packet and commander, keeps its army and wallet, clears its token and socket and selects Normal. Only that person's drop pause resumes; host pauses and another person's drop pause remain (`server.js:521-530,647-648,708-711`). A former token can join as an ordinary spectator but cannot reclaim the AI seat. Horde operatives use the existing companion movement, fire and grenade phases after validating the canonical Horde state. Unsupported companion modes, malformed identity, clock bounds and firing state retain their guards.
+
+Save files still contain commander seats only. Existing connected people not assigned a saved human seat become spectators, matching `server.js:436-450`. Operative membership follows the same restored commander identity. Loaded starts preserve AI level, reconstruct recipient consumers, reset helper attention and initialize independent watcher and operative delivery before callbacks resume. Horde saving remains guarded in this stream.
+
+Ordinary watcher flight rows use the prototype's full-map overlay and identity predicate (`server.js:204,217-220`; `shared/sim.js:5945-5997`). Their existing `flight`, `kind`, optional `effect`, `seq`, position, velocity, gravity and time fields include unseen or retired shooters. Prediction ends at expiry, 0.15 seconds or canonical visible contact. Seat recipients retain their ground-fog and shooter-visibility rules. Horde retains its ground-projectile validation and aircraft-weapon restriction.
+
+The literal test mapping and merge record are in `docs/testing/room-ai3-20261016.md`. Runtime review and hosted merge gates remain with the orchestrator under the current issue #5 process.
+
+## Combined host pause delivery
+
+Host `pause` and `resume` broadcast the existing pause object to every commander, spectator and operative immediately, matching `server.js:205,470-491` at `e4e579a`. The fields remain exactly `{t:"pause", paused, by, reason, left}`. While host-paused, each one-second boundary sends that object followed by one current frame to each connected role (`server.js:500-519`). Operatives receive the immediate transitions as well as the periodic messages. No new message fields or private state are exposed.
+
+The pause branch precedes simulation and room/Horde AI scheduling (`server.js:782`; `server/room-tick.js:15-22`). Army and operative input remain ignored until the host resumes (`server.js:631,700-703,712`). The composed ordinary/Horde witness is `net79_host_pause_freezes_room_ai_armies_and_operatives_with_one_second_frames`, documented in `docs/testing/gap-net79.md`.

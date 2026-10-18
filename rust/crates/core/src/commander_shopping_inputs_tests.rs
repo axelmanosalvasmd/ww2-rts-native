@@ -62,7 +62,12 @@ fn intent_ai33_delivered_depots_claim_nodes_without_hidden_authority_reads() {
     ]);
     let context = input.runtime.as_mut().unwrap();
     context.mode = Mode::Classic;
-    context.nodes = vec![Point { x: 70.0, z: 20.0 }];
+    context.nodes = vec![crate::commander_tactics::NodeObservation {
+        at: Point { x: 70.0, z: 20.0 },
+        rate: 0.0,
+        fuel: false,
+        visible: true,
+    }];
     assert_eq!(shopping(input.clone(), 1000.0, (0.0, 0.0)).buy, "engineer");
     // A nearby Barracks does not claim a resource node.
     input.units[2].at.x = 70.0;
@@ -84,7 +89,12 @@ fn intent_ai33_delivered_depots_claim_nodes_without_hidden_authority_reads() {
         .as_mut()
         .unwrap()
         .nodes
-        .push(Point { x: 100.0, z: 40.0 });
+        .push(crate::commander_tactics::NodeObservation {
+            at: Point { x: 100.0, z: 40.0 },
+            rate: 0.0,
+            fuel: false,
+            visible: true,
+        });
     assert_eq!(shopping(input, 1000.0, (0.0, 0.0)).buy, "engineer");
 }
 
@@ -258,7 +268,12 @@ fn intent_ai33_classic_reserves_only_non_depot_builds_and_rush_releases_them() {
     let rifle = economy::price_of(Mode::Classic, "rifle").unwrap().mp;
     input.manpower = cost("motorpool") + rifle - 1.0;
     assert!(!look(input.clone()).iter().any(|c| c["t"] == "buy"));
-    input.runtime.as_mut().unwrap().nodes = vec![Point { x: 100.0, z: 40.0 }];
+    input.runtime.as_mut().unwrap().nodes = vec![crate::commander_tactics::NodeObservation {
+        at: Point { x: 100.0, z: 40.0 },
+        rate: 0.0,
+        fuel: false,
+        visible: true,
+    }];
     // An available depot is not protected by a building reserve, and raises engineer demand.
     let cmds = look(input.clone());
     assert!(
@@ -322,6 +337,26 @@ fn intent_ai33_fort_jobs_charge_gate_and_leave_deferred_wall_segments_for_ticks(
             &mut BTreeMap::from([(4, step)]),
         )
         .unwrap();
+        let gate = Catalog::compiled()
+            .unwrap()
+            .table("FORTS")
+            .unwrap()
+            .get("gate")
+            .unwrap()
+            .get("cost")
+            .and_then(Rule::number)
+            .unwrap();
+        assert_eq!(r.remaining_mp, if step == 3 { 300.0 - gate } else { 300.0 });
+        assert_eq!(r.reserve, 0.0);
+        assert_eq!(r.commands.len(), if step == 2 { 2 } else { 1 });
+        assert!(
+            r.commands
+                .iter()
+                .all(|c| c["t"] == if step == 3 { "dig" } else { "entrench" })
+        );
+        for command in &r.commands {
+            crate::match_commands::Command::from_json(command).unwrap();
+        }
         assert_eq!(r.remaining_mp, if step == 3 { 150.0 } else { 300.0 });
         assert_eq!(r.reserve, 0.0);
         assert!(!r.commands.is_empty());
@@ -337,7 +372,12 @@ fn intent_ai33_world_engineers_count_unclaimed_nodes_while_build_reserves_use_ow
     ]);
     let c = input.runtime.as_mut().unwrap();
     c.mode = Mode::World;
-    c.nodes = vec![Point { x: 100.0, z: 40.0 }];
+    c.nodes = vec![crate::commander_tactics::NodeObservation {
+        at: Point { x: 100.0, z: 40.0 },
+        rate: 0.0,
+        fuel: false,
+        visible: true,
+    }];
     for (owned, reserve) in [(false, cost("motorpool")), (true, 0.0)] {
         if owned {
             input.runtime.as_mut().unwrap().owned_nodes.insert(0);
@@ -352,6 +392,7 @@ fn intent_ai33_world_engineers_count_unclaimed_nodes_while_build_reserves_use_ow
             false,
             &ground,
             |_| false,
+            &mut MatchRandom::new(77),
         )
         .unwrap();
         assert_eq!(r.reserve, reserve);
@@ -425,9 +466,16 @@ fn intent_ai33_mounted_squads_cannot_spend_or_advance_construction() {
     let context = observation.input().runtime.as_ref().unwrap();
     let ground = sight_game(&observation, context);
     let crew = observation.input().units[..2].iter().collect::<Vec<_>>();
-    let base =
-        crate::commander_construction::plan(&observation, &crew, 1000.0, false, &ground, |_| true)
-            .unwrap();
+    let base = crate::commander_construction::plan(
+        &observation,
+        &crew,
+        1000.0,
+        false,
+        &ground,
+        |_| true,
+        &mut MatchRandom::new(77),
+    )
+    .unwrap();
     assert_eq!(base.builders, vec![2]);
     let fort = crate::commander_fortification::plan(
         &observation,
@@ -444,9 +492,16 @@ fn intent_ai33_mounted_squads_cannot_spend_or_advance_construction() {
     input.units[1].riding = true;
     let observation = Observation::new(input).unwrap();
     let crew = observation.input().units[..2].iter().collect::<Vec<_>>();
-    let base =
-        crate::commander_construction::plan(&observation, &crew, 1000.0, false, &ground, |_| true)
-            .unwrap();
+    let base = crate::commander_construction::plan(
+        &observation,
+        &crew,
+        1000.0,
+        false,
+        &ground,
+        |_| true,
+        &mut MatchRandom::new(77),
+    )
+    .unwrap();
     assert!(base.commands.is_empty());
     assert_eq!(base.remaining_mp, 1000.0);
     let mut steps = BTreeMap::new();

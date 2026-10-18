@@ -1,0 +1,1 @@
+- Keep the exact sandbox flight assertions compatible with the shared flight projector's canonical JSON zero values.

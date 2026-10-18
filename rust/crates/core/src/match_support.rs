@@ -1182,3 +1182,6 @@ impl Match {
 
 #[cfg(test)]
 mod cmb66_tests;
+
+#[cfg(test)]
+mod mov94_tests;

@@ -1,0 +1,3 @@
+- Give trusted restarts fresh recorded match seeds while preserving the running match, delivery accounts and next seed when map loading or match creation fails.
+- Test actual ordinary-mode death cleanup and ending positions, team timeline sampling through victory, and restart recipient frames.
+- Leave broader result and mode snapshot publication, asynchronous start cancellation and hosted AI end-hold coverage incomplete.

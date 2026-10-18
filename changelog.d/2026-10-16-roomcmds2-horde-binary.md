@@ -1,0 +1,1 @@
+- Replace the binary settings test's obsolete Horde start refusal with positive Horde and sandbox Horde starts. Both actual sockets receive the three-seat start and subsequent Horde frames. World and the other unsupported settings remain refused.

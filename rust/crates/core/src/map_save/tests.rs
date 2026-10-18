@@ -165,27 +165,33 @@ fn map15_map_loading_uses_the_existing_complete_scenario_validator() {
             "{pointer}"
         );
     }
-    let error = Match::new(&loaded, options()).err().unwrap();
-    assert_eq!(
-        error,
-        "authored mission: authored groups and areas are unsupported"
+    let mut state = Match::new(&loaded, options()).unwrap();
+    assert!(
+        state
+            .world
+            .game
+            .units
+            .values()
+            .any(|u| u.owner == 0 && u.x == 19.0 && u.z == 19.0)
     );
-
-    // The timed-message subset is admitted, while the complete loader still
-    // retains and validates the unsupported group definition above.
-    valid["scenario"]["groups"] = json!([]);
-    let timed = AuthoritativeMap::from_value(valid).unwrap();
-    let mut state = Match::new(&timed, options()).unwrap();
-    assert!(state.authored_mission.is_some());
-    let report = state.advance_tick().unwrap();
-    assert!(report.events.iter().any(|event| matches!(
-        event,
-        crate::match_tick::TickEvent::AuthoredMission(shot)
-            if shot["k"] == "say" && shot["text"] == "Ready" && shot["pub"] == true
-    )));
-    let cache = SnapshotCache::new(&state).unwrap();
-    for slot in 0..2 {
-        cache.recipient(slot).unwrap();
+    assert!(state.authored_scenario.is_some());
+    assert!(state.authored_mission.is_none());
+    for tick in 1..=3 {
+        let report = state.advance_tick().unwrap();
+        if tick == 1 {
+            assert!(report.events.iter().any(|event| matches!(
+                event,
+                crate::match_tick::TickEvent::AuthoredScenario(shot)
+                    if shot.shot_json()["k"] == "say"
+                        && shot.shot_json()["text"] == "Ready"
+                        && shot.shot_json()["pub"] == true
+            )));
+        }
+        let cache = SnapshotCache::new(&state).unwrap();
+        for slot in 0..2 {
+            cache.recipient(slot).unwrap();
+        }
+        assert!(state.tick_state.fault().is_none());
     }
 }
 

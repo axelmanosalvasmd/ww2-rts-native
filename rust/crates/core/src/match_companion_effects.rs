@@ -3,7 +3,6 @@ use crate::{
     combat::CombatEvent,
     companion_ray,
     companions::{Input, OPERATIVE, SAFE_INTEGER, WEAPONS},
-    economy::Mode,
     environment,
     game::{CELL, Point},
     match_combat::{DamageWorld, ExplosionSource},
@@ -27,8 +26,7 @@ impl Match {
         let op = &self.companions.records[&companion];
         let body = &self.companions.soldiers[&unit];
         let u = &self.world.game.units[&unit];
-        if !matches!(self.options.mode, Mode::Default | Mode::Conquest)
-            || self.world.game.mode.is_some()
+        if !self.companion_mode_supported()
             || winner_decided
             || self.finish.is_some()
             || !op.online
@@ -97,8 +95,7 @@ impl Match {
         let body = &self.companions.soldiers[&unit];
         let op = &self.companions.records[&companion];
         let u = &self.world.game.units[&unit];
-        if !matches!(self.options.mode, Mode::Default | Mode::Conquest)
-            || self.world.game.mode.is_some()
+        if !self.companion_mode_supported()
             || winner_decided
             || self.finish.is_some()
             || !op.online

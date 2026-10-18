@@ -1,0 +1,1 @@
+- Initialize the existing map-ping history for operative room members when composing the room metadata owners. Use exported recipient fields and typed state comparisons in server tests.

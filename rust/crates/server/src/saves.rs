@@ -8,6 +8,15 @@ use std::{
 };
 
 pub(crate) const VERSION: u64 = 1;
+pub(crate) const AUTHORED_VERSION: u64 = 2;
+
+pub(crate) fn version_for(state: &ww2_core::match_runtime::Match) -> u64 {
+    if state.authored_scenario.is_some() {
+        AUTHORED_VERSION
+    } else {
+        VERSION
+    }
+}
 const MAX_SAVE_BYTES: u64 = 128 * 1024 * 1024;
 
 #[derive(Clone)]
@@ -71,7 +80,7 @@ impl SaveStore {
         meta: Value,
         saved_at: u64,
     ) -> Result<String, String> {
-        if state["version"] != VERSION {
+        if state["version"] != VERSION && state["version"] != AUTHORED_VERSION {
             return Err("unsupported save version".into());
         }
         let bytes = serde_json::to_vec(state).map_err(|e| e.to_string())?;
@@ -161,11 +170,11 @@ impl SaveStore {
             return Err("save too large".into());
         }
         let value: Value = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
-        if value["version"] != VERSION {
+        if value["version"] != VERSION && value["version"] != AUTHORED_VERSION {
             return Err("unsupported save version".into());
         }
         if !value.is_object()
-            || !["g", "guard", "map", "seats", "settings", "ai"]
+            || !["g", "guard", "map", "seats", "settings"]
                 .iter()
                 .all(|key| value.get(key).is_some())
         {

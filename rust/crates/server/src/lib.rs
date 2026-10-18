@@ -1,11 +1,20 @@
-//! Lobby transport and trusted native room attachment. Public match start remains unavailable.
+//! Lobby transport, native room attachment, and supported public match startup.
 pub mod authoritative_maps;
 mod commander_ingress;
 mod diagnostics;
+mod editor_errors;
 mod lobby;
+mod map_editor;
 mod maps;
+pub use map_editor::MapEditor;
+mod horde_records;
+pub use horde_records::RecordStore as HordeRecords;
 mod native_startup;
+#[cfg(test)]
+mod room_ai;
+mod room_helpers;
 mod saves;
+mod static_files;
 mod trusted_room;
 pub use trusted_room::TrustedRoomConfig;
 pub mod room_runtime;
@@ -17,11 +26,12 @@ pub mod tick_timing;
 
 use axum::{
     Json, Router,
+    body::Body,
     extract::{
-        RawQuery, State, WebSocketUpgrade,
+        OriginalUri, RawQuery, State, WebSocketUpgrade,
         ws::{CloseFrame, Message, WebSocket},
     },
-    http::header,
+    http::{HeaderMap, Method, Response, header},
     routing::{any, get},
 };
 use lobby::{Connection, Hub, Output};
@@ -48,20 +58,32 @@ const MAX_MESSAGE: usize = 16 * 1024;
 pub struct Config {
     pub max_rooms: usize,
     pub public_url: String,
+    /// Optional browser asset root, with access limited to the prototype's static prefixes.
+    pub static_root: Option<std::path::PathBuf>,
     /// Opt-in host JSONL output. No diagnostic fields enter recipient messages.
     pub diagnostic_dir: Option<std::path::PathBuf>,
     pub tick_log: bool,
     /// Private match files, shared by game workers.
     pub saves_dir: std::path::PathBuf,
+    /// Optional private authoring source, reread for each hosted Horde start/restart.
+    pub authored_maps_dir: Option<std::path::PathBuf>,
+    /// Optional authenticated authored-map editor, shared with workers.
+    pub map_editor: Option<MapEditor>,
+    /// Best Horde runs, shared with workers. Hosting admission remains separate.
+    pub horde_records: HordeRecords,
 }
 impl Default for Config {
     fn default() -> Self {
         Self {
             max_rooms: 32,
             public_url: String::new(),
+            static_root: None,
             diagnostic_dir: None,
             tick_log: false,
             saves_dir: "saves".into(),
+            authored_maps_dir: None,
+            map_editor: None,
+            horde_records: HordeRecords::new("horde-records.json"),
         }
     }
 }
@@ -77,6 +99,7 @@ struct Server {
     hub: Arc<Mutex<Hub>>,
     next: Arc<AtomicU64>,
     clock: Instant,
+    static_files: Option<static_files::StaticFiles>,
     #[cfg(test)]
     test_now_ms: Option<Arc<AtomicU64>>,
 }
@@ -87,6 +110,51 @@ impl Server {
             return now.load(Ordering::Acquire);
         }
         self.clock.elapsed().as_millis().min(u128::from(u64::MAX)) as u64
+    }
+
+    async fn dispatch(
+        &self,
+        code: &str,
+        connection: &Connection,
+        joined: &mut bool,
+        value: Value,
+    ) -> Option<tokio::task::JoinHandle<()>> {
+        let mut hub = self.hub.lock().await;
+        if *joined
+            && matches!(value["t"].as_str(), Some("start" | "restart"))
+            && hub.uses_trusted_start(code)
+        {
+            let command = value["t"].as_str().unwrap();
+            return match hub.claim_trusted_start(code, connection.id, command == "restart") {
+                Ok(request) => {
+                    let server = self.clone();
+                    let code = code.to_owned();
+                    // The socket loop and hub remain available for end while the
+                    // blocking map/startup owner prepares a replacement match.
+                    Some(tokio::spawn(async move {
+                        server.generate_start(code, request).await;
+                    }))
+                }
+                Err(_) => {
+                    hub.refuse_trusted_start(code, connection.id, command, self.now());
+                    None
+                }
+            };
+        }
+        hub.message(code, connection, joined, value, self.now());
+        None
+    }
+
+    async fn generate_start(&self, code: String, request: lobby::StartRequest) {
+        let worker = request.clone();
+        let generated = tokio::task::spawn_blocking(move || worker.generate())
+            .await
+            .unwrap_or_else(|error| Err(format!("native generation worker: {error}")));
+        let _ = self
+            .hub
+            .lock()
+            .await
+            .complete_trusted_start(&code, request, generated, self.now());
     }
 }
 
@@ -159,6 +227,9 @@ async fn serve_inner(
     let mut hub = Hub::new(config.max_rooms.clamp(1, 256), config.public_url);
     hub.configure_trusted_room(trusted);
     hub.configure_saves(config.saves_dir);
+    hub.configure_authored_maps(config.authored_maps_dir);
+    hub.configure_maps(config.map_editor.clone());
+    hub.configure_records(config.horde_records);
     hub.configure_diagnostics(config.diagnostic_dir, config.tick_log)?;
     // Dropping or aborting this future invalidates the same stopped authority
     // used under the Hub lock, even when graceful shutdown never runs.
@@ -167,6 +238,7 @@ async fn serve_inner(
         hub: Arc::new(Mutex::new(hub)),
         next: Arc::new(AtomicU64::new(1)),
         clock: Instant::now(),
+        static_files: config.static_root.map(static_files::StaticFiles::new),
         #[cfg(test)]
         test_now_ms: None,
     };
@@ -201,7 +273,8 @@ async fn serve_inner(
         .route("/api/rooms", get(directory))
         .route("/maps", any(maps::serve))
         .route("/ws", get(upgrade))
-        .fallback(maps::serve)
+        .fallback(static_or_maps)
+        .layer(axum::Extension(config.map_editor))
         .with_state((server, stop.subscribe()));
     let result = axum::serve(listener, app)
         .with_graceful_shutdown(async move {
@@ -220,6 +293,46 @@ async fn maintenance_stop(server: &Server) {
 }
 
 type App = (Server, watch::Receiver<bool>);
+async fn static_or_maps(
+    State((server, _)): State<App>,
+    OriginalUri(uri): OriginalUri,
+    axum::Extension(editor): axum::Extension<Option<MapEditor>>,
+    method: Method,
+    headers: HeaderMap,
+    body: Body,
+) -> Response<Body> {
+    serve_static_or_maps(
+        server.static_files.as_ref(),
+        editor,
+        uri,
+        method,
+        headers,
+        body,
+    )
+    .await
+}
+
+async fn serve_static_or_maps(
+    files: Option<&static_files::StaticFiles>,
+    editor: Option<MapEditor>,
+    uri: axum::http::Uri,
+    method: Method,
+    headers: HeaderMap,
+    body: Body,
+) -> Response<Body> {
+    if uri.path().starts_with("/maps/") || files.is_none() {
+        return maps::serve(
+            OriginalUri(uri),
+            axum::Extension(editor),
+            method,
+            headers,
+            body,
+        )
+        .await;
+    }
+    files.unwrap().serve(uri, headers).await
+}
+
 async fn directory(
     State((server, _)): State<App>,
 ) -> ([(header::HeaderName, &'static str); 1], Json<Value>) {
@@ -351,7 +464,7 @@ async fn socket_loop(
                     }
                 };
                 if let Ok(value) = serde_json::from_slice(&bytes) {
-                    server.hub.lock().await.message(&code,&connection,&mut joined,value,server.now());
+                    let _ = server.dispatch(&code, &connection, &mut joined, value).await;
                 }
             }
         }
@@ -392,3 +505,6 @@ mod session_batch_socket_tests;
 #[cfg(test)]
 #[path = "net_batch50_http_tests.rs"]
 mod net_batch50_http;
+
+#[cfg(test)]
+mod map_editor_tests;

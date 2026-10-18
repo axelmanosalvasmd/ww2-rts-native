@@ -1,0 +1,1 @@
+- Preserve host pause and resume controls while using the checked native attachment directly.

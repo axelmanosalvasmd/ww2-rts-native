@@ -1,0 +1,2 @@
+- Merge main `dcf60eab` into IF-11 candidate `0c45e1ed`. The automatic merge tree is `916bf04f901834b20f80523711615b9b85dd4ed5`.
+- Resolve the equivalent Conquest mode-omission assertion in `rust/crates/core/src/mode_startup_tests.rs` using main's local fields binding. Preserve every seat, exact Classic mode and missing-capability checks, main's empty ghosts assertion, and all other mode refusals. The FFI implementation, header, presentation queries and existing C harness remain byte-identical to the candidate.

@@ -1,0 +1,1 @@
+- Send the prototype's exact blocked denial for malformed command tags from active commanders, preserving raw JSON tag values and omitting an absent tag. Joined root arrays use the same feedback. Keep the existing shared denial throttle, pause, connection, role and lobby rules, with room tests for each boundary and later snapshots for every seat.

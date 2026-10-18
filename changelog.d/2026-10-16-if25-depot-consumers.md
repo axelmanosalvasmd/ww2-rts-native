@@ -1,0 +1,4 @@
+- Connect Classic Depot construction to canonical resource nodes, preserve node order on placement ties, and release paid claims when unfinished sites are cancelled.
+- Let Classic Engineers choose resource nodes by distance and richness, retaining tied node order and their private reservations between planning turns. Add direct placement and planner witnesses, including ordinary ticks and every-seat snapshots for paid Depots.
+- Check that remembered Depot discovery order reaches delivered AI facts and breaks tied raid targets, while duplicate remembered IDs remain refused.
+- Rewrite the Depot branch of `intent_ai66_classic_site_draws_once_per_eligible_engineer_even_without_build` to require the new build proposal while retaining its zero-random-draw assertion.

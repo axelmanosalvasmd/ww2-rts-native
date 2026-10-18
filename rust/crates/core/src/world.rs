@@ -847,6 +847,16 @@ impl World {
     pub fn pending(&self, id: Recipient) -> Option<&BTreeSet<usize>> {
         self.pending.get(&id)
     }
+    pub(crate) fn replace_pending(
+        &mut self,
+        id: Recipient,
+        pending: Option<BTreeSet<usize>>,
+    ) -> Option<BTreeSet<usize>> {
+        match pending {
+            Some(indices) => self.pending.insert(id, indices),
+            None => self.pending.remove(&id),
+        }
+    }
     /// Acknowledge only indices actually consumed; unseen records must stay pending.
     pub fn acknowledge(&mut self, id: Recipient, indices: &[usize]) {
         if let Some(set) = self.pending.get_mut(&id) {

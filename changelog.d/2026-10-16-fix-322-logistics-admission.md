@@ -1,0 +1,2 @@
+- Restore the full-tick logistics admission guard while complete recipient snapshots still refuse logistics state. Keep reserve, withdrawal, support, network and depot behavior available through their component and Match adapters.
+- Replace tests that admitted logistics full ticks with direct adapter proofs and guard regressions. Logistics-off matches still run ordinary ticks and complete snapshots.

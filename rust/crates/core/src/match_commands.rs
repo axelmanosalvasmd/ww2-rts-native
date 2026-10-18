@@ -67,6 +67,18 @@ pub enum Stance {
 /// Internal recorded input. This is not a WebSocket or C interface.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Command {
+    Supply {
+        ids: Vec<i64>,
+        target: i64,
+    },
+    LogisticsResume {
+        ids: Vec<i64>,
+    },
+    Spawn {
+        kind: String,
+        at: Point,
+        enemy: bool,
+    },
     Compound {
         commands: Vec<serde_json::Value>,
         queue: bool,
@@ -456,6 +468,56 @@ impl Command {
                 rows.iter().map(|v| safe_id(v).unwrap_or(-1)).collect()
             });
         match object.get("t").and_then(|v| v.as_str()) {
+            Some("supply" | "logisticsResume") => {
+                // Convoy selection has no ordinary troop cap and falls back to orders.
+                let ids = object
+                    .get("ids")
+                    .and_then(|v| v.as_array())
+                    .map(|rows| rows.iter().map(|v| safe_id(v).unwrap_or(-1)).collect())
+                    .unwrap_or_else(|| {
+                        object
+                            .get("orders")
+                            .and_then(|v| v.as_array())
+                            .map(|rows| rows.iter().map(|v| safe_id(&v[0]).unwrap_or(-1)).collect())
+                            .unwrap_or_default()
+                    });
+                if object["t"] == "supply" {
+                    Ok(Self::Supply {
+                        ids,
+                        target: object.get("target").and_then(safe_id).unwrap_or(-1),
+                    })
+                } else {
+                    Ok(Self::LogisticsResume { ids })
+                }
+            }
+            Some("spawn") => {
+                let kind = object
+                    .get("unit")
+                    .and_then(|v| v.as_str())
+                    .ok_or(Denial::Blocked)?;
+                let x = object
+                    .get("x")
+                    .and_then(|v| v.as_f64())
+                    .filter(|v| v.is_finite())
+                    .ok_or(Denial::Blocked)?;
+                let z = object
+                    .get("z")
+                    .and_then(|v| v.as_f64())
+                    .filter(|v| v.is_finite())
+                    .ok_or(Denial::Blocked)?;
+                let enemy = object.get("enemy").is_some_and(|v| match v {
+                    serde_json::Value::Null => false,
+                    serde_json::Value::Bool(v) => *v,
+                    serde_json::Value::Number(v) => v.as_f64().is_some_and(|v| v != 0.0),
+                    serde_json::Value::String(v) => !v.is_empty(),
+                    serde_json::Value::Array(_) | serde_json::Value::Object(_) => true,
+                });
+                Ok(Self::Spawn {
+                    kind: kind.into(),
+                    at: Point { x, z },
+                    enemy,
+                })
+            }
             Some("orders") => Ok(Self::Compound {
                 commands: object
                     .get("commands")
@@ -771,9 +833,10 @@ impl Command {
     }
     fn valid(&self) -> bool {
         match self {
-            Self::Rail { at, .. } | Self::Enter { at, .. } | Self::FireAt { at, .. } => {
-                at.x.is_finite() && at.z.is_finite()
-            }
+            Self::Spawn { at, .. }
+            | Self::Rail { at, .. }
+            | Self::Enter { at, .. }
+            | Self::FireAt { at, .. } => at.x.is_finite() && at.z.is_finite(),
             Self::Attack { at, .. } => at.is_none_or(|p| p.x.is_finite() && p.z.is_finite()),
             Self::Dig {
                 ids, at, direction, ..
@@ -869,6 +932,7 @@ impl crate::match_runtime::Match {
                     ..
                 } | Command::Stop { .. }
                     | Command::Retreat { .. }
+                    | Command::Stance { .. }
             ) || matches!(command, Command::Attack { .. } | Command::Ability { .. })
                 && self.logistics.get(id).is_some_and(|r| r.stranded);
         (u.owner == owner
@@ -925,8 +989,18 @@ impl crate::match_runtime::Match {
         if matches!(command, Command::Unsupported) {
             return Ok(Some(Denial::Unsupported));
         }
+        if let Command::Spawn { kind, at, enemy } = command {
+            return self.sandbox_spawn(owner, kind, *at, *enemy);
+        }
         if let Command::Compound { commands, queue } = command {
             return self.execute_compound_orders(owner, commands, *queue, winner_decided);
+        }
+        match command {
+            Command::Supply { ids, target } => {
+                return self.execute_convoy_input(owner, ids, Some(*target));
+            }
+            Command::LogisticsResume { ids } => return self.execute_convoy_input(owner, ids, None),
+            _ => {}
         }
         self.validate_building_activity_rows()?;
         if let Command::Rally { ids, id, at } = command {
@@ -1004,7 +1078,15 @@ impl crate::match_runtime::Match {
             return self.execute_enter_command(owner, ids, *at, *queue);
         }
         if let Command::FireAt { ids, at, queue } = command {
-            return self.aircraft_area_command(owner, ids, *at, *queue);
+            if ids.iter().any(|raw| {
+                u32::try_from(*raw)
+                    .ok()
+                    .and_then(|id| self.world.game.units.get(&id))
+                    .is_some_and(|u| u.owner == owner && u.air.is_some())
+            }) {
+                return self.aircraft_area_command(owner, ids, *at, *queue);
+            }
+            return self.ground_fire_at_command(owner, ids, *at, *queue);
         }
         if let Command::Entrench { ids, order, queue } = command {
             return self.execute_entrench(owner, ids, *order, *queue, winner_decided);
@@ -1075,6 +1157,15 @@ impl crate::match_runtime::Match {
             direction,
         } = command
         {
+            // Recorded AI orders share the hosted recipient capability boundary.
+            // Refuse unsupported effects before payment, cooldown or story writes.
+            if self.ordinary_snapshot_only
+                && !crate::recipient_snapshot::SUPPORTED_SUPPORT_KINDS
+                    .iter()
+                    .any(|supported| supported.name() == kind)
+            {
+                return Ok(Some(Denial::Unsupported));
+            }
             return match self.admit_support(owner, kind, *at, *direction) {
                 Ok(denial) => Ok(denial.map(|d| match d {
                     crate::match_support::SupportDenial::Blocked => Denial::Blocked,
@@ -1109,7 +1200,10 @@ impl crate::match_runtime::Match {
             | Command::Attack { ids, .. }
             | Command::Escort { ids, .. }
             | Command::Retreat { ids } => ids.clone(),
-            Command::Compound { .. }
+            Command::Supply { .. }
+            | Command::LogisticsResume { .. }
+            | Command::Spawn { .. }
+            | Command::Compound { .. }
             | Command::Build { .. }
             | Command::Assist { .. }
             | Command::Cancel { .. }
@@ -1578,8 +1672,11 @@ impl crate::match_runtime::Match {
                     self.commands.units.get_mut(&id).unwrap().auto_cast = *on;
                 }
             }
-            Command::Compound { .. }
+            Command::Supply { .. }
+            | Command::LogisticsResume { .. }
+            | Command::Compound { .. }
             | Command::Attack { .. }
+            | Command::Spawn { .. }
             | Command::Build { .. }
             | Command::Assist { .. }
             | Command::Cancel { .. }
@@ -1946,6 +2043,15 @@ impl crate::path_requests::PathRequestContext for RequestContext<'_> {
         kind: crate::path_requests::RequestKind,
     ) -> Option<Point> {
         use crate::path_requests::RequestKind;
+        if kind == RequestKind::FireAt {
+            return match self.match_state.current_fire_at_goal(id) {
+                Ok(goal) => goal,
+                Err(error) => {
+                    self.error = Some(error);
+                    None
+                }
+            };
+        }
         if kind == RequestKind::Dig {
             return self.match_state.current_dig_goal(id);
         }
@@ -2078,6 +2184,14 @@ impl crate::path_requests::PathRequestContext for RequestContext<'_> {
                         .unwrap()
                         .attack_id = 0
                 }
+                crate::path_requests::RequestKind::FireAt => {
+                    self.match_state
+                        .commands
+                        .units
+                        .get_mut(&u.id)
+                        .unwrap()
+                        .fire_at = None
+                }
                 crate::path_requests::RequestKind::Nade => {
                     self.match_state.commands.units.get_mut(&u.id).unwrap().nade = None;
                     let ability = self.match_state.abilities.get_mut(u.id).unwrap();
@@ -2137,6 +2251,9 @@ impl crate::match_runtime::Match {
         // current_goal cannot report errors through the scheduler's Option API.
         // Validate Board and Attack callbacks before observation or FIFO service can write.
         for request in self.commands.requests.queued_requests() {
+            if request.kind == crate::path_requests::RequestKind::FireAt {
+                self.current_fire_at_goal(request.unit)?;
+            }
             if request.kind == crate::path_requests::RequestKind::AttackId {
                 self.current_attack_goal(request.unit)?;
             }
@@ -2231,7 +2348,8 @@ impl crate::match_runtime::Match {
                 c.move_result = Some(MoveResult::Completed {
                     tick: self.world.game.tick,
                 });
-            } else if u.path.is_empty()
+            } else if !self.automatic_convoy(id)
+                && u.path.is_empty()
                 && crate::math::hypot(u.x - goal.x, u.z - goal.z) > 0.25
                 && u.repath <= 0.0
             {
@@ -2404,6 +2522,7 @@ impl crate::match_runtime::Match {
                 | crate::path_requests::RequestKind::Build
                 | crate::path_requests::RequestKind::Board
                 | crate::path_requests::RequestKind::AttackId
+                | crate::path_requests::RequestKind::FireAt
         ) {
             return Err("unsupported command path request".into());
         }
@@ -2421,6 +2540,9 @@ impl crate::match_runtime::Match {
         }
         if kind == crate::path_requests::RequestKind::AttackId {
             self.current_attack_goal(id)?;
+        }
+        if kind == crate::path_requests::RequestKind::FireAt {
+            self.current_fire_at_goal(id)?;
         }
         if kind == crate::path_requests::RequestKind::Board {
             self.current_board_goal(id)?;
@@ -2454,6 +2576,10 @@ mod compound;
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+#[path = "match_commands/support_capability_tests.rs"]
+mod support_capability_tests;
 
 pub(crate) struct MovingRequestContext<'a, 'terrain> {
     pub(crate) unit: &'a mut Unit,
@@ -2543,6 +2669,7 @@ impl crate::match_runtime::Match {
         let owner = unit.owner;
         let kind = unit.kind;
         let before = unit.at();
+        let automatic_convoy = self.automatic_convoy(id);
         let dt = self.rules.movement.tick;
         let limit_travel = self.logistics.get(id).is_some()
             || self
@@ -2590,7 +2717,7 @@ impl crate::match_runtime::Match {
             id,
             suppression_speed,
             &mut |_, _, u, to, why| {
-                if error.is_some() {
+                if automatic_convoy || error.is_some() {
                     return;
                 }
                 match why {

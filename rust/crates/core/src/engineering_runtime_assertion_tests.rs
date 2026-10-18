@@ -310,6 +310,39 @@ fn intent_eng38_building_loss_reaches_nearest_sections_without_second_debit() {
 }
 
 #[test]
+fn if25_building_loss_equal_distance_keeps_authored_section_order() {
+    for reverse in [false, true] {
+        let mut m = empty_scene();
+        let mut cells = building(&mut m, 901, "hq");
+        if reverse {
+            let structure = m
+                .world
+                .structures
+                .iter_mut()
+                .find(|s| s.entity_id == Some(901))
+                .unwrap();
+            structure.cells.reverse();
+            structure.section_ids.reverse();
+            cells.reverse();
+        }
+        // All four section centers are equally far from the building center.
+        let unit = m.world.game.units.get_mut(&901).unwrap();
+        unit.hp -= 100.0;
+        unit.hit_from = Some(Point { x: 32.0, z: 32.0 });
+        environment(&mut m, |runtime, world, ctx| {
+            runtime
+                .sync_building_sections(world, 901, Some(1), ctx)
+                .unwrap();
+        });
+        close(m.world.game.sections[&(cells[0] as u32)].hp, 650.0);
+        for &cell in &cells[1..] {
+            close(m.world.game.sections[&(cell as u32)].hp, 750.0);
+        }
+        close(m.world.game.units[&901].hp, 2900.0);
+    }
+}
+
+#[test]
 fn intent_eng38_each_match_tick_syncs_new_building_loss_from_its_hit_origin() {
     let mut m = scene(false);
     let id = m.next_unit_id;
@@ -1107,4 +1140,104 @@ fn intent_eng80_environment_and_combat_draws_do_not_perturb_each_other() {
         weather.plan_weather(WeatherChoice::Random, MapWeatherInfo::default(), None, 123),
         plan
     );
+}
+
+#[test]
+fn if25_blast_cell_equal_weights_keep_row_scan_order() {
+    for reverse in [false, true] {
+        let mut m = empty_scene();
+        let cells = building(&mut m, 901, "hq");
+        if reverse {
+            let structure = m
+                .world
+                .structures
+                .iter_mut()
+                .find(|s| s.entity_id == Some(901))
+                .unwrap();
+            structure.cells.reverse();
+            structure.section_ids.reverse();
+        }
+        environment(&mut m, |runtime, world, ctx| {
+            runtime
+                .damage_cells(
+                    world,
+                    Blast {
+                        at: Point { x: 32.0, z: 32.0 },
+                        radius: 8.0,
+                        damage: 100.0,
+                        scar: 0.0,
+                    },
+                    ctx,
+                    &mut DamageContext::plain(&BTreeSet::new()),
+                )
+                .unwrap();
+        });
+        let taken = 100.0 * (1.0 - crate::math::hypot(1.0, 1.0) / 10.0 * 0.5);
+        close(m.world.game.sections[&(cells[0] as u32)].hp, 750.0 - taken);
+        for cell in &cells[1..] {
+            close(m.world.game.sections[&(*cell as u32)].hp, 750.0);
+        }
+    }
+}
+
+#[test]
+fn if25_explosion_equal_distance_keeps_surviving_authored_section_order() {
+    for reverse in [false, true] {
+        let mut m = empty_scene();
+        let mut cells = building(&mut m, 901, "hq");
+        if reverse {
+            let structure = m
+                .world
+                .structures
+                .iter_mut()
+                .find(|s| s.entity_id == Some(901))
+                .unwrap();
+            structure.cells.reverse();
+            structure.section_ids.reverse();
+            cells.reverse();
+        }
+        let order = vec![901];
+        let mut damage = DamageWorld {
+            world: &mut m.world,
+            combat: &mut m.combat,
+            grid: &mut m.grid,
+            rules: &m.rules,
+            logistics: &m.logistics,
+            production: &m.production,
+            mode: Mode::Conquest,
+            tech_enabled: false,
+            environment: &mut m.environment,
+            environment_seed: &mut m.start.environment_seed,
+            next_id: &mut m.next_unit_id,
+            unit_order: &order,
+            wind_angle: 0.0,
+            wind_strength: 0.0,
+        };
+        damage
+            .explosion(
+                Point { x: 32.0, z: 32.0 },
+                8.0,
+                crate::match_combat::ExplosionSource {
+                    infantry: 0.0,
+                    vehicle: 100.0,
+                    terrain: None,
+                    suppression: 0.0,
+                    scar: 0.0,
+                    anti_garrison: None,
+                    weapon_kind: None,
+                    off_map_support: false,
+                },
+                1,
+                None,
+                None,
+                None,
+                &mut NoRetarget,
+            )
+            .unwrap();
+        close(m.world.game.sections[&(cells[0] as u32)].hp, 650.0);
+        for cell in &cells[1..] {
+            close(m.world.game.sections[&(*cell as u32)].hp, 750.0);
+        }
+        close(m.world.game.units[&901].hp, 2900.0);
+    }
 }

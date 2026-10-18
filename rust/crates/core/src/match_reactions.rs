@@ -133,16 +133,17 @@ impl Match {
     /// Convoys prefer the nearest active allied source before the mode's home.
     /// Store order breaks equal-distance ties, as in the prototype's stable sort.
     pub(crate) fn convoy_retreat_home(&self, unit: &Unit) -> Option<Point> {
-        self.convoys
+        let state = self
+            .convoys
             .as_ref()
-            .filter(|state| state.trucks.contains_key(&unit.id))?
-            .stores
-            .iter()
-            .filter(|store| {
+            .filter(|state| state.trucks.contains_key(&unit.id))?;
+        crate::sort::first_by(
+            state.stores.iter().filter(|store| {
                 store.active && store.source && self.world.game.allied(unit.owner, store.owner)
-            })
-            .min_by(|a, b| distance(unit.at(), a.at).total_cmp(&distance(unit.at(), b.at)))
-            .map(|store| store.at)
+            }),
+            |a, b| distance(unit.at(), a.at) - distance(unit.at(), b.at),
+        )
+        .map(|store| store.at)
     }
 
     /// Ground retreat reset, sharing the command's staged house exit when needed.
@@ -319,7 +320,13 @@ impl Match {
         if self.options.mode == crate::economy::Mode::World {
             self.actor_policy(u.owner)?;
         }
-        if kind.structure || self.logistics.get(id).is_some_and(|r| r.forced) {
+        if kind.structure
+            || self
+                .convoys
+                .as_ref()
+                .is_some_and(|s| s.trucks.contains_key(&id))
+            || self.logistics.get(id).is_some_and(|r| r.forced)
+        {
             return Ok(());
         }
         if u.air.is_some() || u.riding || kind.rail {

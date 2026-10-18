@@ -1,0 +1,4 @@
+- Refresh FireAt against main while preserving the shared flight and logistics projectors, both design notes, and all command and snapshot guards.
+- Retain main's exact Classic partial-delivery assertions in `mode01_non_world_mode_rows_match_the_prototype_public_fields` and `mov48_classic_retreat_traverses_multiple_legs_with_every_seat_partial_delivery`; update the retreat test mapping to match.
+- Replace the obsolete FireAt refusal portion of `fire_at_and_compound_orders_remain_blocked_at_public_ingress` with `fire_at_reserves_canonical_input_without_immediate_world_mutation`, checking the admitted command's canonical queue key, feedback and unchanged world state. Keep every compound-order refusal and no-mutation assertion in `compound_orders_remain_blocked_at_public_ingress`.
+- Keep the cached/uncached flight-projection equality assertion in `fire_at_live_flight_is_visible_without_disclosing_its_hidden_shooter`.

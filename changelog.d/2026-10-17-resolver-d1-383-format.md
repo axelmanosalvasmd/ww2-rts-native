@@ -1,0 +1,1 @@
+- Format the reconciled native scenario, save and guard tests with the pinned workspace formatter.

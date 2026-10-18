@@ -34,9 +34,14 @@ fn truthy(v: &Value) -> bool {
     }
 }
 
+/// Match the prototype's truthy explicit-definition selection before legacy fallback.
+pub(crate) fn explicit_scenario(map: &Value) -> Option<&Value> {
+    map.get("scenario").filter(|scenario| truthy(scenario))
+}
+
 /// Preserve authored definitions, or migrate the legacy timed map triggers.
 pub fn migrate_scenario(map: &Value) -> Option<Value> {
-    if let Some(scenario) = map.get("scenario").filter(|s| truthy(s)) {
+    if let Some(scenario) = explicit_scenario(map) {
         return Some(scenario.clone());
     }
     let triggers = map.get("triggers")?.as_array()?;

@@ -52,6 +52,9 @@ pub struct Member {
     pub placement: Option<Point>,
     pub acknowledged: bool,
 }
+// The custom decoder returns compiled names instead of borrowing the save buffer.
+type SavedReason = &'static str;
+
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Operation {
     pub id: u64,
@@ -63,8 +66,8 @@ pub struct Operation {
     pub stage: Point,
     pub initial: usize,
     pub members: Vec<Member>,
-    #[serde(deserialize_with = "crate::save_state::optional_static_string")]
-    pub reason: Option<crate::save_state::StaticStr>,
+    #[serde(with = "saved_reason")]
+    pub reason: Option<SavedReason>,
 }
 impl Operation {
     fn change(&mut self, phase: Phase, now: f64) {
@@ -713,3 +716,39 @@ pub fn plan(
 #[cfg(test)]
 #[path = "commander_assault_tests.rs"]
 mod tests;
+
+mod saved_reason {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    fn known(value: &str) -> Option<&'static str> {
+        match value {
+            "handoff" => Some("handoff"),
+            "timeout" => Some("timeout"),
+            "defense" => Some("defense"),
+            "regroup-blocked" => Some("regroup-blocked"),
+            "withdrawn" => Some("withdrawn"),
+            "members-unavailable" => Some("members-unavailable"),
+            "armor" => Some("armor"),
+            "machine-gun" => Some("machine-gun"),
+            "losses" => Some("losses"),
+            _ => None,
+        }
+    }
+    pub fn serialize<S: Serializer>(
+        value: &Option<&'static str>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        if value.is_some_and(|v| known(v).is_none()) {
+            return Err(serde::ser::Error::custom("unknown assault reason"));
+        }
+        value.serialize(serializer)
+    }
+    pub fn deserialize<'de, D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Option<&'static str>, D::Error> {
+        Option::<String>::deserialize(deserializer)?
+            .map(|value| {
+                known(&value).ok_or_else(|| serde::de::Error::custom("unknown assault reason"))
+            })
+            .transpose()
+    }
+}

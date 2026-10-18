@@ -111,6 +111,20 @@ fn aircraft_rules() -> Result<&'static Value, AviationError> {
         .get("air")
         .ok_or(AviationError::Invalid("missing aircraft rules"))
 }
+pub(crate) fn initial_aircraft_runtime(name: &str) -> Result<AircraftRuntime, AviationError> {
+    let def = catalog()?
+        .unit(name)
+        .map_err(|e| AviationError::Actuation(e.to_string()))?;
+    Ok(AircraftRuntime {
+        fuel: number(aircraft_rules()?, "station")?,
+        ammo: number(def, "ammo")?,
+        timer: 0.0,
+        orbit: 0.0,
+        mission: None,
+        attack_pick: 0,
+        downed: false,
+    })
+}
 fn airborne(state: PlaneState) -> bool {
     matches!(
         state,
@@ -248,7 +262,7 @@ impl Match {
         }
         Ok(())
     }
-    /// Nearest finished own airfield, otherwise the source off-map base past HQ.
+    /// Nearest finished accessible airfield, otherwise the off-map base past HQ.
     pub fn aircraft_base(&self, owner: usize, at: Point) -> Result<Point, AviationError> {
         if !(crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode)
             || self.options.mode == crate::economy::Mode::Horde
@@ -259,7 +273,10 @@ impl Match {
                 "air base requires a matching ordinary mode",
             ));
         }
-        if owner >= self.start.players.len() || !finite(at) {
+        if owner >= self.start.players.len()
+            || owner >= self.world.game.players.len()
+            || !finite(at)
+        {
             return Err(AviationError::Invalid("invalid aircraft base owner/point"));
         }
         let mut best = None;
@@ -270,8 +287,22 @@ impl Match {
                 .kinds
                 .get(u.kind)
                 .ok_or(AviationError::Invalid("invalid airfield kind"))?;
+            let accessible = u.owner == owner
+                || self.options.mode == crate::economy::Mode::Horde
+                    && self.start.shared_defenders.is_some_and(|horde_slot| {
+                        owner != horde_slot
+                            && u.owner != horde_slot
+                            && self
+                                .world
+                                .game
+                                .players
+                                .get(u.owner)
+                                .is_some_and(|field_owner| {
+                                    field_owner.team == self.world.game.players[owner].team
+                                })
+                    });
             if kind.name != "airfield"
-                || u.owner != owner
+                || !accessible
                 || !u.built.is_some_and(|v| v >= 1.0)
                 || u.hp <= 0.0
             {
@@ -331,18 +362,7 @@ impl Match {
                 "occupied aircraft metadata identity",
             ));
         }
-        let def = catalog()?
-            .unit(name)
-            .map_err(|e| AviationError::Actuation(e.to_string()))?;
-        let runtime = AircraftRuntime {
-            fuel: number(aircraft_rules()?, "station")?,
-            ammo: number(def, "ammo")?,
-            timer: 0.0,
-            orbit: 0.0,
-            mission: None,
-            attack_pick: 0,
-            downed: false,
-        };
+        let runtime = initial_aircraft_runtime(name)?;
         let mut placer = crate::unit_spawn::SpawnPlacer::new();
         let index = u32::try_from(self.world.game.units.len())
             .map_err(|_| AviationError::Invalid("aircraft scatter index"))?;
@@ -895,6 +915,10 @@ impl Match {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "match_aviation_home_tests.rs"]
+mod home_tests;
 
 #[cfg(test)]
 mod intent_tests {

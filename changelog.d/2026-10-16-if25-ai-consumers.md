@@ -1,0 +1,2 @@
+- Add ordinary AI aircraft target selection and point-holder fortification over delivered facts, with direct stable-order tests and ordinary command, tick and recipient snapshot checks.
+- Preserve crew sort history when an earlier HQ cannot advance its fortification step, so equal-distance crews at a later HQ follow the prototype's repeated sort order.

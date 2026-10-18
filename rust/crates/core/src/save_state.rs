@@ -45,7 +45,14 @@ impl Match {
     pub fn events_from_save_json(
         value: Value,
     ) -> Result<Vec<crate::match_tick::TickEvent>, String> {
-        crate::save_codec::from_value(value)
+        let events: Vec<crate::match_tick::TickEvent> = crate::save_codec::from_value(value)?;
+        if events
+            .iter()
+            .any(|event| matches!(event, crate::match_tick::TickEvent::AuthoredMission(_)))
+        {
+            return Err("legacy authored mission checkpoint events are unsupported".into());
+        }
+        Ok(events)
     }
 
     /// Save every canonical ordinary-match owner, including queues and RNG state.
@@ -107,6 +114,7 @@ impl Match {
 fn known_string(value: &str) -> Option<&'static str> {
     const RUNTIME: &[&str] = &[
         "building",
+        "house",
         "bridge",
         "intact",
         "damaged",
@@ -130,6 +138,7 @@ fn known_string(value: &str) -> Option<&'static str> {
         "nade",
         "arty",
         "bomb",
+        "boom",
         "flame",
         "grenade",
         "artillery",
@@ -190,7 +199,8 @@ pub(crate) fn static_string<'de, D: serde::Deserializer<'de>>(
     d: D,
 ) -> Result<&'static str, D::Error> {
     let value = <String as serde::Deserialize>::deserialize(d)?;
-    known_string(&value).ok_or_else(|| serde::de::Error::custom("unknown compiled save string"))
+    known_string(&value)
+        .ok_or_else(|| serde::de::Error::custom(format!("unknown compiled save string: {value:?}")))
 }
 
 pub(crate) fn optional_static_string<'de, D: serde::Deserializer<'de>>(
@@ -199,7 +209,9 @@ pub(crate) fn optional_static_string<'de, D: serde::Deserializer<'de>>(
     let value = <Option<String> as serde::Deserialize>::deserialize(d)?;
     value
         .map(|v| {
-            known_string(&v).ok_or_else(|| serde::de::Error::custom("unknown compiled save string"))
+            known_string(&v).ok_or_else(|| {
+                serde::de::Error::custom(format!("unknown compiled save string: {v:?}"))
+            })
         })
         .transpose()
 }
@@ -374,6 +386,45 @@ pub(crate) mod tests {
     fn native_checkpoint_rejects_malformed_tree() {
         assert!(Match::from_save_json(json!(["map", []])).is_err());
         assert!(Match::from_save_json(Value::Null).is_err());
+    }
+    #[test]
+    fn native_checkpoint_missing_elimination_defaults_and_present_owner_keeps_float_bits() {
+        let state = ordinary();
+        let mut legacy = state.save_json().unwrap();
+        legacy[1]
+            .as_array_mut()
+            .unwrap()
+            .retain(|entry| entry[0] != json!(["string", "elimination"]));
+        let restored = Match::from_save_json(legacy).unwrap();
+        assert!(restored.elimination.is_none());
+        let elimination = crate::elimination_modes::EliminationState {
+            teams: 2,
+            bunkers: vec![1, 2],
+            time_left: Some(f64::from_bits(0x3ff0000000000001)),
+            sudden_death: true,
+            nodes: vec![crate::match_world::ResourceNode {
+                cell: 4,
+                at: crate::game::Point { x: -0.0, z: 8.0 },
+                depot: Some(5),
+                rate: f64::from_bits(0x4000000000000001),
+                fuel: true,
+            }],
+        };
+        let encoded = crate::save_codec::to_value(&elimination).unwrap();
+        let decoded: crate::elimination_modes::EliminationState = crate::save_codec::from_value(
+            serde_json::from_slice(&serde_json::to_vec(&encoded).unwrap()).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(decoded, elimination);
+        assert_eq!(
+            decoded.time_left.unwrap().to_bits(),
+            elimination.time_left.unwrap().to_bits()
+        );
+        assert_eq!(decoded.nodes[0].at.x.to_bits(), (-0.0f64).to_bits());
+        assert_eq!(
+            decoded.nodes[0].rate.to_bits(),
+            elimination.nodes[0].rate.to_bits()
+        );
     }
     #[test]
     fn native_checkpoint_refuses_changed_compiled_rules() {

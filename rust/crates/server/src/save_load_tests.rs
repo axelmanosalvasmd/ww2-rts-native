@@ -31,6 +31,17 @@ fn assert_same_json(a: &Value, b: &Value) {
     assert!(a == b, "{}", difference(a, b, "$").unwrap_or_default());
 }
 
+fn sorted_keys(value: &Value) -> Vec<&str> {
+    let mut keys = value
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect::<Vec<_>>();
+    keys.sort_unstable();
+    keys
+}
+
 struct TestDir(PathBuf);
 impl TestDir {
     fn new() -> Self {
@@ -70,9 +81,13 @@ fn messages(hub: &mut Hub, rx: &mut mpsc::Receiver<Output>) -> Vec<Value> {
 fn small_match() -> (Match, Value) {
     let raw = json!({"name":"Save match","w":24,"h":24,"trenchFacing":true,"rows":vec![".".repeat(24);24],
         "spawns":[{"x":3,"y":3},{"x":20,"y":20}],"points":[{"id":"front","x":12,"y":12,"vp":1,"mp":1}]});
+    small_match_from_raw(raw)
+}
+fn small_match_from_raw(raw: Value) -> (Match, Value) {
     let map =
         ww2_core::map::AuthoritativeMap::from_json(&serde_json::to_vec(&raw).unwrap()).unwrap();
     let mut options = native_tests::native_match().options;
+    options.logistics = true;
     options.living_weather = true;
     let mut state = Match::new(&map, options).unwrap();
     state.start.win_vp = 1.;
@@ -242,57 +257,104 @@ fn net91_save_storage_round_trip_retains_content_and_per_room_per_kind_limits() 
 }
 #[test]
 fn net28_net93_lobby_save_list_is_synchronous_private_and_newest_first() {
-    let dir = TestDir::new();
-    let (mut hub, a, mut ra, _, mut rb) = setup(&dir);
-    let store = hub.saves.clone();
-    let first = store
-        .write(
-            "ABC",
-            "manual",
-            &envelope(),
-            json!({"mode":"conquest","minutes":1,"names":["First"]}),
-            1_800_000_000_000,
-        )
-        .unwrap();
-    hub.rooms["ABC"].broadcast(&hub.maps, &hub.public_url);
-    let second=store.write("ABC","auto",&envelope(),json!({"mode":"world","minutes":2,"names":["Second"],"world":{"total":8,"owned":[3,2]}}),1_800_000_000_001).unwrap();
-    store
-        .write(
-            "XYZ",
-            "manual",
-            &envelope(),
-            json!({"mode":"conquest","minutes":0,"names":["Other"]}),
-            1_800_000_000_002,
-        )
-        .unwrap();
-    std::fs::write(dir.0.join("ABC-1800000000003-manual.json"), b"{broken").unwrap();
-    hub.rooms["ABC"].broadcast(&hub.maps, &hub.public_url);
-    for receiver in [&mut ra, &mut rb] {
-        let received = messages(&mut hub, receiver);
-        assert_eq!(received.len(), 2);
-        assert_eq!(
-            received[0]["saves"],
-            json!([{"id":first,"kind":"manual","savedAt":1_800_000_000_000u64,"mode":"conquest","minutes":1,"names":["First"]}])
-        );
-        assert_eq!(
-            received[1]["saves"],
-            json!([
-            {"id":second,"kind":"auto","savedAt":1_800_000_000_001u64,"mode":"world","minutes":2,"names":["Second"],"world":{"total":8,"owned":[3,2]}},
-            {"id":first,"kind":"manual","savedAt":1_800_000_000_000u64,"mode":"conquest","minutes":1,"names":["First"]}])
-        );
-        let text = received[1]["saves"].to_string();
-        for secret in [
-            "guard", "triggers", "private", "memory", "bytes", "token", "XYZ",
-        ] {
-            assert!(!text.contains(secret));
+    fn check_broadcasts(
+        hub: &mut Hub,
+        dir: &TestDir,
+        host_id: u64,
+        receivers: &mut [&mut mpsc::Receiver<Output>],
+    ) {
+        let store = hub.saves.clone();
+        let first = store
+            .write(
+                "ABC",
+                "manual",
+                &envelope(),
+                json!({"mode":"conquest","minutes":1,"names":["First"]}),
+                1_800_000_000_000,
+            )
+            .unwrap();
+        hub.rooms["ABC"].broadcast(&hub.maps, &hub.public_url);
+        let second=store.write("ABC","auto",&envelope(),json!({"mode":"world","minutes":2,"names":["Second"],"world":{"total":8,"owned":[3,2]}}),1_800_000_000_001).unwrap();
+        store
+            .write(
+                "XYZ",
+                "manual",
+                &envelope(),
+                json!({"mode":"conquest","minutes":0,"names":["Other"]}),
+                1_800_000_000_002,
+            )
+            .unwrap();
+        std::fs::write(dir.0.join("ABC-1800000000003-manual.json"), b"{broken").unwrap();
+        hub.rooms["ABC"].broadcast(&hub.maps, &hub.public_url);
+        for receiver in receivers {
+            let received = messages(hub, receiver);
+            assert_eq!(received.len(), 2);
+            assert_eq!(
+                received[0]["saves"],
+                json!([{"id":first,"kind":"manual","savedAt":1_800_000_000_000u64,"mode":"conquest","minutes":1,"names":["First"]}])
+            );
+            assert_eq!(
+                received[1]["saves"],
+                json!([
+                {"id":second,"kind":"auto","savedAt":1_800_000_000_001u64,"mode":"world","minutes":2,"names":["Second"],"world":{"total":8,"owned":[3,2]}},
+                {"id":first,"kind":"manual","savedAt":1_800_000_000_000u64,"mode":"conquest","minutes":1,"names":["First"]}])
+            );
+            let text = received[1]["saves"].to_string();
+            for secret in [
+                "guard", "triggers", "private", "memory", "bytes", "token", "XYZ",
+            ] {
+                assert!(!text.contains(secret));
+            }
         }
+        assert_eq!(
+            hub.rooms["ABC"].lobby(host_id, &hub.maps, &hub.public_url)["saves"]
+                .as_array()
+                .unwrap()
+                .len(),
+            2
+        );
     }
-    assert_eq!(
-        hub.rooms["ABC"].lobby(a.id, &hub.maps, &hub.public_url)["saves"]
-            .as_array()
-            .unwrap()
-            .len(),
-        2
+    let running_dir = TestDir::new();
+    let (mut running, host, mut host_rx, _, mut guest_rx) = setup(&running_dir);
+    assert!(running.rooms["ABC"].native.is_some());
+    check_broadcasts(
+        &mut running,
+        &running_dir,
+        host.id,
+        &mut [&mut host_rx, &mut guest_rx],
+    );
+    let dir = TestDir::new();
+    let mut hub = Hub::new(32, String::new());
+    hub.configure_saves(dir.0.clone());
+    let (a, mut ra) = peer(1);
+    let (b, mut rb) = peer(2);
+    let (watcher, mut watcher_rx) = peer(3);
+    let (operative, mut operative_rx) = peer(4);
+    for (client, message) in [
+        (&a, json!({"t":"hello","token":"host","name":"Host"})),
+        (&b, json!({"t":"hello","token":"guest","name":"Guest"})),
+        (
+            &watcher,
+            json!({"t":"hello","token":"watch","name":"Watcher","spectate":true}),
+        ),
+        (
+            &operative,
+            json!({"t":"hello","token":"friend","name":"Friend","role":"operative","commander":0}),
+        ),
+    ] {
+        let mut joined = false;
+        hub.message("ABC", client, &mut joined, message, 0);
+        assert!(joined);
+    }
+    for receiver in [&mut ra, &mut rb, &mut watcher_rx, &mut operative_rx] {
+        messages(&mut hub, receiver);
+    }
+    assert!(hub.rooms["ABC"].native.is_none());
+    check_broadcasts(
+        &mut hub,
+        &dir,
+        a.id,
+        &mut [&mut ra, &mut rb, &mut watcher_rx, &mut operative_rx],
     );
 }
 #[test]
@@ -320,21 +382,11 @@ fn net89_manual_save_requires_running_host_and_replies_before_lobby() {
         .read("ABC", received[0]["id"].as_str().unwrap())
         .unwrap();
     assert_eq!(
-        saved
-            .as_object()
-            .unwrap()
-            .keys()
-            .map(String::as_str)
-            .collect::<Vec<_>>(),
+        sorted_keys(&saved),
         vec!["ai", "g", "guard", "map", "seats", "settings", "version"]
     );
     assert_eq!(
-        saved["settings"]
-            .as_object()
-            .unwrap()
-            .keys()
-            .map(String::as_str)
-            .collect::<Vec<_>>(),
+        sorted_keys(&saved["settings"]),
         vec![
             "army",
             "defenderTeam",
@@ -357,9 +409,19 @@ fn net89_manual_save_requires_running_host_and_replies_before_lobby() {
     );
 }
 #[test]
-fn save_load_running_match_restores_rng_orders_terrain_and_every_seat_through_victory() {
+fn net12_saved_editor_map_restores_exact_state_and_every_seat_through_victory() {
     let dir = TestDir::new();
     let (mut hub, host, mut host_rx, _, mut guest_rx) = setup(&dir);
+    let editor = crate::MapEditor::open(dir.0.join("maps"), "editor-password").unwrap();
+    let raw = crate::map_editor_tests::raw_map();
+    editor.save("default", raw.to_string().as_bytes()).unwrap();
+    let raw = editor.raw("default").unwrap();
+    hub.rooms.get_mut("ABC").unwrap().native = None;
+    hub.configure_maps(Some(editor.clone()));
+    let (state, _) = small_match_from_raw(raw.clone());
+    hub.attach_native("ABC", state, 0).unwrap();
+    messages(&mut hub, &mut host_rx);
+    messages(&mut hub, &mut guest_rx);
     let selected = (0..2)
         .map(|slot| SelectedSeat {
             slot,
@@ -390,8 +452,35 @@ fn save_load_running_match_restores_rng_orders_terrain_and_every_seat_through_vi
     assert_eq!(runtime.state().commands.pending_tick(60).count(), 1);
     let id = hub.save_room("ABC", host.id).unwrap();
     let saved = hub.saves.read("ABC", &id).unwrap();
+    assert_eq!(saved["version"], 1);
+    assert_eq!(saved["map"], raw);
+    assert_eq!(
+        sorted_keys(&saved),
+        ["ai", "g", "guard", "map", "seats", "settings", "version"]
+    );
+    // Loading binds the saved raw map even after the editor replaces its file.
+    let (_, replacement) = small_match();
+    editor
+        .save("default", replacement.to_string().as_bytes())
+        .unwrap();
     let restored = Match::from_save_json(saved["g"]["state"].clone()).unwrap();
     assert_same_json(&restored.save_json().unwrap(), &saved["g"]["state"]);
+    let mut legacy = saved.clone();
+    legacy["version"] = json!(1);
+    legacy["g"]["state"][1]
+        .as_array_mut()
+        .unwrap()
+        .retain(|entry| entry[0] != json!(["string", "elimination"]));
+    let legacy_id = hub
+        .saves
+        .write(
+            "ABC",
+            "manual",
+            &legacy,
+            json!({"mode":"conquest","minutes":0,"names":["host","guest"]}),
+            1_800_000_000_000,
+        )
+        .unwrap();
     let mut original = hub
         .rooms
         .get_mut("ABC")
@@ -400,6 +489,20 @@ fn save_load_running_match_restores_rng_orders_terrain_and_every_seat_through_vi
         .take()
         .unwrap()
         .runtime;
+    hub.load_room("ABC", host.id, &legacy_id, 5000).unwrap();
+    assert!(hub.native_status("ABC").unwrap().paused);
+    hub.message("ABC", &host, &mut true, json!({"t":"resume"}), 5001);
+    messages(&mut hub, &mut host_rx);
+    messages(&mut hub, &mut guest_rx);
+    let mut legacy_runtime = hub
+        .rooms
+        .get_mut("ABC")
+        .unwrap()
+        .native
+        .take()
+        .unwrap()
+        .runtime;
+    // Load the complete v1 checkpoint through the same transaction as the legacy body.
     hub.load_room("ABC", host.id, &id, 5000).unwrap();
     messages(&mut hub, &mut host_rx);
     messages(&mut hub, &mut guest_rx);
@@ -420,6 +523,10 @@ fn save_load_running_match_restores_rng_orders_terrain_and_every_seat_through_vi
     for _ in 0..3000 {
         original.advance_tick(&[false; 2]).unwrap();
         loaded.advance_tick(&[false; 2]).unwrap();
+        legacy_runtime.advance_tick(&[false; 2]).unwrap();
+        let legacy_frame = legacy_runtime
+            .collect_frame(&selected, FrameKind::Scheduled)
+            .unwrap();
         let expected = original
             .collect_frame(&selected, FrameKind::Scheduled)
             .unwrap();
@@ -428,9 +535,12 @@ fn save_load_running_match_restores_rng_orders_terrain_and_every_seat_through_vi
             .unwrap();
         assert_eq!(expected.len(), 2);
         assert_eq!(actual.len(), 2);
-        for (a, b) in expected.iter().zip(&actual) {
+        assert_eq!(legacy_frame.len(), 2);
+        for ((a, b), legacy) in expected.iter().zip(&actual).zip(&legacy_frame) {
             assert_same_json(&a.message, &b.message);
+            assert_same_json(&a.message, &legacy.message);
         }
+        assert!(legacy_runtime.fault().is_none());
         assert_eq!(original.state().start.random, loaded.state().start.random);
         let tick = loaded.state().world.game.tick;
         if matches!(tick, 60 | 61) {
@@ -517,7 +627,7 @@ fn net80_loaded_save_stays_host_paused_until_host_resume_and_refuses_versions_at
     let id = hub.save_room("ABC", host.id).unwrap();
     hub.rooms.get_mut("ABC").unwrap().native = None;
     let mut invalid = hub.saves.read("ABC", &id).unwrap();
-    invalid["version"] = json!(2);
+    invalid["version"] = json!(4);
     let mut zipper = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
     zipper
         .write_all(&serde_json::to_vec(&invalid).unwrap())
@@ -557,7 +667,7 @@ fn net80_loaded_save_stays_host_paused_until_host_resume_and_refuses_versions_at
                 < rows.iter().position(|m| m["t"] == "start").unwrap()
         );
         assert_eq!(
-            rows.last().unwrap(),
+            &rows[rows.iter().position(|m| m["t"] == "start").unwrap() - 1],
             &json!({"t":"pause","paused":true,"by":"host","reason":"host","left":0})
         );
     }
@@ -703,3 +813,211 @@ fn save_between_frames_restores_unsent_events_once_without_consuming_live_terrai
             .is_none_or(|shots| shots.iter().all(|event| event["k"] != "hurt"))
     );
 }
+
+#[test]
+fn authored_objectives_save_v2_rejects_downgrade_and_restores_mission_and_pending_say() {
+    let dir = TestDir::new();
+    let (mut hub, host, mut ra, _guest, mut rb) = setup(&dir);
+    let native = hub.rooms["ABC"].native.as_ref().unwrap();
+    let options = native.runtime.state().options.clone();
+    let mut raw = native.startup.raw_map().clone();
+    raw["scenario"] = json!({"version":1,"objectives":[{"id":"hold","text":"Hold"}],
+        "triggers":[{"id":"intro","scope":"match","condition":{"kind":"time","seconds":0.05},
+        "actions":[{"kind":"objectiveActivate","objective":"hold"},{"kind":"say","text":"Hold"}]}]});
+    let map =
+        ww2_core::map::AuthoritativeMap::from_json(&serde_json::to_vec(&raw).unwrap()).unwrap();
+    let state = Match::new(&map, options).unwrap();
+    let prepared = hub
+        .prepare_native_room(&hub.rooms["ABC"], state, 0, true, Some(&raw))
+        .unwrap();
+    hub.publish_native("ABC", prepared);
+    let runtime = &mut hub
+        .rooms
+        .get_mut("ABC")
+        .unwrap()
+        .native
+        .as_mut()
+        .unwrap()
+        .runtime;
+    runtime.advance_tick(&[false; 2]).unwrap();
+    let mission = runtime.state().authored_scenario.clone();
+    let id = hub.save_room("ABC", host.id).unwrap();
+    let mut saved = hub.saves.read("ABC", &id).unwrap();
+    assert_eq!(saved["version"], 2);
+    hub.rooms.get_mut("ABC").unwrap().native = None;
+    // The superseded version 3 is refused before restoration, preserving the lobby and epoch.
+    let mut legacy = saved.clone();
+    legacy["version"] = json!(3);
+    let bad = "ABC-1800000000002-manual";
+    let mut zipper = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+    zipper
+        .write_all(&serde_json::to_vec(&legacy).unwrap())
+        .unwrap();
+    std::fs::write(dir.0.join(format!("{bad}.save")), zipper.finish().unwrap()).unwrap();
+    let epoch = hub.next_epoch;
+    assert_eq!(
+        hub.load_room("ABC", host.id, bad, 2).unwrap_err(),
+        "unsupported save version"
+    );
+    assert_eq!(hub.next_epoch, epoch);
+    assert!(hub.rooms["ABC"].native.is_none());
+    // Current-main timed-v1 saves are deliberately decode-only, never silently
+    // accepted after dropping their old mission owner.
+    let mut timed_v1 = saved.clone();
+    timed_v1["version"] = json!(1);
+    let fields = timed_v1["g"]["state"][1].as_array_mut().unwrap();
+    fields.retain(|entry| {
+        entry[0] != json!(["string", "authored_scenario"])
+            && entry[0] != json!(["string", "authored_mission"])
+    });
+    fields.push(json!([
+        ["string", "authored_mission"],
+        [
+            "some",
+            [
+                "map",
+                [
+                    [
+                        ["string", "definition"],
+                        [
+                            "map",
+                            [
+                                [["string", "version"], ["u", 1]],
+                                [["string", "triggers"], ["seq", []]],
+                                [["string", "objectives"], ["seq", []]]
+                            ]
+                        ]
+                    ],
+                    [["string", "first_tick"], ["none"]],
+                    [["string", "last_tick"], ["none"]],
+                    [["string", "triggers"], ["seq", []]],
+                    [["string", "objectives"], ["seq", []]],
+                    [["string", "next_execution"], ["u", 1]]
+                ]
+            ]
+        ]
+    ]));
+    let old_timed = hub
+        .saves
+        .write("ABC", "manual", &timed_v1, json!({}), 1_800_000_000_003)
+        .unwrap();
+    let epoch = hub.next_epoch;
+    assert_eq!(
+        hub.load_room("ABC", host.id, &old_timed, 2).unwrap_err(),
+        "legacy authored mission checkpoints are unsupported"
+    );
+    assert_eq!(hub.next_epoch, epoch);
+    assert!(hub.rooms["ABC"].native.is_none());
+    saved["version"] = json!(1);
+    let downgraded = hub
+        .saves
+        .write("ABC", "manual", &saved, json!({}), 1_800_000_000_001)
+        .unwrap();
+    let epoch = hub.next_epoch;
+    assert_eq!(
+        hub.load_room("ABC", host.id, &downgraded, 2).unwrap_err(),
+        "authored scenarios require save version 2"
+    );
+    assert_eq!(hub.next_epoch, epoch);
+    assert!(hub.rooms["ABC"].native.is_none());
+    messages(&mut hub, &mut ra);
+    messages(&mut hub, &mut rb);
+    hub.load_room("ABC", host.id, &id, 3).unwrap();
+    let runtime = &mut hub
+        .rooms
+        .get_mut("ABC")
+        .unwrap()
+        .native
+        .as_mut()
+        .unwrap()
+        .runtime;
+    assert_eq!(runtime.state().authored_scenario, mission);
+    assert_eq!(runtime.state().world.game.tick, 1);
+    let rows = runtime
+        .collect_frame(
+            &[SelectedSeat {
+                slot: 0,
+                full: true,
+                omit: false,
+            }],
+            FrameKind::Scheduled,
+        )
+        .unwrap();
+    assert_eq!(
+        rows[0].message["scenario"]["objectives"][0]["state"],
+        "active"
+    );
+    assert_eq!(
+        rows[0].message["shots"],
+        json!([{"k":"say","text":"Hold","localized":"Hold",
+        "scenarioRecipients":"public","scenarioSide":0,"pub":true,"execution":"scenario:1","atTick":1}])
+    );
+    assert!(runtime.fault().is_none());
+}
+
+#[test]
+fn mode55_lobby_record_uses_current_map_defender_count_and_army_after_reload() {
+    let dir = TestDir::new();
+    std::fs::create_dir_all(&dir.0).unwrap();
+    let path = dir.0.join("horde-records.json");
+    let records = crate::HordeRecords::new(path.clone());
+    let best = json!({"wave":7,"kills":42,"time":310,"names":["Host","Friend"]});
+    records.record(
+        "bastogne",
+        2,
+        "standard",
+        crate::horde_records::Run {
+            wave: 7,
+            kills: 42,
+            time: 310,
+            names: vec!["Host".into(), "Friend".into()],
+        },
+        false,
+    );
+    let (mut hub, host, mut rx, _, _) = setup(&dir);
+    hub.configure_records(crate::HordeRecords::new(path));
+    let room = hub.rooms.get_mut("ABC").unwrap();
+    room.native = None;
+    room.mode = "horde".into();
+    room.map = "bastogne".into();
+    assert_eq!(room.lobby(host.id, &hub.maps, "")["hordeBest"], best);
+    room.army = "large".into();
+    assert_eq!(room.lobby(host.id, &hub.maps, "")["hordeBest"], Value::Null);
+    room.army = "standard".into();
+    room.map = "bocage".into();
+    assert_eq!(room.lobby(host.id, &hub.maps, "")["hordeBest"], Value::Null);
+    room.map = "bastogne".into();
+    room.players.pop();
+    assert_eq!(room.lobby(host.id, &hub.maps, "")["hordeBest"], Value::Null);
+    room.mode = "conquest".into();
+    assert_eq!(room.lobby(host.id, &hub.maps, "")["hordeBest"], Value::Null);
+    // The composed hosted runtime now admits this eligible one-defender lobby.
+    room.mode = "horde".into();
+    hub.message("ABC", &host, &mut true, json!({"t":"start"}), 1);
+    assert!(
+        messages(&mut hub, &mut rx)
+            .iter()
+            .any(|m| m["t"] == "start")
+    );
+    let native = hub.rooms.get_mut("ABC").unwrap().native.as_mut().unwrap();
+    native.runtime.advance_tick(&[false; 2]).unwrap();
+    let seats = (0..2)
+        .map(|slot| SelectedSeat {
+            slot,
+            full: false,
+            omit: false,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        native
+            .runtime
+            .collect_frame(&seats, FrameKind::Current)
+            .unwrap()
+            .len(),
+        2
+    );
+    assert!(native.runtime.fault().is_none());
+}
+
+#[path = "reset_restore_tests.rs"]
+mod reset_restore;

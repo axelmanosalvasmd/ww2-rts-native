@@ -64,7 +64,8 @@ fn ordinary_binary_opt_in_admits_spectators_and_retains_other_refusals() {
     let default = BinaryServer::start(false, SEED);
     let mut ordinary = Client::join(default.address, "a");
     ordinary.send(json!({"t":"start"}));
-    assert_eq!(ordinary.deny("start")["reason"], "scenario");
+    assert_eq!(ordinary.until(|m| m["t"] == "start")["you"], 0);
+    assert_eq!(ordinary.until(|m| m["t"] == "s")["online"], json!([true]));
     ordinary.send(json!({"t":"restart"}));
     assert_eq!(ordinary.deny("restart")["reason"], "scenario");
     assert!(default.receipts().is_empty());
@@ -94,6 +95,25 @@ fn ordinary_binary_opt_in_admits_spectators_and_retains_other_refusals() {
     host.send(json!({"t":"start"}));
     host.deny("start");
     assert!(server.receipts().is_empty());
+    // One human may add an AI inside the trusted two-commander boundary.
+    host.send(json!({"t":"addAi"}));
+    let with_ai = host.until(|m| {
+        m["t"] == "lobby"
+            && m["players"]
+                .as_array()
+                .is_some_and(|players| players.len() == 2)
+            && m["players"][1]["ai"] == true
+    });
+    assert_eq!(with_ai["players"][1]["connected"], true);
+    host.send(json!({"t":"kick","slot":1}));
+    let without_ai = host.until(|m| {
+        m["t"] == "lobby"
+            && m["players"]
+                .as_array()
+                .is_some_and(|players| players.len() == 1)
+    });
+    assert_eq!(without_ai["players"][0]["name"], "a");
+    assert!(server.receipts().is_empty());
     let _guest = Client::join(server.address, "b");
     let mut third = Client::open(
         server.address,
@@ -110,7 +130,7 @@ fn ordinary_binary_opt_in_admits_spectators_and_retains_other_refusals() {
     assert_eq!(watching["spectator"], true);
     assert_eq!(watching["you"], -1);
     host.send(json!({"t":"addAi"}));
-    host.deny("addAi");
+    assert_eq!(host.deny("addAi")["reason"], "blocked");
     host.send(json!({"t":"spectate"}));
     let released = host.until(|m| m["t"] == "lobby" && m["spectator"] == true);
     assert_eq!(released["players"].as_array().unwrap().len(), 1);
@@ -178,26 +198,33 @@ fn ordinary_binary_two_seats_move_stop_takeover_and_restart_with_private_seed() 
     clients[0].send(json!({"t":"restart"}));
     let fresh = clients[0].until(|m| m["t"] == "start");
     assert!(fresh["matchId"].as_u64().unwrap() > identity);
-    assert_eq!(
-        replacement.until(|m| m["t"] == "start")["matchId"],
-        fresh["matchId"]
-    );
-    assert_eq!(fresh["spawns"], start["spawns"]);
-    assert_eq!(fresh["weather"], start["weather"]);
+    let guest_fresh = replacement.until(|m| m["t"] == "start");
+    assert_eq!(guest_fresh["matchId"], fresh["matchId"]);
+    assert_eq!(guest_fresh["spawns"], fresh["spawns"]);
+    assert_eq!(guest_fresh["weather"], fresh["weather"]);
     clients[0].barrier();
     let receipts = server.receipts();
     assert_eq!(receipts.len(), 2);
-    assert_eq!(receipts[0]["options"], receipts[1]["options"]);
-    for receipt in receipts {
+    let mut fresh_settings = receipts[1]["options"].clone();
+    fresh_settings["seed"] = receipts[0]["options"]["seed"].clone();
+    fresh_settings["weatherSeed"] = receipts[0]["options"]["weatherSeed"].clone();
+    assert_eq!(receipts[0]["options"], fresh_settings);
+    assert_ne!(
+        receipts[0]["environmentSeed"],
+        receipts[1]["environmentSeed"]
+    );
+    for (index, receipt) in receipts.into_iter().enumerate() {
         let options = &receipt["options"];
-        assert_eq!(options["seed"].as_u64(), Some(u64::MAX));
-        assert_eq!(options["weatherSeed"], Value::Null);
-        for key in ["shuffle", "tech", "supply", "livingWeather"] {
+        assert_eq!(
+            options["seed"].as_u64(),
+            Some(u64::MAX.wrapping_add(index as u64))
+        );
+        assert!(options["weatherSeed"].as_u64().unwrap() < (1 << 31));
+        assert_eq!(options["weatherSeed"], receipt["derivedWeatherSeed"]);
+        for key in ["shuffle", "tech", "supply", "livingWeather", "logistics"] {
             assert_eq!(options[key], true);
         }
-        for key in ["logistics", "sandbox"] {
-            assert_eq!(options[key], false);
-        }
+        assert_eq!(options["sandbox"], false);
         assert_eq!(options.as_object().unwrap().len(), 13);
     }
     assert_eq!(server.directory(), json!({"rooms":[]}));
@@ -213,12 +240,17 @@ fn ordinary_binary_absent_seat_start_and_restart_auto_pause_then_same_token_resu
     let lobby = host.until(|m| m["t"] == "lobby" && m["players"][1]["connected"] == false);
     assert_eq!(lobby["players"].as_array().unwrap().len(), 2);
     host.send(json!({"t":"start"}));
-    let first = host.until(|m| m["t"] == "start");
     assert_eq!(
         host.until(|m| m["t"] == "pause" && m["paused"] == true)["reason"],
         "drop"
     );
-    assert!(host.barrier().iter().all(|m| m["t"] != "s"));
+    let first = host.until(|m| m["t"] == "start");
+    assert!(
+        host.barrier()
+            .iter()
+            .filter(|m| m["t"] == "s")
+            .all(|m| m["tick"] == 0)
+    );
     let mut guest = Client::open(
         server.address,
         "ABC",
@@ -236,9 +268,9 @@ fn ordinary_binary_absent_seat_start_and_restart_auto_pause_then_same_token_resu
     drop(guest);
     host.until(|m| m["t"] == "lobby" && m["players"][1]["connected"] == false);
     host.send(json!({"t":"restart"}));
+    host.until(|m| m["t"] == "pause" && m["paused"] == true);
     let second = host.until(|m| m["t"] == "start");
     assert!(second["matchId"].as_u64().unwrap() > first["matchId"].as_u64().unwrap());
-    host.until(|m| m["t"] == "pause" && m["paused"] == true);
     let mut guest = Client::open(
         server.address,
         "ABC",
@@ -258,21 +290,49 @@ fn ordinary_binary_absent_seat_start_and_restart_auto_pause_then_same_token_resu
 fn ordinary_binary_refuses_unsupported_settings_before_any_start_publication() {
     let cases = [
         json!({"t":"mode","v":"world"}),
-        json!({"t":"mode","v":"assault"}),
-        json!({"t":"mode","v":"annihilation"}),
-        json!({"t":"mode","v":"classic"}),
         json!({"t":"mode","v":"horde"}),
         json!({"t":"mode","v":"tutorial"}),
-        json!({"t":"sandbox","v":true}),
         json!({"t":"team","slot":1,"v":0}),
     ];
     for setting in cases {
         let server = BinaryServer::start(true, SEED);
         let mut host = Client::join(server.address, "a");
-        let _guest = Client::join(server.address, "b");
+        let mut guest = Client::join(server.address, "b");
         host.send(setting.clone());
         host.barrier();
         host.send(json!({"t":"start"}));
+        if setting["t"] == "mode" && matches!(setting["v"].as_str(), Some("horde" | "tutorial")) {
+            let mode = setting["v"].as_str().unwrap();
+            // Horde and Tutorial are now admitted. Preserve a real-socket
+            // witness rather than merely deleting the former refusal case.
+            let starts = [
+                host.until(|m| m["t"] == "start"),
+                guest.until(|m| m["t"] == "start"),
+            ];
+            assert_eq!(starts[0]["matchId"], starts[1]["matchId"]);
+            for (slot, start) in starts.iter().enumerate() {
+                assert_eq!(start["you"], slot);
+                assert_eq!(start["sandbox"], false);
+                assert_eq!(start["names"].as_array().unwrap().len(), 3);
+                assert_eq!(
+                    start["names"][2],
+                    if mode == "horde" { "Horde" } else { "Enemy" }
+                );
+                assert_eq!(start["teams"], json!([0, 0, 1]));
+            }
+            for _ in 0..3 {
+                for frame in [
+                    host.until(|m| m["t"] == "s"),
+                    guest.until(|m| m["t"] == "s"),
+                ] {
+                    assert_eq!(frame["mode"]["kind"], mode);
+                    assert_eq!(frame["online"].as_array().unwrap().len(), 2);
+                    assert!(frame["tick"].as_u64().unwrap() > 0);
+                }
+            }
+            assert!(!server.log().contains("NATIVE_FAULT"));
+            continue;
+        }
         assert_eq!(host.deny("start")["reason"], "scenario", "{setting}");
         assert!(
             host.barrier()
@@ -290,7 +350,13 @@ fn ordinary_binary_refuses_unsupported_settings_before_any_start_publication() {
         host.barrier();
         begin(&mut host, &mut guest);
         host.until(|m| m["t"] == "s");
-        assert_eq!(server.receipts()[0]["options"]["weather"], weather);
+        let receipts = server.receipts();
+        assert_eq!(receipts[0]["options"]["weather"], weather);
+        assert!(receipts[0]["options"]["weatherSeed"].as_u64().unwrap() < (1 << 31));
+        assert_eq!(
+            receipts[0]["options"]["weatherSeed"],
+            receipts[0]["derivedWeatherSeed"]
+        );
     }
 }
 
@@ -455,5 +521,147 @@ fn mode06_binary_named_armies_start_and_deliver_to_both_sockets() {
         host.barrier();
         assert_eq!(server.receipts()[0]["options"]["army"], key);
         assert!(!server.log().contains("NATIVE_FAULT"));
+    }
+}
+
+#[test]
+fn room_ai_binary_starts_selected_difficulty_and_delivers_recipient_snapshots() {
+    let server = BinaryServer::start(true, SEED);
+    let mut host = Client::join(server.address, "a");
+    host.send(json!({"t":"addAi"}));
+    host.until(|m| m["t"] == "lobby" && m["players"].as_array().is_some_and(|p| p.len() == 2));
+    host.send(json!({"t":"level","slot":1,"v":"hard"}));
+    let lobby = host.until(|m| m["t"] == "lobby" && m["players"][1]["level"] == "hard");
+    assert_eq!(
+        lobby["players"][1],
+        json!({"name":"AI 1","connected":true,"ai":true,"team":1,"faction":1,"level":"hard"})
+    );
+    host.send(json!({"t":"start"}));
+    let start = host.until(|m| m["t"] == "start");
+    assert_eq!(start["names"], json!(["a", "AI 1"]));
+    for _ in 0..4 {
+        let snapshot = host.until(|m| m["t"] == "s");
+        assert_eq!(snapshot["online"], json!([true, true]));
+        assert_eq!(snapshot["ping"][1].as_f64(), Some(-1.0));
+    }
+    assert_eq!(server.receipts().len(), 1);
+}
+
+#[test]
+fn mode01_mode04_binary_ordinary_modes_start_snapshot_and_restart() {
+    for mode in ["conquest", "classic", "annihilation", "assault"] {
+        let server = BinaryServer::start(true, SEED);
+        let mut host = Client::join(server.address, "a");
+        let mut guest = Client::join(server.address, "b");
+        host.send(json!({"t":"mode","v":mode}));
+        host.barrier();
+        let (a, b) = begin(&mut host, &mut guest);
+        assert_eq!(a["matchId"], b["matchId"]);
+        for client in [&mut host, &mut guest] {
+            let snapshot = client.until(|m| m["t"] == "s");
+            if mode == "conquest" {
+                assert!(snapshot.get("mode").is_none());
+            } else {
+                assert_eq!(snapshot["mode"]["kind"], mode);
+            }
+        }
+        assert_eq!(server.receipts()[0]["options"]["mode"], mode);
+        host.send(json!({"t":"restart"}));
+        for client in [&mut host, &mut guest] {
+            let start = client.until(|m| m["t"] == "start");
+            assert!(start["matchId"].as_u64().unwrap() > a["matchId"].as_u64().unwrap());
+            client.until(|m| m["t"] == "s");
+        }
+    }
+}
+
+#[test]
+fn room_ai_horde_binary_starts_selected_level_and_internal_horde_views() {
+    let server = BinaryServer::start(true, SEED);
+    let mut host = Client::join(server.address, "a");
+    host.send(json!({"t":"addAi"}));
+    host.until(|m| m["t"] == "lobby" && m["players"].as_array().is_some_and(|p| p.len() == 2));
+    host.send(json!({"t":"level","slot":1,"v":"hard"}));
+    host.until(|m| m["t"] == "lobby" && m["players"][1]["level"] == "hard");
+    host.send(json!({"t":"mode","v":"horde"}));
+    host.until(|m| m["t"] == "lobby" && m["mode"] == "horde");
+    host.send(json!({"t":"start"}));
+    let start = host.until(|m| m["t"] == "start");
+    assert_eq!(start["names"], json!(["a", "AI 1", "Horde"]));
+    assert_eq!(start["teams"], json!([0, 0, 1]));
+    assert_eq!(start["spawns"].as_array().unwrap().len(), 3);
+    for _ in 0..4 {
+        let snapshot = host.until(|m| m["t"] == "s");
+        assert_eq!(snapshot["mode"]["kind"], "horde");
+        assert_eq!(snapshot["mode"]["slot"], 2);
+        assert_eq!(snapshot["online"], json!([true, true]));
+        assert_eq!(snapshot["ping"][1].as_f64(), Some(-1.0));
+    }
+    host.barrier();
+    assert!(!server.log().contains("NATIVE_FAULT"));
+}
+
+#[test]
+fn hosted_horde_binary_trusted_start_and_restart_reach_horde_owner() {
+    let server = BinaryServer::start(true, SEED);
+    let mut host = Client::join(server.address, "a");
+    let mut guest = Client::join(server.address, "b");
+    host.send(json!({"t":"mode","v":"horde"}));
+    let lobby = host.until(|m| m["t"] == "lobby" && m["mode"] == "horde");
+    assert_eq!(lobby["mapName"], "bastogne");
+    let mut previous_id = None;
+    for command in ["start", "restart"] {
+        host.send(json!({"t":command}));
+        let a = host.until(|m| m["t"] == "start");
+        let b = guest.until(|m| m["t"] == "start");
+        assert_eq!(a["names"], json!(["a", "b", "Horde"]));
+        assert_eq!(a["teams"], json!([0, 0, 1]));
+        assert_eq!(a["matchId"], b["matchId"]);
+        if let Some(previous) = previous_id {
+            assert_ne!(a["matchId"], previous);
+        }
+        previous_id = Some(a["matchId"].clone());
+        for client in [&mut host, &mut guest] {
+            for _ in 0..3 {
+                let snapshot = client.until(|m| m["t"] == "s");
+                assert_eq!(snapshot["mode"]["kind"], "horde");
+                assert_eq!(snapshot["online"], json!([true, true]));
+            }
+        }
+        host.barrier();
+        assert!(!server.log().contains("NATIVE_FAULT"));
+    }
+    assert!(!server.log().contains("NATIVE_FAULT"));
+}
+
+#[test]
+fn ordinary_binary_horde_and_sandbox_horde_start_and_deliver_to_both_sockets() {
+    for sandbox in [false, true] {
+        let server = BinaryServer::start(true, SEED);
+        let mut host = Client::join(server.address, "a");
+        let mut guest = Client::join(server.address, "b");
+        host.send(json!({"t":"mode","v":"horde"}));
+        host.send(json!({"t":"sandbox","v":sandbox}));
+        host.barrier();
+        host.send(json!({"t":"start"}));
+        for start in [
+            host.until(|m| m["t"] == "start"),
+            guest.until(|m| m["t"] == "start"),
+        ] {
+            assert_eq!(start["sandbox"], sandbox);
+            assert_eq!(start["names"].as_array().unwrap().len(), 3);
+            assert_eq!(start["names"][2], "Horde");
+            assert_eq!(start["teams"], json!([0, 0, 1]));
+        }
+        for _ in 0..3 {
+            for frame in [
+                host.until(|m| m["t"] == "s"),
+                guest.until(|m| m["t"] == "s"),
+            ] {
+                assert_eq!(frame["mode"]["kind"], "horde");
+                assert_eq!(frame["online"].as_array().unwrap().len(), 2);
+                assert!(frame["tick"].as_u64().unwrap() > 0);
+            }
+        }
     }
 }

@@ -1,10 +1,40 @@
 Current Unreal integration decisions and measurements: [slice 1y](design.d/2026-10-18-unreal-slice-1y.md). This preserves the approved exact-source ABI query boundary and records the current-main R1 profile incompatibility separately from decoder compatibility.
 
+## Shared authored mission state (2026-10-17)
+
+Use one complete authored v2 checkpoint owner with a required execution clock. Reuse the existing timed evaluator for canonical restoration and preserve public-only spectator projection. Ordinary non-authored saves stay v1; legacy authored owners are explicitly refused. The [state reconciliation](design.d/2026-10-17-scenario-owner-reconciliation.md) records the schema and validation choice.
+
+## Commander medic and house-shelling chores (2026-10-16)
+
+The detached tactics planner now moves a stationary medic toward the ground army mean when it is more than `CFG.aid.seek * 0.8` away. Ground army members contribute in unit ID order. Shell-capable units without a target or an active FireAt choose the first noticed enemy garrison strictly within 60 metres, also in unit ID order. Both decisions emit existing core commands and add no Match state.
+
+Pinned `shared/ai.js:593,673-681` puts these chores before the general busy check. A medic keeps its existing path, and a sheller keeps its active target or FireAt, but house shelling can replace a movement path. The tests retain that source precedence rather than interpreting AI-38's abbreviated busy wording as a new rule. Ordinary fighters still keep paths, attacks, aimed abilities, digging, entry, FireAt and targets. This is an internal planning change over delivered facts; command admission and recipient ownership remain with their existing owners.
+
+CMB-150 remains incomplete without World recovery, sandbox spawn and convoy command integration. CMB-146 still needs rail dispatch and its tick adapter. LOG-05 and LOG-08 remain incomplete without the other firing-family and full logistics-match evidence. Full logistics ticks and complete logistics snapshots stay guarded. This batch starts from PR #337's FireAt branch and must merge after it.
+
+## FireAt runtime and recipient lifetime (2026-10-16)
+
+Internal FireAt uses the existing unit-control cell, queued command owner and deterministic projectile state. Waiting orders normalize to one unit and a cell-center point, projected as existing owner order kind 5. Active plans use the same kind. Direct guns approach intact terrain, accept a first wall only when it belongs to the target structure, and stop after the target cell is destroyed. Salvos keep firing on open ground until replaced. Both use the existing ammunition and shortage owners.
+
+The complete recipient adapter previously rejected all persistent projectiles. Ground flights now use the existing prototype flight row, current fog visibility, hidden shooter removal and a visual horizon clipped by fog and visible contacts. This changes no row shape, contract or public command whitelist. Public `fireat` and compound `orders` remain blocked. World tactical FireAt and replacing a pending aimed ability remain closed at admission. Main's aircraft area owner remains unchanged, including its refusal of mixed selections containing an eligible ground sheller. AI house-shelling and medic chores remain separate work.
+
 ## External AI memory across native checkpoints (2026-10-16)
 
 The separate AI save owner now has a core codec for policy and observation memory. Ordinary commander attention and queued motor inputs reset on load, matching the prototype's unsaved commander WeakMap. Native strategic RNG and bounded Horde pending-order state remain with their policy owner; native routing caches continue to use the persistence choice recorded in `design.d/2026-10-16-save-load.md`. Existing save v1 bodies and null AI content remain compatible. Hosted AI room admission and AI-63 remain separate. `docs/contracts/save-format.md` specifies the representation and `if27_save_continuation_keeps_planner_memory_and_resets_commander_attention` exercises the load boundary and subsequent native ticks.
 
 ## Owner parity decisions A, B and C (2026-10-16)
+
+## Server weather entropy and replay inputs (2026-10-16)
+
+Trusted start and restart now sample weather entropy at the server boundary,
+using `getrandom` 0.4.3 (already present in the lockfile) and the prototype's
+31-bit seed range. Each constructed match stores that input in
+`MatchOptions.weather_seed` and the existing private `NATIVE_MATCH` receipt.
+Replays use the recorded seed, and core ticks consume no operating-system
+entropy. Seed failure refuses startup before publication. This replaces the
+constructor-derived weather seed described in the historical R1 profile below;
+the configured match seed still owns layout and other purpose streams.
+
 
 The [recorded owner decisions](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6217590741) approve the differences below, the Rust-only acceptance of the listed client rows, and World deferral for milestone R1. Julio recorded both owners' decisions after Axel's voice approval; Axel's written confirmation on #5 is requested in that comment. This section records the decisions for STATUS-ABC.
 
@@ -5991,6 +6021,12 @@ Building memory follows the prototype's `isConstructionMode` gate: Classic and W
 
 Classic full ticks and non-ordinary recipient snapshots remain guarded. CMB-130 is dropped from this batch's claim: building memory runs in Classic/World only; waits on #301 Classic runner and World admission. Its component tests retain last-observed identity, type, owner, position and construction progress, shared team sight, hidden changes, unseen destruction and ground/airborne invalidation. Default/Conquest regressions cover seeing a barracks, retreating, hidden changes, retirement, VP finish and revisit with no memory or ghosts. Ability, base dispatch, research and bunker checks retain their full-match continuations and every-seat snapshots. No ABI, wire shape, contract or public command admission changes.
 
+## Additive authoring and placement C queries (2026-10-16)
+
+The owner decision `julio-373-merged-decisions-20261016` authorizes additive C queries for IF-04 and IF-12. Keep ABI 2's existing scalar version and every existing function and layout. Introduce minor revision 1 and a separate minor-version query so old consumers keep their version check. New queries use caller-owned JSON buffers with the existing error and panic conventions; variable result shapes need no new fixed-layout structs. This is a cold authoring/preview surface, with no performance claim or new wire format.
+
+Placement reads only the existing recipient handle. Authoring creates detached state from the user's own document. No running World room is admitted. World placement history, team-qualified recipient demine knowledge and complete seeded fairness equivalence remain explicitly bounded in `docs/contracts/abi-queries.md`. This implementation candidate requires exact-signature review before Unreal adoption.
+
 ## World fort capture follows main's bounded component (2026-10-16)
 
 PR #336 keeps main's World region, elimination and finish behavior from #301, including fort-owner transfers in the bounded component. Tick admission still refuses an imminent fort transfer before commands. The constructor's existing fort ranks retain a read-only regression test. The atomicity witness stages a damaged fort and an eliminated owner's construction plan, then requires the combined income, capture and elimination phase to refuse before changing units, owners, footprints, wallets or regions. World construction, Gate physics, recipient snapshots and hosted admission remain guarded. BASE-54 remains uncounted in this branch.
@@ -6010,3 +6046,89 @@ The scripted policy receives detached seat facts and feeds movements through #34
 Kaiju breath reuses #325's firing component. Added checks cover full-range and radius boundaries, one terrain debit per overlapping cell, scar values and seeded ignition predicates. The pinned prototype's unchanged trench check and direct breath component were run from an external temporary copy at `e4e579a`; the read-only submodule remains unchanged.
 
 Full Horde ticks, complete Horde snapshots and hosted rooms stay guarded. Support, aircraft and ability command attempts from the policy do not open their Horde actuation paths. Ordinary-match witnesses retain the new private policy state through actual capture, income and victory, collect every seat's recipient snapshot on every tick, and continue after finish. FFI, headers, wire schemas, contracts, privacy, public ingress, World admission and logistics tick/snapshot guards are unchanged.
+
+## MAC-AI seat scheduling and detached Classic economy (2026-10-16)
+
+The AI schedule delivers all requested observations before any seat acts and
+retains the last delivered view between snapshot beats. Player and terrain
+memory use public starting facts and only that seat's recipient rows. World
+metadata and remembered-terrain decoding remain detached components; the live
+adapter admits only ordinary Conquest. AI refreshes preserve browser terrain
+updates, including a handover after the browser has consumed its latest delta.
+
+Classic economy decisions now run inside the detached tactics planner before
+shopping: repair/help, depot allocation, production facilities, nearby-plane
+flak defense and budget reserves. Node assignments live in a per-seat BTreeMap.
+Node positions, rates, visibility and claims must come from delivered facts.
+The existing Classic admission and recipient guards stay closed, and the
+strategy is inactive in ordinary Conquest and World. Stable IDs break engineer
+and building distance ties; node indices break equal node scores. Site searches
+reuse core footprint rules over remembered terrain and delivered occupancy.
+Every idle engineer attempting a non-depot site consumes one Ai-purpose draw,
+including non-flak, unaffordable and unavailable sites, as in the prototype's
+object-literal evaluation. Existing native purpose-separated streams are kept;
+this change does not replace them with the prototype's global Math.random.
+
+The simtest seeded runner delivers opening observations, steps the real Match,
+completes each observation pass before acting, admits physical commander inputs
+through the canonical dispatcher and collects every seat's recipient snapshot.
+It retains native random streams and logs [slot, tick, kind, cmd, accepted].
+The source default map is copied verbatim from e4e579a, with no Source recorder.
+This is bounded native reproducibility infrastructure, not complete AI-65 proof:
+the attempted seed-7 Easy default-map 3,600-tick run first failed at tick 310
+with the existing ShotsAndFlights recipient refusal. The regression retains
+that failure, rather than clearing actors or weakening admission. Short-prefix
+reproducibility is separate from full-match and JavaScript-aligned evidence.
+AI-64 also remains blocked by missing Classic/Assault/Horde recipient producers.
+Those rows need a separately authorized recipient/runtime stream; no parity
+status, privacy rule, wire format, FFI or World admission changes here.
+
+## PR 342 integration with consolidated construction (2026-10-16)
+
+The tactics caller runs one construction pass before fortification and shopping.
+`commander_construction` delegates Classic to its detached economy planner and
+keeps the existing skirmish and World reserve paths. It returns the remaining
+wallet, next-building reserve and assigned crew IDs once. Build, Assist and
+node-travel crews are removed before fortification and adaptive rush orders;
+mounted crews and crews already working cannot start a second job. Engineers
+within the existing rush escape radius are reserved for defense before the
+construction pass. Defense and construction share the same delivered rush
+centroid and strict age, match-time and distance checks. The Classic
+site-draw order and per-engineer node memory remain unchanged.
+
+Node facts retain position, rate, resource kind and delivered visibility. Both
+Classic planning and shopping treat explicit claims, delivered live depots and
+remembered enemy depots as claims, with the existing strict eight-metre limit.
+Geometry reads the same node positions. Seat scheduling and delivery keep their
+existing implementation. Classic, World and field-work admission guards stay
+closed; this integration changes no public interface or parity status.
+
+## World fort capture follows main's bounded component (2026-10-16)
+
+PR #336 keeps main's World region, elimination and finish behavior from #301, including fort-owner transfers in the bounded component. Tick admission still refuses an imminent fort transfer before commands. The constructor's existing fort ranks retain a read-only regression test. The atomicity witness stages a damaged fort and an eliminated owner's construction plan, then requires the combined income, capture and elimination phase to refuse before changing units, owners, footprints, wallets or regions. World construction, Gate physics, recipient snapshots and hosted admission remain guarded. BASE-54 remains uncounted in this branch.
+
+## Borrowed building placement (2026-10-16)
+
+Ordinary Build admission uses one read-only building-placement query. It borrows terrain, actors, visibility and optional node, territory and rail-yard facts, so previews can use the same rule without adding match state. Equal-distance nodes retain their input index, matching the prototype's stable sort. The query returns the selected footprint and snapped centre even when a later rule refuses it. Visibility precedes territory, rail, node overlap, coast and physical occupancy. World facts are exercised as components; they do not admit World construction, hosted rooms or recipient delivery. Fortifications retain their separate existing query.
+
+## Horde core reveal, shared facilities and scripted policy (2026-10-16)
+
+`Match::update_horde_vision` refreshes ordinary sight and then adds the existing Horde wave markers in sorted unit-ID order. Only the canonical defender team receives the markers during an active wave. A zero remaining budget and `left <= 3` mark ground attackers; Kaiju markers ignore those two thresholds. Aircraft never gain a wave marker. The component reads existing wave state and changes no fog, recipient or hosting policy.
+
+Shared Horde production reuses the existing buyer debit, unit publisher, building rally and construction transactions. Horde startup initializes the existing seat-owned routing memories after stamping its shared base. Routing, recorded purchases and construction phases validate the canonical Horde team layout before using those components. The builder's team may supply the shared prerequisite and assist a living allied site, while only the site's owner may cancel it and receive the refund. No new Match or Unit fields are needed.
+
+The scripted policy receives detached seat facts and feeds movements through #343's bounded queue. It uses Normal scheduling, immediate visible contacts, automatic retreat arming, the nearest visible bunker measured from the Horde spawn, support priorities, ready aircraft and ground abilities. It does not buy, research, issue health retreats, choose human situations or call paradrops. Its private stationary history is derived from successive delivered positions; deterministic ties use unit IDs. This is the AI-57 decision component. Generic engineering and house-shelling chores belong to their separate AI rows and are not claimed here.
+
+Kaiju breath reuses #325's firing component. Added checks cover full-range and radius boundaries, one terrain debit per overlapping cell, scar values and seeded ignition predicates. The pinned prototype's unchanged trench check and direct breath component were run from an external temporary copy at `e4e579a`; the read-only submodule remains unchanged.
+
+Full Horde ticks, complete Horde snapshots and hosted rooms stay guarded. Support, aircraft and ability command attempts from the policy do not open their Horde actuation paths. Ordinary-match witnesses retain the new private policy state through actual capture, income and victory, collect every seat's recipient snapshot on every tick, and continue after finish. FFI, headers, wire schemas, contracts, privacy, public ingress, World admission and logistics tick/snapshot guards are unchanged.
+
+## Additive authoring and placement C queries (2026-10-16)
+
+The owner decision `julio-373-merged-decisions-20261016` authorizes additive C queries for IF-04 and IF-12. Keep ABI 2's existing scalar version and every existing function and layout. Introduce minor revision 1 and a separate minor-version query so old consumers keep their version check. New queries use caller-owned JSON buffers with the existing error and panic conventions; variable result shapes need no new fixed-layout structs. This is a cold authoring/preview surface, with no performance claim or new wire format.
+
+Placement reads only the existing recipient handle. Authoring creates detached state from the user's own document. No running World room is admitted. World placement history, team-qualified recipient demine knowledge and complete seeded fairness equivalence remain explicitly bounded in `docs/contracts/abi-queries.md`. This implementation candidate requires exact-signature review before Unreal adoption.
+
+## Additive presentation C queries (2026-10-17)
+
+IF-11 stacks on #418 and uses its caller-owned JSON query convention for movementProfile, isGroundVehicle, bodyRadius, flightAt and velocityAt. Major version 2 and existing declarations/layouts remain intact; minor revision 2 identifies the five additions. Motion queries select a compiled unit definition by name. Flight queries accept explicit finite world-metre coordinates, velocities, gravity, stamp and time, then delegate to the existing deterministic projectile providers. This avoids a new fixed-layout struct or a second flight calculation. No match state, wire field or gameplay rule is added. Exact signatures remain subject to Axel's review before Unreal adoption. The contract and source comparisons are in `docs/contracts/abi-queries.md` and `docs/testing/if11-presentation.md`.

@@ -48,12 +48,7 @@ fn base02_mode06_non_world_constructors_scale_wallets_and_population() {
         (ArmySize::Endless, 20.0, 5.0),
     ] {
         for mode in MODES {
-            let result = create(mode, army);
-            if mode == Mode::Horde && army == ArmySize::Endless {
-                assert!(result.err().unwrap().contains("Endless"));
-                continue;
-            }
-            let mut m = result.unwrap();
+            let mut m = create(mode, army).unwrap();
             let expected = match mode {
                 Mode::Conquest => vec![150.0, 150.0],
                 Mode::Assault => vec![320.0, 250.0],
@@ -97,9 +92,9 @@ fn base02_mode06_non_world_constructors_scale_wallets_and_population() {
                     "{mode:?} {army:?} seat {slot}"
                 );
             }
-            // Horde's full tick remains guarded. Other constructors use the ordinary tick.
-            if mode != Mode::Horde {
+            for _ in 0..3 {
                 m.advance_tick().unwrap();
+                assert!(m.tick_state.fault().is_none());
                 assert!(
                     m.start
                         .economy
@@ -107,6 +102,12 @@ fn base02_mode06_non_world_constructors_scale_wallets_and_population() {
                         .iter()
                         .all(|p| p.mp.is_finite() && p.inc.is_finite())
                 );
+                if mode != Mode::Tutorial {
+                    let cache = crate::recipient_snapshot::SnapshotCache::new(&m).unwrap();
+                    for slot in 0..m.start.players.len() {
+                        cache.recipient(slot).unwrap();
+                    }
+                }
             }
         }
     }
@@ -324,12 +325,12 @@ fn base52_first_fitting_site_moves_away_from_a_nearby_income_point() {
 
 #[test]
 fn mode01_non_world_mode_rows_match_the_prototype_public_fields() {
-    use crate::recipient_snapshot::{SnapshotCache, SnapshotError, mode_row};
+    use crate::recipient_snapshot::{DeliveryState, SelectedSeat, SnapshotCache, mode_row};
 
     // Prototype sim.js:5895-5898; Tutorial's initial goal is tutorial.js:11.
-    // The component row does not admit the other modes to whole-frame delivery.
+    // Ordinary modes carry their exact public row; closed modes remain refused.
     for mode in MODES {
-        let m = create(mode, ArmySize::Standard).unwrap();
+        let mut m = create(mode, ArmySize::Standard).unwrap();
         let expected = match mode {
             Mode::Conquest => Json::Null,
             Mode::Assault => json!({
@@ -355,18 +356,113 @@ fn mode01_non_world_mode_rows_match_the_prototype_public_fields() {
             _ => unreachable!(),
         };
         assert_eq!(mode_row(&m).unwrap(), expected, "{mode:?}");
+        let cache = SnapshotCache::new(&m).unwrap();
+        for slot in 0..m.start.players.len() {
+            assert_eq!(
+                cache.recipient(slot).unwrap(),
+                crate::recipient_snapshot::recipient_uncached(&m, slot).unwrap(),
+                "cached/uncached {mode:?} seat {slot}"
+            );
+        }
+        // Also retain the partial API's explicitly missing component contract.
+        let count = m.start.players.len();
+        let mut partial_delivery = DeliveryState::new(&m).unwrap();
+        let partial = partial_delivery
+            .capture(&mut m, &vec![true; count], &vec![false; count])
+            .unwrap();
+        assert_eq!(
+            partial.slots().collect::<Vec<_>>(),
+            (0..count).collect::<Vec<_>>()
+        );
+        for slot in 0..count {
+            let projection = partial.recipient(slot).unwrap();
+            if mode == Mode::Conquest {
+                assert!(!projection.fields.contains_key("mode"));
+            } else {
+                assert_eq!(projection.fields["mode"], expected);
+            }
+            assert_eq!(
+                projection.missing,
+                vec![
+                    crate::recipient_snapshot::SnapshotCapability::WrecksAndFoundMines,
+                    crate::recipient_snapshot::SnapshotCapability::ShotsAndFlights,
+                    crate::recipient_snapshot::SnapshotCapability::TeamEffects,
+                ]
+            );
+        }
         if mode == Mode::Conquest {
-            assert!(SnapshotCache::new(&m).is_ok());
-        } else {
-            assert!(matches!(
-                SnapshotCache::new(&m),
-                Err(SnapshotError::UnsupportedMode)
-            ));
+            let cache = SnapshotCache::new(&m).unwrap();
+            for slot in 0..m.start.players.len() {
+                let snapshot = cache.recipient(slot).unwrap();
+                assert!(!snapshot.fields.contains_key("mode"));
+                assert!(snapshot.fields["units"].is_array());
+            }
+        } else if matches!(
+            mode,
+            Mode::Classic | Mode::Annihilation | Mode::Horde | Mode::Assault
+        ) {
+            let count = m.start.players.len();
+            let cache = SnapshotCache::new(&m).unwrap();
+            for slot in 0..count {
+                if mode == Mode::Conquest {
+                    assert!(!cache.recipient(slot).unwrap().fields.contains_key("mode"));
+                }
+                assert_eq!(
+                    cache.recipient(slot).unwrap(),
+                    crate::recipient_snapshot::recipient_uncached(&m, slot).unwrap(),
+                    "cached/uncached {mode:?} seat {slot}"
+                );
+            }
+            let mut delivery = DeliveryState::new(&m).unwrap();
+            let selected = (0..count)
+                .map(|slot| SelectedSeat {
+                    slot,
+                    full: true,
+                    omit: false,
+                })
+                .collect::<Vec<_>>();
+            let frame = delivery
+                .capture_selected_with_tick_events(&mut m, &selected, &[])
+                .unwrap()
+                .unwrap();
+            assert_eq!(
+                frame.slots().collect::<Vec<_>>(),
+                (0..count).collect::<Vec<_>>()
+            );
+            for slot in 0..count {
+                let snapshot = frame.recipient(slot).unwrap().into_json();
+                assert_eq!(snapshot["t"], "s");
+                assert_eq!(snapshot["mode"], expected, "{mode:?} seat {slot}");
+                assert!(snapshot.get("missing").is_none());
+                for field in ["wrecks", "foundMines", "shots", "flights"] {
+                    assert!(snapshot[field].is_array(), "{mode:?} seat {slot}: {field}");
+                }
+                if mode == Mode::Classic {
+                    assert!(snapshot["nodes"].is_array());
+                    assert_eq!(snapshot["ghosts"], json!([]));
+                } else {
+                    assert!(snapshot.get("nodes").is_none());
+                    assert!(snapshot.get("ghosts").is_none());
+                }
+            }
+        } else if matches!(mode, Mode::Assault | Mode::Annihilation | Mode::Tutorial) {
+            let cache = SnapshotCache::new(&m).unwrap();
+            for slot in 0..m.start.players.len() {
+                assert_eq!(
+                    cache.recipient(slot).unwrap().fields["mode"],
+                    expected,
+                    "{mode:?} seat {slot}"
+                );
+            }
         }
     }
     let mut default = create(Mode::Conquest, ArmySize::Standard).unwrap();
     default.options.mode = Mode::Default;
     assert_eq!(mode_row(&default).unwrap(), Json::Null);
+    let cache = SnapshotCache::new(&default).unwrap();
+    for slot in 0..default.start.players.len() {
+        assert!(!cache.recipient(slot).unwrap().fields.contains_key("mode"));
+    }
 }
 
 #[test]
@@ -421,5 +517,39 @@ fn mode01_mode_rows_round_timers_and_refuse_invalid_values_or_mode_pairs() {
             None
         };
         assert_eq!(mode_row(&m), Err(SnapshotError::UnsupportedMode));
+    }
+}
+
+#[test]
+fn all_admitted_mode_rows_survive_six_tick_selected_delivery() {
+    use crate::recipient_snapshot::{DeliveryState, SelectedSeat, mode_row};
+    for mode in MODES {
+        let mut m = create(mode, ArmySize::Standard).unwrap();
+        let selected: Vec<_> = (0..m.start.players.len())
+            .map(|slot| SelectedSeat {
+                slot,
+                full: true,
+                omit: false,
+            })
+            .collect();
+        let mut delivery = DeliveryState::new(&m).unwrap();
+        for _ in 0..6 {
+            let report = m.advance_tick().unwrap();
+            let current = mode_row(&m).unwrap();
+            let frame = delivery
+                .capture_selected_with_tick_events(&mut m, &selected, &report.events)
+                .unwrap()
+                .unwrap();
+            for seat in &selected {
+                let snapshot = frame.recipient(seat.slot).unwrap().into_json();
+                assert_eq!(snapshot["t"], "s");
+                assert!(snapshot["units"].is_array());
+                assert!(snapshot["cells"].is_array());
+                assert!(snapshot["fog"]["v"].is_string());
+                assert!(snapshot["fog"]["e"].is_string());
+                assert_eq!(snapshot["mode"], current, "{mode:?}, seat {}", seat.slot);
+            }
+            assert!(m.tick_state.fault().is_none());
+        }
     }
 }

@@ -1,7 +1,7 @@
 //! Pure ordinary RTS projection from original Source boundary inputs and events.
 //! This test does not replay gameplay, restore MatchRandom, or adopt transport policy.
-//! Only complete `shots` rows are compared. Other snapshot fields, dormant ordinary
-//! state, and source-only falling bodies are retained in the fixture but not claimed.
+//! Complete `shots` and `flights` rows are compared. Other snapshot fields, dormant
+//! ordinary state, and source-only falling bodies remain outside the claim.
 #[allow(dead_code)]
 use crate::shared::companion_tick as common;
 
@@ -19,7 +19,9 @@ use ww2_core::{
     match_support::{SupportEvent, SupportKind, SupportTiming},
     match_tick::TickEvent,
     projectiles::{Flight, Point3},
-    recipient_snapshot::{DeliveryState, SelectedSeat, SnapshotCapability, SnapshotError},
+    recipient_snapshot::{
+        DeliveryState, SelectedSeat, SnapshotCache, SnapshotCapability, SnapshotError,
+    },
     rules::Rules,
 };
 
@@ -567,11 +569,10 @@ fn original_ordinary_batches_match_selected_shot_rows_and_numeric_bits() {
                             1
                         );
                     }
-                    // Source snapshotFor warms teamFog at each selected query,
-                    // including the launch frame that native complete admission
-                    // refuses. The public base-field query supplies this input
-                    // history from canonical facts, before the refusal baseline.
-                    // Its disposable receipt is not complete-frame delivery.
+                    // Source snapshotFor warms teamFog at each selected query.
+                    // The public base-field query preserves that input history
+                    // from canonical facts. Complete-frame delivery below uses
+                    // a fresh receipt without claiming delivery-history parity.
                     if !selected.is_empty() {
                         let mut query = DeliveryState::new(&state).unwrap();
                         assert!(
@@ -580,6 +581,32 @@ fn original_ordinary_batches_match_selected_shot_rows_and_numeric_bits() {
                                 .unwrap()
                                 .is_some()
                         );
+                        if !before["flights"].as_array().unwrap().is_empty() {
+                            let cache = SnapshotCache::new(&state).unwrap();
+                            let expected = common::decoded(&frame["outputs"]);
+                            for seat in &selected {
+                                let partial = cache.recipient(seat.slot).unwrap();
+                                let row = expected
+                                    .as_array()
+                                    .unwrap()
+                                    .iter()
+                                    .find(|row| id(&row["slot"]) as usize == seat.slot)
+                                    .unwrap();
+                                common::exact(
+                                    &partial.fields["flights"],
+                                    &row["fields"]["flights"],
+                                    &format!(
+                                        "{name}:{} seat{} partial flights",
+                                        frame["tick"], seat.slot
+                                    ),
+                                );
+                                assert!(
+                                    partial
+                                        .missing
+                                        .contains(&SnapshotCapability::ShotsAndFlights)
+                                );
+                            }
+                        }
                     }
                     // Each boundary has a fresh receipt owner on this same
                     // Match. Delivery-history parity is outside this test.
@@ -587,22 +614,12 @@ fn original_ordinary_batches_match_selected_shot_rows_and_numeric_bits() {
                     let state_before = guard(&state, &delivery);
                     let result =
                         delivery.capture_selected_with_tick_events(&mut state, &selected, &batch);
-                    if frame["refusals"]
+                    let live_flights = frame["refusals"]
                         .as_array()
                         .unwrap()
                         .iter()
-                        .any(|v| v == "live-flights")
-                    {
-                        flights += 1;
-                        assert!(matches!(
-                            result,
-                            Err(SnapshotError::Unsupported {
-                                capability: SnapshotCapability::ShotsAndFlights,
-                                ..
-                            })
-                        ));
-                        assert_eq!(guard(&state, &delivery), state_before);
-                    } else if selected.is_empty() {
+                        .any(|v| v == "live-flights");
+                    if selected.is_empty() {
                         assert!(result.unwrap().is_none());
                         assert_eq!(guard(&state, &delivery), state_before);
                         assert_eq!(batch.len(), 2);
@@ -624,9 +641,15 @@ fn original_ordinary_batches_match_selected_shot_rows_and_numeric_bits() {
                                 &row["fields"]["shots"],
                                 &format!("{name}:{} seat{} shots", frame["tick"], row["slot"]),
                             );
+                            common::exact(
+                                &actual["flights"],
+                                &row["fields"]["flights"],
+                                &format!("{name}:{} seat{} flights", frame["tick"], row["slot"]),
+                            );
                             recipients += 1;
                             shots += row["fields"]["shots"].as_array().unwrap().len();
                         }
+                        flights += usize::from(live_flights);
                         frames += 1;
                         air_frames += usize::from(air_input);
                         supplied += batch.len();
@@ -634,8 +657,8 @@ fn original_ordinary_batches_match_selected_shot_rows_and_numeric_bits() {
                     assert_eq!(state.start.random.snapshot(), random);
                 }
                 // Source resets each scheduled batch regardless of eligible seats.
-                // Native refusal witnesses establish no delivery or host fault
-                // policy. Accumulation and reset remain caller-owned.
+                // Accumulation and reset remain caller-owned; this component
+                // comparison establishes no host fault policy.
                 batch.clear();
             }
             common::apply_delta(&mut recorded, &frame["afterDelta"]);
@@ -651,7 +674,7 @@ fn original_ordinary_batches_match_selected_shot_rows_and_numeric_bits() {
         (
             traces, frames, recipients, shots, supplied, empty, air_frames, flights, falling
         ),
-        (7, 158, 790, 90, 24, 1, 1, 1, 4)
+        (7, 159, 795, 94, 25, 1, 1, 1, 4)
     );
 }
 
@@ -674,18 +697,21 @@ fn caller_batch_refusals_do_not_publish_a_valid_original_prefix() {
         full: false,
         omit: false,
     }];
-    for (row, capability) in [
+    for (row, expected) in [
         (
             TickEvent::Environment(Effect::LastHit { unit: 1, owner: 0 }),
-            SnapshotCapability::ShotsAndFlights,
+            SnapshotError::Unsupported {
+                unit: 0,
+                capability: SnapshotCapability::ShotsAndFlights,
+            },
         ),
         (
             TickEvent::Firing(LaunchEvent::Throw {
-                shooter: 1,
+                shooter: 0,
                 owner: 0,
                 at: point(&source["units"][0]),
             }),
-            SnapshotCapability::ShotsAndFlights,
+            SnapshotError::Rules,
         ),
         (
             TickEvent::Firing(LaunchEvent::SmallArms(SmallArmsEvent {
@@ -695,23 +721,26 @@ fn caller_batch_refusals_do_not_publish_a_valid_original_prefix() {
                 at: point3(&valid[0]),
                 hit: None,
             })),
-            SnapshotCapability::ShotsAndFlights,
+            SnapshotError::Unsupported {
+                unit: 0,
+                capability: SnapshotCapability::ShotsAndFlights,
+            },
         ),
         (
             TickEvent::Aviation(AviationEvent::PlaneDown {
                 target: 1,
                 owner: 0,
                 at: point(&source["units"][0]),
-                direction: 0.0,
+                direction: f64::NAN,
             }),
-            SnapshotCapability::Air,
+            SnapshotError::InvalidNumber,
         ),
     ] {
         let batch = [prefix.clone(), row];
         let before = guard(&state, &delivery);
         assert!(
             matches!(delivery.capture_selected_with_tick_events(&mut state, &selected, &batch),
-            Err(SnapshotError::Unsupported { capability: c, .. }) if c == capability)
+            Err(error) if error == expected)
         );
         assert_eq!(guard(&state, &delivery), before);
         // Empty selection bypasses admission and never consumes the caller's batch.

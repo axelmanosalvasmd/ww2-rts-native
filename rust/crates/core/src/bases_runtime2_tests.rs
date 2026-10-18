@@ -95,11 +95,11 @@ fn base17_buy_denial_order_and_queued_unique_limits() {
     );
 }
 
-fn coastal_match(naval: bool, tech: bool) -> Match {
+fn coastal_map(naval: bool) -> AuthoritativeMap {
     let rows = (0..128)
         .map(|_| format!("{}{}{}", ".".repeat(24), "W".repeat(40), ".".repeat(64)))
         .collect::<Vec<_>>();
-    let coast = AuthoritativeMap::from_json(
+    AuthoritativeMap::from_json(
         &serde_json::to_vec(&json!({
             "name":"Coastal bases", "w":128,"h":128,"naval":naval,"rows":rows,
             "spawns":[{"x":8,"y":8},{"x":112,"y":112}],
@@ -107,43 +107,71 @@ fn coastal_match(naval: bool, tech: bool) -> Match {
         }))
         .unwrap(),
     )
-    .unwrap();
+    .unwrap()
+}
+
+fn coastal_match(naval: bool, tech: bool) -> Match {
     let mut opts = options(Mode::Conquest, tech);
     opts.army = ArmySize::Endless;
-    Match::new(&coast, opts).unwrap()
+    Match::new(&coastal_map(naval), opts).unwrap()
+}
+
+fn placement_view(m: &mut Match, naval: bool) -> crate::client_view::ClientView {
+    let mut delivery = crate::recipient_snapshot::DeliveryState::new(m).unwrap();
+    let full = vec![true; m.start.players.len()];
+    let omit = vec![false; m.start.players.len()];
+    let frame = delivery.capture_with_lists(m, &full, &omit, &[]).unwrap();
+    let mut view = crate::client_view::ClientView::new();
+    for slot in 0..full.len() {
+        let mut snapshot = frame.recipient(slot).unwrap().into_json();
+        if slot != 0 {
+            continue;
+        }
+        let fog = snapshot.as_object_mut().unwrap().remove("fog").unwrap();
+        view.apply(&json!({"t":"start", "map":crate::map::map_for_client(coastal_map(naval).source()).unwrap(),
+            "you":slot,"teams":[0,1], "cells":snapshot["cells"], "fog":fog}).to_string()).unwrap();
+        view.apply(&snapshot.to_string()).unwrap();
+    }
+    view
 }
 
 #[test]
-fn base27_preview_reasons_match_real_build_denials_without_payment_or_tick_faults() {
-    use crate::building_placement::{Context as PlacementContext, Reason};
+fn base27_recipient_preview_matches_build_reasons_and_accepted_footprint() {
+    use crate::building_placement::{Context as PlacementContext, Reason, check_recipient};
     use crate::game::Point;
-    use crate::recipient_snapshot::SnapshotCache;
-    for (naval, kind, at, expected, denial) in [
+    for (naval, kind, at, expected) in [
         (
             false,
             "shipyard",
             Point { x: 44.0, z: 28.0 },
-            Reason::Blocked,
-            "blocked",
+            Some(Reason::Blocked),
         ),
         (
             true,
             "shipyard",
             Point { x: 30.0, z: 36.0 },
-            Reason::Coast,
-            "coast",
+            Some(Reason::Coast),
         ),
         (
             true,
             "barracks",
             Point { x: 220.0, z: 220.0 },
-            Reason::NotVisible,
-            "notVisible",
+            Some(Reason::NotVisible),
         ),
+        (
+            true,
+            "barracks",
+            Point { x: 16.0, z: 16.0 },
+            Some(Reason::Blocked),
+        ),
+        (true, "shipyard", Point { x: 44.0, z: 28.0 }, None),
+        (true, "barracks", Point { x: 30.0, z: 36.0 }, None),
     ] {
         let mut m = coastal_match(naval, false);
         let worker = own(&m, 0, "rifle");
-        let preview = crate::building_placement::check(
+        let view = placement_view(&mut m, naval);
+        let preview = check_recipient(&view, kind, at).unwrap();
+        let authoritative = crate::building_placement::check(
             &PlacementContext {
                 game: &m.world.game,
                 rules: &m.rules,
@@ -155,34 +183,56 @@ fn base27_preview_reasons_match_real_build_denials_without_payment_or_tick_fault
             },
             kind,
             at,
-            |center| m.recipient_sees(0, center),
+            |spot| m.recipient_sees(0, spot),
         )
         .unwrap();
-        assert_eq!(preview.reason, Some(expected));
+        assert_eq!(preview, authoritative, "{kind} at {at:?}");
+        assert_eq!(preview.reason, expected, "{kind} at {at:?}");
         let before = (
             m.start.economy.clone(),
             m.next_unit_id,
             m.world.game.units.len(),
         );
-        denied(
+        let denial = dispatch(
             &mut m,
             0,
             json!({"t":"build","kind":kind,"ids":[worker],"x":at.x,"z":at.z}),
-            denial,
         );
-        assert_eq!(
-            (
-                m.start.economy.clone(),
-                m.next_unit_id,
-                m.world.game.units.len()
-            ),
-            before
-        );
-        for _ in 0..4 {
+        if let Some(reason) = expected {
+            let name = match reason {
+                Reason::Blocked => "blocked",
+                Reason::NotVisible => "notVisible",
+                Reason::Coast => "coast",
+                _ => unreachable!(),
+            };
+            assert_eq!(denial.unwrap().name(), name);
+            assert_eq!(
+                (
+                    m.start.economy.clone(),
+                    m.next_unit_id,
+                    m.world.game.units.len()
+                ),
+                before
+            );
+        } else {
+            assert!(denial.is_none());
+            let site = &m.world.game.units[&before.1];
+            assert_eq!(site.at(), preview.at);
+            assert_eq!(
+                site.cells,
+                preview
+                    .cells
+                    .map(|cells| cells.into_iter().map(|c| c as u32).collect())
+            );
+            assert!(m.start.economy.players[0].mp < before.0.players[0].mp);
+        }
+        for _ in 0..6 {
             m.advance_tick().unwrap();
-            let cache = SnapshotCache::new(&m).unwrap();
-            for slot in 0..m.start.players.len() {
-                cache.recipient(slot).unwrap();
+            let view = placement_view(&mut m, naval);
+            let replay = check_recipient(&view, kind, at).unwrap();
+            // An accepted footprint becomes blocked in both providers on the next delivered frame.
+            if expected.is_none() {
+                assert_eq!(replay.reason, Some(Reason::Blocked));
             }
         }
         assert!(m.tick_state.fault().is_none());
@@ -444,10 +494,15 @@ fn base45_paid_cache_requires_logistics_and_serves_only_when_finished() {
     assert_eq!(m.world.game.units[&truck].path, unit.path);
     assert_eq!(m.world.game.units[&truck].world_goal, unit.world_goal);
     assert_eq!(m.start.economy, wallets);
-    assert_eq!(
-        m.advance_tick().unwrap_err().reason,
-        "reserve and convoy tick phases are not connected"
-    );
+    // An idle empty truck at its source is retired by a real convoy tick.
+    // Hold this selected truck until the component-built cache can accept it.
+    assert_eq!(dispatch(&mut m, 0, json!({"t":"stop","ids":[truck]})), None);
+    m.advance_tick().unwrap();
+    assert!(m.world.game.units.contains_key(&truck));
+    assert!(m.tick_state.fault().is_none());
+    let after_tick_mp = m.start.economy.players[0].mp;
+    m.validate_logistics_runtime().unwrap();
+    m.preflight_ordinary_snapshot().unwrap();
     for _ in 0..241 {
         m.world.game.tick += 1;
         let mut frame = m.begin_construction_tick().unwrap();
@@ -468,7 +523,7 @@ fn base45_paid_cache_requires_logistics_and_serves_only_when_finished() {
             .any(|s| s.entity == Some(cache))
     );
     assert!(m.supply_convoys(0, &[truck], cache).unwrap());
-    assert_eq!(m.start.economy.players[0].mp, mp - 60.);
+    assert_eq!(m.start.economy.players[0].mp, after_tick_mp);
 }
 
 fn research_context<'a>(units: &'a [UnitView<'static>], mode: Mode) -> Context<'a> {

@@ -1,0 +1,6 @@
+- Combine ordinary logistics option selection with the authored scenario engine from 390b4657 (#386). World remains deferred.
+- Merge record: merge 7927bc66 with scenario-engine 390b4657. All paths outside the four files below merged automatically.
+- `docs/contracts/README.md`: retain the authored v2 save-format row and the construction-production contract row.
+- `lobby.rs`: retain scenario-engine editor-map lookup and LOGISTICS-2 room option mapping and multi-mode constructor dispatch. Bind options against the actual selected authored map so strict scenario opt-in is applied before construction. Existing private, roster, mode, army and weather guards remain.
+- `lobby_saves.rs`: retain scenario-engine authored save-version validation and the integrated ordinary-mode/logistics save admission. Sandbox, World, AI and spectator guards remain.
+- `room_runtime.rs`: retain both construction-production and scenario-recipient test modules. No inherited test is removed.

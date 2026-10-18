@@ -41,3 +41,9 @@ node_modules/
 
 # Game states the harness generates (harness/sim-state.mjs)
 harness/out/
+
+# Private server persistence
+.edit-password
+/horde-records.json
+/maps/
+/saves/

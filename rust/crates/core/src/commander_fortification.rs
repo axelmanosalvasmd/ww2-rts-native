@@ -147,7 +147,7 @@ pub(crate) fn plan_after_builds(
     let spare = math::max(budget, budget + saved - 300.0) - build_reserve;
     for hq in hqs {
         let step = *steps.get(&hq.id).unwrap_or(&0);
-        if step >= 6 || step > 0 && tier < 2 {
+        if context.mode == Mode::World && (step >= 6 || step > 0 && tier < 2) {
             continue;
         }
         let center = Point {
@@ -186,6 +186,9 @@ pub(crate) fn plan_after_builds(
         crate::sort::sort_by(&mut crew, |a, b| {
             distance(a.at, hq.at) - distance(b.at, hq.at)
         });
+        if step >= 6 || step > 0 && tier < 2 {
+            continue;
+        }
         let worker = crew[0];
         let wall_cost = catalog
             .table("FORTS")

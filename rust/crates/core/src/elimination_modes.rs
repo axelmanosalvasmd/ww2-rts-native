@@ -52,6 +52,28 @@ fn produces(kind: usize, rules: &crate::rules::Rules) -> Result<bool, String> {
         .unwrap_or(false))
 }
 
+fn classic_node_pairs(players: &[crate::match_runtime::PlayerStart]) -> Vec<(usize, usize)> {
+    let mut pairs = Vec::new();
+    for (slot, player) in players.iter().enumerate() {
+        let mut enemies = players
+            .iter()
+            .enumerate()
+            .filter(|(_, p)| p.config.team != player.config.team)
+            .collect::<Vec<_>>();
+        crate::sort::sort_by(&mut enemies, |(_, p), (_, q)| {
+            math::hypot(p.spawn.x - player.spawn.x, p.spawn.z - player.spawn.z)
+                - math::hypot(q.spawn.x - player.spawn.x, q.spawn.z - player.spawn.z)
+        });
+        for (other, _) in enemies.into_iter().take(2) {
+            let pair = (slot.min(other), slot.max(other));
+            if !pairs.contains(&pair) {
+                pairs.push(pair);
+            }
+        }
+    }
+    pairs
+}
+
 impl Match {
     pub fn new_annihilation(
         map: &crate::map::AuthoritativeMap,
@@ -162,16 +184,8 @@ impl Match {
 
     fn new_elimination_shell(
         map: &crate::map::AuthoritativeMap,
-        mut options: MatchOptions,
+        options: MatchOptions,
     ) -> Result<Self, String> {
-        if map.source().get("scenario").is_some() {
-            return Err("elimination startup does not apply authored scenarios".into());
-        }
-        // These bounded modes have no reserves/convoy publication adapter yet.
-        if options.logistics {
-            return Err("elimination startup does not support logistics".into());
-        }
-        options.logistics = false;
         let rules = crate::rules::Rules::compiled().map_err(|e| e.to_string())?;
         let start = StartPlan::prepare_elimination(map, &options, &rules)?;
         let teams = options
@@ -227,9 +241,8 @@ impl Match {
         let point_radius = number(cfg, "pointRadius")?;
         avoid.extend(self.start.points.iter().map(|p| (p.at, point_radius + 3.0)));
         let mut wanted = Vec::new();
-        let mut pairs = Vec::new();
-        let mut paired = BTreeSet::new();
-        for (slot, player) in self.start.players.iter().enumerate() {
+        let pairs = classic_node_pairs(&self.start.players);
+        for player in &self.start.players {
             let a = math::atan2(center.z - player.spawn.z, center.x - player.spawn.x);
             for side in [-1.0, 1.0] {
                 wanted.push((
@@ -241,23 +254,6 @@ impl Match {
                     false,
                     None,
                 ));
-            }
-            let mut enemies = self
-                .start
-                .players
-                .iter()
-                .enumerate()
-                .filter(|(_, p)| p.config.team != player.config.team)
-                .collect::<Vec<_>>();
-            crate::sort::sort_by(&mut enemies, |(_, p), (_, q)| {
-                math::hypot(p.spawn.x - player.spawn.x, p.spawn.z - player.spawn.z)
-                    - math::hypot(q.spawn.x - player.spawn.x, q.spawn.z - player.spawn.z)
-            });
-            for (other, _) in enemies.into_iter().take(2) {
-                let pair = (slot.min(other), slot.max(other));
-                if paired.insert(pair) {
-                    pairs.push(pair);
-                }
             }
         }
         for &(a, b) in &pairs {
@@ -699,6 +695,12 @@ impl Match {
             self.building_rallies.remove(&unit.id);
             self.recruit_metadata.remove(&unit.id);
             self.logistics.remove(unit.id);
+            if let Some(convoys) = self.convoys.as_mut() {
+                // Administrative elimination deletes source units directly. Drop
+                // their attached state without charging a combat truck loss.
+                convoys.trucks.remove(&unit.id);
+                convoys.stores.retain(|store| store.entity != Some(unit.id));
+            }
             self.aviation.remove(unit.id);
             for node in &mut self.elimination.as_mut().unwrap().nodes {
                 if node.depot == Some(unit.id) {

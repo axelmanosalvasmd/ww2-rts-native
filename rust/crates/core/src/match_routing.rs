@@ -32,6 +32,11 @@ pub struct RecipientRouting {
     wrecks: Vec<Wreck>,
 }
 impl RecipientRouting {
+    pub(crate) fn independent_delivery(&self) -> Self {
+        let mut result = self.clone();
+        let _ = result.memory.take_changes();
+        result
+    }
     fn save_storage_pointers(&self) -> [usize; 2] {
         self.routes.storage_pointers()
     }
@@ -93,6 +98,7 @@ impl Match {
             pointers.extend(recipient.save_storage_pointers());
         }
         pointers.extend(self.commands.paths.storage_pointers());
+        pointers.extend(self.supply_routes.save_storage_pointers());
         pointers
     }
 
@@ -111,6 +117,7 @@ impl Match {
             }
         }
         self.commands.paths.relocate_save_storage(&bindings);
+        self.supply_routes.relocate_save_storage(&bindings);
         for recipient in &mut self.recipients {
             recipient.relocate_save_storage(&bindings);
         }
@@ -1181,6 +1188,7 @@ pub fn prepare_ordinary_recipient_lists(
     let grid = SpatialGrid::new(&g.units, 16.0);
     let mut results = Vec::with_capacity(owners.len());
     let mut replacements = Vec::with_capacity(owners.len());
+    let nodes = state.ordinary_snapshot_nodes()?;
     for &owner in owners {
         let prior = &state.recipients[owner].wreck_memory;
         let accepted = collect_wrecks(
@@ -1222,7 +1230,7 @@ pub fn prepare_ordinary_recipient_lists(
             crate::recipient_lists::RecipientLists {
                 wrecks,
                 found_mines,
-                nodes: None,
+                nodes: nodes.clone(),
             },
         ));
     }

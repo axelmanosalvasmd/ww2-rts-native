@@ -118,7 +118,10 @@ async fn socket_controls_use_owned_slot_and_survive_same_token_takeover() {
             json!({"t":"deny","cmd":"move","reason":"blocked"})
         );
         a.send(json!({"t":"attack","ids":[owned],"target":foreign}));
-        assert_eq!(a.until(|m| m["t"] == "deny")["reason"], "blocked");
+        assert_eq!(
+            a.until(|m| m["t"] == "deny"),
+            json!({"t":"deny","cmd":"attack","reason":"unseen"})
+        );
         let mut replacement = Receiver::open(address, "a");
         assert_eq!(a.until(|m| m["t"] == "replaced"), json!({"t":"replaced"}));
         let start = replacement.until(|m| m["t"] == "start");

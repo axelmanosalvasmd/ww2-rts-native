@@ -30,16 +30,34 @@ profile during an active wave nor private Horde budgets enter the row.
 
 Ordinary Conquest recipient snapshots keep omitting `mode`: `modeRow` returns
 undefined for absent `g.mode`, so JSON serialization omits the property at
-`sim.js:6032`. The other five mode rows are component results;
-their complete recipient snapshots and server room admission retain the existing
-guards. World projection and admission remain closed in this stream.
+`sim.js:6032`. Complete recipient snapshots now admit the matching Classic, Annihilation and
+Assault option/game pairs as well. Classic retains its public nodes and per-team
+ghosts from construction-production. Horde and Tutorial remain component results
+in this stream; their hosted lifecycles belong to separate changes. World
+projection and admission remain closed.
 
 The lobby retains its existing seven-name whitelist (`server.js:659`) and
 `spawns` seat-count field (`server.js:336,345`). The shared start-readiness
 predicate requires one through capacity players and, for Assault, at least one
 player on each side of the selected defender team (`server.js:332,682`). The
-trusted R1 start path also retains its narrower two-human Conquest policy.
-No new lobby field or public Start capability is added.
+trusted R1 Start path admits Conquest, Classic, Annihilation and Assault within
+its existing private, two-human, opposing-team profile. Default remains the
+internal Conquest alias, not an eighth lobby name. The mode whitelist and
+host-only Start/Restart follow `server.js:659-686`; ordinary constructors follow
+`shared/sim.js:682-689,786-861`. Assault uses the selected defender team.
+World, Tutorial, Sandbox and hosted Horde stay outside this admission.
+No lobby field, message shape or version changes.
+
+Each admitted mode reuses the existing Start envelope and full recipient path.
+Public mode fields follow the table above. The existing result object preserves
+the actual mode name, uses `{t, vp}` samples for Conquest and
+`{t, points, structures}` samples for the other ordinary modes, and keeps
+`winVp` null for non-Conquest modes, following
+`shared/story.js:52-70`. Save/load retains the version 1 envelope and canonical
+mode owners; loading revalidates the matching mode, bound map, startup layout,
+every seat and complete snapshots before publishing any room state. The save
+content and its private native representation remain documented in save-format.md.
+The narrower aircraft, logistics and command capability guards remain in force.
 
 Exact component rows and absence rules are checked by
 `mode01_non_world_mode_rows_match_the_prototype_public_fields`,

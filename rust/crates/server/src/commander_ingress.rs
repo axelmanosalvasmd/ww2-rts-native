@@ -2,7 +2,7 @@
 use serde_json::Value;
 use std::collections::BTreeMap;
 use ww2_core::{
-    match_commands::{Command, CommandResult, Denial, Stance},
+    match_commands::{Command, CommandResult, Denial},
     match_runtime::Match,
     orders::{OrderKey, QueueError},
 };
@@ -32,6 +32,21 @@ impl CommanderIngress {
                 | "cancel"
                 | "cancelProduction"
                 | "destroy"
+                | "buy"
+                | "support"
+                | "fireat"
+                | "supply"
+                | "logisticsResume"
+                | "spawn"
+                | "attack"
+                | "ability"
+                | "autocast"
+                | "build"
+                | "board"
+                | "unload"
+                | "escort"
+                | "rail"
+                | "orders"
         )
     }
     pub fn enqueue(&mut self, state: &mut Match, slot: usize, raw: &Value) -> Result<(), Denial> {
@@ -51,6 +66,21 @@ impl CommanderIngress {
             Some("cancel") => "cancel",
             Some("cancelProduction") => "cancelProduction",
             Some("destroy") => "destroy",
+            Some("buy") => "buy",
+            Some("support") => "support",
+            Some("fireat") => "fireat",
+            Some("supply") => "supply",
+            Some("logisticsResume") => "logisticsResume",
+            Some("spawn") => "spawn",
+            Some("attack") => "attack",
+            Some("ability") => "ability",
+            Some("autocast") => "autocast",
+            Some("build") => "build",
+            Some("board") => "board",
+            Some("unload") => "unload",
+            Some("escort") => "escort",
+            Some("rail") => "rail",
+            Some("orders") => "orders",
             _ => return Err(Denial::Blocked),
         };
         let command = Command::from_json(raw)?;
@@ -70,8 +100,29 @@ impl CommanderIngress {
                 | Command::Cancel { .. }
                 | Command::CancelProduction { .. }
                 | Command::Destroy { .. }
+                | Command::Buy { .. }
+                | Command::Support { .. }
+                | Command::FireAt { .. }
+                | Command::Supply { .. }
+                | Command::LogisticsResume { .. }
+                | Command::Spawn { .. }
+                | Command::Attack { .. }
+                | Command::Ability { .. }
+                | Command::Autocast { .. }
+                | Command::Build { .. }
+                | Command::Board { .. }
+                | Command::Unload { .. }
+                | Command::Escort { .. }
+                | Command::Rail { .. }
+                | Command::Compound { .. }
         ) {
             return Err(Denial::Blocked);
+        }
+        if matches!(&command, Command::Support { kind, .. }
+            if !ww2_core::recipient_snapshot::SUPPORTED_SUPPORT_KINDS
+                .iter().any(|supported| supported.name() == kind))
+        {
+            return Err(Denial::Unsupported);
         }
         let state_player = state
             .start
@@ -82,74 +133,9 @@ impl CommanderIngress {
         if state.finish.is_some() || state_player.out || state_player.away {
             return Err(Denial::Blocked);
         }
-        // R1 admits Conquest only. The prototype refuses production cancellation
-        // there, and no training queue may enter this room's tick state.
-        if matches!(command, Command::CancelProduction { .. }) {
-            return Err(Denial::Needs);
-        }
-        // This initial service slice covers ordinary ground controls. Foreign,
-        // missing and source-ineligible IDs retain the core's selection rules.
-        let rows = match &command {
-            Command::Move { orders, .. } => orders.iter().map(|o| o.unit).collect::<Vec<_>>(),
-            Command::Stop { ids } | Command::Stance { ids, .. } => ids.clone(),
-            Command::Enter { ids, .. }
-            | Command::Dig { ids, .. }
-            | Command::Entrench { ids, .. }
-            | Command::Cover { ids, .. }
-            | Command::Assist { ids, .. }
-            | Command::Retreat { ids }
-            | Command::Rally { ids, .. }
-            | Command::Destroy { ids, .. } => ids.clone(),
-            _ => Vec::new(),
-        };
-        for raw in rows.iter().take(50.max(state.world.game.units.len())) {
-            let Some(unit) = u32::try_from(*raw)
-                .ok()
-                .and_then(|id| state.world.game.units.get(&id))
-            else {
-                continue;
-            };
-            let kind = state.rules.kinds.get(unit.kind).ok_or(Denial::Blocked)?;
-            if unit.owner != slot
-                || kind.structure
-                || kind.rail
-                || unit.rail
-                || unit.riding
-                || state
-                    .commands
-                    .units
-                    .get(&unit.id)
-                    .is_some_and(|c| c.operative)
-            {
-                continue;
-            }
-            let forced = state.logistics.get(unit.id).is_some_and(|r| r.forced);
-            let allowed_forced = matches!(
-                command,
-                Command::Move {
-                    attack_move: false,
-                    ..
-                } | Command::Stop { .. }
-            );
-            if forced && !allowed_forced {
-                continue;
-            }
-            if kind.air
-                || kind.naval
-                || unit.air.is_some()
-                || matches!(command, Command::Move { .. } | Command::Stop { .. }) && unit.build
-                || matches!(
-                    command,
-                    Command::Stance {
-                        stance: Stance::AutoRetreat,
-                        on: true,
-                        ..
-                    }
-                ) && (unit.garrison.is_some() || unit.build)
-            {
-                return Err(Denial::Unsupported);
-            }
-        }
+        // Selection, mode admission and prospective state checks belong to the
+        // canonical command executor. Keep the raw selection intact for its cap,
+        // mixed-selection and per-family denial rules.
         state.validate_tick_state().map_err(|_| Denial::Blocked)?;
         let tick = u64::try_from(state.world.game.tick)
             .ok()
@@ -325,7 +311,7 @@ mod tests {
     }
 
     #[test]
-    fn prospective_unsupported_exits_and_bad_rows_do_not_reserve_keys() {
+    fn supported_stance_is_queued_and_malformed_rows_do_not_reserve_keys() {
         let mut state = crate::lobby::native_tests::native_match();
         let actor = state
             .world
@@ -335,89 +321,7 @@ mod tests {
             .find(|u| u.owner == 0 && state.rules.kinds[u.kind].name == "rifle")
             .unwrap()
             .id;
-        state.commands.units.get_mut(&actor).unwrap().auto_retreat = false;
-        let original = state.world.game.units[&actor].at();
-        let width = state.world.game.w;
-        let center = |cell: usize| ww2_core::game::Point {
-            x: (cell % width) as f64 * ww2_core::game::CELL + ww2_core::game::CELL / 2.,
-            z: (cell / width) as f64 * ww2_core::game::CELL + ww2_core::game::CELL / 2.,
-        };
-        let house = state
-            .world
-            .game
-            .chars
-            .iter()
-            .enumerate()
-            .filter(|(_, ch)| **ch == b'B')
-            .max_by_key(|(cell, _)| {
-                let at = center(*cell);
-                ((at.x - original.x).abs() + (at.z - original.z).abs()) as u64
-            })
-            .unwrap()
-            .0;
-        let at = center(house);
-        let unit = state.world.game.units.get_mut(&actor).unwrap();
-        unit.x = at.x;
-        unit.z = at.z;
-        state.grid.update(actor, unit);
         let mut ingress = CommanderIngress::default();
-        for building in [false, true] {
-            let unit = state.world.game.units.get_mut(&actor).unwrap();
-            unit.hp = 1.;
-            unit.garrison = (!building).then_some(house);
-            if building {
-                // Repair a constructor-created HQ through the canonical assignment API.
-                let site = state
-                    .world
-                    .game
-                    .units
-                    .values()
-                    .find(|u| u.owner == 0 && state.rules.kinds[u.kind].name == "hq")
-                    .unwrap()
-                    .id;
-                state.world.game.units.get_mut(&site).unwrap().hp = 1.;
-                assert_eq!(
-                    state
-                        .execute_assist(0, &[i64::from(actor)], i64::from(site), false)
-                        .unwrap(),
-                    None
-                );
-                assert!(state.world.game.units[&actor].build);
-                assert_eq!(state.commands.units[&actor].build_target, Some(site));
-            }
-            state.validate_tick_state().unwrap();
-            state.commands.units.get_mut(&actor).unwrap().auto_retreat = true;
-            assert!(state.automatic_retreat_candidate(actor).unwrap());
-            // Core construction and garrison retreat are supported. This host
-            // slice still refuses enabling the prospective stance in either.
-            state.validate_tick_state().unwrap();
-            state.commands.units.get_mut(&actor).unwrap().auto_retreat = false;
-            let before = format!(
-                "{:?}",
-                (&state.world.game.units, &state.commands.units, &ingress)
-            );
-            assert_eq!(
-                ingress.enqueue(
-                    &mut state,
-                    0,
-                    &json!({"t":"stance","ids":[actor],"key":"autoRetreat","on":true})
-                ),
-                Err(Denial::Unsupported)
-            );
-            assert_eq!(
-                format!(
-                    "{:?}",
-                    (&state.world.game.units, &state.commands.units, &ingress)
-                ),
-                before
-            );
-            assert_eq!(state.commands.pending_commands(), 0);
-        }
-        state.commands.units.get_mut(&actor).unwrap().auto_retreat = true;
-        assert!(state.automatic_retreat_unit(actor).unwrap());
-        assert!(state.world.game.units[&actor].retreating);
-        assert!(!state.world.game.units[&actor].build);
-        assert_eq!(state.commands.units[&actor].build_target, None);
         let before = format!(
             "{:?}",
             (&state.world.game.units, &state.commands.units, &ingress)
@@ -438,7 +342,18 @@ mod tests {
             before
         );
         assert_eq!(state.commands.pending_commands(), 0);
+        ingress
+            .enqueue(
+                &mut state,
+                0,
+                &json!({"t":"stance","ids":[actor],"key":"autoRetreat","on":true}),
+            )
+            .unwrap();
+        let report = state.advance_tick().unwrap();
+        assert!(ingress.complete(&report.commands).is_empty());
+        assert!(state.commands.units[&actor].auto_retreat);
     }
+
     #[test]
     fn garrisoned_move_and_amove_exit_and_keep_tick_snapshots_valid() {
         for name in ["move", "amove"] {
@@ -489,19 +404,114 @@ mod tests {
     }
 
     #[test]
-    fn conquest_production_cancel_is_refused_without_reserving_input() {
+    fn conquest_production_cancel_uses_canonical_denial_after_enqueue() {
         let mut state = crate::lobby::native_tests::native_match();
         let mut ingress = CommanderIngress::default();
-        assert_eq!(
-            ingress.enqueue(
+        ingress
+            .enqueue(
                 &mut state,
                 0,
-                &json!({"t":"cancelProduction","id":1,"job":1})
-            ),
-            Err(Denial::Needs)
+                &json!({"t":"cancelProduction","id":1,"job":1}),
+            )
+            .unwrap();
+        assert_eq!(state.commands.pending_commands(), 1);
+        let report = state.advance_tick().unwrap();
+        assert_eq!(
+            ingress.complete(&report.commands),
+            vec![(0, "cancelProduction", Denial::Needs)]
         );
         assert_eq!(state.commands.pending_commands(), 0);
         assert!(ingress.feedback.is_empty());
+    }
+
+    #[test]
+    fn fire_at_reserves_canonical_input_without_immediate_world_mutation() {
+        let mut state = crate::lobby::native_tests::native_match();
+        let mut ingress = CommanderIngress::default();
+        let raw = json!({"t":"fireat","ids":[1],"x":10,"z":10});
+        let before = format!("{:?}", (&state.world.game.units, &state.commands.units));
+        assert_eq!(state.commands.pending_commands(), 0);
+        assert!(CommanderIngress::recognizes("fireat"));
+        assert_eq!(ingress.enqueue(&mut state, 0, &raw), Ok(()));
+        assert_eq!(state.commands.pending_commands(), 1);
+        let key = OrderKey {
+            tick: 1,
+            issuer: 0,
+            sequence: 1,
+        };
+        assert_eq!(
+            state.commands.pending_tick(1).collect::<Vec<_>>(),
+            vec![(&key, &Command::from_json(&raw).unwrap())]
+        );
+        assert_eq!(ingress.feedback.get(&key), Some(&"fireat"));
+        assert_eq!(
+            format!("{:?}", (&state.world.game.units, &state.commands.units)),
+            before
+        );
+    }
+
+    #[test]
+    fn compound_orders_use_one_identity_and_preserve_canonical_first_denial() {
+        let mut state = crate::lobby::native_tests::native_match();
+        let mut ingress = CommanderIngress::default();
+        let raw = json!({"t":"orders","commands":[{"t":"fireat","ids":[],"x":10,"z":10}]});
+        let before = format!("{:?}", (&state.world.game.units, &state.commands.units));
+        assert!(CommanderIngress::recognizes("orders"));
+        ingress.enqueue(&mut state, 0, &raw).unwrap();
+        assert_eq!(state.commands.pending_commands(), 1);
+        assert_eq!(
+            format!("{:?}", (&state.world.game.units, &state.commands.units)),
+            before
+        );
+        let report = state.advance_tick().unwrap();
+        assert_eq!(ingress.complete(&report.commands).len(), 1);
+        assert_eq!(state.commands.pending_commands(), 0);
+    }
+
+    #[test]
+    fn base_commands_reserve_input_without_immediate_world_mutation() {
+        let mut state = crate::lobby::native_tests::native_match();
+        let mut ingress = CommanderIngress::default();
+        let hq = state
+            .world
+            .game
+            .units
+            .values()
+            .find(|unit| unit.owner == 0 && state.rules.kinds[unit.kind].name == "hq")
+            .unwrap()
+            .id;
+        let before = format!(
+            "{:?}",
+            (
+                &state.world,
+                &state.start.economy,
+                &state.building_rallies,
+                &state.player_rallies
+            )
+        );
+        for (index, raw) in [
+            json!({"t":"cancel", "id":hq}),
+            json!({"t":"rally", "id":hq, "x":30, "z":30}),
+            json!({"t":"rally", "x":30, "z":30}),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            assert_eq!(ingress.enqueue(&mut state, 0, &raw), Ok(()));
+            assert_eq!(state.commands.pending_commands(), index + 1);
+            assert_eq!(
+                format!(
+                    "{:?}",
+                    (
+                        &state.world,
+                        &state.start.economy,
+                        &state.building_rallies,
+                        &state.player_rallies
+                    )
+                ),
+                before
+            );
+        }
     }
 
     #[test]
@@ -588,4 +598,116 @@ mod tests {
             }
         }
     }
+    #[test]
+    fn garrison_and_construction_auto_retreat_enqueue_through_canonical_executor() {
+        for building in [false, true] {
+            let mut state = crate::lobby::native_tests::native_match();
+            let actor = state
+                .world
+                .game
+                .units
+                .values()
+                .find(|u| u.owner == 0 && state.rules.kinds[u.kind].name == "rifle")
+                .unwrap()
+                .id;
+            state.commands.units.get_mut(&actor).unwrap().auto_retreat = false;
+            let original = state.world.game.units[&actor].at();
+            let width = state.world.game.w;
+            let center = |cell: usize| ww2_core::game::Point {
+                x: (cell % width) as f64 * ww2_core::game::CELL + ww2_core::game::CELL / 2.,
+                z: (cell / width) as f64 * ww2_core::game::CELL + ww2_core::game::CELL / 2.,
+            };
+            let house = state
+                .world
+                .game
+                .chars
+                .iter()
+                .enumerate()
+                .filter(|(_, ch)| **ch == b'B')
+                .max_by_key(|(cell, _)| {
+                    let at = center(*cell);
+                    ((at.x - original.x).abs() + (at.z - original.z).abs()) as u64
+                })
+                .unwrap()
+                .0;
+            let at = center(house);
+            let unit = state.world.game.units.get_mut(&actor).unwrap();
+            unit.x = at.x;
+            unit.z = at.z;
+            state.grid.update(actor, unit);
+            let mut ingress = CommanderIngress::default();
+            {
+                let unit = state.world.game.units.get_mut(&actor).unwrap();
+                unit.hp = 1.;
+                unit.garrison = (!building).then_some(house);
+                if building {
+                    // Repair a constructor-created HQ through the canonical assignment API.
+                    let site = state
+                        .world
+                        .game
+                        .units
+                        .values()
+                        .find(|u| u.owner == 0 && state.rules.kinds[u.kind].name == "hq")
+                        .unwrap()
+                        .id;
+                    state.world.game.units.get_mut(&site).unwrap().hp = 1.;
+                    assert_eq!(
+                        state
+                            .execute_assist(0, &[i64::from(actor)], i64::from(site), false)
+                            .unwrap(),
+                        None
+                    );
+                    assert!(state.world.game.units[&actor].build);
+                    assert_eq!(state.commands.units[&actor].build_target, Some(site));
+                }
+                state.validate_tick_state().unwrap();
+                state.commands.units.get_mut(&actor).unwrap().auto_retreat = true;
+                assert!(state.automatic_retreat_candidate(actor).unwrap());
+                // Both construction and garrison retreat use the canonical queued executor.
+                state.validate_tick_state().unwrap();
+                state.commands.units.get_mut(&actor).unwrap().auto_retreat = false;
+                ingress
+                    .enqueue(
+                        &mut state,
+                        0,
+                        &json!({"t":"stance","ids":[actor],"key":"autoRetreat","on":true}),
+                    )
+                    .unwrap();
+                assert_eq!(state.commands.pending_commands(), 1);
+                let results = state.apply_commands(1, false).unwrap();
+                assert!(ingress.complete(&results).is_empty());
+                assert!(state.commands.units[&actor].auto_retreat);
+                assert_eq!(state.commands.pending_commands(), 0);
+            }
+            state.commands.units.get_mut(&actor).unwrap().auto_retreat = true;
+            assert!(state.automatic_retreat_unit(actor).unwrap());
+            assert!(state.world.game.units[&actor].retreating);
+            assert!(!state.world.game.units[&actor].build);
+            assert_eq!(state.commands.units[&actor].build_target, None);
+            let before = format!(
+                "{:?}",
+                (&state.world.game.units, &state.commands.units, &ingress)
+            );
+            assert_eq!(
+                ingress.enqueue(
+                    &mut state,
+                    0,
+                    &json!({"t":"move","orders":[[actor,2,"bad"]]})
+                ),
+                Err(Denial::Blocked)
+            );
+            assert_eq!(
+                format!(
+                    "{:?}",
+                    (&state.world.game.units, &state.commands.units, &ingress)
+                ),
+                before
+            );
+            assert_eq!(state.commands.pending_commands(), 0);
+        }
+    }
 }
+
+#[cfg(test)]
+#[path = "room_fireat_tests.rs"]
+mod room_fireat_tests;

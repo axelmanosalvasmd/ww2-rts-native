@@ -43,11 +43,6 @@ impl Match {
         {
             return Err("Assault startup requires original team IDs 0-5".into());
         }
-        // Legacy timed triggers use the existing shared shell state. New authored scenarios
-        // need their own setup/runtime adapter and must not be silently dropped here.
-        if map.source().get("scenario").is_some() {
-            return Err("Assault startup does not yet apply authored scenarios".into());
-        }
         let attacker_team = options
             .players
             .iter()
@@ -267,5 +262,7 @@ fn can_stamp_start(game: &Game, cells: &[usize]) -> bool {
             <= 1
 }
 
+#[cfg(test)]
+mod fortified_start_tests;
 #[cfg(test)]
 mod tests;

@@ -1,0 +1,1 @@
+- Keep inherited flight tests valid under the combined projectile validator: use an in-map launch cell for the ground round and expect the canonical integer-zero JSON fields. Malformed-flight rejection, fog, contact and privacy assertions remain.

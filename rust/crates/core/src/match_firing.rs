@@ -966,6 +966,40 @@ impl Match {
         start_fraction: f64,
         end_fraction: f64,
     ) -> Result<Option<FlightContact>, String> {
+        self.flight_contact_filtered(p, a, b, Some((start_fraction, end_fraction)), |_| true)
+    }
+    /// Snapshot extrapolation uses current poses and only visible unit bodies.
+    /// Terrain remains canonical, matching flightUntil at the prototype pin.
+    pub(crate) fn visible_flight_contact_perspective(
+        &self,
+        p: &LiveFlight,
+        a: projectiles::Point3,
+        b: projectiles::Point3,
+        slot: usize,
+        full_map: bool,
+    ) -> Result<Option<FlightContact>, String> {
+        self.recipient_flight_contact(p, a, b, |id| {
+            full_map || crate::recipient_snapshot::seen_by(self, slot, id)
+        })
+    }
+    pub(crate) fn recipient_flight_contact(
+        &self,
+        p: &LiveFlight,
+        a: projectiles::Point3,
+        b: projectiles::Point3,
+        visible: impl Fn(UnitId) -> bool,
+    ) -> Result<Option<FlightContact>, String> {
+        self.flight_contact_filtered(p, a, b, None, visible)
+    }
+    fn flight_contact_filtered(
+        &self,
+        p: &LiveFlight,
+        a: projectiles::Point3,
+        b: projectiles::Point3,
+        fractions: Option<(f64, f64)>,
+        visible: impl Fn(UnitId) -> bool,
+    ) -> Result<Option<FlightContact>, String> {
+        let (start_fraction, end_fraction) = fractions.unwrap_or((1.0, 1.0));
         let g = &self.world.game;
         let level_height = n(self.firing_config()?, "levelHeight", 2.5);
         let mut best: Option<FlightContact> = None;
@@ -1019,6 +1053,7 @@ impl Match {
                 && t.air.is_none()
                 && !t.riding
                 && t.id != p.shooter
+                && visible(t.id)
                 && (p.blast_source.is_some() || !g.allied(p.owner, t.owner))
         });
         candidates.sort_unstable();
@@ -1028,11 +1063,8 @@ impl Match {
             if def.building && t.cells.as_ref().is_some_and(|c| !c.is_empty()) {
                 continue;
             }
-            let old = self
-                .firing
-                .prior
-                .get(&id)
-                .copied()
+            let old = fractions
+                .and_then(|_| self.firing.prior.get(&id).copied())
                 .unwrap_or_else(|| t.pose());
             let before = projectiles::BodyPosition {
                 x: old.x + (t.x - old.x) * start_fraction,
@@ -1088,8 +1120,8 @@ impl Match {
     }
     fn fire_breath(&mut self, id: UnitId, target: UnitId) -> Result<(), String> {
         self.supported_firing_mode()?;
-        if self.options.mode != crate::economy::Mode::Horde {
-            return Err("beam firing requires canonical Horde mode".into());
+        if self.options.mode != crate::economy::Mode::Horde && !self.options.sandbox {
+            return Err("beam firing requires Horde or sandbox".into());
         }
         self.validate_firing_units()?;
         let g = &self.world.game;
@@ -1445,13 +1477,7 @@ impl Match {
         Ok(())
     }
 
-    /// Physical salvos retain the reference timer's two draws for each emitted segment.
-    /// The projectile already carries the physical payload, so this timer emits no second blast.
-    pub fn advance_firing_salvos(&mut self, dt: f64) -> Result<(), String> {
-        self.supported_firing_mode()?;
-        if !dt.is_finite() || dt < 0.0 {
-            return Err("invalid salvo timer step".into());
-        }
+    pub(crate) fn validate_firing_salvos(&self) -> Result<(), String> {
         if self.firing.salvos.iter().any(|s| {
             s.left == 0
                 || s.left > 4096
@@ -1464,6 +1490,17 @@ impl Match {
         }) {
             return Err("invalid physical salvo".into());
         }
+        Ok(())
+    }
+
+    /// Physical salvos retain the reference timer's two draws for each emitted segment.
+    /// The projectile already carries the physical payload, so this timer emits no second blast.
+    pub fn advance_firing_salvos(&mut self, dt: f64) -> Result<(), String> {
+        self.supported_firing_mode()?;
+        if !dt.is_finite() || dt < 0.0 {
+            return Err("invalid salvo timer step".into());
+        }
+        self.validate_firing_salvos()?;
         for s in &mut self.firing.salvos {
             s.next -= dt;
             if s.next > 0.0 {
@@ -1543,6 +1580,17 @@ impl Match {
     }
 
     pub fn apply_unit_firing(&mut self, id: UnitId, moving: bool, dt: f64) -> Result<(), String> {
+        let suppression = self.world.game.units.get(&id).map_or(0.0, |u| u.supp);
+        self.apply_unit_firing_with_suppression(id, moving, dt, suppression)
+    }
+
+    pub(crate) fn apply_unit_firing_with_suppression(
+        &mut self,
+        id: UnitId,
+        moving: bool,
+        dt: f64,
+        terrain_suppression: f64,
+    ) -> Result<(), String> {
         self.supported_firing_mode()?;
         if !dt.is_finite() || dt < 0.0 {
             return Err("invalid firing step".into());
@@ -1571,10 +1619,22 @@ impl Match {
         if kind.air
             || kind.rail
             || control.operative
-            || control.fire_at.is_some()
-            || control.nade.is_some()
+            || (control.nade.is_some() && self.options.mode == crate::economy::Mode::World)
         {
-            return Err("air, rail, operative and ability/terrain firing are unsupported".into());
+            return Err("air, rail, operative and aimed ability firing are unsupported".into());
+        }
+        if control.nade.is_some() {
+            // The ordinary ability phase may retain an out-of-range aim while
+            // approaching it. Source sim.js:5416-5430,5553-5580 still fires normally.
+            self.validate_abilities()?;
+            if !matches!(
+                self.ability_kind(id)?,
+                crate::match_abilities::AbilityKind::Grenade
+                    | crate::match_abilities::AbilityKind::Satchel
+                    | crate::match_abilities::AbilityKind::Barrage
+            ) {
+                return Err("pending firing aim requires an aimed ability".into());
+            }
         }
         if u.riding {
             return Ok(());
@@ -1589,8 +1649,11 @@ impl Match {
             self.commands.units.get_mut(&id).unwrap().aim = u.rot;
             return Ok(());
         };
-        if flag(w, "beam") && self.options.mode != crate::economy::Mode::Horde {
-            return Err("beam firing requires canonical Horde mode".into());
+        if flag(w, "beam")
+            && self.options.mode != crate::economy::Mode::Horde
+            && !self.options.sandbox
+        {
+            return Err("beam firing requires Horde or sandbox".into());
         }
         let hull = !kind.infantry && !kind.structure && !moving;
         if hull {
@@ -1634,6 +1697,9 @@ impl Match {
             self.firing.initialize(id).target_id = 0;
             self.commands.units.get_mut(&id).unwrap().aim = rot;
             return Ok(());
+        }
+        if self.commands.units[&id].fire_at.is_some() {
+            return self.fire_at_weapon(id, terrain_suppression);
         }
         let current = self.firing.get(id).copied().unwrap_or_default();
         if hold_fire && attack == 0 {
@@ -2649,6 +2715,9 @@ mod map_feature_tests;
 #[path = "map_intent_batch2_tests.rs"]
 mod map_intent_batch2;
 
+mod fire_at;
+#[cfg(test)]
+mod fire_at_tests;
 #[cfg(test)]
 #[path = "match_kaiju_tests.rs"]
 mod match_kaiju_tests;

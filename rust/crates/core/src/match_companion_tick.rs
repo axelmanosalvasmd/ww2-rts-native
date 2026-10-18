@@ -2,10 +2,16 @@
 use crate::{
     companions::{CombatRequest, RESPAWN_TICKS, SAFE_INTEGER},
     economy::Mode,
+    match_actor::ordinary_ground_mode,
     match_runtime::Match,
 };
 
 impl Match {
+    pub(crate) fn companion_mode_supported(&self) -> bool {
+        ordinary_ground_mode(&self.world.game, self.options.mode)
+            && (self.options.mode != Mode::Horde || self.validate_horde_economy().is_ok())
+    }
+
     /// Validate the identity join and next clock before a tick publishes phases.
     /// The empty registry leaves the ordinary runner's existing clock bounds intact.
     pub(crate) fn prepare_companion_tick(&self) -> Result<(), String> {
@@ -20,8 +26,7 @@ impl Match {
             }
             return Ok(());
         }
-        if !matches!(self.options.mode, Mode::Default | Mode::Conquest)
-            || self.world.game.mode.is_some()
+        if !self.companion_mode_supported()
             || !(0..SAFE_INTEGER - RESPAWN_TICKS).contains(&self.world.game.tick)
         {
             return Err("invalid operative tick mode or clock".into());
@@ -95,7 +100,7 @@ impl Match {
 mod tests {
     use super::*;
     use crate::{
-        economy::Faction,
+        economy::{Faction, Mode},
         economy_state::ArmySize,
         map::AuthoritativeMap,
         match_runtime::{MatchOptions, PlayerConfig},

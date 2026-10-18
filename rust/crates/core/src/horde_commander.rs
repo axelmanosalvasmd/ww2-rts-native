@@ -12,10 +12,26 @@ use crate::{
 pub const ORDER_BATCH: usize = 4;
 pub const ORDER_LIMIT: usize = 240;
 
+/// The recipient gives display plans, without private target or work-job data.
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct DeliveredPlan {
+    pub kind: u8,
+    pub at: Point,
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct DeliveredIntent {
+    pub plan: Option<DeliveredPlan>,
+    pub orders: Vec<DeliveredPlan>,
+    pub digging: bool,
+}
+
 /// Only the owner's intent, detached at observation time. Position and health
 /// changes alone do not supersede a queued order; new routes and Stop do.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct OwnPlan {
+    #[serde(default)]
+    pub delivered: Option<DeliveredIntent>,
     pub path_generation: u64,
     pub goal: Option<Point>,
     pub route_end: Option<Point>,
@@ -37,6 +53,10 @@ pub struct OwnPlan {
 }
 
 impl OwnPlan {
+    pub fn is_digging(&self) -> bool {
+        self.dig.is_some() || self.delivered.as_ref().is_some_and(|p| p.digging)
+    }
+
     fn same_intent(&self, other: &Self) -> bool {
         if self.path_generation != other.path_generation {
             return false;
@@ -360,7 +380,7 @@ impl HordeCommander {
                     && p.goal.is_none()
                     && p.attack == 0
                     && p.target == 0
-                    && p.dig.is_none()
+                    && !p.is_digging()
                     && !p.entrench
                     && p.build.is_none()
                     && p.enter.is_none()
@@ -436,6 +456,7 @@ impl Match {
             air: u.air.is_some(),
             structure: self.rules.kinds[u.kind].structure,
             plan: OwnPlan {
+                delivered: None,
                 path_generation: u.path_gen,
                 goal: u.world_goal,
                 route_end: c.route_end,

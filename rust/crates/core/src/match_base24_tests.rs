@@ -5,7 +5,7 @@ use crate::{
     map::AuthoritativeMap,
     match_commands::{Command, Denial},
     match_runtime::{Match, MatchOptions, PlayerConfig},
-    recipient_snapshot::SnapshotCache,
+    recipient_snapshot::{DeliveryState, SelectedSeat, SnapshotCache},
     weather::WeatherChoice,
 };
 use serde_json::json;
@@ -156,14 +156,33 @@ fn base24_shared_rally_drives_buyer_owned_paid_recruitment() {
         Some(Denial::Unseen)
     );
     assert_eq!(m.building_rallies[&maker], Some(at));
-    assert!(
-        SnapshotCache::new(&m).is_err(),
-        "complete Horde snapshots stay guarded"
-    );
-    assert!(
-        m.advance_tick().is_err(),
-        "complete Horde ticks stay guarded"
-    );
+    let cache = SnapshotCache::new(&m).unwrap();
+    for slot in 0..m.world.game.players.len() {
+        assert_eq!(
+            cache.recipient(slot).unwrap().fields["mode"]["kind"],
+            "horde"
+        );
+    }
+    drop(cache);
+    let mut delivery = DeliveryState::new(&m).unwrap();
+    let selected = (0..m.world.game.players.len())
+        .map(|slot| SelectedSeat {
+            slot,
+            full: true,
+            omit: false,
+        })
+        .collect::<Vec<_>>();
+    let report = m.advance_tick().unwrap();
+    let frame = delivery
+        .capture_selected_with_tick_events(&mut m, &selected, &report.events)
+        .unwrap()
+        .unwrap();
+    for seat in &selected {
+        let snapshot = frame.recipient(seat.slot).unwrap().into_json();
+        assert_eq!(snapshot["t"], "s");
+        assert_eq!(snapshot["mode"]["kind"], "horde");
+    }
+    assert!(m.tick_state.fault().is_none());
 }
 
 #[test]

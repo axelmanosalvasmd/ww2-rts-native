@@ -6,7 +6,7 @@ use crate::{
     map::AuthoritativeMap,
     match_commands::{MatchCommands, UnitControl},
     match_runtime::{Match, MatchOptions, PlayerConfig},
-    recipient_snapshot::{SnapshotCache, SnapshotError},
+    recipient_snapshot::{DeliveryState, SelectedSeat, SnapshotCache, SnapshotError},
     unit_spawn::{initial_aircraft, initial_unit},
     weather::WeatherChoice,
     world::World,
@@ -256,14 +256,16 @@ fn cmb130_classic_remembers_last_seen_buildings_until_an_airborne_observer_revis
         assert!(m.tick_state.fault().is_none());
         assert!(remembered(&m, 0).is_empty());
     }
-    for slot in 0..3 {
-        assert_eq!(
-            SnapshotCache::new(&m)
+    let cache = SnapshotCache::new(&m).unwrap();
+    for slot in 0..m.start.players.len() {
+        let projection = cache.recipient(slot).unwrap();
+        assert_eq!(projection.fields["ghosts"], json!([]));
+        assert!(
+            projection.fields["units"]
+                .as_array()
                 .unwrap()
-                .recipient(slot)
-                .unwrap()
-                .fields["ghosts"],
-            json!([])
+                .iter()
+                .all(|row| row[0] != json!(building))
         );
     }
 }
@@ -342,17 +344,56 @@ fn cmb127_horde_reveals_only_active_final_ground_enemies_and_bosses_to_defenders
         }
         assert!(!m.world.game.players[slot].sees(enemy));
     }
-    assert!(
-        m.advance_tick()
-            .unwrap_err()
-            .reason
-            .contains("requires represented ordinary or World mode")
+    // This visibility fixture creates the physical aircraft without the sortie
+    // owner. Complete ticking and snapshots must still reject that missing state.
+    let tick = m.world.game.tick;
+    let units = crate::save_codec::to_value(&m.world.game.units).unwrap();
+    let horde = m.horde.clone();
+    assert_eq!(
+        m.advance_tick().unwrap_err().reason,
+        "aircraft admission: query aircraft has no sortie runtime metadata"
     );
+    assert_eq!(m.world.game.tick, tick);
+    assert_eq!(
+        crate::save_codec::to_value(&m.world.game.units).unwrap(),
+        units
+    );
+    assert_eq!(m.horde, horde);
     assert!(m.tick_state.fault().is_none());
-    assert!(matches!(
-        SnapshotCache::new(&m),
-        Err(SnapshotError::UnsupportedMode)
-    ));
+    assert!(matches!(SnapshotCache::new(&m), Err(SnapshotError::Rules)));
+    assert_eq!(
+        m.restrict_to_ordinary_snapshots(),
+        Err(SnapshotError::Rules)
+    );
+
+    // Canonical Horde state is admitted through the wave and every-seat delivery.
+    let mut opts = options(&[0, 1]);
+    opts.mode = Mode::Horde;
+    let mut m = Match::new_horde(&map(), opts).unwrap();
+    m.restrict_to_ordinary_snapshots().unwrap();
+    let mut delivery = DeliveryState::new(&m).unwrap();
+    let seats = (0..m.world.game.players.len())
+        .map(|slot| SelectedSeat {
+            slot,
+            full: true,
+            omit: false,
+        })
+        .collect::<Vec<_>>();
+    assert!(m.end_horde_break().unwrap());
+    for _ in 0..16 {
+        let report = m.advance_tick().unwrap();
+        assert!(m.tick_state.fault().is_none());
+        assert!(m.horde.as_ref().unwrap().active);
+        let frame = delivery
+            .capture_selected_with_tick_events(&mut m, &seats, &report.events)
+            .unwrap()
+            .unwrap();
+        for seat in &seats {
+            let snapshot = frame.recipient(seat.slot).unwrap().into_json();
+            assert_eq!(snapshot["tick"], report.tick);
+            assert_eq!(snapshot["mode"]["kind"], "horde");
+        }
+    }
 }
 
 #[test]

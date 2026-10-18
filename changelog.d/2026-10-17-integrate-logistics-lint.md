@@ -1,0 +1,1 @@
+- Fix strict Clippy in `hosted_recorded_support_pays_once_and_delivers_every_seat_through_cleanup_and_ending` by enumerating the two arrival flags directly. Preserve both recipient slots, every assertion, all simulation ticks and the arrival accumulation logic. No test behavior or runtime guard changes.

@@ -3,7 +3,7 @@
 //!
 //! Every function here follows the same rules:
 //! - It returns `int32_t`: `WW2_OK` (0) on success, or a negative `WW2_ERR_*` code. Results go through
-//!   out-parameters. Only `ww2_abi_version` and `ww2_rules_hash` return their number directly.
+//!   out-parameters. `ww2_abi_version`, `ww2_abi_minor_version` and `ww2_rules_hash` return numbers directly.
 //! - It runs inside `catch_unwind`. A panic returns `WW2_ERR_PANIC`; nothing unwinds into C or C++.
 //! - A null pointer is an error, except where its length is 0, since nothing is read or written then.
 //! - After a failure, `ww2_last_error` copies a readable message for the calling thread.
@@ -322,6 +322,12 @@ pub unsafe extern "C" fn ww2_formation_spots(
         Ok(())
     })
 }
+
+mod queries;
+pub use queries::*;
+
+mod presentation;
+pub use presentation::*;
 
 #[cfg(test)]
 mod tests {

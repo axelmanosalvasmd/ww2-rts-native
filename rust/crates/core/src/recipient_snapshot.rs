@@ -1,5 +1,6 @@
-//! Internal ordinary recipient projections and an explicitly admitted quiet seat envelope.
+//! Internal ordinary-mode projections and an explicitly admitted seat envelope.
 //! Unsupported canonical actors remain explicit. No transport contract is added.
+//! Projectile and aviation fields follow the pinned prototype recipient rules.
 use crate::{
     catalog::Catalog,
     combat,
@@ -16,14 +17,27 @@ mod aircraft;
 mod composition;
 #[path = "recipient_snapshot/delivery.rs"]
 mod delivery;
+#[cfg(test)]
+#[path = "recipient_snapshot/elimination_tests.rs"]
+mod elimination_tests;
 #[path = "recipient_snapshot/engineering.rs"]
 mod engineering;
 #[path = "recipient_snapshot/falling.rs"]
 mod falling;
+#[path = "recipient_snapshot/flights.rs"]
+mod flights;
+#[path = "recipient_snapshot/logistics.rs"]
+mod logistics;
 #[path = "recipient_snapshot/modes.rs"]
 mod modes;
+#[path = "recipient_snapshot/operative.rs"]
+mod operative;
+#[path = "recipient_snapshot/operative_flights.rs"]
+mod operative_flights;
 #[path = "recipient_snapshot/owners.rs"]
 mod owners;
+#[path = "recipient_snapshot/projectiles.rs"]
+mod projectiles;
 #[path = "recipient_snapshot/public_state.rs"]
 mod public_state;
 #[path = "recipient_snapshot/selected.rs"]
@@ -37,6 +51,7 @@ mod support;
 pub use composition::{GroundListDeliveryFrame, QuiescentDeliveryFrame, SupportedSeatSnapshot};
 pub use delivery::{DeliveryFrame, DeliveryState};
 pub use modes::mode_row;
+pub use operative::OperativeDelivery;
 pub use selected::{SelectedDeliveryFrame, SelectedGroundListFrame, SelectedSeat};
 pub use shots::{SelectedGroundShotFrame, ShotRef};
 pub use spectator::SpectatorDelivery;
@@ -87,9 +102,8 @@ pub struct RecipientProjection {
     pub missing: Vec<SnapshotCapability>,
 }
 
-/// The public Horde mode component, separate from complete recipient admission.
-/// No seat data or hidden purchase state enters this row. The complete Horde
-/// snapshot and host remain guarded by their existing mode checks.
+/// Prototype Horde mode fields, shared by all recipients. Internal purchase
+/// state stays private; sandbox bosses can publish their bar during wave zero.
 pub fn horde_mode_row(state: &Match) -> Result<Value, SnapshotError> {
     let mode = state.horde_projection().map_err(|_| SnapshotError::Rules)?;
     let horde = state.horde.as_ref().ok_or(SnapshotError::Rules)?;
@@ -102,6 +116,8 @@ pub fn horde_mode_row(state: &Match) -> Result<Value, SnapshotError> {
     });
     if mode.wave > 0 {
         row["profile"] = json!(mode.profile.as_str());
+    }
+    if mode.wave > 0 || mode.boss.is_some() {
         row["boss"] = json!(mode.boss);
     }
     if let Some(profile) = mode.next_profile {
@@ -196,14 +212,52 @@ impl<'a> SnapshotCache<'a> {
 
 fn validate_snapshot(state: &Match) -> Result<(), SnapshotError> {
     if !matches!(
-        (state.options.mode, state.world.game.mode),
-        (Mode::Default | Mode::Conquest, None)
-            | (Mode::Classic, Some(crate::game::ModeKind::Classic))
-    ) || state.world.geography().is_some()
-        || state.assault.is_some()
+        state.options.mode,
+        Mode::Default
+            | Mode::Conquest
+            | Mode::Assault
+            | Mode::Annihilation
+            | Mode::Classic
+            | Mode::Tutorial
+            | Mode::Horde
+    ) || !crate::match_actor::ordinary_ground_mode(&state.world.game, state.options.mode)
+        || state.world.geography().is_some()
+        || ((state.options.mode == Mode::Assault) != state.assault.is_some())
         || state.world_runtime.is_some()
+        || state.world.game.mode.is_some() && state.validate_ordinary_finish_state().is_err()
+        || matches!(state.options.mode, Mode::Annihilation | Mode::Classic)
+            && state.validate_elimination_state().is_err()
     {
         return Err(SnapshotError::UnsupportedMode);
+    }
+    logistics::validate(state)?;
+    if state.options.mode == Mode::Tutorial {
+        state
+            .validate_tutorial_state()
+            .map_err(|_| SnapshotError::Rules)?;
+    }
+    if state.options.mode == Mode::Assault {
+        state
+            .validate_match_finish_state()
+            .map_err(|_| SnapshotError::Rules)?;
+    }
+    if matches!(state.options.mode, Mode::Annihilation | Mode::Classic) {
+        state
+            .validate_elimination_state()
+            .map_err(|_| SnapshotError::Rules)?;
+    }
+    if state.options.mode == Mode::Horde {
+        state
+            .validate_horde_economy()
+            .map_err(|_| SnapshotError::Rules)?;
+    }
+    if let Some(assault) = state.assault
+        && (!(0..6).contains(&assault.defender_team)
+            || !(-1..6).contains(&assault.attacker_team)
+            || assault.defender_team == assault.attacker_team
+            || !assault.time_left.is_finite())
+    {
+        return Err(SnapshotError::Rules);
     }
     let g = &state.world.game;
     let cells = g.w.checked_mul(g.h).ok_or(SnapshotError::Rules)?;
@@ -237,8 +291,43 @@ fn validate_snapshot(state: &Match) -> Result<(), SnapshotError> {
         }
         finite(&[u.x, u.z])?;
     }
+    if !state.firing.flights.is_empty()
+        || !state.firing.salvos.is_empty()
+        || !state.firing.grenades.is_empty()
+    {
+        state
+            .validate_firing_tick_state()
+            .map_err(|_| SnapshotError::Rules)?;
+        state
+            .validate_firing_salvos()
+            .map_err(|_| SnapshotError::Rules)?;
+        state
+            .validate_firing_grenade_step(0.)
+            .map_err(|_| SnapshotError::Rules)?;
+    }
+    projectiles::validate(state)?;
     engineering::validate(state)?;
     aircraft::validate(state)?;
+    if state.options.mode == Mode::Horde {
+        projectiles::validate(state)?;
+    }
+    state.prepare_companion_tick().map_err(|_| {
+        let unit = state
+            .commands
+            .units
+            .iter()
+            .find_map(|(&id, control)| {
+                (control.operative
+                    && g.units.contains_key(&id)
+                    && state.check_companion(id).is_err())
+                .then_some(id)
+            })
+            .unwrap_or(0);
+        SnapshotError::Unsupported {
+            unit,
+            capability: SnapshotCapability::Operatives,
+        }
+    })?;
     Ok(())
 }
 
@@ -306,6 +395,10 @@ fn project_recipient(
     fields.extend(owners);
     fields.extend(public);
     fields.insert("falling".into(), falling::project(state, slot)?);
+    fields.insert("flights".into(), flights::project(state, slot)?);
+    if let Some(logistics) = logistics::project(state, slot)? {
+        fields.insert("logistics".into(), logistics);
+    }
     Ok(RecipientProjection {
         fields,
         missing: vec![
@@ -314,12 +407,11 @@ fn project_recipient(
             SnapshotCapability::Fog,
             SnapshotCapability::ShotsAndFlights,
             SnapshotCapability::TeamEffects,
-            SnapshotCapability::Logistics,
         ],
     })
 }
 
-fn seen_by(state: &Match, slot: usize, id: u32) -> bool {
+pub(crate) fn seen_by(state: &Match, slot: usize, id: u32) -> bool {
     let g = &state.world.game;
     let u = g.units.get(&id);
     g.reveal && u.is_some()
@@ -364,9 +456,6 @@ fn unit_row(state: &Match, u: &Unit) -> Result<Value, SnapshotError> {
         .map_err(|_| unsupported(SnapshotCapability::GateState))?;
     crate::match_construction::validate_build_activity(u, control)
         .map_err(|_| unsupported(SnapshotCapability::Engineering))?;
-    if control.operative {
-        return Err(unsupported(SnapshotCapability::Operatives));
-    }
     let ability = state
         .abilities
         .get(u.id)
@@ -406,6 +495,9 @@ fn unit_row(state: &Match, u: &Unit) -> Result<Value, SnapshotError> {
         u.built.unwrap_or(1.0),
     ])?;
     let mut flags = 0u64;
+    if control.operative {
+        flags |= 131072;
+    }
     if u.air.is_some() && !vision::airborne(u) {
         flags |= 512;
     }
@@ -561,10 +653,14 @@ fn economy_fields(state: &Match, slot: usize) -> Result<Map<String, Value>, Snap
     let p = &state.start.economy.players[slot];
     finite(&[p.mp, p.mun, p.fuel, p.inc, p.vp])?;
     let mut fields = Map::new();
-    // Ordinary Conquest does not initialize the source player mun/fuel fields.
-    // Canonical accounting zeros do not make those wire fields present.
+    // Classic initializes these wallets. Other admitted ordinary modes leave
+    // them undefined in the prototype, even though native accounting has zeros.
     for (key, value) in [("mp", p.mp.floor()), ("inc", r(p.inc))] {
         fields.insert(key.into(), json!(value));
+    }
+    if state.options.mode == Mode::Classic {
+        fields.insert("mun".into(), json!(p.mun.floor()));
+        fields.insert("fuel".into(), json!(p.fuel.floor()));
     }
     for (key, value) in [("fuelInc", p.fuel_inc), ("upkeep", p.upkeep)] {
         if let Some(value) = value {
@@ -1144,9 +1240,12 @@ pub(crate) mod tests {
             let cache = SnapshotCache::new(&m).unwrap();
             for (slot, expected) in case["outputs"].as_array().unwrap().iter().enumerate() {
                 let projection = cache.recipient(slot).unwrap();
+                let mut expected = expected.clone();
+                expected["flights"] = case["fullOutputs"][slot]["flights"].clone();
+                expected["air"] = case["fullOutputs"][slot]["air"].clone();
                 equal(
                     &Value::Object(projection.fields),
-                    expected,
+                    &expected,
                     &format!("{} recipient{slot}", case["name"]),
                 );
                 assert!(!projection.missing.is_empty());
@@ -1213,6 +1312,13 @@ mod map_house_selected_tests;
 #[cfg(test)]
 #[path = "recipient_snapshot/net52_tests.rs"]
 mod net52_tests;
+
+#[cfg(test)]
+#[path = "economy_currency_tests.rs"]
+mod economy_currency_tests;
+#[cfg(test)]
+#[path = "recipient_snapshot/production_state_tests.rs"]
+mod production_state_tests;
 
 #[cfg(test)]
 #[path = "recipient_snapshot/combat_filter_tests.rs"]

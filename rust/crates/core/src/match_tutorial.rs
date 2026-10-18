@@ -20,6 +20,12 @@ pub struct TutorialLine {
     pub at: Point,
 }
 
+impl TutorialLine {
+    pub fn shot_json(&self) -> serde_json::Value {
+        serde_json::json!({"k":"say", "text":self.text, "x":self.at.x, "z":self.at.z, "pub":true})
+    }
+}
+
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct TutorialRuntime {
     enemy: usize,
@@ -310,13 +316,14 @@ impl Match {
             .get_mut(&id)
             .ok_or("missing Tutorial house actor")?;
         if math::hypot(unit.x - at.x, unit.z - at.z) <= CELL * 1.6 {
-            unit.x = at.x;
-            unit.z = at.z;
-            unit.garrison = Some(cell);
-            unit.path.clear();
-            unit.board = 0;
+            crate::unit_placement::place_unit(&mut self.grid, unit, |unit| {
+                unit.x = at.x;
+                unit.z = at.z;
+                unit.garrison = Some(cell);
+                unit.path.clear();
+                unit.board = 0;
+            });
             self.commands.units.get_mut(&id).unwrap().enter = None;
-            self.grid.update(id, unit);
         }
         Ok(())
     }

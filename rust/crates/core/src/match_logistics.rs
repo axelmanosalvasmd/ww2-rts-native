@@ -4,6 +4,10 @@ mod batch5_tests;
 #[cfg(test)]
 mod causal_tests;
 #[cfg(test)]
+mod full_tick_tests;
+#[cfg(test)]
+mod net54_tests;
+#[cfg(test)]
 mod runtime_tests;
 
 use crate::{
@@ -63,7 +67,89 @@ fn facts<'a>(u: &Unit, rules: &'a Rules) -> UnitFacts<'a> {
         riding: u.riding,
     }
 }
+pub(crate) fn initial_unit_reserves(
+    enabled: bool,
+    unit: &Unit,
+    rules: &Rules,
+) -> Result<Option<logistics::Reserves>, String> {
+    let definition =
+        Definition::from_catalog(&rules.kinds[unit.kind].name).map_err(|e| e.to_string())?;
+    let mut prepared = logistics::LogisticsState::default();
+    prepared.initialize_unit(
+        reserve_context(enabled),
+        facts(unit, rules),
+        Some(&definition),
+    );
+    Ok(prepared.remove(unit.id))
+}
+
 impl Match {
+    pub(crate) fn automatic_convoy(&self, id: u32) -> bool {
+        self.convoys
+            .as_ref()
+            .and_then(|c| c.trucks.get(&id))
+            .is_some_and(|c| !c.manual)
+    }
+
+    /// Full ordinary ticks require the constructor's paired reserve/convoy state.
+    /// World logistics still needs its separate territory/network integration.
+    pub(crate) fn validate_logistics_runtime(&self) -> Result<(), String> {
+        if self.options.logistics != self.convoys.is_some() {
+            return Err("logistics option and convoy state disagree".into());
+        }
+        if self.convoys.is_some() {
+            if !matches!(
+                self.options.mode,
+                crate::economy::Mode::Default
+                    | crate::economy::Mode::Conquest
+                    | crate::economy::Mode::Classic
+                    | crate::economy::Mode::Annihilation
+            ) {
+                return Err("physical logistics requires a supported ordinary mode".into());
+            }
+            self.validate_supply()?;
+            let mut expected = logistics::LogisticsState::default();
+            for unit in self.world.game.units.values() {
+                let definition = Definition::from_catalog(&self.rules.kinds[unit.kind].name)
+                    .map_err(|e| e.to_string())?;
+                let eligible = expected
+                    .initialize_unit(
+                        reserve_context(true),
+                        facts(unit, &self.rules),
+                        Some(&definition),
+                    )
+                    .is_some();
+                if eligible != self.logistics.get(unit.id).is_some() {
+                    return Err("unit reserve metadata does not match logistics eligibility".into());
+                }
+            }
+            for (id, reserve) in self.logistics.iter() {
+                if !self.world.game.units.contains_key(&id)
+                    || [
+                        Some(reserve.ammo),
+                        Some(reserve.ammo_max),
+                        Some(reserve.ammo_price),
+                        reserve.ammo_credit,
+                        Some(reserve.provisions),
+                        reserve.fuel,
+                        reserve.emergency,
+                        reserve.warning,
+                        reserve.supply_rate,
+                        reserve.cut_for,
+                    ]
+                    .into_iter()
+                    .flatten()
+                    .any(|n| !n.is_finite() || n < 0.0)
+                {
+                    return Err("invalid canonical reserve metadata".into());
+                }
+            }
+        } else if self.logistics.iter().next().is_some() {
+            return Err("reserves require enabled logistics".into());
+        }
+        Ok(())
+    }
+
     #[cfg(test)]
     pub(crate) fn test_supply_truck(&mut self, owner: usize) -> u32 {
         self.with_supply_world(|_, state, _, world| {
@@ -124,15 +210,7 @@ impl Match {
         {
             return Err("invalid new reserve identity".into());
         }
-        let definition = Definition::from_catalog(&self.rules.kinds[unit.kind].name)
-            .map_err(|e| e.to_string())?;
-        let mut prepared = logistics::LogisticsState::default();
-        prepared.initialize_unit(
-            reserve_context(self.options.logistics),
-            facts(unit, &self.rules),
-            Some(&definition),
-        );
-        Ok(prepared.remove(unit.id))
+        initial_unit_reserves(self.options.logistics, unit, &self.rules)
     }
     /// The source network runs on its own early-phase beat, using the tick's captured ordered list.
     pub fn refresh_supply_network(&mut self, unit_order: &[u32]) -> Result<(), String> {
@@ -140,6 +218,21 @@ impl Match {
             return Ok(());
         }
         self.recompute_supply_network(unit_order)
+    }
+    /// A zero beat freezes the existing network, as in the prototype test hook.
+    pub(crate) fn refresh_supply_network_on_beat(
+        &mut self,
+        unit_order: &[u32],
+        beat: u64,
+    ) -> Result<bool, String> {
+        if self.convoys.is_none()
+            || beat == 0
+            || !(self.world.game.tick as u64).is_multiple_of(beat)
+        {
+            return Ok(false);
+        }
+        self.refresh_supply_network(unit_order)?;
+        Ok(true)
     }
     fn recompute_supply_network(&mut self, unit_order: &[u32]) -> Result<(), String> {
         self.validate_supply()?;
@@ -171,7 +264,7 @@ impl Match {
             })
             .collect::<Vec<_>>();
         let initial = self.world.initial();
-        self.supply_net = GroundSupplyNetwork::compute(
+        self.supply_net = GroundSupplyNetwork::compute_for_mode(
             SupplyInput {
                 view: view(&self.world.game),
                 chars: &self.world.game.chars,
@@ -182,6 +275,7 @@ impl Match {
                 players: &players,
             },
             &mut SpawnPlacer::new(),
+            self.options.mode,
         )?;
         Ok(())
     }
@@ -262,6 +356,53 @@ impl Match {
         self.with_supply_world(|ctx, state, reserves, world| {
             state.support_provision(ctx, unit, owner, amount, reserves, world)
         })
+    }
+    /// Prototype convoy commands run before ordinary troop selection and keep duplicates.
+    pub(crate) fn execute_convoy_input(
+        &mut self,
+        owner: usize,
+        ids: &[i64],
+        target: Option<i64>,
+    ) -> Result<Option<crate::match_commands::Denial>, String> {
+        use crate::match_commands::Denial;
+        let Some(convoys) = self.convoys.as_ref() else {
+            return Ok(Some(Denial::Blocked));
+        };
+        let trucks = ids
+            .iter()
+            .filter_map(|raw| u32::try_from(*raw).ok())
+            .filter(|id| {
+                self.world.game.units.get(id).is_some_and(|u| {
+                    u.owner == owner
+                        && u.hp > 0.
+                        && self.rules.kinds[u.kind].name == "truck"
+                        && convoys.trucks.contains_key(id)
+                })
+            })
+            .collect::<Vec<_>>();
+        if trucks.is_empty() {
+            return Ok(Some(Denial::Needs));
+        }
+        let success = if let Some(raw) = target {
+            let Some(unit) = u32::try_from(raw)
+                .ok()
+                .and_then(|id| self.world.game.units.get(&id))
+            else {
+                return Ok(Some(Denial::Needs));
+            };
+            let cache = self.rules.kinds[unit.kind].name == "supplycache";
+            if unit.hp <= 0.
+                || !self.world.game.allied(unit.owner, owner)
+                || (self.logistics.get(unit.id).is_none() && !cache)
+                || cache && !unit.built.is_some_and(|built| built >= 1.)
+            {
+                return Ok(Some(Denial::Needs));
+            }
+            self.supply_convoys(owner, &trucks, unit.id)?
+        } else {
+            self.resume_convoys(owner, &trucks)?
+        };
+        Ok((!success).then_some(Denial::Blocked))
     }
     /// Manual supply uses canonical stores, reserves and the owner's remembered routes.
     pub fn supply_convoys(
@@ -370,8 +511,21 @@ impl Match {
         self.validate_supply_context()
     }
     fn validate_supply_context(&self) -> Result<(), String> {
-        if !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode) {
-            return Err("supply adapter supports ordinary Conquest only".into());
+        let supported = matches!(
+            (self.options.mode, self.world.game.mode),
+            (
+                crate::economy::Mode::Default | crate::economy::Mode::Conquest,
+                None
+            ) | (
+                crate::economy::Mode::Classic,
+                Some(crate::game::ModeKind::Classic)
+            ) | (
+                crate::economy::Mode::Annihilation,
+                Some(crate::game::ModeKind::Annihilation)
+            )
+        );
+        if !supported {
+            return Err("supply adapter requires an ordinary logistics mode".into());
         }
         let g = &self.world.game;
         let birth_slots = u32::try_from(g.players.len()).map_err(|_| "invalid supply roster")?;
@@ -594,7 +748,7 @@ impl Match {
             .ok_or("missing army population scale")?;
         let ctx = supply_convoys::Context {
             enabled: true,
-            construction: false,
+            construction: self.options.mode.is_construction(),
             tick: self.world.game.tick as u64,
             winner: false,
             army_pop: pop,
@@ -949,8 +1103,20 @@ impl supply_convoys::World for ConvoyWorld<'_> {
     }
 }
 
-fn queued_points(control: &UnitControl, id: u32, abilities: bool) -> Result<Vec<Point>, String> {
+fn queued_points(control: &UnitControl, id: u32, non_truck: bool) -> Result<Vec<Point>, String> {
     use crate::match_commands::Command;
+    // Only manual truck interception reads queued waypoint geometry. Other
+    // actors retain their own typed queues and need only orders_pending here.
+    if non_truck {
+        if control
+            .orders
+            .iter()
+            .any(|c| matches!(c, Command::Unsupported))
+        {
+            return Err("unsupported queued supply command".into());
+        }
+        return Ok(Vec::new());
+    }
     let mut points = Vec::new();
     for command in &control.orders {
         match command {
@@ -973,15 +1139,6 @@ fn queued_points(control: &UnitControl, id: u32, abilities: bool) -> Result<Vec<
                 }
                 points.push(orders[0].at);
             }
-            Command::Ability {
-                ids,
-                at: Some(at),
-                queue: false,
-                automatic: false,
-            } if abilities
-                && ids.as_slice() == [i64::from(id)]
-                && at.x.is_finite()
-                && at.z.is_finite() => {}
             _ => return Err("unsupported queued convoy command projection".into()),
         }
     }
@@ -1097,3 +1254,9 @@ fn physical_handoff(
         )
         .expect("validated physical handoff")
 }
+
+#[cfg(test)]
+#[path = "movement_tick_network_tests.rs"]
+mod movement_tick_network_tests;
+#[cfg(test)]
+mod room_command_tests;

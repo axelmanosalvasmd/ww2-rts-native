@@ -220,8 +220,18 @@ fn if27_v1_null_memory_and_human_resumption_reset_without_changing_game_schema()
 #[test]
 fn if27_horde_pending_memory_round_trips_order_budget_and_supersession() {
     use crate::game::Point;
-    use crate::horde_commander::{HordeCommander, Live, OwnPlan, OwnUnit, View, Wave};
+    use crate::horde_commander::{
+        DeliveredIntent, DeliveredPlan, HordeCommander, Live, OwnPlan, OwnUnit, View, Wave,
+    };
     let plan = OwnPlan {
+        delivered: Some(DeliveredIntent {
+            plan: Some(DeliveredPlan {
+                kind: 0,
+                at: Point { x: 40.0, z: 40.0 },
+            }),
+            orders: vec![],
+            digging: false,
+        }),
         path_generation: 2,
         goal: None,
         route_end: None,
@@ -468,6 +478,7 @@ fn if27_field_and_world_policy_memory_round_trip_and_legacy_defaults() {
         panic!("ordinary seat must use the human brain");
     };
     let mut encoded = serde_json::to_value(&**policy).unwrap();
+    encoded["tactics"]["node"] = serde_json::json!({"9": 2});
     encoded["tactics"]["field"] = serde_json::json!({
         "bridges":[12], "bridge_crew":{"4":{"tick":9,"dug":true}},
         "fill_crew":{"5":{"tick":10,"dug":false}},
@@ -477,6 +488,10 @@ fn if27_field_and_world_policy_memory_round_trip_and_legacy_defaults() {
         "rail_at":{"7":23}, "fort_steps":{"8":3},
         "field": encoded["tactics"]["field"].clone()
     });
+    encoded["tactics"]["engineering"] = serde_json::json!({
+        "bridges":[17], "bridge_crew":{"2":{"time":3.0,"dug":true}}, "fill_crew":{}, "demine_crew":{}
+    });
+
     **policy = serde_json::from_value(encoded.clone()).unwrap();
     let expected = policy.clone();
     let memory = HumanObservationMemory::new(0);
@@ -489,11 +504,41 @@ fn if27_field_and_world_policy_memory_round_trip_and_legacy_defaults() {
         panic!("restored seat must use the human brain");
     };
     assert_eq!(policy, &expected);
+    // Main's external v1 AI memory predates the Classic node assignments.
+    fn field_mut<'a>(value: &'a mut Value, name: &str) -> &'a mut Value {
+        &mut value[1]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|entry| entry[0] == serde_json::json!(["string", name]))
+            .unwrap()[1]
+    }
+    let mut legacy_saved = saved.clone();
+    let memory = field_mut(&mut legacy_saved[0], "memory");
+    let human = field_mut(memory, "Human");
+    let policy = field_mut(human, "policy");
+    let tactics = field_mut(policy, "tactics");
+    let fields = tactics[1].as_array_mut().unwrap();
+    let previous_len = fields.len();
+    fields.retain(|entry| entry[0] != serde_json::json!(["string", "node"]));
+    assert_eq!(fields.len() + 1, previous_len);
+    let legacy_restored = game
+        .restore_ai_memories_json(&legacy_saved, &[(0, Level::Hard)])
+        .unwrap();
+    let Brain::Human { policy, .. } = &legacy_restored[0].0.brain else {
+        panic!("legacy seat must use the human brain");
+    };
+    let mut expected_legacy = serde_json::to_value(&expected).unwrap();
+    expected_legacy["tactics"]["node"] = serde_json::json!({});
+    assert_eq!(serde_json::to_value(policy).unwrap(), expected_legacy);
     let tactics = encoded["tactics"].as_object_mut().unwrap();
     tactics.remove("field");
     tactics.remove("world");
+    tactics.remove("node");
+    tactics.remove("engineering");
     let legacy: HumanPolicy = serde_json::from_value(encoded).unwrap();
     let legacy = serde_json::to_value(legacy).unwrap();
+    assert_eq!(legacy["tactics"]["node"], serde_json::json!({}));
     assert_eq!(
         legacy["tactics"]["field"],
         serde_json::to_value(crate::commander_field_policy::State::default()).unwrap()
@@ -501,5 +546,9 @@ fn if27_field_and_world_policy_memory_round_trip_and_legacy_defaults() {
     assert_eq!(
         legacy["tactics"]["world"],
         serde_json::to_value(crate::commander_world_policy::State::default()).unwrap()
+    );
+    assert_eq!(
+        legacy["tactics"]["engineering"],
+        serde_json::to_value(crate::commander_engineering::State::default()).unwrap()
     );
 }

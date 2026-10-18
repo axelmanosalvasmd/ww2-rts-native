@@ -8,7 +8,7 @@ use crate::{
     match_commands::Command,
     match_runtime::{Match, MatchOptions, PlayerConfig},
     orders::OrderKey,
-    recipient_snapshot::{DeliveryState, SelectedSeat, SnapshotCache, SnapshotError},
+    recipient_snapshot::{DeliveryState, SelectedSeat},
     weather::WeatherChoice,
 };
 use serde_json::{Value, json};
@@ -97,7 +97,86 @@ fn enqueue(state: &mut Match, sequence: u64, command: Value) {
         )
         .unwrap();
 }
-fn tick_and_collect(state: &mut Match, delivery: Option<&mut DeliveryState>) {
+fn collect_classic_complete(state: &mut Match, delivery: &mut DeliveryState) {
+    let expected = crate::recipient_snapshot::mode_row(state).unwrap();
+    assert_eq!(expected["kind"], "classic");
+    let count = state.start.players.len();
+    let selected = (0..count)
+        .map(|slot| SelectedSeat {
+            slot,
+            full: false,
+            omit: false,
+        })
+        .collect::<Vec<_>>();
+    let expected_units: Vec<_> = (0..count)
+        .map(|slot| {
+            let own: Vec<_> = state
+                .world
+                .game
+                .units
+                .values()
+                .filter(|unit| unit.owner == slot)
+                .map(|unit| u64::from(unit.id))
+                .collect();
+            let hidden: Vec<_> = state
+                .world
+                .game
+                .units
+                .values()
+                .filter(|unit| {
+                    !state.world.game.reveal
+                        && !state.world.game.allied(unit.owner, slot)
+                        && !state.world.game.players[slot].sees(unit.id)
+                })
+                .map(|unit| u64::from(unit.id))
+                .collect();
+            (own, hidden)
+        })
+        .collect();
+    let jobs = state.field_works.jobs().len();
+    let frame = delivery
+        .capture_selected_with_tick_events(state, &selected, &[])
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        frame.slots().collect::<Vec<_>>(),
+        (0..count).collect::<Vec<_>>()
+    );
+    for (slot, (own, hidden)) in expected_units.iter().enumerate() {
+        let snapshot = frame.recipient(slot).unwrap().into_json();
+        assert_eq!(snapshot["t"], "s");
+        assert_eq!(snapshot["mode"], expected, "Classic seat {slot}");
+        assert!(snapshot.get("missing").is_none());
+        for field in [
+            "units",
+            "works",
+            "wrecks",
+            "foundMines",
+            "shots",
+            "flights",
+            "smokes",
+            "strikes",
+        ] {
+            assert!(snapshot[field].is_array(), "Classic seat {slot}: {field}");
+        }
+        let rows = snapshot["units"].as_array().unwrap();
+        for id in own {
+            assert!(rows.iter().any(|row| row[0].as_u64() == Some(*id)));
+        }
+        for id in hidden {
+            assert!(rows.iter().all(|row| row[0].as_u64() != Some(*id)));
+        }
+        assert_eq!(
+            snapshot["works"].as_array().unwrap().len(),
+            if slot == 0 { jobs } else { 0 }
+        );
+        assert!(snapshot["cells"].is_array());
+        assert!(snapshot["units"].is_array());
+        assert!(snapshot["works"].is_array());
+    }
+}
+
+fn tick_and_collect(state: &mut Match, delivery: &mut DeliveryState) {
     let report = state.advance_tick().unwrap();
     assert!(
         report.commands.iter().all(|result| result.denial.is_none()),
@@ -109,18 +188,12 @@ fn tick_and_collect(state: &mut Match, delivery: Option<&mut DeliveryState>) {
     for &id in state.world.game.units.keys() {
         state.validate_gate_actor(id).unwrap();
     }
-    let Some(delivery) = delivery else {
-        // These existing mode snapshot bounds are independent of Gate admission.
-        assert!(matches!(
-            SnapshotCache::new(state),
-            Err(SnapshotError::UnsupportedMode)
-        ));
-        return;
-    };
+    let snapshot_mode = (!matches!(state.options.mode, Mode::Default | Mode::Conquest))
+        .then(|| crate::recipient_snapshot::mode_row(state).unwrap());
     let selected: Vec<_> = (0..state.start.players.len())
         .map(|slot| SelectedSeat {
             slot,
-            full: false,
+            full: true,
             omit: false,
         })
         .collect();
@@ -128,10 +201,24 @@ fn tick_and_collect(state: &mut Match, delivery: Option<&mut DeliveryState>) {
         .capture_selected_with_tick_events(state, &selected, &report.events)
         .unwrap()
         .unwrap();
+    assert_eq!(
+        frame.slots().collect::<Vec<_>>(),
+        selected.iter().map(|seat| seat.slot).collect::<Vec<_>>()
+    );
     for seat in selected {
         let snapshot = frame.recipient(seat.slot).unwrap().into_json();
+        assert_eq!(snapshot["t"], "s");
+        assert!(snapshot.get("missing").is_none());
+        for field in ["wrecks", "foundMines", "shots", "flights"] {
+            assert!(snapshot[field].is_array(), "seat {}: {field}", seat.slot);
+        }
         assert!(snapshot["units"].is_array());
         assert!(snapshot["works"].is_array());
+        if let Some(expected) = &snapshot_mode {
+            assert_eq!(snapshot.get("mode"), Some(expected));
+        } else {
+            assert!(snapshot.get("mode").is_none());
+        }
     }
 }
 fn count(state: &Match, kind: &str) -> usize {
@@ -156,6 +243,12 @@ fn intent_ai50_gate_order_completes_in_each_real_ordinary_mode_with_supported_se
         Mode::Classic,
     ] {
         let (mut state, builder) = scene(mode);
+        if mode == Mode::Classic {
+            assert_eq!(
+                crate::recipient_snapshot::mode_row(&state).unwrap(),
+                json!({"kind":"classic","timeLeft":1500.0,"suddenDeath":false})
+            );
+        }
         let before = count(&state, "gate");
         let first_gate = state.next_unit_id;
         let spent = state.story[0].mp_spent;
@@ -165,16 +258,11 @@ fn intent_ai50_gate_order_completes_in_each_real_ordinary_mode_with_supported_se
             json!({"t":"dig","kind":"gate","ids":[builder],
             "x":80.0,"z":45.0,"dir":0.0}),
         );
-        let mut delivery = if matches!(mode, Mode::Default | Mode::Conquest) {
-            Some(DeliveryState::new(&state).unwrap())
-        } else {
-            assert!(matches!(
-                SnapshotCache::new(&state),
-                Err(SnapshotError::UnsupportedMode)
-            ));
-            None
-        };
-        tick_and_collect(&mut state, delivery.as_mut());
+        let mut delivery = DeliveryState::new(&state).unwrap();
+        if mode == Mode::Classic {
+            collect_classic_complete(&mut state, &mut delivery);
+        }
+        tick_and_collect(&mut state, &mut delivery);
         let job = state.field_works.jobs().get(&builder).unwrap();
         assert_eq!(job.kind, FortKind::Gate);
         assert_eq!(job.cells.len(), 3);
@@ -182,7 +270,7 @@ fn intent_ai50_gate_order_completes_in_each_real_ordinary_mode_with_supported_se
         let cells: Vec<_> = job.cells.iter().map(|cell| cell.cell).collect();
         let mut completed = false;
         for _ in 0..1200 {
-            tick_and_collect(&mut state, delivery.as_mut());
+            tick_and_collect(&mut state, &mut delivery);
             if !state.field_works.is_active(builder) && count(&state, "gate") == before + 3 {
                 completed = true;
                 break;
@@ -198,7 +286,7 @@ fn intent_ai50_gate_order_completes_in_each_real_ordinary_mode_with_supported_se
             assert_eq!(gate.cells.as_deref(), Some([cell as u32].as_slice()));
         }
         for _ in 0..12 {
-            tick_and_collect(&mut state, delivery.as_mut());
+            tick_and_collect(&mut state, &mut delivery);
         }
         assert_eq!(count(&state, "gate"), before + 3);
         assert!(!state.world.game.units[&builder].dig);
@@ -245,7 +333,7 @@ fn intent_ai50_wall_fronts_queue_and_complete_through_ordinary_conquest_snapshot
         "x":55.0,"z":46.0,"x2":55.0,"z2":36.0,"queue":true}),
     );
     let mut delivery = DeliveryState::new(&state).unwrap();
-    tick_and_collect(&mut state, Some(&mut delivery));
+    tick_and_collect(&mut state, &mut delivery);
     assert!(state.field_works.membership(builder).is_some());
     assert!(state.field_works.membership(other).is_some());
     assert!(
@@ -257,7 +345,7 @@ fn intent_ai50_wall_fronts_queue_and_complete_through_ordinary_conquest_snapshot
     let mut saw_paid = false;
     let mut completed = false;
     for _ in 0..2200 {
-        tick_and_collect(&mut state, Some(&mut delivery));
+        tick_and_collect(&mut state, &mut delivery);
         saw_paid |= state
             .field_works
             .jobs()
@@ -286,6 +374,6 @@ fn intent_ai50_wall_fronts_queue_and_complete_through_ordinary_conquest_snapshot
     assert!(walls.iter().any(|wall| wall.z < 46.0));
     assert!(walls.iter().all(|wall| wall.z <= 47.0 || wall.z >= 53.0));
     for _ in 0..12 {
-        tick_and_collect(&mut state, Some(&mut delivery));
+        tick_and_collect(&mut state, &mut delivery);
     }
 }

@@ -3,16 +3,21 @@
 Compatibility source: `reference/ww2-rts` at
 `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`. This extends command admission in
 the existing private, two-human Conquest R1 room. It keeps the existing wire
-shapes, canonical meters and recipient view. World, Tutorial, Horde, spectators,
-operatives and convoy command admission remain outside this batch.
+shapes, canonical meters and recipient view. World and World recovery remain
+deferred. Ordinary convoy commands, FireAt and
+the remaining canonical command union are admitted by the ROOM-COMMANDS
+successors, alongside the composed sandbox, operative, spectator and hosted
+Horde owners and contracts. Public R1 start remains private Conquest;
+internal Classic attachment supports production cancellation with logistics
+disabled, as described in [room-command-union.md](room-command-union.md).
 
 The owner decisions are `julio-owner-decisions-recorded-20261016`
 (issue #5, comment 6217590741), groups F and M. Julio's later owner instruction
 `julio-owner-merge-now-20261016` (6217727398) confirms the grant and says Axel's
 later written line does not gate implementation. Axel also confirmed these
 decisions on #5 in `axel-owner-confirm-a-to-p-20261016`. This follows the handoff
-and preserves `axel-interface-response-004`. Hermes' exact-head content review
-remains required; no ack is claimed here.
+and preserves `axel-interface-response-004`. No Hermes ack is claimed here. The orchestrator owns later CI, review and merge
+decisions.
 
 ## Host controls and resync
 
@@ -47,6 +52,9 @@ in place (`shared/command-feedback.js:2-8`).
 | Command | Existing JSON fields | Prototype dispatch |
 | --- | --- | --- |
 | `move`, `amove` | `orders:[[id,x,z]]`, optional `ids`, `queue`, `together`, `face` | `shared/sim.js:3421-3461` |
+| `fireat` | `ids`, `x`, `z`, optional `queue` | `shared/sim.js:3462-3477` |
+| `supply` | `ids` or `orders:[[id,x,z]]`, `target` | `shared/supply-convoys.js:573-610` |
+| `logisticsResume` | `ids` or `orders:[[id,x,z]]` | `shared/supply-convoys.js:573-590` |
 | `garrison` | `ids`, `x`, `z`, optional `queue` | `shared/sim.js:3478` |
 | `stop` | `ids` | `shared/sim.js:3511-3514` |
 | `retreat`, `stance`, `cover` | `ids`; `key`,`on` for stance; optional `queue` for cover | `shared/sim.js:3571,3574,3580` |
@@ -55,14 +63,19 @@ in place (`shared/command-feedback.js:2-8`).
 | `tech` | `kind` (`tier`, `inf`, `guns`, `armor`) | `shared/sim.js:3723` |
 | `cancel`, `destroy`, `rally` | Existing `id`,`ids`,`x`,`z` fields for the respective commands | `shared/sim.js:3748,3760,3766` |
 
-`cancelProduction` remains refused before enqueue in R1 Conquest with
-`{"t":"deny","cmd":"cancelProduction","reason":"needs"}`. This is exactly the
-prototype's non-construction-mode result (`shared/sim.js:3737-3738`). Conquest
-training queues remain forbidden by the native tick guard.
+`cancelProduction` now uses the same recorded queue as every ordinary command.
+In R1 Conquest it retains the exact
+`{"t":"deny","cmd":"cancelProduction","reason":"needs"}` result from the
+canonical executor (`shared/sim.js:3737-3738`). Internally attached Classic
+matches can cancel waiting production and receive their original paid refund;
+active jobs retain `notWaiting`. Conquest training queues remain forbidden by
+the native tick guard.
 
 The socket denial matrix verifies a deterministic prototype denial branch per
-command. Existing ground selection restrictions remain in place, and
-client authority fields are ignored. Unknown orders in an active, unpaused seat
+command. Canonical per-family selection rules remain in place, and client
+authority fields are ignored. The old server ground-only filter is removed so
+supported mixed selections and construction replacements reach their owners.
+Unknown orders in an active, unpaused seat
 now receive the prototype's `blocked` denial (`shared/sim.js:3812`).
 
 Garrison and cover retain the prototype semantics (`shared/sim.js:3420,
@@ -77,27 +90,63 @@ both cancellation commands use scalar inputs rather than a selected ID list.
 The public lifecycle test sends commands over actual sockets from start through
 successful garrison, dig, entrench, cover, assist, retreat, rally, tech, cancel
 and destroy, public capture orders, VP victory, final hold, result and a subsequent
-host end. Its initial construction fixture is declared separately from socket
-input because public build remains closed. Every simulation tick builds snapshots
+host end. The test declares its initial construction site before socket input;
+the command-union room tests separately cover successful public Build. Every simulation tick builds snapshots
 for both seats and checks for a fault.
 Normal Conquest results retain `winner`, `teams`, `names`, `reason`, `at`,
 `endTick`, `story`, `timeline`, `winVp`, `mode` and recipient `you`, as in
 `server.js:348,753` and `shared/story.js:66-70`. This proves the Conquest and
 host-end portions of MODE-90; other modes and Horde results remain unqualified.
 
-## Held dependencies
+## Room command composition
 
-Sandbox, attack, fireat, ability, autocast, support, build, buy, board, unload,
-escort, rail and grouped orders retain their existing public refusal. Tutorial
-auto-start, convoy commands and recovery are also deferred. The prototype's
-research message is named `tech`; no `research` message is added.
+FireAt preserves the prototype JSON object and denial reasons (`blocked`,
+`notVisible`, `needs`, `queueFull`). Salvo weapons can target unseen open ground;
+direct terrain guns require a cell with hit points. Ground queues retain their
+existing owner-only order kind 5 (`shared/sim.js:3381-3390,5894,6027` and native
+`recipient_snapshot/owners.rs`). Bombers take an immediate area mission even
+when `queue:true`; a mixed bomber and ground selection applies both behaviors
+(`shared/sim.js:3462-3477`). Finite coordinates use the prototype's clamp to map
+extent (`shared/sim.js:3258`); an exact upper extent lies outside the cell grid.
 
-Broader ingress cannot safely open against this base: persistent firing flights,
-salvos and grenades are refused by
-`rust/crates/core/src/recipient_snapshot/composition.rs` in `admit_actors`, while
-`match_firing.rs` can create those actors after an accepted attack or aimed
-ability. Plane-backed support similarly exceeds the adapter's
-`SUPPORTED_SUPPORT_KINDS`. The flights/events stream must carry those complete
-lifecycles before these command families or unrestricted sandbox births open.
-Queued ability and fireat rows also need their prototype owner-only order
-encodings before their waiting state can be delivered.
+Convoy selection runs before ordinary troop selection. It preserves raw order
+and duplicate IDs without the troop cap, uses `ids` when it is an array, and
+otherwise derives IDs from `orders`. Only live trucks owned by the seated issuer
+participate. Supply targets must be live friendly reserve-bearing units or
+completed supply caches. Missing selection/targets return `needs`; a valid
+selection whose route/job cannot be assigned returns `blocked`. Without enabled
+convoys these commands return the prototype fallback `blocked`. Supply and resume
+use the existing recipient-fed routes, stores, reserves and convoy state. No new
+snapshot fields are introduced. `logisticsResume` clears manual/hold state and
+restarts the retained job (`shared/supply-convoys.js:573-610`).
+
+Every admitted command uses the canonical next-tick queue. Guests may issue
+FireAt and convoy commands for their own units. Host-only restrictions remain
+on the prototype host controls; ordinary commands have no extra host gate
+(`server.js:696-715`). Paused gameplay is ignored; spoofed authority fields never
+select a slot, tick or sequence. Denial delivery and throttle are unchanged.
+Pending convoy inputs survive the existing versioned JSON checkpoint.
+
+## Composed command union and remaining boundaries
+
+[room-command-union.md](room-command-union.md) records prototype Attack,
+Ability, Autocast, Build, Board, Unload, Escort, Rail, grouped Orders and
+production-cancellation shapes, selection rules and full room lifecycle tests.
+The existing canonical queue and denial owner serve all of them. Rail retains
+its prototype ordinary-mode `blocked` result, and successful World recovery
+and dispatch stay deferred under decision C.
+
+Sandbox spawn, operative input and shot privacy, and hosted Horde commands use
+their composed owners. [room-commands2.md](room-commands2.md) records sandbox and
+convoy command composition, while [room-commands2-events.md](room-commands2-events.md)
+records the operative and Horde event composition. These owners retain the
+prototype host restriction on the Horde break command.
+
+The #296 base previously limited support to Artillery, Smoke and Cover and
+refused aircraft purchases because snapshots could not carry flights. Integrated
+#369 supplies all eight support kinds and the ordinary flight/event projection;
+the successor NET-58 work composes the operative and Horde event families.
+Canonical guards still refuse states their lifecycle cannot represent, including
+aircraft abilities and depot construction. This note alone does not claim
+execution of the integrated NET-43 or NET-58 checks; the final-head integration
+report records that evidence.

@@ -1,0 +1,5 @@
+- Preserve Classic resource-pair and remembered-building discovery order, and HQ crew sort history when distances tie.
+- Deliver public resource richness, remembered depot claims, terrain engineering facts and own-aircraft readiness to ordinary AI planners.
+- Add direct witnesses for the remaining ordinary simulation sort consumers. World inventory remains deferred.
+- Admit the existing finite off-map aircraft home positions to runtime AI observations while retaining bounded ground and path validation.
+- Record 66 passing focused checks for ordinary sort consumers, including tick, recipient privacy and saved-policy continuation checks. World inventory remains deferred.

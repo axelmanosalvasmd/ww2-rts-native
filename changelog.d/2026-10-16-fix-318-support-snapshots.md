@@ -1,0 +1,2 @@
+- Limit AI support choices to the snapshot adapter's shared supported-kind list, preventing air support from faulting recipient snapshots. Keep unsupported AI support choices closed until their projections are available.
+- Replace planner tests that expected unsupported air support with refusal and artillery fallback coverage. Verify a preferred Dive target with ordinary ticks and snapshots for every seat.

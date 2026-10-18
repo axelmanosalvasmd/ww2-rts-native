@@ -57,6 +57,24 @@ impl Match {
         }
     }
 
+    /// Claims belong to the canonical mode node owner and only to this exact depot.
+    pub(crate) fn release_depot_claim(&mut self, id: UnitId) {
+        if let Some(state) = self.elimination.as_mut() {
+            for node in &mut state.nodes {
+                if node.depot == Some(id) {
+                    node.depot = None;
+                }
+            }
+        }
+        if let Some(state) = self.world_runtime.as_mut() {
+            for node in &mut state.nodes {
+                if node.depot == Some(id) {
+                    node.depot = None;
+                }
+            }
+        }
+    }
+
     /// Tear down an owned unfinished site for the original 75 percent MP refund.
     /// This administrative removal creates no death, bounty, rubble or built counter.
     pub fn cancel_construction(
@@ -177,15 +195,9 @@ impl Match {
         self.building_rallies.remove(&id);
         self.recruit_metadata.remove(&id);
         self.aviation.remove(id);
-        if let Some(world) = self.world_runtime.as_mut() {
-            for node in &mut world.nodes {
-                if node.depot == Some(id) {
-                    node.depot = None;
-                }
-            }
-        }
         self.start.economy.players[owner].mp = wallet;
         story.commit();
+        self.release_depot_claim(id);
         Ok(None)
     }
     fn validate_construction_actor(&self, id: UnitId) -> Result<(), String> {
@@ -295,6 +307,20 @@ impl Match {
     }
 
     /// Read-only admission. The sole runner calls this before inputs and again before its clock.
+    pub(crate) fn construction_tick_needed(&self) -> bool {
+        self.options.mode != crate::economy::Mode::World
+            && (self.options.mode != crate::economy::Mode::Horde
+                || self.commands.units.iter().any(|(worker, control)| {
+                    control.build_target.is_some()
+                        && self
+                            .world
+                            .game
+                            .units
+                            .get(worker)
+                            .is_some_and(|unit| unit.build)
+                }))
+    }
+
     pub fn validate_construction_tick(&self) -> Result<(), String> {
         // Horde exposes assigned facility work, not the ordinary construction phase.
         if self.options.mode == crate::economy::Mode::Horde
@@ -574,7 +600,7 @@ impl Match {
                         break;
                     };
                     let paid = math::min(repaired, reserve.provisions * 5.0);
-                    reserve.provisions -= paid / 5.0;
+                    reserve.provisions = math::max(0.0, reserve.provisions - paid / 5.0);
                     repaired -= paid;
                 }
             }
@@ -924,9 +950,29 @@ impl Match {
 }
 
 impl Match {
+    /// Borrow the ordinary mode's canonical resource claims in authored node order.
+    pub(crate) fn construction_nodes(
+        &self,
+    ) -> Result<Vec<crate::building_placement::Node>, String> {
+        if self.options.mode != crate::economy::Mode::Classic {
+            return Ok(Vec::new());
+        }
+        self.validate_elimination_state()?;
+        Ok(self
+            .elimination
+            .as_ref()
+            .unwrap()
+            .nodes
+            .iter()
+            .map(|node| crate::building_placement::Node {
+                cell: node.cell,
+                at: node.at,
+                claimed: node.depot.is_some(),
+            })
+            .collect())
+    }
+
     /// Pay and stamp an admitted static site before computing any crew route.
-    /// Depot nodes, coastal producers, caches and construction modes require their
-    /// canonical providers and are refused explicitly by this ordinary caller.
     pub fn execute_build(
         &mut self,
         owner: usize,
@@ -957,9 +1003,6 @@ impl Match {
             .contains(&name)
         {
             return Ok(Some(Denial::Blocked));
-        }
-        if name == "depot" {
-            return Ok(Some(Denial::Unsupported));
         }
         let types = crate::economy::builder_types(self.options.mode).map_err(|e| e.to_string())?;
         let builders = selected
@@ -1048,13 +1091,14 @@ impl Match {
         if name == "supplycache" && !self.options.logistics {
             return self.construction_denial(&selected, Denial::Blocked);
         }
+        let nodes = self.construction_nodes()?;
         let placement = crate::building_placement::check(
             &crate::building_placement::Context {
                 game: &self.world.game,
                 rules: &self.rules,
                 mode: self.options.mode,
                 logistics: self.options.logistics,
-                nodes: &[],
+                nodes: &nodes,
                 owned_cells: None,
                 rail_yard: None,
             },
@@ -1068,13 +1112,14 @@ impl Match {
                 Reason::Blocked => Denial::Blocked,
                 Reason::NotVisible => Denial::NotVisible,
                 Reason::Coast => Denial::Coast,
-                // World and node construction are refused before this ordinary query.
+                // World territory and rail placement remain outside this admitted path.
                 Reason::Territory | Reason::Rail => {
                     return Err("unexpected World placement reason".into());
                 }
             };
             return self.construction_denial(&selected, denial);
         }
+        let node_index = placement.node;
         let cells = placement.cells.ok_or("missing construction footprint")?;
         let center = placement.at;
         self.world
@@ -1213,6 +1258,9 @@ impl Match {
             owner,
             cost,
         )?;
+        if let Some(index) = node_index {
+            self.elimination.as_mut().unwrap().nodes[index].depot = Some(id);
+        }
         Ok(None)
     }
 }
@@ -1224,3 +1272,15 @@ mod tests;
 #[cfg(test)]
 #[path = "base_native_intent_tests.rs"]
 mod native_intent;
+
+#[cfg(test)]
+#[path = "match_construction_logistics_tests.rs"]
+mod logistics_intent;
+
+#[cfg(test)]
+#[path = "base_construction_runtime_tests.rs"]
+mod construction_runtime;
+
+#[cfg(test)]
+#[path = "match_depot_tests.rs"]
+mod depot_tests;

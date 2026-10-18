@@ -1,0 +1,3 @@
+- Preserve loaded logistics and HQ-tier settings when a trusted Conquest room restarts. Resolve native feature opt-ins by mode and share the room option mapping across existing constructors, with mode, scenario, roster, army, weather and every-seat runtime checks. General authored scenario execution, full Horde hosting and World room admission remain guarded.
+- Report the rejected compiled string when checkpoint decoding refuses it, so save/load failures identify the unsupported value.
+- Fix default-map checkpoint loading by recognizing the existing house structure kind. The restart test now preserves the complete authored structure graph across loading.

@@ -530,7 +530,10 @@ fn attached_match_blocks_lobby_mutations_and_preserves_command_window_on_rejoin(
     let budget = hub.rooms["ABC"].players[1].denies.clone();
     for index in 0..8 {
         guest.send(&mut hub, "ABC", json!({"t":"ping","c":index}), 2006 + index);
-        assert_eq!(guest.messages(), vec![json!({"t":"pong","c":index})]);
+        assert_eq!(
+            guest.messages(),
+            vec![json!({"t":"pong","c":index,"srv":[0.0,2]})]
+        );
     }
     assert_eq!(hub.rooms["ABC"].players[1].denies, budget);
     let id = hub.rooms["ABC"]
@@ -854,19 +857,9 @@ fn away_seat_stops_ordinary_wallet_income_and_cannot_command() {
 }
 
 #[test]
-fn unimplemented_roles_and_public_lifecycle_remain_explicit_refusals() {
+fn unimplemented_public_lifecycle_commands_remain_explicit_refusals() {
     let (mut hub, mut host, _guest) = room();
-    let mut operative = Peer::new(3);
-    operative.send(&mut hub, "ABC", json!({"t":"hello","token":"operative","name":"Operative","role":"operative","commander":0}), 0);
-    assert!(!operative.joined);
-    assert!(
-        matches!(operative.output.try_recv(), Ok(Output::Json(v)) if v == json!({"t":"deny","cmd":"join","reason":"commander"}))
-    );
-    assert!(matches!(
-        operative.output.try_recv(),
-        Ok(Output::Close(1008, "operative unavailable"))
-    ));
-    for (index, name) in ["start", "restart", "end", "leave", "handAi", "nextwave"]
+    for (index, name) in ["restart", "end", "leave", "handAi", "nextwave"]
         .iter()
         .enumerate()
     {

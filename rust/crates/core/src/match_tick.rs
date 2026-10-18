@@ -2,6 +2,11 @@
 //!
 //! This integration grows by attaching the independently verified phase adapters.
 //! Reports identify phases still absent; a clock advance is not playable-match proof.
+#[cfg(test)]
+mod phase_additional_tests;
+#[cfg(test)]
+mod phase_dependency_tests;
+
 use std::collections::BTreeMap;
 
 use crate::{game::Pose, grid::UnitId, movement::RouteRequest};
@@ -54,6 +59,7 @@ pub enum TickPhase {
     Convoys,
     Victory,
     Tutorial,
+    Horde,
 }
 
 /// Persistent simulation state, never wall-clock state. A phase failure poisons
@@ -84,12 +90,12 @@ impl TickPathConfig {
 pub struct TickState {
     pub(crate) fault: Option<String>,
     started: bool,
+    #[serde(default)]
     aircraft_weapons_restricted: bool,
     paths: TickPathConfig,
 }
 impl TickState {
-    /// Recipient rooms cannot publish aircraft projectile flights until owner decision E.
-    /// This restriction does not change command admission or the standalone combat provider.
+    /// Hosted modes without aircraft projectile delivery retain this restriction.
     pub fn restrict_aircraft_weapons_for_delivery(&mut self) {
         self.aircraft_weapons_restricted = true;
     }
@@ -111,7 +117,11 @@ pub enum TickEvent {
     Aviation(crate::match_aviation::AviationEvent),
     Environment(crate::environment::Effect),
     Scenario(crate::legacy_scenario::SayAction),
+    Tutorial(crate::match_tutorial::TutorialLine),
+    AuthoredScenario(crate::authored_scenario::ScenarioSay),
+    /// Decode-only legacy checkpoint event. Never emitted by the runtime.
     AuthoredMission(serde_json::Value),
+    Horde(crate::match_horde::HordeEvent),
 }
 
 /// A failed phase keeps the effects already emitted at their original boundaries.
@@ -311,9 +321,13 @@ impl crate::match_runtime::Match {
         if self.options.mode == crate::economy::Mode::Tutorial {
             self.validate_tutorial_state()?;
         }
-        if self.options.logistics || self.convoys.is_some() {
-            return Err("reserve and convoy tick phases are not connected".into());
+        if self.options.mode == crate::economy::Mode::Horde {
+            self.validate_horde_economy()?;
         }
+        if world && (self.options.logistics || self.convoys.is_some()) {
+            return Err("World logistics tick phases are not connected".into());
+        }
+        self.validate_logistics_runtime()?;
         self.preflight_legacy_scenario()?;
         self.tick_state.paths.validate()?;
         let boundary = game.tick as u64 + 1;
@@ -359,9 +373,12 @@ impl crate::match_runtime::Match {
             self.validate_production_phases(self.rules.movement.tick)
                 .map_err(|error| format!("production admission: {error:?}"))?;
             self.validate_carrier_tick()?;
-            self.validate_construction_tick()?;
+            if self.construction_tick_needed() {
+                self.validate_construction_tick()?;
+            }
             self.validate_gate_tick()?;
             self.validate_ground_attacks()?;
+            self.validate_terrain_fire_orders()?;
             self.validate_reaction_tick_actors()?;
             self.validate_field_project_tick(&current_order)?;
         }
@@ -450,6 +467,7 @@ impl crate::match_runtime::Match {
                 .map_err(|error| format!("aircraft published state: {error}"))?;
             self.validate_carrier_tick()?;
             self.validate_ground_attacks()?;
+            self.validate_terrain_fire_orders()?;
             self.validate_reaction_tick_actors()?;
             let current_order = self.world.game.units.keys().copied().collect::<Vec<_>>();
             self.validate_support_metadata()
@@ -457,7 +475,9 @@ impl crate::match_runtime::Match {
             self.validate_support_tick_phases(&current_order, dt, boundary)
                 .map_err(|error| format!("support published state: {error}"))?;
             self.validate_field_project_tick(&current_order)?;
-            self.validate_construction_tick()?;
+            if self.construction_tick_needed() {
+                self.validate_construction_tick()?;
+            }
             self.validate_production_phases(dt)
                 .map_err(|error| format!("production published state: {error:?}"))?;
         }
@@ -493,6 +513,8 @@ impl crate::match_runtime::Match {
         if tick % 4 == 1 {
             if self.options.mode == crate::economy::Mode::World {
                 self.refresh_world_visibility()?;
+            } else if self.options.mode == crate::economy::Mode::Horde {
+                self.refresh_horde_visibility()?;
             } else {
                 vision::update_vision(&mut self.world.game, &self.rules, &self.grid);
                 if self.options.mode == crate::economy::Mode::Classic {
@@ -518,12 +540,15 @@ impl crate::match_runtime::Match {
         phases.push(TickPhase::Paths);
         let claim_order = self.world.game.units.keys().copied().collect::<Vec<_>>();
         self.begin_firing_tick(&claim_order)?;
-        let mut construction = if self.options.mode == crate::economy::Mode::World {
-            None
-        } else {
+        let mut construction = if self.construction_tick_needed() {
             Some(self.begin_construction_tick()?)
+        } else {
+            None
         };
         let mut moved = Vec::new();
+        if self.convoys.is_some() {
+            phases.push(TickPhase::UnitReserves);
+        }
         let mut last_id = None;
         loop {
             // The source iterates its live Map. Monotonic IDs let births made
@@ -554,7 +579,9 @@ impl crate::match_runtime::Match {
                 continue;
             }
             if self.rules.kinds[unit.kind].rail {
-                self.step_rail_train(id, dt)?;
+                if self.validate_rail_tick_actor(id)? {
+                    self.step_rail_train(id, dt)?;
+                }
                 continue;
             }
             if self.options.mode == crate::economy::Mode::World {
@@ -581,8 +608,12 @@ impl crate::match_runtime::Match {
                 }
             }
             let unit = &self.world.game.units[&id];
+            let terrain_suppression = unit.supp;
             let factor = movement::supp_speed(unit.supp);
-            // Reserve adapters attach before this pre-timer order phase.
+            if self.convoys.is_some() {
+                self.advance_unit_reserves(id)?;
+                self.advance_supply_withdrawal(id)?;
+            }
             if self.options.mode == crate::economy::Mode::World {
                 self.apply_world_guard_home(id)?;
             }
@@ -681,6 +712,7 @@ impl crate::match_runtime::Match {
                 continue;
             }
             self.apply_attack_move(id)?;
+            self.apply_fire_at_order(id)?;
             if self.options.mode != crate::economy::Mode::World {
                 self.apply_ground_attack(id)?;
             }
@@ -700,7 +732,8 @@ impl crate::match_runtime::Match {
             let moving = !unit.path.is_empty()
                 || crate::math::hypot(unit.x - before.x, unit.z - before.z) > 0.001;
             self.sync_supply_withdrawal_progress(id);
-            let result = self.apply_unit_firing(id, moving, dt);
+            let result =
+                self.apply_unit_firing_with_suppression(id, moving, dt, terrain_suppression);
             self.take_firing_tick_events(events);
             result?;
         }
@@ -717,8 +750,11 @@ impl crate::match_runtime::Match {
             TickPhase::Reactions,
             TickPhase::TrafficKnowledge,
             TickPhase::Movement,
-            TickPhase::Firing,
         ]);
+        if self.options.mode != crate::economy::Mode::World {
+            phases.push(TickPhase::GroundEffects);
+        }
+        phases.push(TickPhase::Firing);
         if self.options.mode == crate::economy::Mode::World {
             phases.push(TickPhase::Production);
         }
@@ -773,13 +809,8 @@ impl crate::match_runtime::Match {
         }
 
         if self.options.mode != crate::economy::Mode::World && !winner_decided {
-            if let Some(mission) = self.authored_mission.as_mut() {
-                events.extend(
-                    mission
-                        .step(tick as u64, self.world.game.players.len())?
-                        .into_iter()
-                        .map(TickEvent::AuthoredMission),
-                );
+            if self.authored_scenario.is_some() {
+                self.step_authored_scenario(tick as u64, events)?;
             } else {
                 crate::legacy_scenario_runtime::step_legacy_scenario_emitting(
                     self,
@@ -796,6 +827,7 @@ impl crate::match_runtime::Match {
                     },
                 )
                 .map_err(|error| format!("legacy scenario: {error}"))?;
+                self.step_authored_scenario(tick as u64, events)?;
             }
             phases.push(TickPhase::Scenario);
         }
@@ -839,7 +871,7 @@ impl crate::match_runtime::Match {
         .map_err(|e| format!("living weather: {e:?}"))?;
         drop(smokes);
         phases.push(TickPhase::LivingWeather);
-        // Expiring smoke still blocks ignition during the source fire phase.
+        // Expiring smoke still suppresses replacement smoke during the source fire phase.
         self.tick_environment_phase(EnvironmentPhase::FireFlood(&unit_order), events)?;
         self.world
             .game
@@ -853,7 +885,10 @@ impl crate::match_runtime::Match {
             self.apply_point_supply(&unit_order)?;
             phases.push(TickPhase::PointSupply);
         }
-        // Network refresh attaches between point supply and prepared reinforcement.
+        let beat = crate::supply_network::SupplyRules::compiled()?.network_ticks;
+        if self.refresh_supply_network_on_beat(&unit_order, beat)? {
+            phases.push(TickPhase::SupplyNetwork);
+        }
         self.reinforce(&recovery, dt)?;
         phases.push(TickPhase::Reinforcement);
         self.tick_retirement(&unit_order, retirement, events)?;
@@ -878,7 +913,15 @@ impl crate::match_runtime::Match {
             }
             self.apply_point_capture_income(&unit_order)?;
             phases.push(TickPhase::PointCaptureIncome);
+            if self.convoys.is_some() {
+                self.step_supply_convoys(self.finish.is_some())?;
+                phases.push(TickPhase::Convoys);
+            }
             match self.options.mode {
+                crate::economy::Mode::Horde => {
+                    events.extend(self.step_horde(dt)?.into_iter().map(TickEvent::Horde));
+                    phases.push(TickPhase::Horde);
+                }
                 crate::economy::Mode::Assault => {
                     self.apply_assault_victory(dt)?;
                 }
@@ -902,6 +945,7 @@ impl crate::match_runtime::Match {
         } else {
             Vec::new()
         };
+        events.extend(tutorial_lines.iter().cloned().map(TickEvent::Tutorial));
         Ok(TickReport {
             tutorial_lines,
             tick,
@@ -933,14 +977,7 @@ impl crate::match_runtime::Match {
                     TickPhase::SupplyNetwork,
                 ]
             } else {
-                vec![
-                    TickPhase::UnitReserves,
-                    TickPhase::Production,
-                    TickPhase::Rail,
-                    TickPhase::GroundEffects,
-                    TickPhase::SupplyNetwork,
-                    TickPhase::Convoys,
-                ]
+                vec![TickPhase::Production, TickPhase::Rail]
             },
         })
     }

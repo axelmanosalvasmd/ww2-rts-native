@@ -107,7 +107,7 @@ impl SpectatorDelivery {
             "shots".into(),
             projected.into_iter().next().ok_or(SnapshotError::Rules)?.1,
         );
-        fields.insert("flights".into(), json!([]));
+        fields.insert("flights".into(), watcher_flights(state)?);
         fields.insert("t".into(), json!("s"));
         // Keep the prototype's literal removal list, including its retained tech.
         for key in [
@@ -252,6 +252,50 @@ impl SpectatorDelivery {
             Value::Array(changed)
         })
     }
+}
+
+// watchGame supplies reveal=true and EVERYTHING.has without changing canonical sight.
+fn watcher_flights(state: &Match) -> Result<Value, SnapshotError> {
+    let time = state.world.game.tick as f64 * state.rules.movement.tick;
+    finite(&[time])?;
+    let mut rows = Vec::with_capacity(state.firing.flights.len());
+    for flight in state.firing.flights.values() {
+        if flight.launched > time {
+            continue;
+        }
+        let kind = state
+            .rules
+            .kinds
+            .get(flight.source_kind)
+            .ok_or(SnapshotError::Rules)?;
+        let at = crate::projectiles::flight_at(flight.solution, time)
+            .map_err(|_| SnapshotError::Rules)?;
+        let velocity = crate::projectiles::velocity_at(flight.solution, time)
+            .map_err(|_| SnapshotError::Rules)?;
+        let mut until = math::min(flight.expires, time + 0.15);
+        if kind.weapon && until > time {
+            let end = crate::projectiles::flight_at(flight.solution, until)
+                .map_err(|_| SnapshotError::Rules)?;
+            if let Some(contact) = state
+                .recipient_flight_contact(flight, at, end, |_| true)
+                .map_err(|_| SnapshotError::Rules)?
+            {
+                until = time + (until - time) * contact.hit.fraction;
+            }
+        }
+        let mut row = json!({
+            "flight":flight.id,"kind":kind.name,"seq":flight.sequence,
+            "x":at.x,"y":at.y,"z":at.z,"v":[velocity.x,velocity.y,velocity.z],
+            "gravity":flight.solution.gravity,"time":time,"launched":flight.launched,
+            "expires":flight.expires,"until":until,"f":flight.shooter,"fo":flight.owner
+        });
+        if let Some(effect) = flight.effect {
+            row["effect"] = json!(effect);
+        }
+        crate::match_firing::normalize_json_zero(&mut row);
+        rows.push(row);
+    }
+    Ok(Value::Array(rows))
 }
 
 fn cell_json(observed: &ObservedRow) -> Value {
@@ -507,6 +551,174 @@ mod tests {
             seated[4],
             json!({"x":130.,"z":130.,"k":"hurt","kill":true,"local":true})
         );
+    }
+
+    #[test]
+    fn watcher_mixed_operative_and_ordinary_flights_keep_full_values_without_seat_visibility() {
+        use crate::{
+            companions::Input,
+            economy::{Faction, Mode},
+            economy_state::ArmySize,
+            game::Point,
+            map::AuthoritativeMap,
+            match_firing::AbilityBlast,
+            match_runtime::{MatchOptions, PlayerConfig},
+            projectiles::{Flight, Point3},
+            weather::WeatherChoice,
+        };
+        let map = AuthoritativeMap::from_value(json!({
+            "name":"Watcher mixed flights","w":64,"h":64,
+            "rows":vec![".".repeat(64);64],
+            "spawns":[{"x":8,"y":8},{"x":54,"y":54}],
+            "points":[{"x":32,"y":32}]
+        }))
+        .unwrap();
+        let mut state = Match::new(
+            &map,
+            MatchOptions {
+                seed: 7301,
+                mode: Mode::Conquest,
+                players: vec![
+                    PlayerConfig {
+                        name: "First".into(),
+                        team: 0,
+                        faction: Faction::Usa,
+                    },
+                    PlayerConfig {
+                        name: "Second".into(),
+                        team: 1,
+                        faction: Faction::Germany,
+                    },
+                ],
+                shuffle: false,
+                army: ArmySize::Standard,
+                weather: WeatherChoice::Map,
+                weather_seed: Some(1),
+                living_weather: false,
+                map_key: None,
+                tech: false,
+                supply: false,
+                logistics: false,
+                sandbox: false,
+            },
+        )
+        .unwrap();
+        let operative = state
+            .join_companion("watcher-flight", 0, false)
+            .unwrap()
+            .unwrap();
+        let operative_flight = state
+            .throw_companion(
+                operative,
+                &Input {
+                    forward: 0.,
+                    strafe: 0.,
+                    yaw: 0.,
+                    pitch: 0.,
+                    fire: false,
+                    ads: false,
+                    crouch: false,
+                    sprint: false,
+                    weapon: 0,
+                },
+                false,
+            )
+            .unwrap();
+        let ordinary = state
+            .world
+            .game
+            .units
+            .values()
+            .find(|u| u.owner == 1 && state.rules.kinds[u.kind].name == "rifle")
+            .unwrap()
+            .id;
+        let blast =
+            AbilityBlast::from_unit(state.world.game.units[&ordinary].kind, &state.rules).unwrap();
+        let ordinary_flight = state
+            .launch_ability_flight(ordinary, Point { x: 80., z: 60. }, blast, None, None)
+            .unwrap();
+        state.firing.events.clear();
+        state.world.game.tick = 20;
+        for player in &mut state.world.game.players {
+            player.visible.clear();
+        }
+        // Both current ground cells are hidden from every seated recipient.
+        let key = Some(state.world.game.vision_tick.unwrap_or(-1));
+        for team in [0, 1] {
+            let mut fog = crate::fog::TeamFog::new(64 * 64);
+            fog.key = key;
+            state.routing_fog.teams.insert(team, fog);
+        }
+        for (index, id) in [operative_flight, ordinary_flight].into_iter().enumerate() {
+            let p = state.firing.flights.get_mut(&id).unwrap();
+            p.solution = Flight {
+                origin: Point3::new(40., 10., 60. + 10. * index as f64),
+                velocity: Point3::new(20., 0., 0.),
+                gravity: 0.,
+                stamp: 0.,
+            };
+            p.launched = 0.;
+            p.last = 1.;
+            p.expires = if index == 0 { 3. } else { 1.05 };
+        }
+        let before = format!(
+            "{:?}{:?}{:?}",
+            state.world, state.recipients, state.routing_fog
+        );
+        let mut stream = SpectatorDelivery::new(&state).unwrap();
+        let snapshot = stream.capture(&state, &[], true).unwrap();
+        assert_eq!(
+            snapshot["flights"],
+            json!([
+                {"flight":operative_flight,"kind":"rifle","effect":"boom","seq":0,
+                 "x":60.,"y":10.,"z":60.,"v":[20.,0,0],"gravity":0,
+                 "time":1.,"launched":0,"expires":3.,"until":1.15,"f":operative,"fo":0},
+                {"flight":ordinary_flight,"kind":"rifle","effect":"boom","seq":0,
+                 "x":60.,"y":10.,"z":70.,"v":[20.,0,0],"gravity":0,
+                 "time":1.,"launched":0,"expires":1.05,"until":1.05,"f":ordinary,"fo":1}
+            ])
+        );
+        assert_eq!(
+            super::super::flights::project(&state, 0).unwrap(),
+            json!([])
+        );
+        assert_eq!(
+            format!(
+                "{:?}{:?}{:?}",
+                state.world, state.recipients, state.routing_fog
+            ),
+            before
+        );
+        // A body hidden from seat 0 still limits a watcher's visible prediction.
+        let target = state.world.game.units.get_mut(&ordinary).unwrap();
+        target.x = 62.;
+        target.z = 60.;
+        state.grid.update(ordinary, target);
+        state
+            .firing
+            .flights
+            .get_mut(&operative_flight)
+            .unwrap()
+            .solution
+            .origin
+            .y = 1.;
+        let clipped = stream.capture(&state, &[], false).unwrap();
+        let until = clipped["flights"][0]["until"].as_f64().unwrap();
+        assert!(
+            (1.0..1.15).contains(&until),
+            "visible contact clips watcher flight: {until}"
+        );
+        let saved = stream.clone();
+        state
+            .firing
+            .flights
+            .get_mut(&operative_flight)
+            .unwrap()
+            .solution
+            .velocity
+            .x = f64::NAN;
+        assert!(stream.capture(&state, &[], false).is_err());
+        assert_eq!(stream, saved);
     }
 
     #[test]

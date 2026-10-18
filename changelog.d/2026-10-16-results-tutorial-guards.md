@@ -1,0 +1,2 @@
+- Preserve trusted Start capacity and Assault-side readiness checks through the asynchronous startup owner, and share those checks with public Start. Tutorial list publication now rejects a mode tag without canonical Tutorial state.
+- Update mode01_non_world_mode_rows_match_the_prototype_public_fields to check the same literal mode fields in every admitted seat mode projection, replacing its obsolete non-Conquest refusal. Keep all malformed-owner and readiness guard assertions unchanged.

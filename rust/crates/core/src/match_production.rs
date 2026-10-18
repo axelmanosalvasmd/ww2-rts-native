@@ -73,11 +73,13 @@ fn context<'a>(
     units: &'a [UnitView<'a>],
     regions: Option<&'a [Region]>,
     sudden_death: bool,
+    income_excluded_slot: Option<usize>,
 ) -> Context<'a> {
     Context {
         mode: ModeContext {
             kind: options.mode,
-            ..Default::default()
+            defender_team: (options.mode == Mode::Horde).then_some(0),
+            income_excluded_slot,
         },
         army: options.army,
         tech_enabled: options.tech,
@@ -100,11 +102,6 @@ fn validate_training_birth(
     let kind = rules.kind(name).ok_or(ProductionStepError::InvalidState(
         "unknown queued birth kind",
     ))?;
-    if rules.kinds[kind].air {
-        return Err(ProductionStepError::Placement(
-            crate::produced_units::Error::UnsupportedAir,
-        ));
-    }
     if rules.kinds[kind].rail {
         return Err(ProductionStepError::InvalidState(
             "queued railway birth is unsupported",
@@ -122,6 +119,7 @@ impl Match {
             Mode::Annihilation => self.world.game.mode == Some(ModeKind::Annihilation),
             Mode::Classic => self.world.game.mode == Some(ModeKind::Classic),
             Mode::Tutorial => self.validate_tutorial_state().is_ok(),
+            Mode::Horde => self.validate_horde_economy().is_ok(),
             Mode::World => {
                 self.world.game.mode == Some(ModeKind::World) && self.world_runtime.is_some()
             }
@@ -174,6 +172,7 @@ impl Match {
             &units,
             regions.as_deref(),
             self.elimination_sudden_death(),
+            self.horde.as_ref().map(|state| state.slot),
         );
         self.production
             .validate_phases(&context, &self.start.economy, dt)?;
@@ -197,7 +196,7 @@ impl Match {
                         "nonempty skirmish training queue",
                     ));
                 }
-                if self.options.logistics
+                if (self.options.logistics && self.options.mode == Mode::World)
                     || unit.owner >= count
                     || !self.building_rallies.contains_key(&id)
                 {
@@ -260,6 +259,7 @@ impl Match {
             &units,
             regions.as_deref(),
             self.elimination_sudden_death(),
+            self.horde.as_ref().map(|state| state.slot),
         );
         let registered = self
             .production
@@ -336,6 +336,7 @@ impl Match {
             &units,
             regions.as_deref(),
             self.elimination_sudden_death(),
+            self.horde.as_ref().map(|state| state.slot),
         );
         // Queue and wallet drafts are small. A rejected refund must leave both owners intact.
         let mut production = self.production.clone();
@@ -382,6 +383,7 @@ impl Match {
             &units,
             regions.as_deref(),
             self.elimination_sudden_death(),
+            self.horde.as_ref().map(|state| state.slot),
         );
         let prepared =
             self.production
@@ -416,6 +418,7 @@ impl Match {
             &units,
             regions.as_deref(),
             self.elimination_sudden_death(),
+            self.horde.as_ref().map(|state| state.slot),
         );
         Ok(self
             .production
@@ -447,9 +450,9 @@ impl Match {
             .building(building)
             .is_some_and(|b| !b.jobs().is_empty())
         {
-            if self.options.logistics {
+            if self.options.logistics && self.options.mode == Mode::World {
                 return Err(ProductionStepError::InvalidState(
-                    "training reserves initialization unsupported",
+                    "World training reserves initialization unsupported",
                 ));
             }
             if !self.building_rallies.contains_key(&building) {
@@ -470,6 +473,7 @@ impl Match {
                 &units,
                 regions.as_deref(),
                 self.elimination_sudden_death(),
+                self.horde.as_ref().map(|state| state.slot),
             );
             let prepared = self.production.prepare_building_step(
                 &context,
@@ -514,6 +518,9 @@ impl Match {
             .rules
             .kind(&completion.kind)
             .ok_or(ProductionStepError::InvalidState("training unit kind"))?;
+        if self.rules.kinds[kind].air {
+            return self.complete_aircraft_training(building, dt, completion);
+        }
         let mut view = terrain_view(game);
         view.versions = Versions {
             infantry: self.world.versions.infantry,
@@ -522,11 +529,12 @@ impl Match {
             obstruction: self.world.versions.obstruction,
             knowledge: 0,
         };
+        let catalog = Catalog::compiled().map_err(|e| ProductionStepError::Production(e.into()))?;
         let mut placed = self
             .produced_placer
             .produce(
                 &self.rules,
-                Catalog::compiled().map_err(|e| ProductionStepError::Production(e.into()))?,
+                catalog,
                 view,
                 &game.units,
                 ProduceInput {
@@ -608,6 +616,12 @@ impl Match {
         control.aim = placed.aim;
         control.rally_drift = placed.rally.is_some();
         control.route_end = route_end;
+        let mut reserves = if self.options.mode == Mode::World {
+            None
+        } else {
+            self.prepare_new_unit_reserves(&placed.unit)
+                .map_err(ProductionStepError::Control)?
+        };
         let units = units(&self.world.game, &self.rules, count)?;
         let context = context(
             &self.options,
@@ -615,6 +629,7 @@ impl Match {
             &units,
             regions.as_deref(),
             self.elimination_sudden_death(),
+            self.horde.as_ref().map(|state| state.slot),
         );
         let prepared =
             self.production
@@ -643,11 +658,92 @@ impl Match {
             self.firing.initialize(unit.id);
             self.abilities.initialize(unit.id);
             self.recovery.initialize(unit.id);
+            if let Some(reserves) = reserves.take() {
+                self.logistics.insert(unit.id, reserves);
+            }
         });
         Ok(Some(CompletedTrainingUnit {
             unit: id,
             completion,
             route_status: status,
+        }))
+    }
+
+    fn complete_aircraft_training(
+        &mut self,
+        building: u32,
+        dt: f64,
+        completion: production::CompletedUnit,
+    ) -> Result<Option<CompletedTrainingUnit>, ProductionStepError> {
+        // The producer's position is authoritative for a queued aircraft birth,
+        // even when another Airfield is nearer to the player's spawn.
+        self.validate_aviation()
+            .map_err(|e| ProductionStepError::Control(e.to_string()))?;
+        let owner = completion.owner;
+        let kind = self
+            .rules
+            .kind(&completion.kind)
+            .ok_or(ProductionStepError::InvalidState("training aircraft kind"))?;
+        let id = self.next_unit_id;
+        let runtime = crate::match_aviation::initial_aircraft_runtime(&completion.kind)
+            .map_err(|e| ProductionStepError::Control(e.to_string()))?;
+        let staged = StagedUnit::aircraft(
+            &self.world.game,
+            &self.rules,
+            owner,
+            kind,
+            id,
+            u32::try_from(self.world.game.units.len())
+                .map_err(|_| ProductionStepError::InvalidState("training aircraft count"))?,
+            self.start.players[owner].spawn,
+            self.world.game.units[&building].at(),
+        )
+        .map_err(ProductionStepError::Publication)?;
+        let count = self.production_step_context()?;
+        let units = units(&self.world.game, &self.rules, count)?;
+        let context = context(
+            &self.options,
+            self.world.game.naval,
+            &units,
+            None,
+            self.elimination_sudden_death(),
+            self.horde.as_ref().map(|state| state.slot),
+        );
+        let prepared =
+            self.production
+                .prepare_building_step(&context, &self.start.economy, building, dt)?;
+        if prepared.completed() != Some(&completion) {
+            return Err(ProductionStepError::InvalidState(
+                "training aircraft completion changed",
+            ));
+        }
+        let publication = prepare_publication(
+            PublicationParts {
+                units: &mut self.world.game.units,
+                grid: &mut self.grid,
+                controls: &mut self.commands.units,
+                recruitment: &mut self.recruit_metadata,
+                next_id: &mut self.next_unit_id,
+            },
+            &self.rules,
+            count,
+            vec![staged],
+        )
+        .map_err(ProductionStepError::Publication)?;
+        let completion = prepared
+            .commit()
+            .expect("staged aircraft training completion");
+        publication.publish_with(|unit, _| {
+            self.aviation.planes.insert(unit.id, runtime);
+            self.combat.initialize(unit.id).hit_by = Some(0);
+            self.firing.initialize(unit.id);
+            self.abilities.initialize(unit.id);
+            self.recovery.initialize(unit.id);
+        });
+        Ok(Some(CompletedTrainingUnit {
+            unit: id,
+            completion,
+            route_status: None,
         }))
     }
 }

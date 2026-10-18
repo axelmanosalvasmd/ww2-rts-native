@@ -4,21 +4,21 @@ use crate::{game::Point, match_commands::Command, production::JobStatus};
 pub(super) fn capture(state: &Match) -> Result<Vec<Map<String, Value>>, SnapshotError> {
     let mut owners = vec![Map::new(); state.world.game.players.len()];
     for owner in &mut owners {
-        for name in ["plans", "orders", "queues", "productionJobs"] {
+        for name in ["plans", "orders", "queues", "productionJobs", "air"] {
             owner.insert(name.into(), Value::Array(Vec::new()));
         }
     }
     for (slot, owner) in owners.iter_mut().enumerate() {
         owner.insert("movement".into(), super::movement_for(state, slot)?);
-        if !state.aviation.planes.is_empty() {
-            owner.insert("air".into(), json!([]));
-        }
     }
     let catalog = Catalog::compiled().map_err(|_| SnapshotError::Rules)?;
     for u in state.world.game.units.values() {
-        let own = &mut owners[u.owner];
         if let Some(air) = u.air {
-            push(own, "air", aircraft::row(state, u.id, air)?);
+            push(
+                &mut owners[u.owner],
+                "air",
+                aircraft::row(state, u.id, air)?,
+            );
         }
         if let Some(building) = state.production.building(u.id) {
             let mut row = vec![json!(u.id)];
@@ -41,14 +41,27 @@ pub(super) fn capture(state: &Match) -> Result<Vec<Map<String, Value>>, Snapshot
             finite(&[point.x, point.z])?;
             row.extend([json!(r(point.x)), json!(r(point.z))]);
             row.extend(building.queue().map(|kind| json!(kind)));
-            push(own, "queues", json!(row));
+            // Source sim.js:387,6022 shares defender facilities in Horde.
+            // Paid identities and refund values remain owner-only at :6024.
+            for (slot, owner) in owners.iter_mut().enumerate() {
+                let shared = state.options.mode == Mode::Horde
+                    && state
+                        .horde
+                        .as_ref()
+                        .is_some_and(|horde| slot != horde.slot && u.owner != horde.slot)
+                    && state.world.game.allied(u.owner, slot);
+                if slot == u.owner || shared {
+                    push(owner, "queues", json!(row));
+                }
+            }
             let jobs = building.rows().into_iter().map(|row| {
                 finite(&[row.job.charge.mp, row.job.charge.fuel])?;
                 Ok(json!({"id":row.job.id,"type":row.job.kind,"mp":row.job.charge.mp,
                     "fuel":row.job.charge.fuel,"status":match row.status { JobStatus::Active=>"active",JobStatus::Waiting=>"waiting"}}))
             }).collect::<Result<Vec<_>, SnapshotError>>()?;
-            push(own, "productionJobs", json!([u.id, jobs]));
+            push(&mut owners[u.owner], "productionJobs", json!([u.id, jobs]));
         }
+        let own = &mut owners[u.owner];
         let control = state
             .commands
             .units
@@ -79,6 +92,17 @@ pub(super) fn capture(state: &Match) -> Result<Vec<Map<String, Value>>, Snapshot
                     } if orders.len() == 1 && orders[0].unit == i64::from(u.id) => {
                         (if *attack_move { 2 } else { 1 }, orders[0].at)
                     }
+                    Command::FireAt {
+                        ids,
+                        at,
+                        queue: false,
+                    } if ids.as_slice() == [i64::from(u.id)] => (5, *at),
+                    Command::Ability {
+                        ids,
+                        at: Some(at),
+                        queue: false,
+                        automatic: false,
+                    } if ids.as_slice() == [i64::from(u.id)] => (6, *at),
                     Command::Attack {
                         ids,
                         target,
@@ -146,6 +170,33 @@ pub(super) fn capture(state: &Match) -> Result<Vec<Map<String, Value>>, Snapshot
                 row.extend([json!(kind), json!(r(point.x)), json!(r(point.z))]);
             }
             push(own, "orders", json!(row));
+        }
+    }
+    if state.options.mode == Mode::Horde {
+        let horde = state.horde.as_ref().ok_or(SnapshotError::Rules)?;
+        // Horde shares queue/progress/rally rows through productionAccess.
+        // Paid job identities and refunds remain with the building owner.
+        let queue_rows = owners
+            .iter()
+            .map(|owner| owner["queues"].as_array().unwrap().clone())
+            .collect::<Vec<_>>();
+        for (slot, owner) in owners.iter_mut().enumerate() {
+            let mut rows = Vec::new();
+            for unit in state.world.game.units.values() {
+                if unit.owner == slot
+                    || (slot != horde.slot
+                        && unit.owner != horde.slot
+                        && state.world.game.allied(unit.owner, slot))
+                {
+                    rows.extend(
+                        queue_rows[unit.owner]
+                            .iter()
+                            .filter(|row| row[0].as_u64() == Some(u64::from(unit.id)))
+                            .cloned(),
+                    );
+                }
+            }
+            owner.insert("queues".into(), json!(rows));
         }
     }
     Ok(owners)

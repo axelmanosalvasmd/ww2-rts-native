@@ -195,7 +195,7 @@ fn movement_rules(t: &Value) -> Result<MovementRules> {
     let m = given(t, "movement").ok_or("movement: missing")?;
     let tr = given(m, "traffic").ok_or("movement.traffic: missing")?;
     let lane = given(m, "lane").ok_or("movement.lane: missing")?;
-    let terrain_hp = given(m, "terrainHp")
+    let mut terrain_hp = given(m, "terrainHp")
         .and_then(Value::as_object)
         .ok_or("terrainHp: expected an object")?
         .iter()
@@ -204,6 +204,7 @@ fn movement_rules(t: &Value) -> Result<MovementRules> {
             _ => Err(format!("terrainHp: bad entry {letter}")),
         })
         .collect::<Result<Vec<_>>>()?;
+    terrain_hp.sort_by_key(|(ch, _)| *ch);
     Ok(MovementRules {
         tick: num(t, "tick")?,
         retreat_speed: num(m, "retreatSpeed")?,

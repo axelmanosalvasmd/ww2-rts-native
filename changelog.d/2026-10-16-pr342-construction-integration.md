@@ -1,0 +1,3 @@
+- Integrate Classic AI planning with the single construction pass, carrying its wallet and reserves into shopping and excluding assigned or mounted engineers from later construction work.
+- Preserve richer delivered resource-node facts, Classic site draws and both delivered depot and explicit node claims when merging the AI seat-delivery work with current main.
+- Keep rush-defense engineer escapes ahead of new Classic construction assignments, using the same threat centroid for both decisions.

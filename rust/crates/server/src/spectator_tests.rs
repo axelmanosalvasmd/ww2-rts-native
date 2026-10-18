@@ -76,6 +76,47 @@ fn assert_ordinary_frames(hub: &mut Hub, peers: &mut [&mut Peer], base_ms: u64) 
 }
 
 #[test]
+fn spectator_host_pauses_and_resumes_after_both_humans_leave_for_ai() {
+    let (mut hub, mut a, mut b) = room();
+    let mut watcher = Peer::new(3);
+    watcher.hello(&mut hub, true, 0);
+    hub.attach_native("ABC", native_tests::native_match(), 0)
+        .unwrap();
+    for peer in [&mut a, &mut b, &mut watcher] {
+        peer.drain(&mut hub, 0);
+    }
+    a.send(&mut hub, json!({"t":"leave"}), 1);
+    b.send(&mut hub, json!({"t":"leave"}), 2);
+    let room = &hub.rooms["ABC"];
+    assert!(room.players.iter().all(|p| p.ai && p.connection.is_none()));
+    assert!(room.is_host(watcher.c.id));
+    watcher.drain(&mut hub, 2);
+    watcher.send(&mut hub, json!({"t":"pause"}), 3);
+    assert_eq!(
+        watcher.drain(&mut hub, 3),
+        vec![json!({"t":"pause","paused":true,"by":"P3","reason":"host","left":0})]
+    );
+    let runtime = &mut hub
+        .rooms
+        .get_mut("ABC")
+        .unwrap()
+        .native
+        .as_mut()
+        .unwrap()
+        .runtime;
+    assert!(runtime.paused());
+    assert!(runtime.poll_pause(&[true, true], 40_000).unwrap().blocked);
+    assert!(runtime.fault().is_none());
+    watcher.drain(&mut hub, 40_000);
+    watcher.send(&mut hub, json!({"t":"resume"}), 40_001);
+    assert_eq!(
+        watcher.drain(&mut hub, 40_001),
+        vec![json!({"t":"pause","paused":false,"by":"","reason":"host","left":0})]
+    );
+    assert_ordinary_frames(&mut hub, &mut [&mut watcher], 40_050);
+}
+
+#[test]
 fn intent_net82_spectator_close_removes_identity_without_creating_or_releasing_drop_pause() {
     let (mut hub, mut a, mut b) = room();
     let mut watcher = Peer::new(3);
@@ -149,6 +190,47 @@ fn intent_net82_spectator_close_removes_identity_without_creating_or_releasing_d
 }
 
 #[test]
+fn horde_watchers_receive_complete_seat_names_at_start_and_late_join() {
+    let (mut hub, mut a, mut b) = room();
+    a.send(&mut hub, json!({"t":"mode","v":"horde"}), 0);
+    let mut initial = Peer::new(3);
+    initial.hello(&mut hub, true, 0);
+    a.drain(&mut hub, 0);
+    b.drain(&mut hub, 0);
+    initial.drain(&mut hub, 0);
+
+    a.send(&mut hub, json!({"t":"start"}), 0);
+    let status = hub.native_status("ABC").unwrap();
+    assert!(status.fault.is_none());
+    let state = hub.rooms["ABC"].native.as_ref().unwrap().runtime.state();
+    let horde = state.horde.as_ref().unwrap().slot;
+    assert_eq!(horde, 2);
+    let expected = json!(["P1", "P2", state.start.players[horde].config.name]);
+    let messages = initial.drain(&mut hub, 0);
+    let start = messages.iter().find(|value| value["t"] == "start").unwrap();
+    assert_eq!(start["names"], expected);
+    assert_eq!(start["teams"], json!([0, 0, 1]));
+    assert_eq!(start["you"], 0);
+    assert!(start.get("fog").is_none());
+    let match_id = start["matchId"].clone();
+    a.drain(&mut hub, 0);
+    b.drain(&mut hub, 0);
+
+    let mut late = Peer::new(4);
+    late.hello(&mut hub, false, 1);
+    assert!(late.joined);
+    let messages = late.drain(&mut hub, 1);
+    let start = messages.iter().find(|value| value["t"] == "start").unwrap();
+    assert_eq!(start["names"], expected);
+    assert_eq!(start["teams"], json!([0, 0, 1]));
+    assert_eq!(start["matchId"], match_id);
+    assert!(start.get("fog").is_none());
+    assert_eq!(hub.rooms["ABC"].players.len(), 2);
+    assert_eq!(hub.rooms["ABC"].spectators.len(), 2);
+    assert!(hub.native_status("ABC").unwrap().fault.is_none());
+}
+
+#[test]
 fn intent_net57_seated_fog_starts_deltas_and_reconnect_leave_watchers_unmasked() {
     // Decode the prototype's URL-safe base-32 varints independently of the
     // native encoder. Runs alternate unchanged/flipped, starting unchanged.
@@ -182,6 +264,8 @@ fn intent_net57_seated_fog_starts_deltas_and_reconnect_leave_watchers_unmasked()
                 .unwrap()
                 .keys()
                 .map(String::as_str)
+                .collect::<std::collections::BTreeSet<_>>()
+                .into_iter()
                 .collect::<Vec<_>>(),
             ["e", "v"]
         );
@@ -500,6 +584,8 @@ fn intent_net26_spectator_start_precedes_lobby_and_pause_without_changing_seat_m
             .unwrap()
             .keys()
             .map(String::as_str)
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
             .collect::<Vec<_>>(),
         expected_keys
     );
@@ -640,8 +726,10 @@ fn intent_net46_spectator_army_commands_are_silent_and_never_queued() {
     watcher.send(&mut hub, json!({"t":"ping","c":123}), 0);
     assert_eq!(
         watcher.drain(&mut hub, 0),
-        vec![json!({"t":"pong","c":123})]
+        vec![json!({"t":"pong","c":123,"srv":[0.0,2]})]
     );
+    assert!(a.drain(&mut hub, 0).is_empty());
+    assert!(b.drain(&mut hub, 0).is_empty());
     // The same valid order enters the queue from the owning seated connection.
     a.send(&mut hub, json!({"t":"move","orders":[[actor,12,12]]}), 0);
     assert_eq!(

@@ -52,6 +52,47 @@ pub(super) fn scene(mode: Mode, teams: &[i32]) -> Match {
     }
     .unwrap()
 }
+#[test]
+fn classic_and_annihilation_initialize_physical_logistics_and_deliver_every_seat() {
+    for mode in [Mode::Classic, Mode::Annihilation] {
+        let mut m = scene(mode, &[0, 1]);
+        m.options.logistics = true;
+        m.initialize_logistics().unwrap();
+        assert!(m.convoys.is_some());
+        assert!(
+            m.world
+                .game
+                .units
+                .values()
+                .any(|u| { !m.rules.kinds[u.kind].structure && m.logistics.get(u.id).is_some() })
+        );
+        m.validate_tick_state().unwrap();
+        assert!(m.logistics.iter().next().is_some());
+        let selected = (0..m.start.players.len())
+            .map(|slot| crate::recipient_snapshot::SelectedSeat {
+                slot,
+                full: false,
+                omit: false,
+            })
+            .collect::<Vec<_>>();
+        let mut delivery = crate::recipient_snapshot::DeliveryState::new(&m).unwrap();
+        for _ in 0..3 {
+            let report = m.advance_tick().unwrap();
+            m.validate_logistics_runtime().unwrap();
+            let frame = delivery
+                .capture_selected_with_tick_events(&mut m, &selected, &report.events)
+                .unwrap()
+                .unwrap();
+            for seat in &selected {
+                assert_eq!(
+                    frame.recipient(seat.slot).unwrap().into_json()["logistics"]["enabled"],
+                    true
+                );
+            }
+        }
+    }
+}
+
 pub(super) fn ids(m: &Match, owner: usize, name: &str) -> Vec<u32> {
     m.world
         .game
@@ -714,6 +755,27 @@ fn if25_elimination_reuses_teammate_sort_order_for_later_equal_distance_transfer
         m.advance_tick().unwrap();
         assert!(m.tick_state.fault().is_none());
     }
+}
+
+#[test]
+fn if25_classic_node_pairs_keep_enemy_ties_and_first_discovery_order() {
+    let mut m = scene(Mode::Classic, &[0, 1, 2, 3]);
+    for player in &mut m.start.players {
+        player.spawn = Point { x: 100.0, z: 100.0 };
+    }
+    assert_eq!(
+        classic_node_pairs(&m.start.players),
+        vec![(0, 1), (0, 2), (1, 2), (0, 3), (1, 3)]
+    );
+    // Slot 0 has three equally distant enemies. Only the first two qualify.
+    m.start.players[0].config.team = 0;
+    m.start.players[1].config.team = 0;
+    m.start.players[2].config.team = 1;
+    m.start.players[3].config.team = 1;
+    assert_eq!(
+        classic_node_pairs(&m.start.players),
+        vec![(0, 2), (0, 3), (1, 2), (1, 3)]
+    );
 }
 
 #[path = "classic_bases_tests.rs"]

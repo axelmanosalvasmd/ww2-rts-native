@@ -31,7 +31,12 @@ pub(crate) fn ordinary_ground_mode(game: &Game, mode: Mode) -> bool {
             | (Mode::Annihilation, Some(ModeKind::Annihilation))
             | (Mode::Classic, Some(ModeKind::Classic))
             | (Mode::Tutorial, Some(ModeKind::Tutorial))
-    )
+    ) || mode == Mode::Horde
+        && game.mode == Some(ModeKind::Horde)
+        && (2..=6).contains(&game.players.len())
+        && game.players.iter().enumerate().all(|(slot, player)| {
+            player.slot == slot && player.team == if slot + 1 == game.players.len() { 1 } else { 0 }
+        })
 }
 
 /// Validate only the represented actor modes, not their complete tick capabilities.

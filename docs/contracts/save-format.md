@@ -1,8 +1,8 @@
-# Native match save format, version 1
+# Native match save format, versions 1 and 2
 
-This implements owner group I as recorded in [issue #5, comment 6217590741](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6217590741). The compatibility source is `reference/ww2-rts` at `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`. Hermes' exact-head implementation acknowledgement remains a merge requirement. This document does not mark another draft contract agreed.
+This implements owner group I as recorded in [issue #5, comment 6217590741](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6217590741). The compatibility source is `reference/ww2-rts` at `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`. The 2026-10-17 owner handoff supersedes the earlier exact-head pre-merge acknowledgment gate for this integration; Hermes reviews after landing, as confirmed in [comment 6232712225](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6232712225). This document does not mark another draft contract agreed.
 
-The envelope carries the prototype's game, local defender, raw map, seats, settings and planner-memory content. JSON with a version field replaces Node's V8 binary serialization. Existing Node `.save` files are not imported. Version 1 binds this native state schema and its compiled rules; incompatible schema or rules changes require a format-version increment. Files and credentials remain server-private. The deterministic core encodes and decodes in-memory state and performs no file I/O.
+The envelope carries the prototype's game, local defender, raw map, seats, settings and planner-memory content. JSON with a version field replaces Node's V8 binary serialization. Existing Node `.save` files are not imported. Each version binds its native state schema and compiled rules; incompatible schema or rules changes require a format-version increment. Files and credentials remain server-private. The deterministic core encodes and decodes in-memory state and performs no file I/O.
 
 ## Files and summaries
 
@@ -29,17 +29,17 @@ A lobby exposes exactly `id, kind, savedAt, mode, minutes, names`, plus `world` 
 
 ## Body keys
 
-The root has these seven required keys. The six content owners correspond to `server.js:425-426` and `server/saves.js:16-26`; `version` is the owner-approved native format addition.
+The writer emits these seven keys. Readers require the six non-AI keys and default a missing `ai` to null. The six content owners correspond to `server.js:425-426` and `server/saves.js:16-26`; `version` is the owner-approved native format addition.
 
 | Key | Value and source |
 | --- | --- |
-| `version` | Integer `1`. Any other value is refused before native state restoration. |
+| `version` | Integer `1` for existing non-authored matches, or `2` for authored missions. Other versions are refused before native state restoration. Version 1 carrying authored state is refused. |
 | `g` | Lossless native `Match` checkpoint, described below. It owns every implemented authoritative ordinary-match component. The prototype stores the whole `g` at `server/saves.js:18`. |
 | `guard` | Separate local-defender player, corresponding to the non-enumerable `g.players[-1]` at `server/saves.js:15-26`. Currently `null`; a non-null guard is refused by room admission while World is closed. |
 | `map` | Full raw authored map, including private layers and triggers. It is never replaced with `mapForClient`. The prototype uses `null` in World (`server.js:426`); native World restoration is refused. |
 | `seats` | Saved roster in simulation slot order, with the keys below (`server.js:425`). |
 | `settings` | Exactly the nine setting keys below (`server.js:419,426`). |
-| `ai` | Planner memories, separately owned from `g` (`shared/ai.js:159-165`). Human room saves keep this `null`; hosted AI room admission remains separate. The core AI-memory codec below can persist the external planner owner without adding envelope keys. Commander attention is not added to this envelope. |
+| `ai` | Planner memories, separately owned from `g` (`shared/ai.js:159-165`). Either `null` or an array in simulation slot order. Each non-null entry has `recipient`, `view`, `planner` and `cells`, as described below. Commander attention and input state are not added to this envelope. |
 
 Each saved seat has `name`, `token`, `ai`, `level`, `team`, `faction`. `name` removes a trailing ` (AI)`; `ai` is boolean; `level` is the difficulty string, or `null` for a human without an AI level; `team` and `faction` are the original numeric values (`server.js:425`). A valid UTF-16 token is saved as a JSON string. A token ending in an unpaired surrogate uses `{utf16: [code units]}` so the native server's existing truncated token identity survives JSON without replacement characters. This is a private format representation, not a socket field.
 
@@ -47,7 +47,7 @@ The setting keys and values are:
 
 | Key | Value |
 | --- | --- |
-| `mode` | Room mode, currently admitted as `conquest`. |
+| `mode` | Room mode, currently admitted as `conquest` or `horde`. |
 | `worldSize` | World-size setting string. |
 | `mapName` | Authored map key. |
 | `mapSpawns` | Raw authored spawn objects, preserving `x`, `y` and optional `assault`. |
@@ -57,7 +57,7 @@ The setting keys and values are:
 | `logistics` | Match logistics switch. |
 | `tech` | Match technology switch. |
 
-The list is identical to `server.js:419`. In particular, `sandbox` is not a setting key. Native sandbox and logistics room restoration remain refused by this batch's existing room capability boundary.
+The list is identical to `server.js:419`. In particular, `sandbox` is not a setting key. Sandbox Horde restoration preserves the checkpoint flag; ordinary sandbox restoration remains refused. Ordinary logistics checkpoints preserve reserves, convoy stores, cargo, routes and supply state through the existing versioned match checkpoint.
 
 ## Game checkpoint encoding
 
@@ -77,9 +77,9 @@ The list is identical to `server.js:419`. In particular, `sandbox` is not a sett
 
 Each node is `[tag, payload]`, except `["unit"]` and `["none"]`. A unit enum variant is a tagged string containing its variant name. Other enum variants are single-entry tagged maps from their variant name to the tagged newtype, sequence or field-map payload.
 
-All fields in `Match` and its nested mutable owners participate in the checkpoint. This includes `world`, `start` (economy, points, weather and RNG streams), `options`, commands and pending orders, production, rallies, field work, combat, firing, abilities, recovery, environment, logistics, supply, unit allocation, story, fallen locations, finish state and timeline. Recipient routing knowledge, fog, remembered buildings, path requests, retries and route caches also survive. Immutable compiled rules are reconstructed from the binary. World runtime and geography are excluded behind an explicit save/load refusal.
+All fields in `Match` and its nested mutable owners participate in the checkpoint. This includes `world`, `start` (economy, points, weather and RNG streams), `options`, commands and pending orders, production, rallies, field work, combat, firing, abilities, recovery, environment, logistics, supply, unit allocation, story, fallen locations, finish state and timeline. Recipient routing knowledge, fog, remembered buildings, path requests, retries and route caches also survive. Immutable compiled rules are reconstructed from the binary. Canonical static structure kinds, including `house` and `bridge`, resolve to their existing compiled strings when decoded; unknown values are refused with a value diagnostic. World runtime and geography are excluded behind an explicit save/load refusal.
 
-Native cache identities that refer to vector allocations must be rebound to restored storage. They are not dereferenced from saved addresses. This is an internal native persistence choice under IF-27, recorded in `design.d/2026-10-16-save-load.md`: the prototype loses WeakMap path/cache state (`shared/sim.js:2865,3035`), while native checkpoints retain state required for deterministic continuation. It does not claim JavaScript tick equality or import compatibility.
+Native cache identities that refer to vector allocations must be rebound to restored storage, including convoy handoff paths, per-owner ordinary and danger paths, and their owned danger and vehicle buffers. They are not dereferenced from saved addresses. This is an internal native persistence choice under IF-27, recorded in `design.d/2026-10-16-save-load.md`: the prototype loses WeakMap path/cache state (`shared/sim.js:2865,3035`), while native checkpoints retain state required for deterministic continuation. It does not claim JavaScript tick equality or import compatibility.
 
 The `state` struct field keys are listed below. These are native component boundaries for the prototype's whole-game payload (`shared/sim.js:709-728`, terrain and optional arrays at `:735-766`), rather than additional socket keys. Nested records use the same tagged struct/map/sequence rules and the typed fields of the named canonical owner.
 
@@ -97,16 +97,19 @@ The `state` struct field keys are listed below. These are native component bound
 | `capture_ticks`, `tick_state`, `ordinary_snapshot_only` | Capture clocks, tick phase state and the existing delivery capability restriction. |
 | `story`, `fallen`, `finish`, `timeline`, `next_unit_id` | Match statistics, fall locations, terminal decision, result samples and the canonical actor allocator. |
 | `assault`, `horde`, `tutorial`, `scenario`, `companions`, `rail_runs` | Existing mode and operative owners. Inactive records are retained; their presence does not grant room admission. |
-| `authored_mission` | Optional timed authored mission definition, execution clock, trigger state and ordered objective records. Older v1 checkpoints default to absent; restored records must match canonical execution. See [spectator-missions-v0.md](spectator-missions-v0.md). |
+| `authored_scenario` | Optional bounded ordinary mission owner with the complete v2 schema below, including its execution clock. Non-authored checkpoints default to absent; present timed state is validated against canonical execution and full engine state against its contextual records and facts. See [scenario objectives](scenario-objectives.md). |
+| `authored_mission` | Decode-only legacy timed owner. A present legacy owner is refused instead of silently discarded; newly written matches use `authored_scenario` alone. |
 | `elimination` | Optional Annihilation/Classic owner: `teams`, `bunkers`, `time_left`, `sudden_death`, `nodes`. Each resource node retains `cell`, `at` (`x`, `z`), `depot`, `rate`, `fuel`. |
 | `rules` | Omitted and reconstructed from compiled rules. Saving modified rules is refused. |
 | `world_runtime` | Omitted; saving or loading a World runtime is refused. |
 
 `elimination` uses the existing tagged codec: `none` when inactive, otherwise `some` containing a struct map. Its timer, node positions and rates retain exact `f64` bits. These owners correspond to the prototype's `g.mode.teams`, `g.mode.bunkers`, `g.mode.timeLeft`, `g.mode.suddenDeath` and `g.nodes` (`shared/sim.js:792-795,1679,1705-1721,5760-5761`). At pin `e4e579a`, `server.js:425-426` passes the complete game to `snapshotState`, which serializes `g` at `server/saves.js:18-20`.
 
-Version remains 1. The hotfix completes serialization of the existing `Match.elimination` field and documents its nested keys; it adds no envelope or socket keys. Main `57ebeb8e`, which combined elimination modes and versioned saves, could not compile and therefore could not write a v1 checkpoint. A checkpoint from another build that omits `elimination` still deserializes that optional owner as `None`, so otherwise compatible non-elimination v1 saves remain loadable. Missing state is not reconstructed for Annihilation or Classic: their validators reject it. A present elimination record must contain its required typed fields; incomplete records are refused.
+The elimination hotfix retains version 1. It completes serialization of the existing `Match.elimination` field and documents its nested keys; it adds no envelope or socket keys. Main `57ebeb8e`, which combined elimination modes and versioned saves, could not compile and therefore could not write a v1 checkpoint. A checkpoint from another build that omits `elimination` still deserializes that optional owner as `None`, so otherwise compatible non-elimination v1 saves remain loadable. Missing state is not reconstructed for Annihilation or Classic: their validators reject it. A present elimination record must contain its required typed fields; incomplete records are refused.
 
-Annihilation and Classic remain excluded by ordinary recipient snapshot admission, including the room save/load path. Their full Match checkpoint codec is tested independently, including Classic sudden death, resource nodes and next-tick continuation. Serializing their owners does not open room admission.
+Annihilation and Classic now have ordinary recipient snapshot adapters, documented in [classic-annihilation-snapshots.md](classic-annihilation-snapshots.md). Their full Match checkpoint codec retains the existing schema, including Classic sudden death, resource nodes and next-tick continuation. Room admission and save/load caller restrictions remain separate from checkpoint serialization.
+
+Authored missions use envelope version 2 because older binaries ignore unknown struct fields and could otherwise silently discard the new mission owner. Non-authored matches continue writing version 1. This binary accepts both versions, but refuses authored state inside a version 1 envelope. The prototype game content remains represented by the same six owners; only the already-native envelope version changes. Pending authored announcements use the new `TickEvent.AuthoredScenario` variant, and the optional owner is serialized through the existing tagged codec.
 
 ## Admission and delivery
 
@@ -114,25 +117,90 @@ Annihilation and Classic remain excluded by ordinary recipient snapshot admissio
 
 `loadSave` requires the current host in a lobby and an ID belonging to that exact room (`server.js:694-695`). File decoding, native validation, settings, raw-map binding, roster binding and all recipient start snapshots must succeed before changing the room, epoch or delivery accounts. Failure sends `{t:"deny", cmd:"loadSave", reason:"save"}`.
 
-Human seat assignment follows the prototype's two passes (`server.js:439-445`). First every saved human matches an unused present identity by nonempty token, including offline identities. Then remaining seats take unused connected humans in present order. Current names and tokens survive a match; saved teams and factions replace current choices. Unmatched humans wait offline with their saved identities. This batch refuses AI seats, planner memories and surplus connected humans that would need running spectator delivery. Those cases remain incomplete under NET-92 and AI-63.
+Human seat assignment follows the prototype's two passes (`server.js:439-445`). First every saved human matches an unused present identity by nonempty token, including offline identities. Then remaining seats take unused connected humans in present order. Current names and tokens survive a match; saved teams and factions replace current choices. Unmatched humans wait offline with their saved identities. The RESETS-RESTORE extension restores AI planner memories and fresh human helpers and retains surplus connected humans as spectators. See [resets-restore.md](resets-restore.md) for admission and lifecycle details.
 
-A successful load clears the previous result and opens an indefinite host pause with exactly `{t:"pause", paused:true, by:<current host name>, reason:"host", left:0}` (`server.js:393-412,470-485`). It resets drop-pause allowances. The playing lobby precedes every start, and every connected seat receives its start and pause before a tick can run. The loaded room ignores gameplay while paused. Its current host may send `resume`, which uses the existing `{t:"pause", paused:false, by:"", reason:"host", left:0}` shape. Guests remain refused. The host pause has no reconnect or time expiry.
+A successful load clears the previous result and opens an indefinite host pause with exactly `{t:"pause", paused:true, by:<current host name>, reason:"host", left:0}` (`server.js:393-412,470-485`). It resets drop-pause allowances. The playing lobby precedes every start, and every connected seat receives the loaded pause before its start, before a tick can run. The loaded room ignores gameplay while paused. Its current host may send `resume`, which uses the existing `{t:"pause", paused:false, by:"", reason:"host", left:0}` shape. Guests remain refused. The host pause has no reconnect or time expiry.
 
 ## Batch scope
 
 Intent tests cover the save portions of NET-28 and NET-80, plus NET-89, NET-91 and NET-93. They also compare a running saved match's continuation with uninterrupted native execution, using held fire, movement and queued AutoRetreat stance changes, collecting both seats' complete recipient snapshots on every tick through a VP victory and subsequent ending ticks. Unsupported-version refusal must preserve the lobby and epoch.
 
-NET-12 (editor writes), MODE-55 (Horde records), NET-90 (World autosave), the full NET-71 callback ordering, full NET-92 seat/AI/spectator restoration and AI-63 planner memory are not claimed by ordinary match persistence.
+NET-12 (editor writes), MODE-55 (Horde records), NET-90 (World autosave), the full NET-71 callback ordering, full NET-92 seat/AI/spectator restoration are not claimed by ordinary match persistence. AI-63 ordinary planner persistence is covered by the room AI continuation below.
 
+## Hosted AI planner memory
+
+The room AI extension implements AI-63 for admitted ordinary rooms. The top-level `ai` array corresponds to the prototype's external per-game, per-seat memories (`shared/ai.js:157-165`, `server.js:425-426`). It is private save data and adds no socket fields. An all-human room without helper memory still writes `null`; older version 1 files with `ai:null` remain loadable.
+
+Each entry contains these native owners:
+
+- `recipient`: the seat decoder's slot, public map, delivered clock, building observation times and discovered mines. The transient allocation binding is omitted and rebound to the new consumer.
+- `view`: the commander's delivered terrain characters, masks, elevation, naval flag, clock and remembered sightings, bound to that slot and map dimensions.
+- `planner`: version 1, seat owner, complete quiet-policy source state and tactics state. Tactics include Mind notice/lesson memory, raids, assault membership and phases, situation, aim, supply waits, released units, the current decision, support clocks, cleared sightings, node assignments and fortification progress.
+- `cells`: recipient terrain deltas delivered since the most recent strategic look, indexed by cell identity.
+
+The first three records use the existing tagged native value codec, preserving float bits and ordered maps. `cells` uses JSON cell rows with numeric keys encoded as object keys. None comes from an authoritative enemy observation. All entries are captured together; if any seat cannot be cloned, the save writes `ai:null` for all seats, matching `server/saves.js:16-22`.
+
+Loading stages every saved seat and validates its memory before publishing the room. Only saved AI seats receive memory. Human helper memories are discarded, matching `server.js:437-448`. AI levels default to Normal if absent. Names lose the handover suffix as in `server.js:425,441`; tokens remain empty for AI seats. Invalid AI levels, seat counts or bound memory records fail before publication.
+
+Camera attention, selection, input queues, delivered strategic packets and commander random streams are not saved. Each AI gets a fresh commander and an opening look after load (`shared/ai-human.js:35,55-69`). Restored strategic memory is combined with a newly delivered recipient start snapshot. This intentionally does not promise uninterrupted commander input or random-stream equality. The canonical match checkpoint and already admitted commands remain unchanged.
+
+`ai63_hosted_save_restores_planners_resets_humans_and_restarts_commanders` captures learned memory through the real room save store, checks human reset and fresh commander state, verifies lobby/pause/start ordering, resumes and collects every seat's recipient snapshot on later ticks. Core checkpoint tests exercise nonempty planner fields and wrong-seat refusal. The hosted Horde integration also restores human-seat planner memory; the internal director restarts from its recipient packet. Full all-role startup remains separate.
+
+## Reconciled save stack (#373, #376, #383, #386)
+
+The elimination serialization repair and editor/record persistence retain version 1. An absent `elimination` means no elimination owner, matching an ordinary prototype game without that mode state. Present elimination values remain lossless, and elimination modes reject missing authoritative state. Editor maps and Horde records add no match checkpoint keys.
+
+Authored missions require one version increment, to version 2. The prototype restores the saved game directly (`server/saves.js:23-26`, `server.js:434-451`); it does not restart mission execution on load. Defaulting a running mission's executions, objectives, historical captures or pending arrivals would change that game. Version 1 binaries can ignore unknown struct fields, so version 2 also prevents them from silently discarding an authored owner. Both scenario PRs must use the same complete authored checkpoint schema, including contextual trigger records, objective scopes, condition facts, current target owners and deferred arrivals. The objective-only executor writes that schema before the engine extends behavior. Non-authored saves remain version 1; readers accept versions 1 and 2, and version 1 carrying authored state is refused. There is no version 3 in this stack.
+
+The authored owner has one shared schema for the objective and engine branches:
+
+| Field | Required content when authored state is present |
+| --- | --- |
+| `data` | The validated authored definition. |
+| `executions` | `trigger@scope` keys to `{count, next, previous, execution}` records, including evaluated triggers that have not fired. |
+| `objectives` | Activation-ordered rows with `id, scope, text, state, recipients, side, updated, execution`. |
+| `facts` | `groups, authored_units, started_groups, deferred_groups, captured, completed_objectives, trigger_counts, areas`. |
+| `owners` | Current owner of every authored capture target. |
+| `deferred` | Pending arrivals with `group, side, units, at, order, expires`; units retain `kind, authored`. |
+| `next_execution` | The next deterministic `scenario:<number>` identity. |
+| `last_tick` | Required nullable execution clock. Null before tick one; otherwise the last executed ordinary mission tick. A stale clock is refused. |
+
+These values mirror persisted prototype scenario owners at `shared/scenarios.js:88-98,136-170`. Missing complete authored state defaults only to `None` for a non-authored match. Required nested fields are never rebuilt from empty defaults. The objective-only runtime retains empty groups and arrivals, but writes real trigger records, capture history, objective dependencies and empty area definitions. Old experimental objective-only v2 bodies with string execution values or missing required fields are refused, rather than silently migrated. The superseded v3 envelope is unsupported.
 ## External AI memory codec (IF-27)
 
-`Match::save_ai_memories_json` and `restore_ai_memories_json` encode and restore the separate `ai` content owner. They accept an explicit AI roster; omitted human seats lose their old AI memory. This follows `shared/ai.js:159-165` and `server.js:426,447-448`. Room save/load still refuses hosted AI seats and non-null `ai`, pending their hosting integration. These core APIs do not activate that capability or claim AI-63.
+`Match::save_ai_memories_json` and `restore_ai_memories_json` encode and restore the separate `ai` content owner. These core APIs accept an explicit AI roster; omitted human seats lose their old AI memory. This follows `shared/ai.js:159-165` and `server.js:426,447-448`. These APIs are separate from the hosted room codec above. They retain their own tagged `owner`/`binding`/`memory` representation and do not encode the room codec's `recipient`/`view`/`planner`/`cells` entries. Hosted room save/load uses that room codec; these core APIs remain available independently.
 
 The value is `null` for an older v1 human save, or an array indexed by simulation slot. A missing or null entry starts that AI fresh. Present entries use the existing lossless tagged codec. Each contains `owner`, a match `binding` (seed, dimensions, seat count and spawn), and `memory`. Ordinary memory contains the complete native policy (strategic RNG, opening aim, tactical lessons, assault membership, cooldowns and released orders) and observation memory (contacts and stationary timers). The observation's allocation address is omitted and rebound by its next observation. Native Horde memory retains its bounded pending order queue, comparison plans and scheduling state, but clears its old delivered view and waits for a fresh observation (`server.js:398-404`). No saved raw address is trusted.
 
-Ordinary camera attention, motor RNG, pending human input actions and the previous delivered packet restart on load. They belong to `ai-human.js`'s separate WeakMap (`shared/ai-human.js:35,51-65`), which `server/saves.js:18-26` does not serialize. Strategic policy and observation memory correspond to the separate AI WeakMap that is serialized. Restoring only requested AI slots implements the human-seat reset at `server.js:447-448`.
+Ordinary camera attention, motor RNG, pending human input actions and the previous delivered packet restart on load. They belong to `ai-human.js`'s separate WeakMap (`shared/ai-human.js:35,51-65`), which `server/saves.js:18-26` does not serialize. This core codec preserves strategic policy RNG along with policy and observation memory. The hosted room codec above instead resets commander random streams. Strategic policy and observation memory correspond to the separate AI WeakMap that is serialized. Restoring only requested AI slots implements the human-seat reset at `server.js:447-448`.
 
-Version stays 1: neither the seven envelope keys nor `g.state` changes. Existing null-memory v1 saves still load. The external codec adds the representation of a previously refused non-null owner; it changes no previously writable checkpoint. Unknown tags, wrong match/seat binding, duplicate roster seats and mismatched brain kinds are refused. The existing room capability guard continues to refuse non-null AI content.
+The AI codec does not increment the envelope version or change its seven keys or `g.state`. Non-authored matches stay version 1 and authored matches use version 2. Existing null-memory v1 saves still load. The external codec adds the representation of a previously refused non-null owner; it changes no previously writable checkpoint. Unknown tags, wrong match/seat binding, duplicate roster seats and mismatched brain kinds are refused. The core codec remains separate from the ordinary room delivered-view codec; both restore transactionally.
 
-Merged policy state also persists field-work bridge, fill and demine crews, armor sightings, World rail timing and fort steps through the same tagged AI codec. Older non-null policy memory lacking the new field and World owners defaults those owners, preserving v1 compatibility. World room admission remains closed.
+Merged policy state also persists field-work bridge, fill and demine crews, armor sightings, World rail timing and fort steps through the same tagged AI codec. Older non-null policy memory lacking node assignments or the field and World owners defaults those records, preserving v1 compatibility. World room admission remains closed.
 Scripted Horde policy remembers its observed stationary positions and timers. Older commander memory without that policy starts it fresh. Its old decoded policy packet is cleared with the old delivered view on load, so the next action still requires a fresh delivered observation.
+
+The native Horde comparison plan also retains its optional `delivered` intent:
+optional display `plan`, display `orders`, and the `digging` flag. Display plans
+carry the existing recipient `kind` and point `at`, never hidden work or target
+data (`shared/sim.js:6016-6062`). Missing `delivered` content decodes as `None`
+for older native comparison plans. This stays inside the existing tagged
+external AI owner, with its fresh-observation requirement after load. It adds
+no match checkpoint or envelope key. The populated comparison-plan round trip
+is covered by `if27_horde_pending_memory_round_trips_order_budget_and_supersession`.
+
+## Combined hosted Horde continuation
+
+Horde rooms with one through five defenders use the same transactional envelope.
+The internal Horde seat is part of `g`, not `seats`. Wave state, canonical RNG,
+queued commands, pending effects and ending hold survive; saved mode and internal
+slot must agree with the defender roster. Raw saved maps remain sufficient after
+an authored source file disappears. Sandbox Horde preserves the sandbox flag and
+still suppresses ranked records.
+
+The unified delivered-frame owner restores roster-AI planner entries and seeds
+the internal director fresh from its loaded recipient packet. The internal
+entry is null (or the whole `ai` field is null for human-only defender rosters),
+matching the incoming #426 missing-memory fallback. This does not claim the
+previous director's private planner queue survives. Every simulation seat is
+captured before publication, while only actual connections receive starts.
+Authored envelopes remain v2 and ordinary envelopes v1.

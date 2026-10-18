@@ -121,20 +121,99 @@ fn net66_presence_and_ping_survive_scheduled_paused_catchup_and_reconnect_delive
     }
     assert!(hub.native_status("ABC").unwrap().fault.is_none());
 
-    // AI metadata uses the same production projection, without enabling room AI.
+    // Admitted AI seats keep the same presence and ping projection in real frames.
     let mut lobby = Hub::new(32, String::new());
-    let (client, _rx) = peer(10);
+    let (client, mut client_rx) = peer(10);
     join(&mut lobby, &client, "human", 0);
     lobby.message("ABC", &client, &mut true, json!({"t":"addAi"}), 1);
     let ai = &mut lobby.rooms.get_mut("ABC").unwrap().players[1];
     ai.rtt = Some(123.0);
     assert!(ai.online());
     assert_eq!(ai.ping(), Some(-1.0));
-    assert!(
-        lobby
-            .attach_native("ABC", native_tests::native_match(), 2)
-            .is_err()
-    );
+    lobby
+        .attach_native("ABC", native_tests::native_match(), 2)
+        .unwrap();
+    drain(&mut lobby, &mut client_rx, 2);
+    for beat in 0..4 {
+        lobby.poll_native(2 + beat * 50, beat * 50_000_000);
+    }
+    let messages = drain(&mut lobby, &mut client_rx, 152);
+    assert!(snapshots(&messages).next().is_some());
+    for frame in snapshots(&messages) {
+        assert_eq!(frame["online"], json!([true, true]));
+        assert_eq!(frame["ping"], json!([null, -1.0]));
+    }
+    let status = lobby.native_status("ABC").unwrap();
+    assert!(status.tick > 0);
+    assert!(!status.paused);
+    assert!(status.fault.is_none());
+}
+
+#[test]
+fn only_host_pause_and_resume_change_pause_without_advancing_state() {
+    for paused in [false, true] {
+        for host_control in [false, true] {
+            for command in ["pause", "resume"] {
+                let (mut hub, host, mut host_rx, guest, mut guest_rx) = setup();
+                if paused {
+                    hub.rooms
+                        .get_mut("ABC")
+                        .unwrap()
+                        .native
+                        .as_mut()
+                        .unwrap()
+                        .runtime
+                        .pause(0, "host", crate::room_runtime::PauseReason::Host, 1)
+                        .unwrap();
+                }
+                assert!(UNAVAILABLE.contains(&command));
+                let runtime = &hub.rooms["ABC"].native.as_ref().unwrap().runtime;
+                let tick = runtime.state().world.game.tick;
+                let random = runtime.state().start.random.snapshot();
+                let pending = runtime.state().commands.pending_commands();
+                let pause = runtime.pause_message(2);
+                let client = if host_control { &host } else { &guest };
+                hub.message("ABC", client, &mut true, json!({"t":command}), 2);
+                let host_messages = drain(&mut hub, &mut host_rx, 2);
+                let guest_messages = drain(&mut hub, &mut guest_rx, 2);
+                let expected_paused = if host_control {
+                    command == "pause"
+                } else {
+                    paused
+                };
+                let runtime = &hub.rooms["ABC"].native.as_ref().unwrap().runtime;
+                if host_control {
+                    let message = if command == "pause" {
+                        json!({"t":"pause","paused":true,"by":"host","reason":"host","left":0})
+                    } else {
+                        json!({"t":"pause","paused":false,"by":"","reason":"host","left":0})
+                    };
+                    let expected = if paused && command == "pause" {
+                        vec![]
+                    } else {
+                        vec![message.clone()]
+                    };
+                    assert_eq!(host_messages, expected);
+                    assert_eq!(guest_messages, expected);
+                    assert_eq!(runtime.pause_message(2), message);
+                } else {
+                    let expected = if paused {
+                        vec![]
+                    } else {
+                        vec![json!({"t":"deny","cmd":command,"reason":"blocked"})]
+                    };
+                    assert_eq!(guest_messages, expected);
+                    assert!(host_messages.is_empty());
+                    assert_eq!(runtime.pause_message(2), pause);
+                }
+                assert_eq!(runtime.paused(), expected_paused);
+                assert_eq!(runtime.state().world.game.tick, tick);
+                assert_eq!(runtime.state().start.random.snapshot(), random);
+                assert_eq!(runtime.state().commands.pending_commands(), pending);
+                assert!(runtime.fault().is_none());
+            }
+        }
+    }
 }
 
 #[test]

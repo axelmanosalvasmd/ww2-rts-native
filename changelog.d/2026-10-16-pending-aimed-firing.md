@@ -1,0 +1,1 @@
+- Fix an ordinary match fault when a squad walks into range for an aimed ability. Pending aimed orders now retain their normal targeting and firing phase, matching the prototype. Extend the room ability test through several approach ticks, the real throw, grenade flight and expiry, with both seats' snapshots throughout.

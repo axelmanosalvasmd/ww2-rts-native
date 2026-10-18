@@ -1,11 +1,10 @@
 //! Prepared aircraft branches for the single canonical recorded command dispatcher.
-//! No ground destination, route or recipient-memory query belongs to these branches.
+//! Mixed area orders share the canonical ground fire-at path.
 use crate::{
-    catalog::{Catalog, Value},
     game::{PlaneState, Point},
     grid::UnitId,
     match_aviation::{AviationError, MissionKind, PlaneMission},
-    match_commands::{Denial, MoveOutcome},
+    match_commands::{Command, Denial, MoveOutcome},
     match_runtime::Match,
 };
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -52,13 +51,17 @@ impl Match {
         owner: usize,
         ids: &[i64],
         at: Point,
-        _queue: bool,
+        queue: bool,
     ) -> Result<Option<Denial>, String> {
         self.validate_aviation().map_err(|e| e.to_string())?;
         if owner >= self.world.game.players.len() || !at.x.is_finite() || !at.z.is_finite() {
             return Ok(Some(Denial::Blocked));
         }
-        let Some(cell) = self.world.game.cell_of(at.x, at.z) else {
+        let g = &self.world.game;
+        let Some(cell) = g.cell_of(
+            crate::math::max(0., crate::math::min(g.w as f64 * crate::game::CELL, at.x)),
+            crate::math::max(0., crate::math::min(g.h as f64 * crate::game::CELL, at.z)),
+        ) else {
             return Ok(Some(Denial::Blocked));
         };
         let width = self.world.game.w;
@@ -67,30 +70,24 @@ impl Match {
             z: (cell / width) as f64 * crate::game::CELL + crate::game::CELL / 2.0,
         };
         let mut prepared = Vec::new();
-        let mut ground_selected = false;
-        for raw in ids {
+        let mut ground = Vec::new();
+        let command = Command::FireAt {
+            ids: ids.to_vec(),
+            at,
+            queue,
+        };
+        for raw in ids.iter().take(50.max(self.world.game.units.len())) {
             let Some(id) = u32::try_from(*raw).ok() else {
                 continue;
             };
             let Some(u) = self.world.game.units.get(&id) else {
                 continue;
             };
-            if u.owner != owner || u.hp <= 0.0 {
+            if self.eligible_command_unit(*raw, owner, &command) != Some(id) || u.hp <= 0.0 {
                 continue;
             }
             if u.air.is_none() {
-                let def = Catalog::compiled()
-                    .map_err(|e| e.to_string())?
-                    .unit(&self.rules.kinds[u.kind].name)
-                    .map_err(|e| e.to_string())?;
-                let weapon = def.get("w");
-                ground_selected |= weapon.is_some_and(|w| {
-                    w.get("salvo").and_then(Value::boolean) == Some(true)
-                        || self.world.game.cell_hp[cell] > 0.0
-                            && w.get("shellTerrain")
-                                .and_then(Value::number)
-                                .is_some_and(|damage| damage > 0.0)
-                });
+                ground.push(*raw);
                 continue;
             }
             if self.rules.kinds[u.kind].name != "bomber" {
@@ -101,11 +98,11 @@ impl Match {
                 .map_err(|e| e.to_string())?;
             prepared.push(order);
         }
-        if ground_selected {
-            return Ok(Some(Denial::Unsupported));
-        }
+        // Ground guns retain their queue semantics; bombers take an immediate
+        // area mission even when the shared command requests queuing.
+        let ground_denial = self.ground_fire_at_command(owner, &ground, at, queue)?;
         if prepared.is_empty() {
-            return Ok(Some(Denial::Needs));
+            return Ok(ground_denial);
         }
         for order in prepared {
             self.apply_aircraft_order(order);

@@ -26,6 +26,7 @@ mod mov_runtime_batch;
 mod native_order_intent_tests;
 
 pub mod ai_schedule;
+pub mod ai_seat_view;
 pub mod ai_view;
 pub mod assault_runtime;
 pub mod building_placement;
@@ -34,16 +35,32 @@ pub mod client_view;
 pub mod combat;
 pub mod command_destinations;
 pub mod command_feedback;
+pub mod commander_abilities;
+pub mod commander_ability_policy;
+mod commander_actions;
 pub mod commander_ai;
 pub mod commander_assault;
+mod commander_classic_economy;
 pub mod commander_classic_rules;
 mod commander_construction;
+mod commander_engineering;
+#[cfg(test)]
+mod commander_engineering_schedule_tests;
 mod commander_fortification;
 mod commander_forward_hq;
 pub mod commander_mind;
 mod commander_mirror;
 mod commander_shopping;
 pub mod commander_tactics;
+
+pub mod commander_attack_policy;
+pub mod commander_focus_runtime;
+pub mod commander_look;
+mod commander_received_vision;
+pub mod commander_support_policy;
+pub mod commander_support_runtime;
+#[cfg(test)]
+mod commander_union_tests;
 pub mod companion_ray;
 pub mod companions;
 pub mod conquest_end;
@@ -73,14 +90,17 @@ pub mod recipient_availability;
 #[cfg(test)]
 use crate as core_api;
 pub mod authored_mission;
+pub mod authored_scenario;
 #[cfg(test)]
 #[path = "../tests/support/human_commander_facts.rs"]
 mod human_commander_test_facts;
 pub mod legacy_scenario;
 pub mod legacy_scenario_runtime;
 pub mod match_companion_effects;
+mod match_companion_status;
 mod match_companion_tick;
 pub mod match_companions;
+mod scenario_actuators;
 pub mod scenario_validation;
 pub mod seat_commander;
 
@@ -109,6 +129,7 @@ mod match_destroy;
 pub mod match_end;
 pub mod match_firing;
 pub mod match_garrison;
+mod match_sandbox;
 
 mod match_gates;
 pub mod match_ground_contact;
@@ -139,6 +160,7 @@ pub mod path_requests;
 
 pub mod orders;
 pub mod pathfinding;
+pub mod presentation_queries;
 pub mod produced_units;
 pub mod production;
 pub mod projectiles;
@@ -218,6 +240,15 @@ mod mov_intent_batch;
 mod bases_runtime_construction_tests;
 
 #[cfg(test)]
+mod logistics_support_tests;
+
+#[cfg(test)]
+mod logistics_network_depot_tests;
+
+#[cfg(test)]
+mod logistics_runtime_tests;
+
+#[cfg(test)]
 mod misc_bridge_tests;
 
 #[cfg(test)]
@@ -242,6 +273,35 @@ mod mov_followup_garrison_tests;
 mod save_codec;
 mod save_state;
 
+pub mod authoring_queries;
+#[cfg(test)]
+mod match_horde_operative_tests;
+
 pub mod commander_field_policy;
 pub mod commander_world_policy;
+mod match_terrain_orders;
+#[cfg(test)]
+mod movement_tick_ground_tests;
+#[cfg(test)]
+mod movement_tick_phase_tests;
+#[cfg(test)]
+mod movement_tick_privacy_tests;
+#[cfg(test)]
+mod movement_tick_speed_tests;
+
+#[cfg(test)]
+mod economy_research_tests;
+
 mod numeric_keys;
+
+#[cfg(test)]
+mod production_lifecycle_intent_tests;
+#[cfg(test)]
+mod results_restart_tests;
+
+pub mod recipient_placement;
+#[cfg(test)]
+mod terrain_fire_tests;
+
+#[cfg(test)]
+mod ai_privacy_modes_tests;

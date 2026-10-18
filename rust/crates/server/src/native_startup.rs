@@ -8,6 +8,19 @@ use ww2_core::{
     world::World,
 };
 
+/// Public lobby names remain the prototype whitelist; Default is an internal Conquest alias.
+pub(crate) fn ordinary_mode(name: &str) -> Option<Mode> {
+    match name {
+        "conquest" => Some(Mode::Conquest),
+        "assault" => Some(Mode::Assault),
+        "annihilation" => Some(Mode::Annihilation),
+        "classic" => Some(Mode::Classic),
+        "horde" => Some(Mode::Horde),
+        "tutorial" => Some(Mode::Tutorial),
+        _ => None,
+    }
+}
+
 pub(crate) const MAX_MATCH_ID: u64 = 9_007_199_254_740_991;
 #[cfg(test)]
 #[path = "native_map_batch3_tests.rs"]
@@ -35,6 +48,9 @@ pub(crate) struct StartEnvelope {
     match_id: u64,
 }
 impl NativeStartup {
+    pub(crate) fn public_map(&self) -> &Value {
+        &self.map
+    }
     pub(crate) fn prepare(state: &Match, settings: StartupSettings<'_>) -> Result<Self, String> {
         let authored = crate::authoritative_maps::load(settings.map).map_err(|e| e.to_string())?;
         Self::prepare_authored(state, settings, authored)
@@ -59,9 +75,10 @@ impl NativeStartup {
         settings: StartupSettings<'_>,
         authored: &ww2_core::map::AuthoritativeMap,
     ) -> Result<Self, String> {
-        if settings.mode != "conquest"
-            || !matches!(state.options.mode, Mode::Default | Mode::Conquest)
-            || state.world.game.mode.is_some()
+        let expected = ordinary_mode(settings.mode);
+        if expected.is_none()
+            || !(expected == Some(state.options.mode)
+                || expected == Some(Mode::Conquest) && state.options.mode == Mode::Default)
             || state.options.map_key.as_deref() != Some(settings.map)
             || state.options.weather != WeatherChoice::from_reference(Some(settings.weather))
             || state.options.sandbox != settings.sandbox
@@ -98,18 +115,30 @@ impl NativeStartup {
         {
             return Err("native startup authoring map binding changed".into());
         }
-        let expected_mission = ww2_core::authored_mission::AuthoredMission::from_map(authored)?;
-        if state
-            .authored_mission
-            .as_ref()
-            .map(|mission| mission.definition())
-            != expected_mission
-                .as_ref()
-                .map(|mission| mission.definition())
-        {
-            return Err("native startup mission definition disagrees with the bound map".into());
-        }
-        let plan = StartPlan::prepare(authored, &state.options, &state.rules)?;
+        state.validate_authored_map_binding(authored)?;
+        let plan = match state.options.mode {
+            Mode::Tutorial => StartPlan::prepare_tutorial(authored, &state.options, &state.rules)?,
+            Mode::Default | Mode::Conquest => {
+                StartPlan::prepare(authored, &state.options, &state.rules)?
+            }
+            Mode::Horde => StartPlan::prepare_horde(authored, &state.options, &state.rules)?,
+            Mode::Classic | Mode::Annihilation => {
+                StartPlan::prepare_elimination(authored, &state.options, &state.rules)?
+            }
+            Mode::Assault => StartPlan::prepare_assault(
+                authored,
+                &state.options,
+                &state.rules,
+                state
+                    .assault
+                    .ok_or("missing Assault startup state")?
+                    .defender_team,
+            )?,
+            _ => return Err("native startup requires a represented ordinary mode".into()),
+        };
+        // Validate the canonical mode pair even when this API is used before RoomRuntime.
+        ww2_core::recipient_snapshot::mode_row(state)
+            .map_err(|e| format!("native startup mode: {e:?}"))?;
         if plan.players.len() != state.start.players.len()
             || plan
                 .players
@@ -135,6 +164,13 @@ impl NativeStartup {
         names: &[String],
         match_id: u64,
     ) -> Result<StartEnvelope, String> {
+        let mut names = names.to_vec();
+        if state
+            .tutorial_state()
+            .is_some_and(|t| t.enemy() == names.len())
+        {
+            names.push(state.options.players[names.len()].name.clone());
+        }
         if names.len() != self.count
             || state.start.players.len() != self.count
             || state.world.game.players.len() != self.count

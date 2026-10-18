@@ -6,16 +6,35 @@ These files reserve contract topics; no protocol or ABI is approved by their cre
 
 | Document | Draft owner | Consumer reviewer | Status |
 | --- | --- | --- | --- |
-| protocol.md | Julio | Axel | v0 draft; technical answers recorded (#5); spectator reference behavior and cached flag mask clarified 2026-10-16 |
+| protocol.md | Julio | Axel | v0 draft; technical answers recorded (#5); operative hit-position, spectator reference behavior and cached-mask decisions confirmed by both owners on 2026-10-16, recorded in protocol.md |
 | [r1-ingress.md](r1-ingress.md) | Julio | Axel | Prototype-identical ordinary R1 ingress candidate under the recorded groups F/M grant; exact-head runtime ack pending |
+| [start-cancellation.md](start-cancellation.md) | Julio | Axel | Identical prototype v0 pending-start cancellation and scenario-denial shapes; exact-head acknowledgement pending |
+| [ordinary-results.md](ordinary-results.md) | Julio | Axel | Identical prototype v0 ordinary mode/result fields; owner groups N/P recorded in #5 comment 6217590741; exact-head acknowledgement pending |
+| [room-command-union.md](room-command-union.md) | Julio | Axel | Prototype-identical remaining room command admission, queued Ability and attached Classic cancellation under decision M; execution pending |
+| [room-commands2-events.md](room-commands2-events.md) | Julio | Axel | Prototype-identical operative, Horde and ordinary flight composition under decisions E/G/K/O; execution pending |
 | terrain.md | Julio | Axel | v0 draft; technical answers recorded (#5) |
-| [save-format.md](save-format.md) | Julio | Axel | Private JSON format v1; owner group I recorded in #5 comment 6217590741; implementation exact-head acknowledgement pending |
+| [save-format.md](save-format.md) | Julio | Axel | Private JSON v1 for ordinary matches and shared authored v2; owner group I recorded in #5 comment 6217590741; implementation exact-head acknowledgement pending |
+| [sandbox.md](sandbox.md) | Julio | Axel | Prototype sandbox start, spawn and recipient rules under owner decisions M/N/P; implementation exact-head acknowledgement pending |
+| [construction-production.md](construction-production.md) | Julio | Axel | Prototype-identical Classic and Horde ground production fields, including Classic logistics; exact-head runtime review and hosted aviation integration remain pending |
 | [startup-tables/README.md](startup-tables/README.md) | Julio | Axel | Content/schema v1 candidate explicitly accepted by both owners in PR #195 review; internal producer/platform proof integrated through PR #198 at `514e15f4`; transport #199 remains unagreed and unimplemented; Unreal adoption pending |
 | [combat-recipient-filtering.md](combat-recipient-filtering.md) | Julio | Axel | Existing prototype unit and ghost shapes; cached-path privacy mask under confirmed owner decision P; no World or Classic room admission |
-| rust-unreal-abi.md | Julio | Axel | Six ABI 2 recipient-view calls authoritative through PR #16, merged at `d88ef6d`; broader v0 contract remains draft; approved header unchanged; consumer source published in draft PR #201 at `9551d3976e9145c81030cf5a81ec7f0764b04d12`, explicitly not for merge, neither merged nor adopted on main; fresh live and complete decoder adoption pending |
+| rust-unreal-abi.md | Julio | Axel | Six ABI 2 recipient-view calls authoritative through PR #16, merged at `d88ef6d`; broader v0 contract remains draft; existing approved declarations unchanged; additive ABI 2.1/2.2 queries are a candidate in [abi-queries.md](abi-queries.md); consumer source published in draft PR #201 at `9551d3976e9145c81030cf5a81ec7f0764b04d12`, explicitly not for merge, neither merged nor adopted on main; fresh live and complete decoder adoption pending |
+
+The [R1 ingress note](r1-ingress.md) records prototype command shapes and the
+bounded #296/#366 overlap under owner decisions F and M. Exact-head runtime
+review remains required.
 
 [PR #201](https://github.com/axelmanosalvasmd/ww2-rts-native/pull/201) records Axel-reported Linux build/automation on Rust `92fb7fe`, separate from the earlier live/package results on `03a49ac`. These owner reports are not independently validated here. Rust unit rows are the draft's default, but C++ fallback, row tails, cells, fog and independent row parsing remain. Windows/macOS client and input checks, physical mouse/keyboard tests and broader rules-query integration are still pending. Native proof and integration are recorded in [DESIGN.md](../../DESIGN.md); they do not establish Unreal adoption.
 
 Contract PRs must state native/reference baseline, version/status, fields and semantics, ownership/privacy, error/recovery behavior, compatibility transition, fixtures and verification evidence. Both owners must explicitly approve breaking changes before adoption. Mark a contract agreed only after approvals and merge. Do not put credentials or private sessions in fixtures.
 
-The ABI 2 approval is limited to the six recipient-view calls in `rust-unreal-abi.md` and their staged Unreal consumer update. It does not approve additional interfaces or the pending protocol/privacy proposals. The broader drafts remain drafts; merged jointly approved scope is authoritative.
+The ABI 2 approval is limited to the six recipient-view calls in `rust-unreal-abi.md` and their staged Unreal consumer update. It does not approve additional interfaces. The operative privacy decisions recorded in `protocol.md` have separate owner confirmation. The broader drafts remain drafts; merged jointly approved scope is authoritative.
+
+[Owner economy projection](economy-projection.md) records the prototype-identical internal currency fields and mode scope. It does not approve additional public mode admission or C interfaces.
+[Editor maps and Horde records](editor-record-persistence.md) documents authenticated raw-map access, worker catalogue refresh and private Horde record storage under the recorded owner decisions. Hosted Horde admission and World persistence remain separate.
+
+[Additive ABI 2.1/2.2 queries](abi-queries.md) are an implementation candidate authorized by owner decision `julio-373-merged-decisions-20261016` on #5. Existing ABI 2 functions and layouts remain unchanged; exact signatures require runtime review before Unreal adoption.
+
+IF-11 adds five stateless motion/flight queries in minor revision 2, stacked on #418. The same additive-only authorization and signature review before Unreal adoption apply.
+
+[Ordinary owner lists](owner-lists-v0.md) records the existing prototype snapshot shapes for private economy, production, aircraft and physical logistics. It adds no ABI or command interface and does not change the protocol draft's approval status.

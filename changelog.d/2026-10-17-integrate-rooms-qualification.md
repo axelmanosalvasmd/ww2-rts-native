@@ -1,0 +1,1 @@
+- Record complete rooms-chain validation: 1,918 enabled tests passed using named ci-test/ci profiles, with formatting, strict workspace Clippy and the workspace documentation-test command also passing. Preserve the earlier failure accounting, exact qualified source tree and cloud-only resource scheduling in the validation receipt.

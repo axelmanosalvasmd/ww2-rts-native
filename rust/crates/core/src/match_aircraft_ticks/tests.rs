@@ -530,3 +530,174 @@ fn cmb78_recalled_aircraft_fly_home_and_start_rearming() {
     assert_eq!(m.aviation.planes[&id].mission, None);
     assert_eq!(m.aviation.planes[&id].timer, 30.0);
 }
+
+#[test]
+fn mov86_aircraft_commands_dispatch_every_mission_and_preserve_unready_sorties() {
+    use crate::match_commands::{Command, Denial};
+    use serde_json::json;
+
+    // Prototype e4e579a shared/sim.js:3442,3473,3498-3519,3337 and 2193-2196.
+    let mut m = scene(&[("rifle", 0, 40.0, 35.0), ("tank", 1, 45.0, 40.0)]);
+    let patrol = PlaneMission {
+        kind: MissionKind::Patrol,
+        target: None,
+        at: Point { x: 40.0, z: 40.0 },
+    };
+    let attacker = add_plane(&mut m, "attacker", patrol);
+    let bomber = add_plane(&mut m, "bomber", patrol);
+    let fighter = add_plane(&mut m, "fighter", patrol);
+    let enemy = add_plane(&mut m, "bomber", patrol);
+    m.world.game.units.get_mut(&enemy).unwrap().owner = 1;
+    sight(&mut m);
+    m.world.game.players[0].visible = vec![2, enemy];
+
+    for (wire, id, kind, target, at) in [
+        (
+            json!({"t":"move","orders":[[attacker,50.0,40.0]]}),
+            attacker,
+            MissionKind::Patrol,
+            None,
+            Point { x: 50.0, z: 40.0 },
+        ),
+        (
+            json!({"t":"attack","ids":[attacker],"target":2}),
+            attacker,
+            MissionKind::Attack,
+            Some(2),
+            m.world.game.units[&2].at(),
+        ),
+        (
+            json!({"t":"attack","ids":[fighter],"target":enemy}),
+            fighter,
+            MissionKind::Attack,
+            Some(enemy),
+            m.world.game.units[&enemy].at(),
+        ),
+        (
+            json!({"t":"fireat","ids":[bomber],"x":50.0,"z":40.0}),
+            bomber,
+            MissionKind::Area,
+            None,
+            Point { x: 51.0, z: 41.0 },
+        ),
+        (
+            json!({"t":"escort","ids":[fighter],"target":1}),
+            fighter,
+            MissionKind::Escort,
+            Some(1),
+            m.world.game.units[&1].at(),
+        ),
+        (
+            json!({"t":"stop","ids":[fighter]}),
+            fighter,
+            MissionKind::Patrol,
+            None,
+            m.world.game.units[&fighter].at(),
+        ),
+    ] {
+        assert_eq!(
+            m.execute_command(0, &Command::from_json(&wire).unwrap(), false)
+                .unwrap(),
+            None,
+            "{wire}"
+        );
+        assert_eq!(m.world.game.units[&id].air, Some(PlaneState::Out));
+        assert_eq!(
+            m.aviation.planes[&id].mission,
+            Some(PlaneMission { kind, target, at })
+        );
+    }
+    let ground_attack =
+        Command::from_json(&json!({"t":"attack","ids":[1],"target":enemy})).unwrap();
+    assert_eq!(
+        m.execute_command(0, &ground_attack, false).unwrap(),
+        Some(Denial::Needs)
+    );
+    assert_eq!(m.commands.units[&1].attack_id, 0);
+    let retreat = Command::from_json(&json!({"t":"retreat","ids":[fighter]})).unwrap();
+    assert_eq!(m.execute_command(0, &retreat, false).unwrap(), None);
+    assert_eq!(m.world.game.units[&fighter].air, Some(PlaneState::Home));
+
+    for (state, fuel, ammo) in [
+        (PlaneState::Rearm, 50.0, 2.0),
+        (PlaneState::Base, 0.0, 2.0),
+        (PlaneState::Base, 50.0, 0.0),
+    ] {
+        m.world.game.units.get_mut(&bomber).unwrap().air = Some(state);
+        let sortie = m.aviation.planes.get_mut(&bomber).unwrap();
+        sortie.fuel = fuel;
+        sortie.ammo = ammo;
+        let before = *sortie;
+        for wire in [
+            json!({"t":"move","orders":[[bomber,60.0,50.0]]}),
+            json!({"t":"attack","ids":[bomber],"target":2}),
+            json!({"t":"fireat","ids":[bomber],"x":60.0,"z":50.0}),
+            json!({"t":"escort","ids":[bomber],"target":1}),
+            json!({"t":"stop","ids":[bomber]}),
+        ] {
+            assert_eq!(
+                m.execute_command(0, &Command::from_json(&wire).unwrap(), false)
+                    .unwrap(),
+                None
+            );
+            assert_eq!(m.world.game.units[&bomber].air, Some(state));
+            assert_eq!(m.aviation.planes[&bomber], before, "{state:?}: {wire}");
+        }
+    }
+}
+
+#[test]
+fn mov88_bomber_sticks_and_automatic_guns_wait_for_their_natural_intervals() {
+    // Prototype e4e579a shared/sim.js:2227-2234 and 4141-4154.
+    for name in ["bomber", "attacker"] {
+        let mut m = scene(&[("tank", 1, 43.0, 40.0)]);
+        let mission = PlaneMission {
+            kind: if name == "bomber" {
+                MissionKind::Area
+            } else {
+                MissionKind::Patrol
+            },
+            target: None,
+            at: Point { x: 40.0, z: 40.0 },
+        };
+        let id = add_plane(&mut m, name, mission);
+        let initial_ammo = m.aviation.planes[&id].ammo;
+        m.step_aircraft_turn(id, 0.05).unwrap();
+        assert_eq!(m.aviation.planes[&id].ammo, initial_ammo - 1.0);
+        let first_flights = m.firing.flights.len();
+        assert!(first_flights > 0);
+        let interval = m.firing.get(id).unwrap().cooldown;
+        assert!(interval > 0.1);
+        if name == "attacker" {
+            assert_eq!(m.aviation.planes[&id].attack_pick, 1);
+            assert_eq!(m.firing.get(id).unwrap().retarget, 0.5);
+        } else {
+            assert_eq!(m.world.game.units[&id].air, Some(PlaneState::Station));
+            assert_eq!(m.firing.salvos.last().unwrap().at, mission.at);
+        }
+        // Pose stays on station while the actual aircraft turn advances its weapon clock.
+        let position = m.world.game.units[&id].at();
+        let turns_before_due = (interval / 0.05).ceil() as usize - 1;
+        for _ in 0..turns_before_due {
+            let u = m.world.game.units.get_mut(&id).unwrap();
+            u.x = position.x;
+            u.z = position.z;
+            m.grid.update(id, u);
+            m.step_aircraft_turn(id, 0.05).unwrap();
+            assert_eq!(m.aviation.planes[&id].ammo, initial_ammo - 1.0);
+            assert_eq!(m.firing.flights.len(), first_flights);
+        }
+        for _ in 0..2 {
+            let u = m.world.game.units.get_mut(&id).unwrap();
+            u.x = position.x;
+            u.z = position.z;
+            m.grid.update(id, u);
+            m.step_aircraft_turn(id, 0.05).unwrap();
+            if m.aviation.planes[&id].ammo == initial_ammo - 2.0 {
+                break;
+            }
+        }
+        assert_eq!(m.aviation.planes[&id].ammo, initial_ammo - 2.0);
+        assert_eq!(m.firing.flights.len(), first_flights * 2);
+    }
+}

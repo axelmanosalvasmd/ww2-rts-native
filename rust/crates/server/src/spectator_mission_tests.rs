@@ -222,32 +222,48 @@ fn intent_net77_authored_objectives_and_private_messages_filter_spectators_throu
         }
         if tick == 3 {
             let loaded = Match::from_save_json(runtime.state().save_json().unwrap()).unwrap();
-            assert_eq!(loaded.authored_mission, runtime.state().authored_mission);
+            assert_eq!(loaded.authored_scenario, runtime.state().authored_scenario);
             restored = Some(RoomRuntime::new(loaded, 150).unwrap());
         }
     }
 }
 
 #[test]
-fn authored_mission_admission_refuses_unimplemented_actions_and_changed_map_bindings() {
+fn authored_mission_admission_runs_engine_actions_and_refuses_changed_map_bindings() {
     let raw = authored_map();
     let original = state(&raw);
-    // Reject a valid mission history attached to a later unfinished match clock.
+    // The reconciled authored-v2 owner must match its required clock.
     let mut stale = state(&raw);
     stale.world.game.tick = 1;
     assert!(stale.save_json().is_err());
+    let map = AuthoritativeMap::from_json(&serde_json::to_vec(&raw).unwrap()).unwrap();
+    let mut timed = state(&raw);
+    timed.authored_scenario = None;
+    timed.authored_mission = ww2_core::authored_mission::AuthoredMission::from_map(&map).unwrap();
+    assert!(timed.save_json().is_err());
     // A null authored definition retains migrated legacy timed triggers.
     let mut legacy = raw.clone();
     legacy["scenario"] = Value::Null;
     legacy["triggers"] = json!([{"at":0,"say":"Legacy public"}]);
     let legacy = state(&legacy);
     assert!(legacy.scenario.is_some());
-    assert!(legacy.authored_mission.is_none());
-    let mut unsupported = raw.clone();
-    unsupported["scenario"]["triggers"][0]["actions"] =
-        json!([{"kind":"destroy","box":[10,10,11,11]}]);
-    let map = AuthoritativeMap::from_json(&serde_json::to_vec(&unsupported).unwrap()).unwrap();
-    assert!(Match::new(&map, original.options.clone()).is_err());
+    assert!(legacy.authored_scenario.is_none());
+    let mut destructive = raw.clone();
+    destructive["rows"][20] = json!(format!("{}#{}", ".".repeat(20), ".".repeat(43)));
+    destructive["scenario"]["triggers"][0]["actions"] =
+        json!([{"kind":"destroy","box":[20,20,20,20]}]);
+    let mut admitted = state(&destructive);
+    assert_eq!(admitted.world.game.chars[20 * 64 + 20], b'#');
+    for _ in 0..3 {
+        admitted.advance_tick().unwrap();
+        admitted.ordinary_snapshot_raw_lists().unwrap();
+        assert!(admitted.tick_state.fault().is_none());
+    }
+    assert_eq!(admitted.world.game.chars[20 * 64 + 20], b'+');
+    let map = AuthoritativeMap::from_json(&serde_json::to_vec(&destructive).unwrap()).unwrap();
+    let mut unsupported_mode = original.options.clone();
+    unsupported_mode.mode = Mode::World;
+    assert!(Match::new(&map, unsupported_mode).is_err());
     let mut different = raw.clone();
     different["scenario"]["objectives"][0]["text"] = json!({"en":"Changed mission"});
     let settings = crate::native_startup::StartupSettings {
@@ -261,4 +277,27 @@ fn authored_mission_admission_refuses_unimplemented_actions_and_changed_map_bind
         crate::native_startup::NativeStartup::prepare_loaded(&original, settings, &different)
             .is_err()
     );
+
+    let mut ordered = raw.clone();
+    ordered["scenario"]["triggers"][0]["actions"][1]["text"] =
+        serde_json::from_str(r#"{"es":"Primero","fr":"Deuxieme"}"#).unwrap();
+    let ordered_state = state(&ordered);
+    let mut reordered = ordered.clone();
+    reordered["scenario"]["triggers"][0]["actions"][1]["text"] =
+        serde_json::from_str(r#"{"fr":"Deuxieme","es":"Primero"}"#).unwrap();
+    let bind = |map: &Value| {
+        crate::native_startup::NativeStartup::prepare_loaded(
+            &ordered_state,
+            crate::native_startup::StartupSettings {
+                map: "river-pass",
+                mode: "conquest",
+                army: "standard",
+                weather: "map",
+                sandbox: false,
+            },
+            map,
+        )
+    };
+    assert!(bind(&ordered).is_ok());
+    assert!(bind(&reordered).is_err());
 }

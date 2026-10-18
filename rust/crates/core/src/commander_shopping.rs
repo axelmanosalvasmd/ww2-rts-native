@@ -628,7 +628,12 @@ mod tests {
             &[],
             Context {
                 mode: Mode::Classic,
-                nodes: vec![Point { x: 70.0, z: 70.0 }],
+                nodes: vec![crate::commander_tactics::NodeObservation {
+                    at: Point { x: 70.0, z: 70.0 },
+                    rate: 0.0,
+                    fuel: false,
+                    visible: true,
+                }],
                 ..context(Faction::Germany)
             },
         );

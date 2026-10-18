@@ -1,0 +1,1 @@
+- Format the combined command lifecycle tests and additive event merge. Keep every guard and assertion.

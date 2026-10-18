@@ -458,41 +458,64 @@ fn original_cut_reconnection_check_and_human_inputs_match() {
 }
 
 fn runtime_match() -> crate::match_runtime::Match {
+    runtime_match_with_mode(crate::economy::Mode::Conquest)
+}
+
+fn runtime_match_with_mode(mode: crate::economy::Mode) -> crate::match_runtime::Match {
+    runtime_match_scene(mode, false)
+}
+
+fn runtime_match_scene(mode: crate::economy::Mode, quiet: bool) -> crate::match_runtime::Match {
     use crate::{
-        economy::{Faction, Mode},
+        economy::Faction,
         economy_state::ArmySize,
         map::AuthoritativeMap,
         match_runtime::{Match, MatchOptions, PlayerConfig},
         weather::WeatherChoice,
     };
-    let map=AuthoritativeMap::from_json(&serde_json::to_vec(&json!({"name":"AI runtime intent","w":64,"h":64,
-        "rows":vec![".".repeat(64);64],"spawns":[{"x":4,"y":4},{"x":59,"y":59}],"points":[{"x":32,"y":32}]})).unwrap()).unwrap();
-    Match::new(
-        &map,
-        MatchOptions {
-            seed: 771,
-            mode: Mode::Conquest,
-            players: [0, 1]
-                .into_iter()
-                .map(|team| PlayerConfig {
-                    name: format!("Seat {team}"),
-                    team,
-                    faction: Faction::Germany,
-                })
-                .collect(),
-            shuffle: false,
-            army: ArmySize::Standard,
-            weather: WeatherChoice::Map,
-            weather_seed: None,
-            living_weather: false,
-            map_key: None,
-            tech: false,
-            supply: false,
-            logistics: false,
-            sandbox: false,
-        },
+    let rows: Vec<_> = (0..64)
+        .map(|y| {
+            if quiet && (16..48).contains(&y) {
+                "W".repeat(64)
+            } else {
+                ".".repeat(64)
+            }
+        })
+        .collect();
+    let point = if quiet { 11 } else { 32 };
+    let map = AuthoritativeMap::from_json(
+        &serde_json::to_vec(&json!({"name":"AI runtime intent","w":64,"h":64,
+        "rows":rows,"spawns":[{"x":4,"y":4},{"x":59,"y":59}],"points":[{"x":point,"y":point}]}))
+        .unwrap(),
     )
-    .unwrap()
+    .unwrap();
+    let options = MatchOptions {
+        seed: 771,
+        mode,
+        players: [0, 1]
+            .into_iter()
+            .map(|team| PlayerConfig {
+                name: format!("Seat {team}"),
+                team,
+                faction: Faction::Germany,
+            })
+            .collect(),
+        shuffle: false,
+        army: ArmySize::Standard,
+        weather: WeatherChoice::Map,
+        weather_seed: None,
+        living_weather: false,
+        map_key: None,
+        tech: false,
+        supply: false,
+        logistics: false,
+        sandbox: false,
+    };
+    if mode == crate::economy::Mode::Classic {
+        Match::new_classic(&map, options).unwrap()
+    } else {
+        Match::new(&map, options).unwrap()
+    }
 }
 fn screen(view: &HumanView<Observation>) -> ScreenView<'_, Observation> {
     ScreenView {
@@ -611,38 +634,27 @@ fn intent_ai36_runtime_policy_retreat_reaches_the_canonical_command_queue() {
 }
 
 #[test]
-fn intent_ai28_delivered_stock_uses_public_two_decimal_precision() {
+fn undelivered_logistics_refuses_before_publishing_human_observation() {
     let mut m = runtime_match();
     m.options.logistics = true;
     m.initialize_logistics().unwrap();
-    let id = *m
-        .world
-        .game
-        .units
-        .iter()
-        .find(|(_, u)| u.owner == 0 && m.rules.kinds[u.kind].name == "rifle")
-        .unwrap()
-        .0;
-    let stock = m.logistics.get_mut(id).unwrap();
-    stock.provisions = 59.6;
-    stock.fuel = Some(36.4);
-    stock.ammo = stock.ammo_max * 0.499;
-    let view = m
-        .human_commander_observation(
-            &mut crate::match_human_observation::HumanObservationMemory::new(0),
-        )
-        .unwrap();
-    let delivered = view.packet.input().runtime.as_ref().unwrap().units[&id]
-        .stock
-        .as_ref()
-        .unwrap();
-    assert_eq!(delivered.provisions, 59.6);
-    assert_eq!(delivered.fuel, Some(36.4));
-    assert_eq!(delivered.ammo, Some(0.5));
-    let commands = HumanPolicy::new(0, 771)
-        .plan(screen(&view), Level::Normal)
-        .unwrap();
-    assert!(!commands.iter().any(|c| c["t"] == "retreat"));
+    let mut memory = crate::match_human_observation::HumanObservationMemory::new(0);
+    let before = memory.clone();
+    let random = m.start.random.snapshot();
+    let queue = m.commands.queue.snapshot();
+    let routing = format!("{:?}", m.recipients);
+    assert_eq!(
+        m.human_commander_observation(&mut memory),
+        Err("human commander requires delivered logistics support".into())
+    );
+    assert_eq!(memory, before);
+    assert_eq!(m.start.random.snapshot(), random);
+    assert_eq!(m.commands.queue.snapshot(), queue);
+    assert_eq!(format!("{:?}", m.recipients), routing);
+    // A stale stock owner cannot bypass the guard by clearing the option alone.
+    m.options.logistics = false;
+    assert!(m.human_commander_observation(&mut memory).is_err());
+    assert_eq!(memory, before);
 }
 
 #[test]
@@ -864,6 +876,7 @@ fn intent_ai33_construction_spending_survives_ordinary_ticks_and_recipient_snaps
     }
     assert_eq!(m.tick_state.fault(), None);
     assert_eq!(m.world.game.units[&id].built, Some(1.0));
+    // Adaptive host snapshot cadence can deliver observations on either tick parity.
     let view = m.human_commander_observation(
         &mut crate::match_human_observation::HumanObservationMemory::new(0),
     );
@@ -1021,6 +1034,8 @@ fn intent_ai33_fortification_state_survives_full_match_and_every_seat_snapshot()
     assert_eq!(m.tick_state.fault(), None);
 }
 
+#[path = "commander_field_live_tests.rs"]
+mod field_live_tests;
 #[test]
 fn intent_ai12_refused_garrison_still_keeps_the_squad_busy_for_that_look() {
     use crate::{
@@ -1122,5 +1137,383 @@ fn intent_ai12_refused_garrison_still_keeps_the_squad_busy_for_that_look() {
         "a new look must discard the refused reservation"
     );
 }
-#[path = "commander_field_live_tests.rs"]
-mod field_live_tests;
+
+#[test]
+fn ai63_planner_checkpoint_retains_full_memory_without_random_streams() {
+    use crate::{
+        commander_ai::Aim,
+        commander_tactics::{Decision, Situation, SituationKind},
+    };
+    let mut policy = HumanPolicy::new(2, 77);
+    policy.source.aim = Some(Aim { i: 3, until: -0.0 });
+    policy.source.point_failures = vec![1, 255, 4];
+    policy.tactics.raid = Some(crate::commander_classic_rules::Raid {
+        target: 99,
+        ids: vec![4, 5],
+        at: crate::game::Point { x: 2., z: 3. },
+    });
+    policy.tactics.situation = Some(Situation {
+        kind: SituationKind::Defense,
+        until: 9.,
+        point: Some(1),
+        threat: Some(7),
+        at: Some(crate::game::Point { x: 4., z: 5. }),
+        counter: Some("at"),
+        safe: Some(2),
+        failed_at: 3,
+    });
+    policy.tactics.aim = Some((3, 12.));
+    policy.tactics.supply_waiting.insert(3);
+    policy.tactics.released.insert(4);
+    policy.tactics.decision = Some(Decision {
+        situation: SituationKind::Push,
+        buy: "rifle".into(),
+        aim: Some(3),
+    });
+    policy.tactics.called = Some(27.);
+    policy.tactics.cleared_sightings.insert(8, 19.);
+    policy.tactics.node.insert(9, 2);
+    policy.tactics.fort_steps.insert(10, 4);
+    policy.tactics.field.armor_seen = true;
+    policy.tactics.world.rail_at.insert(12, 75);
+    policy.tactics.world.fort_steps.insert(13, 2);
+    policy.tactics.world.field.armor_seen = true;
+    policy.tactics.assault.cooldown = 8.;
+    policy.tactics.assault.serial = u64::MAX;
+    policy.tactics.assault.released.insert(11, 12.);
+    policy.tactics.assault.operation = Some(crate::commander_assault::Operation {
+        id: 3,
+        phase: crate::commander_assault::Phase::Regroup,
+        started: 2.,
+        state_at: 4.,
+        point: Some(1),
+        at: crate::game::Point { x: 1., z: 2. },
+        stage: crate::game::Point { x: 3., z: 4. },
+        initial: 2,
+        members: vec![crate::commander_assault::Member {
+            id: 5,
+            role: crate::commander_assault::Role::Support,
+            last: crate::game::Point { x: 5., z: 6. },
+            progress_at: 8.,
+            order: Some(crate::game::Point { x: 7., z: 8. }),
+            placement: Some(crate::game::Point { x: 9., z: 10. }),
+            acknowledged: true,
+        }],
+        reason: Some("regroup-blocked"),
+    });
+    let saved = policy.planner_memory_json().unwrap();
+    policy.random.next_fraction(StreamId::Ai(2));
+    assert_eq!(
+        saved,
+        policy.planner_memory_json().unwrap(),
+        "random progress is not saved"
+    );
+    let mut restored = HumanPolicy::new(2, 999);
+    let random = restored.random.clone();
+    restored.restore_planner_memory(&saved).unwrap();
+    assert_eq!(saved, restored.planner_memory_json().unwrap());
+    assert_eq!(restored.random, random);
+    for reason in [
+        "handoff",
+        "timeout",
+        "defense",
+        "regroup-blocked",
+        "withdrawn",
+        "members-unavailable",
+        "armor",
+        "machine-gun",
+        "losses",
+    ] {
+        policy.tactics.assault.operation.as_mut().unwrap().reason = Some(reason);
+        let saved = policy.planner_memory_json().unwrap();
+        restored.restore_planner_memory(&saved).unwrap();
+        assert_eq!(
+            restored.tactics, policy.tactics,
+            "valid assault reason {reason}"
+        );
+    }
+    // Checkpoints written before field and World planner memories default only
+    // those new owners, while retaining every previously saved planner field.
+    let mut legacy = saved.clone();
+    let tactics = legacy[1]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|entry| entry[0] == json!(["string", "tactics"]))
+        .unwrap();
+    tactics[1][1].as_array_mut().unwrap().retain(|entry| {
+        entry[0] != json!(["string", "field"]) && entry[0] != json!(["string", "world"])
+    });
+    let mut legacy_restored = HumanPolicy::new(2, 999);
+    legacy_restored.restore_planner_memory(&legacy).unwrap();
+    assert_eq!(
+        legacy_restored.tactics.field,
+        crate::commander_field_policy::State::default()
+    );
+    assert_eq!(
+        legacy_restored.tactics.world,
+        crate::commander_world_policy::State::default()
+    );
+    let mut expected_legacy = policy.tactics.clone();
+    expected_legacy.field = Default::default();
+    expected_legacy.world = Default::default();
+    // The saved checkpoint precedes the later assault-reason variations above.
+    expected_legacy.assault.operation.as_mut().unwrap().reason = Some("regroup-blocked");
+    assert_eq!(legacy_restored.tactics, expected_legacy);
+    let before = restored.clone();
+    let foreign = HumanPolicy::new(1, 77).planner_memory_json().unwrap();
+    assert!(restored.restore_planner_memory(&foreign).is_err());
+    assert_eq!(restored, before);
+    assert!(restored.restore_planner_memory(&json!([])).is_err());
+    assert_eq!(restored, before);
+}
+
+#[test]
+fn intent_ai66_private_streams_drive_ordinary_ai_ticks_and_every_seat_snapshot() {
+    use crate::{
+        economy::Mode,
+        human_commander_timing::{Skill, Timing},
+        match_human_observation::HumanObservationMemory,
+        orders::OrderKey,
+        recipient_snapshot::{DeliveryState, SelectedSeat},
+        seat_commander::{Advance, Brain, Delivered},
+    };
+    for mode in [Mode::Conquest, Mode::Classic] {
+        // Authored water separates opposing ground armies. This row exercises
+        // planner/motor randomness and buildings, without depending on combat effects.
+        let mut game = runtime_match_scene(mode, true);
+        for player in &mut game.start.players {
+            for cooldown in player.support.values_mut() {
+                *cooldown = 10_000.0;
+            }
+        }
+        if mode == Mode::Conquest {
+            game.start.win_vp = 20.0;
+        } else {
+            // Start after two existing depots, so the ordinary non-depot branch
+            // is reached without depending on the separate node-economy planner.
+            for (slot, cells) in [
+                (0, [11 * 64 + 6, 6 * 64 + 11]),
+                (1, [52 * 64 + 57, 57 * 64 + 52]),
+            ] {
+                for cell in cells {
+                    game.place_starting_building(slot, "depot", cell).unwrap();
+                }
+            }
+        }
+        let mut seats: Vec<_> = (0..2)
+            .map(|slot| game.create_seat_commander(slot, Level::Hard).unwrap())
+            .collect();
+        let mut memories: Vec<_> = (0..2).map(HumanObservationMemory::new).collect();
+        let mut delivery = DeliveryState::new(&game).unwrap();
+        let mut sequence = [0; 2];
+        let mut emitted = [0; 2];
+        let mut maximum_draws = [0; 2];
+        let mut snapshots = 0;
+        let mut built = false;
+        let mut ended = None;
+        let limit = if mode == Mode::Classic { 600 } else { 1800 };
+        for _ in 0..limit {
+            let tick = game.world.game.tick;
+            for slot in 0..2 {
+                let before_other = seats[1 - slot].clone();
+                let terminal = game.finish.is_some();
+                let before_self = terminal.then(|| seats[slot].clone());
+                let before_match_rng = game.start.random.clone();
+                let before_environment = game.start.environment_seed;
+                let first = matches!(seats[slot].brain(), Brain::Human { state, .. } if state.snapshot().is_none());
+                let view = seats[slot].wants_view(tick, tick % 2 == 0).then(|| {
+                    Delivered::Human(Box::new(
+                        game.human_commander_observation(&mut memories[slot])
+                            .unwrap(),
+                    ))
+                });
+                let Advance::Human(advance) = game
+                    .advance_seat_commander(&mut seats[slot], view, tick as u64, &[])
+                    .unwrap()
+                else {
+                    panic!("ordinary seat must use human timing")
+                };
+                assert_eq!(seats[1 - slot], before_other);
+                if let Some(before) = before_self {
+                    assert_eq!(seats[slot], before);
+                    assert_eq!(
+                        advance,
+                        crate::human_commander_state::HumanAdvance::default()
+                    );
+                }
+                assert_eq!(game.start.random, before_match_rng);
+                assert_eq!(game.start.environment_seed, before_environment);
+                let Brain::Human { state, .. } = seats[slot].brain() else {
+                    panic!()
+                };
+                let runtime = state.snapshot().unwrap();
+                assert_eq!(runtime.timing.draws() % 2, 0);
+                maximum_draws[slot] = maximum_draws[slot].max(runtime.timing.draws());
+                if first {
+                    let mut expected = Timing::new(game.options.seed as u32, slot as u32);
+                    let delay = expected.opening_delay(Skill::for_level("hard")).unwrap();
+                    assert_eq!(runtime.timing, expected);
+                    assert_eq!(runtime.look.as_ref().unwrap().at, tick as u64 + delay);
+                }
+                if let Some(raw) = advance.input.and_then(|input| input.command) {
+                    emitted[slot] += 1;
+                    let command = Command::from_json(&raw).unwrap();
+                    built |= raw["t"] == "build";
+                    game.enqueue_command(
+                        OrderKey {
+                            tick: tick as u64 + 1,
+                            issuer: slot as u32,
+                            sequence: sequence[slot],
+                        },
+                        command,
+                    )
+                    .unwrap();
+                    sequence[slot] += 1;
+                }
+            }
+            let report = game.advance_tick().unwrap();
+            assert_eq!(game.tick_state.fault(), None);
+            let selected = [0, 1].map(|slot| SelectedSeat {
+                slot,
+                full: false,
+                omit: false,
+            });
+            let frame = delivery
+                .capture_selected_with_tick_events(&mut game, &selected, &report.events)
+                .unwrap_or_else(|error| {
+                    panic!(
+                        "{mode:?} tick {}: {error:?}; events={:?}",
+                        report.tick, report.events
+                    )
+                })
+                .unwrap();
+            for slot in 0..2 {
+                let packet = frame.recipient(slot).unwrap().into_json();
+                assert_eq!(packet["tick"], report.tick);
+                snapshots += 1;
+            }
+            if game.finish.is_some() {
+                let finish_tick = *ended.get_or_insert(game.world.game.tick);
+                if game.world.game.tick >= finish_tick + 8 {
+                    break;
+                }
+            }
+        }
+        assert!(
+            emitted.iter().all(|count| *count > 0),
+            "{mode:?}: {emitted:?}"
+        );
+        assert!(maximum_draws.iter().all(|count| *count > 2));
+        assert_eq!(snapshots, game.world.game.tick as usize * 2);
+        if mode == Mode::Classic {
+            assert!(
+                built,
+                "Classic planner must deliver an actual build attempt"
+            );
+            assert!(
+                game.world
+                    .game
+                    .units
+                    .values()
+                    .any(|u| game.rules.kinds[u.kind].name == "barracks")
+            );
+        } else {
+            assert!(
+                ended.is_some(),
+                "point income must finish the ordinary match"
+            );
+        }
+    }
+}
+
+#[test]
+fn intent_ai66_classic_human_view_requires_matching_mode_and_keeps_quiet_policy_narrow() {
+    use crate::{economy::Mode, game::ModeKind, match_human_observation::HumanObservationMemory};
+    let mut game = runtime_match_scene(Mode::Classic, true);
+    let mut memory = HumanObservationMemory::new(0);
+    let view = game.human_commander_observation(&mut memory).unwrap();
+    assert_eq!(
+        view.packet.input().runtime.as_ref().unwrap().mode,
+        Mode::Classic
+    );
+    assert!(view.packet.input().units.iter().all(|u| u.owner == 0));
+    assert!(game.opening_commander_observation(0).is_err());
+    let before = (memory.clone(), game.start.random.clone());
+    game.world.game.mode = None;
+    assert!(game.human_commander_observation(&mut memory).is_err());
+    assert_eq!((memory.clone(), game.start.random.clone()), before);
+    game.world.game.mode = Some(ModeKind::Classic);
+    let elimination = game.elimination.take();
+    assert!(game.human_commander_observation(&mut memory).is_err());
+    assert_eq!((memory.clone(), game.start.random.clone()), before);
+    game.elimination = elimination;
+    game.options.mode = Mode::World;
+    assert!(game.human_commander_observation(&mut memory).is_err());
+    assert_eq!((memory, game.start.random.clone()), before);
+}
+
+#[test]
+fn intent_ai28_delivered_stock_uses_public_two_decimal_precision() {
+    let mut m = runtime_match();
+    m.options.logistics = true;
+    m.initialize_logistics().unwrap();
+    let id = *m
+        .world
+        .game
+        .units
+        .iter()
+        .find(|(_, u)| u.owner == 0 && m.rules.kinds[u.kind].name == "rifle")
+        .unwrap()
+        .0;
+    let stock = m.logistics.get_mut(id).unwrap();
+    stock.provisions = 59.6;
+    stock.fuel = Some(36.4);
+    stock.ammo = stock.ammo_max * 0.499;
+    use crate::ai_view::{CommanderViewMemory, PublicMap};
+    use crate::recipient_snapshot::{DeliveryState, SelectedSeat};
+    let mut memory = m.ordinary_ai_view_memory(0).unwrap();
+    let mut delivery = DeliveryState::new(&m).unwrap();
+    let raw = delivery
+        .capture_selected_with_tick_events(
+            &mut m,
+            &[SelectedSeat {
+                slot: 0,
+                full: true,
+                omit: false,
+            }],
+            &[],
+        )
+        .unwrap()
+        .unwrap()
+        .recipient(0)
+        .unwrap()
+        .into_json();
+    let decoded = memory.decode(&raw).unwrap();
+    let public = PublicMap {
+        width: m.world.game.w,
+        height: m.world.game.h,
+        players: decoded.players.clone(),
+        points: decoded.points.clone(),
+    };
+    let mut policy_view = CommanderViewMemory::new(
+        0,
+        public,
+        decoded.initial_chars.clone(),
+        decoded.initial_height.clone(),
+        decoded.naval,
+    )
+    .unwrap();
+    let view = policy_view.observe(&decoded, &raw).unwrap();
+    let delivered = view.packet.input().runtime.as_ref().unwrap().units[&id]
+        .stock
+        .as_ref()
+        .unwrap();
+    assert_eq!(delivered.provisions, 59.6);
+    assert_eq!(delivered.fuel, Some(36.4));
+    assert_eq!(delivered.ammo, Some(0.5));
+    let commands = HumanPolicy::new(0, 771)
+        .plan(screen(&view), Level::Normal)
+        .unwrap();
+    assert!(!commands.iter().any(|c| c["t"] == "retreat"));
+}
