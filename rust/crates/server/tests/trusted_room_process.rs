@@ -232,58 +232,64 @@ fn ordinary_binary_two_seats_move_stop_takeover_and_restart_with_private_seed() 
 
 #[test]
 fn ordinary_binary_absent_seat_start_and_restart_auto_pause_then_same_token_resume() {
-    let server = BinaryServer::start(true, SEED);
-    let mut host = Client::join(server.address, "a");
-    let guest = Client::join(server.address, "b");
-    guest.socket.shutdown(Shutdown::Both).unwrap();
-    drop(guest);
-    let lobby = host.until(|m| m["t"] == "lobby" && m["players"][1]["connected"] == false);
-    assert_eq!(lobby["players"].as_array().unwrap().len(), 2);
-    host.send(json!({"t":"start"}));
-    assert_eq!(
-        host.until(|m| m["t"] == "pause" && m["paused"] == true)["reason"],
-        "drop"
-    );
-    let first = host.until(|m| m["t"] == "start");
-    assert!(
-        host.barrier()
-            .iter()
-            .filter(|m| m["t"] == "s")
-            .all(|m| m["tick"] == 0)
-    );
-    let mut guest = Client::open(
-        server.address,
-        "ABC",
-        json!({"t":"hello","token":"b","name":"b"}),
-    );
-    assert_eq!(
-        guest.until(|m| m["t"] == "start")["matchId"],
-        first["matchId"]
-    );
-    guest.until(|m| m["t"] == "pause" && m["paused"] == true);
-    guest.until(|m| m["t"] == "pause" && m["paused"] == false);
-    guest.until(|m| m["t"] == "s");
-    host.until(|m| m["t"] == "s");
-    guest.socket.shutdown(Shutdown::Both).unwrap();
-    drop(guest);
-    host.until(|m| m["t"] == "lobby" && m["players"][1]["connected"] == false);
-    host.send(json!({"t":"restart"}));
-    host.until(|m| m["t"] == "pause" && m["paused"] == true);
-    let second = host.until(|m| m["t"] == "start");
-    assert!(second["matchId"].as_u64().unwrap() > first["matchId"].as_u64().unwrap());
-    let mut guest = Client::open(
-        server.address,
-        "ABC",
-        json!({"t":"hello","token":"b","name":"b"}),
-    );
-    assert_eq!(
-        guest.until(|m| m["t"] == "start")["matchId"],
-        second["matchId"]
-    );
-    guest.until(|m| m["t"] == "pause" && m["paused"] == false);
-    guest.until(|m| m["t"] == "s");
-    host.barrier();
-    assert_eq!(server.receipts().len(), 2);
+    for owner_r1 in [false, true] {
+        let server = if owner_r1 {
+            BinaryServer::start_owner_r1(SEED, 1)
+        } else {
+            BinaryServer::start(true, SEED)
+        };
+        let mut host = Client::join(server.address, "a");
+        let guest = Client::join(server.address, "b");
+        guest.socket.shutdown(Shutdown::Both).unwrap();
+        drop(guest);
+        let lobby = host.until(|m| m["t"] == "lobby" && m["players"][1]["connected"] == false);
+        assert_eq!(lobby["players"].as_array().unwrap().len(), 2);
+        host.send(json!({"t":"start"}));
+        assert_eq!(
+            host.until(|m| m["t"] == "pause" && m["paused"] == true)["reason"],
+            "drop"
+        );
+        let first = host.until(|m| m["t"] == "start");
+        assert!(
+            host.barrier()
+                .iter()
+                .filter(|m| m["t"] == "s")
+                .all(|m| m["tick"] == 0)
+        );
+        let mut guest = Client::open(
+            server.address,
+            "ABC",
+            json!({"t":"hello","token":"b","name":"b"}),
+        );
+        assert_eq!(
+            guest.until(|m| m["t"] == "start")["matchId"],
+            first["matchId"]
+        );
+        guest.until(|m| m["t"] == "pause" && m["paused"] == true);
+        guest.until(|m| m["t"] == "pause" && m["paused"] == false);
+        guest.until(|m| m["t"] == "s");
+        host.until(|m| m["t"] == "s");
+        guest.socket.shutdown(Shutdown::Both).unwrap();
+        drop(guest);
+        host.until(|m| m["t"] == "lobby" && m["players"][1]["connected"] == false);
+        host.send(json!({"t":"restart"}));
+        host.until(|m| m["t"] == "pause" && m["paused"] == true);
+        let second = host.until(|m| m["t"] == "start");
+        assert!(second["matchId"].as_u64().unwrap() > first["matchId"].as_u64().unwrap());
+        let mut guest = Client::open(
+            server.address,
+            "ABC",
+            json!({"t":"hello","token":"b","name":"b"}),
+        );
+        assert_eq!(
+            guest.until(|m| m["t"] == "start")["matchId"],
+            second["matchId"]
+        );
+        guest.until(|m| m["t"] == "pause" && m["paused"] == false);
+        guest.until(|m| m["t"] == "s");
+        host.barrier();
+        assert_eq!(server.receipts().len(), 2);
+    }
 }
 
 #[test]
@@ -663,5 +669,108 @@ fn ordinary_binary_horde_and_sandbox_horde_start_and_deliver_to_both_sockets() {
                 assert!(frame["tick"].as_u64().unwrap() > 0);
             }
         }
+    }
+}
+
+#[test]
+fn owner_r1_binary_start_restart_and_shards_preserve_private_constructor_profile() {
+    for shards in [1, 2] {
+        for weather in ["map", "rain", "random"] {
+            let server = BinaryServer::start_owner_r1(u64::MAX, shards);
+            let mut host = Client::join(server.address, "a");
+            let mut guest = Client::join(server.address, "b");
+            host.send(json!({"t":"weather","v":weather}));
+            host.barrier();
+            let (first, _) = begin(&mut host, &mut guest);
+            for client in [&mut host, &mut guest] {
+                let snapshot = client.until(|m| m["t"] == "s");
+                assert!(snapshot.get("logistics").is_none());
+            }
+            guest.send(json!({"t":"restart"}));
+            guest.deny("restart");
+            host.send(json!({"t":"restart"}));
+            let second = host.until(|m| m["t"] == "start");
+            assert_ne!(first["matchId"], second["matchId"]);
+            assert_eq!(
+                guest.until(|m| m["t"] == "start")["matchId"],
+                second["matchId"]
+            );
+            assert_eq!(first["spawns"], second["spawns"]);
+            assert_eq!(first["weather"], second["weather"]);
+            host.barrier();
+            let receipts = server.receipts();
+            assert_eq!(receipts.len(), 2);
+            assert_eq!(receipts[0]["options"], receipts[1]["options"]);
+            assert_eq!(
+                receipts[0]["derivedWeatherSeed"],
+                receipts[1]["derivedWeatherSeed"]
+            );
+            assert_eq!(
+                receipts[0]["environmentSeed"],
+                receipts[1]["environmentSeed"]
+            );
+            for receipt in &receipts {
+                assert_eq!(receipt["options"]["seed"].as_u64(), Some(u64::MAX));
+                assert_eq!(receipt["options"]["weatherSeed"], Value::Null);
+                assert_eq!(receipt["options"]["logistics"], false);
+            }
+            for client in [&mut host, &mut guest] {
+                client.until(|m| m["t"] == "s");
+                for message in &client.messages {
+                    for key in [
+                        "seed",
+                        "weatherSeed",
+                        "derivedWeatherSeed",
+                        "environmentSeed",
+                        "receipt",
+                        "profile",
+                    ] {
+                        assert!(message.get(key).is_none(), "private {key} leaked");
+                    }
+                }
+            }
+            assert_eq!(server.directory(), json!({"rooms":[]}));
+            assert!(!server.log().contains("NATIVE_FAULT"));
+        }
+    }
+}
+
+#[test]
+fn owner_r1_binary_rejects_invalid_cli_and_out_of_profile_modes() {
+    for args in [
+        vec!["--trusted-profile", "owner-r1"],
+        vec![
+            "--trusted-room",
+            "ABC",
+            "--seed",
+            "1",
+            "--trusted-profile",
+            "unknown",
+        ],
+        vec!["--trusted-room", "ABC", "--seed", "1", "--trusted-profile"],
+    ] {
+        let result = Command::new(env!("CARGO_BIN_EXE_ww2-server"))
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(!result.status.success());
+        assert!(!String::from_utf8_lossy(&result.stdout).contains("LISTENING"));
+    }
+    for setting in [
+        json!({"t":"mode","v":"world"}),
+        json!({"t":"mode","v":"horde"}),
+        json!({"t":"mode","v":"classic"}),
+        json!({"t":"sandbox","v":true}),
+        json!({"t":"army","v":"large"}),
+    ] {
+        let server = BinaryServer::start_owner_r1(SEED, 1);
+        let mut host = Client::join(server.address, "a");
+        let _guest = Client::join(server.address, "b");
+        host.send(setting);
+        host.barrier();
+        host.send(json!({"t":"start"}));
+        host.deny("start");
+        assert!(server.receipts().is_empty());
+        assert!(host.barrier().iter().all(|m| m["t"] != "start"));
     }
 }

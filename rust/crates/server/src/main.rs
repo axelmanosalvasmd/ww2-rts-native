@@ -1,13 +1,16 @@
 use std::{env, net::IpAddr};
 use tokio::net::TcpListener;
 use ww2_server::shards::{serve_sharded, shard_count};
-use ww2_server::{Config, MapEditor, TrustedRoomConfig, serve, serve_trusted_room};
+use ww2_server::{
+    Config, MapEditor, TrustedLaunchProfile, TrustedRoomConfig, serve, serve_trusted_room,
+};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut explicit_bind = None;
     let mut trusted_room = None;
     let mut seed = None;
+    let mut profile = None;
     let mut args = env::args().skip(1);
     while let Some(arg) = args.next() {
         match arg.as_str() {
@@ -16,18 +19,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 trusted_room = Some(args.next().ok_or("--trusted-room requires CODE")?);
             }
             "--seed" if seed.is_none() => seed = Some(args.next().ok_or("--seed requires U64")?),
+            "--trusted-profile" if profile.is_none() => {
+                profile = Some(match args.next().as_deref() {
+                    Some("prototype") => TrustedLaunchProfile::Prototype,
+                    Some("owner-r1") => TrustedLaunchProfile::OwnerR1,
+                    _ => return Err("--trusted-profile requires prototype or owner-r1".into()),
+                });
+            }
             "--help" | "-h" => {
                 println!(
-                    "ww2-server [--bind HOST:PORT] [--trusted-room CODE --seed U64]\nAddress priority: --bind, WW2_BIND, HOST/PORT, 127.0.0.1:3000. Port 0 selects a free port. MAX_ROOMS defaults to 32 (1-256); WW2_STATIC_ROOT enables browser assets.\nWW2_SHARDS: 1-64 isolated game threads (default 1).\nHosted Horde: one through five defenders, with recipient-only server AI.\nWW2_AUTHORED_MAPS_DIR: optional private maps reread at Horde Start/Restart.\nTrusted mode: one private two-seat ordinary room, named armies, optional sandbox, logistics on. Seeds/receipts stay host-private."
+                    "ww2-server [--bind HOST:PORT] [--trusted-room CODE --seed U64 [--trusted-profile prototype|owner-r1]]\nAddress priority: --bind, WW2_BIND, HOST/PORT, 127.0.0.1:3000. Port 0 selects a free port. MAX_ROOMS defaults to 32 (1-256); WW2_STATIC_ROOT enables browser assets.\nWW2_SHARDS: 1-64 isolated game threads (default 1).\nHosted Horde: one through five defenders, with recipient-only server AI.\nWW2_AUTHORED_MAPS_DIR: optional private maps reread at Horde Start/Restart.\nTrusted mode: one private two-seat ordinary room, named armies, optional sandbox, logistics on. Seeds/receipts stay host-private.\nowner-r1: Conquest, Standard army, sandbox off, two human commanders; logistics off, constructor-derived weather, explicit seed reused on Restart. Default prototype behavior is unchanged."
                 );
                 return Ok(());
             }
             _ => return Err(format!("unknown argument: {arg}").into()),
         }
     }
+    if profile.is_some() && trusted_room.is_none() {
+        return Err("--trusted-profile requires --trusted-room and --seed".into());
+    }
     let trusted = match (trusted_room, seed) {
         (None, None) => None,
-        (Some(code), Some(seed)) => Some(TrustedRoomConfig::new(code, seed.parse::<u64>()?)?),
+        (Some(code), Some(seed)) => Some(
+            TrustedRoomConfig::new(code, seed.parse::<u64>()?)?
+                .with_profile(profile.unwrap_or_default()),
+        ),
         _ => return Err("--trusted-room and --seed must be supplied together".into()),
     };
     let address = bind_address(

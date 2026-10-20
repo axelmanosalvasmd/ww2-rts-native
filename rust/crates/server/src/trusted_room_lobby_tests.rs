@@ -140,38 +140,44 @@ fn identity(hub: &Hub) -> RoomIdentity {
 
 #[test]
 fn trusted_rejected_and_faulted_restart_preserves_runtime_receipt_accounts_and_epoch() {
-    let (mut hub, a, mut ra, _, mut rb) = room();
-    assert_eq!(hub.start_trusted("ABC", a.id, false, 0).unwrap(), 1);
-    while ra.try_recv().is_ok() {}
-    while rb.try_recv().is_ok() {}
-    hub.next_epoch = crate::native_startup::MAX_MATCH_ID;
-    let before = identity(&hub);
-    assert!(
-        hub.start_trusted("ABC", a.id, true, 0)
-            .unwrap_err()
-            .contains("epoch exhausted")
-    );
-    assert_eq!(identity(&hub), before);
-    assert!(ra.try_recv().is_err() && rb.try_recv().is_err());
-    hub.next_epoch = 1;
-    hub.rooms
-        .get_mut("ABC")
-        .unwrap()
-        .native
-        .as_mut()
-        .unwrap()
-        .runtime
-        .fault_stop("internal deterministic latched-fault setup".into());
-    let before = identity(&hub);
-    assert!(
-        hub.start_trusted("ABC", a.id, true, 0)
-            .unwrap_err()
-            .contains("faulted match restart")
-    );
-    hub.poll_native(1000, 1_000_000_000);
-    assert_eq!(identity(&hub), before);
-    assert_eq!(hub.next_epoch, 1);
-    assert!(ra.try_recv().is_err() && rb.try_recv().is_err());
+    for profile in [
+        crate::TrustedLaunchProfile::Prototype,
+        crate::TrustedLaunchProfile::OwnerR1,
+    ] {
+        let (mut hub, a, mut ra, _, mut rb) = room();
+        hub.trusted.as_mut().unwrap().profile = profile;
+        assert_eq!(hub.start_trusted("ABC", a.id, false, 0).unwrap(), 1);
+        while ra.try_recv().is_ok() {}
+        while rb.try_recv().is_ok() {}
+        hub.next_epoch = crate::native_startup::MAX_MATCH_ID;
+        let before = identity(&hub);
+        assert!(
+            hub.start_trusted("ABC", a.id, true, 0)
+                .unwrap_err()
+                .contains("epoch exhausted")
+        );
+        assert_eq!(identity(&hub), before);
+        assert!(ra.try_recv().is_err() && rb.try_recv().is_err());
+        hub.next_epoch = 1;
+        hub.rooms
+            .get_mut("ABC")
+            .unwrap()
+            .native
+            .as_mut()
+            .unwrap()
+            .runtime
+            .fault_stop("internal deterministic latched-fault setup".into());
+        let before = identity(&hub);
+        assert!(
+            hub.start_trusted("ABC", a.id, true, 0)
+                .unwrap_err()
+                .contains("faulted match restart")
+        );
+        hub.poll_native(1000, 1_000_000_000);
+        assert_eq!(identity(&hub), before);
+        assert_eq!(hub.next_epoch, 1);
+        assert!(ra.try_recv().is_err() && rb.try_recv().is_err());
+    }
 }
 
 #[test]
@@ -491,7 +497,7 @@ fn weather_replay(receipt: &Value) -> Match {
             shuffle: o["shuffle"].as_bool().unwrap(),
             army: ArmySize::Standard,
             weather: WeatherChoice::from_reference(o["weather"].as_str()),
-            weather_seed: Some(o["weatherSeed"].as_u64().unwrap() as u32),
+            weather_seed: o["weatherSeed"].as_u64().map(|seed| seed as u32),
             living_weather: o["livingWeather"].as_bool().unwrap(),
             map_key: Some(o["mapKey"].as_str().unwrap().into()),
             tech: o["tech"].as_bool().unwrap(),
@@ -844,4 +850,39 @@ fn mode06_trusted_armies_keep_lobby_choice_wallets_receipts_and_both_seat_frames
     );
     assert!(hub.rooms["ABC"].native.is_none());
     assert!(hub.accounts.is_empty());
+}
+
+#[test]
+fn owner_r1_uses_canonical_weather_without_sampling_entropy() {
+    for choice in ["map", "clear", "rain", "random"] {
+        let (mut hub, host, mut ra, _, mut rb) = room();
+        hub.trusted.as_mut().unwrap().profile = crate::TrustedLaunchProfile::OwnerR1;
+        hub.message(
+            "ABC",
+            &host,
+            &mut true,
+            json!({"t":"weather","v":choice}),
+            0,
+        );
+        for restart in [false, true] {
+            hub.start_trusted_with_weather_source("ABC", host.id, restart, 0, || {
+                panic!("owner-r1 must not sample weather entropy")
+            })
+            .unwrap();
+            let native = hub.rooms["ABC"].native.as_ref().unwrap();
+            let receipt = native.receipt.as_ref().unwrap();
+            assert_eq!(receipt["options"]["seed"], 3936341);
+            assert!(receipt["options"]["weatherSeed"].is_null());
+            assert_eq!(receipt["options"]["logistics"], false);
+            let replay = weather_replay(receipt);
+            let actual = native.runtime.state();
+            assert_eq!(actual.start.weather_seed, replay.start.weather_seed);
+            assert_eq!(actual.start.environment_seed, replay.start.environment_seed);
+            assert_eq!(actual.start.weather, replay.start.weather);
+            assert_eq!(actual.start.initial_rain, replay.start.initial_rain);
+            assert_eq!(actual.start.initial_wet, replay.start.initial_wet);
+            while ra.try_recv().is_ok() {}
+            while rb.try_recv().is_ok() {}
+        }
+    }
 }

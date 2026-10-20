@@ -104,6 +104,13 @@ impl Hub {
     }
 
     pub(super) fn horde_command(&mut self, code: &str, id: u64, msg: &Value, now: u64) -> bool {
+        // Let the bounded profile's ordinary admission path reject Horde, also
+        // for synchronous library dispatch rather than only WebSocket dispatch.
+        if self.trusted.as_ref().is_some_and(|trusted| {
+            trusted.code == code && trusted.profile == crate::TrustedLaunchProfile::OwnerR1
+        }) {
+            return false;
+        }
         let Some(room) = self.rooms.get(code).filter(|r| r.mode == "horde") else {
             return false;
         };

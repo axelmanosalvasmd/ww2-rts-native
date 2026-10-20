@@ -26,3 +26,14 @@ existing deterministic core with a seed and does not draw randomness on ticks.
 Owner decision B assigns the Unreal weather picker to the client owner. Its
 Rust portion is accepted under that decision. This change implements no picker
 and claims no Unreal execution or acceptance.
+
+
+## Explicit owner-R1 host profile
+
+The opt-in `--trusted-profile owner-r1` uses the previously requested bounded
+owner profile instead of the prototype startup entropy policy above. It passes
+`weather_seed: None` to the unchanged canonical constructor and reuses the host's
+explicit match seed on Start and healthy Restart. No OS weather entropy is
+sampled for this profile. The resulting derived seeds remain host-private in the
+existing receipt. Default prototype starts retain the behavior above. This adds
+no wire field or client-selected option and does not establish client acceptance.
