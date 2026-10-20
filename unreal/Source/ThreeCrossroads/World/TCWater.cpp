@@ -23,6 +23,12 @@
 const TCHAR* const FTCWater::ReferencePin = TEXT("e4e579a838aabae3b1d9dadbc17a0a87147bc52d");
 const TCHAR* const FTCWater::MaterialPath = TEXT("/Game/Water/M_TCWater.M_TCWater");
 
+// Default-preserving, one-factor rendered controls. They affect presentation
+// only: never drop the water mask, geometry or queries needed by the match.
+static TAutoConsoleVariable<int32> CVarWorld27WaterVisible(TEXT("tc.World27.WaterVisible"), 1, TEXT("Diagnostic: 0 hides only the water carrier, retaining its opaque bed."));
+static TAutoConsoleVariable<int32> CVarWorld27WaterFoam(TEXT("tc.World27.WaterFoam"), 1, TEXT("Diagnostic: 0 removes water crest and shoreline foam only."));
+static TAutoConsoleVariable<int32> CVarWorld27WaterShadow(TEXT("tc.World27.WaterShadow"), 1, TEXT("Diagnostic: 0 disables only water shadow reception, retaining the scene sun and atlas."));
+
 namespace TCWaterView
 {
 	// A transient RGBA8 texture, raw bytes (no sRGB decode, as three's DataTexture), with a full mip chain when asked
@@ -344,6 +350,8 @@ void FTCWater::Flush(const FTCMatchState& State, double NowSeconds, bool bReveal
 		if (Core.GeometryChanged) SendGeometry();
 	}
 	if (!MID.IsValid() && Material.IsValid()) BindMaterial();
+	if (Mesh.IsValid()) Mesh->SetVisibility(CVarWorld27WaterVisible.GetValueOnGameThread() != 0);
+	if (MID.IsValid()) MID->SetScalarParameterValue(TEXT("FoamOn"), CVarWorld27WaterFoam.GetValueOnGameThread() != 0 ? 1.f : 0.f);
 	// The source Standard BRDF and PCF are evaluated in the water material. Only the
 	// existing sun and its native depth atlas are consumed, with no second light.
 	if (!Lighting.IsValid() && Actor.IsValid())
@@ -355,7 +363,8 @@ void FTCWater::Flush(const FTCMatchState& State, double NowSeconds, bool bReveal
 	{
 		const FTCMood& Look = Lighting->Shown();
 		const FVector Dir = -Lighting->Sun->GetForwardVector();
-		MID->SetVectorParameterValue(TEXT("SunDirection"), FLinearColor(Dir.X, Dir.Y, Dir.Z, Lighting->Sun->ShadowAmount));
+		const float Shadow = CVarWorld27WaterShadow.GetValueOnGameThread() != 0 ? Lighting->Sun->ShadowAmount : 0.f;
+		MID->SetVectorParameterValue(TEXT("SunDirection"), FLinearColor(Dir.X, Dir.Y, Dir.Z, Shadow));
 		MID->SetVectorParameterValue(TEXT("SunColour"), Look.Sun * Look.SunI);
 		MID->SetVectorParameterValue(TEXT("WaterHaze"), Look.Haze);
 		MID->SetVectorParameterValue(TEXT("WaterFog"), FLinearColor(Lighting->FogNear(), Lighting->FogFar(), Lighting->HazeBeforeTone() ? 1.f : 0.f, 0));

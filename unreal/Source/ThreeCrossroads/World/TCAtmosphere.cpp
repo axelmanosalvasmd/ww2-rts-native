@@ -3,6 +3,7 @@
 #include "World/TCAtmosphere.h"
 #include "World/TCTerrain.h"
 #include "World/TCRailways.h"
+#include "World/TCFogFrontier.h"
 #include "Net/TCMatchState.h"
 #include "Client/TCCameraPawn.h"
 #include "Client/TCPlayerController.h"
@@ -10,6 +11,7 @@
 #include "ThreeCrossroads.h"
 #include "ProceduralMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/Material.h"
 #include "Materials/MaterialInterface.h"
 #include "Engine/Texture2D.h"
 #include "Engine/GameViewportClient.h"
@@ -544,11 +546,24 @@ void FTCAtmosphere::Update(float Dt, const FTCMatchState& State, const ATCTerrai
 				M->SetScalarParameterValue(TEXT("FogOn"), 1.f);
 				bFogParamsStale = false;
 			}
+	if (GroundMat)
+	{
+		const FTCFogFrontier* Shared = TCFogLook::Active();
+		const bool bSharedOverlay = Shared && Shared->HasMap() && Shared->MapW() == State.Map.W
+			&& Shared->MapH() == State.Map.H && Shared->AlphaTexture();
+		// atmosphere.js cover/cloud render before main.js and apron.js's fog.
+		// The common overlay now shades this ground too. Keep the legacy
+		// multiplier only without it, or with an old after-DOF carrier asset.
+		// Recheck every frame: attachment can change without any texel change.
+		const bool bBeforeFog = GroundMat->GetMaterial()->TranslucencyPass == MTP_BeforeDOF;
+		GroundMat->SetScalarParameterValue(TEXT("FogOn"), bSharedOverlay && bBeforeFog ? 0.f : 1.f);
+	}
 
 	UpdateSheets(T);
 	UpdateFall(Terrain, PC, Focus);
 	UpdateBirds(T, Terrain);
 	TraceHistory(TEXT("frame"), Dt, State, bFixedLookTime);
+	TraceView(PC, Focus);
 
 	const FString Line = FString::Printf(TEXT("mood %s, weather %s, shower %.2f wet %.2f, fall '%s', mist %d, banks %s, cover %s"), *MoodRow.Name.ToString(), *WxNow, ShowerRain, ShowerWet,
 		*FallNow, MistSheets(), BanksOn ? TEXT("on") : TEXT("off"), bCoverShown ? TEXT("on") : TEXT("off"));
@@ -668,6 +683,23 @@ void FTCAtmosphere::TraceHistory(const TCHAR* Event, double Dt, const FTCMatchSt
 		(double)Cur.Haze, (double)Cur.Sun, (double)Cur.Shadow, (double)Cur.Clouds, (double)Cur.Wet, (double)Cur.Sheen, (double)Cur.Mud, (double)Cur.Cover, (double)Cur.Banks,
 		(double)Goal.Haze, (double)Goal.Sun, (double)Goal.Shadow, (double)Goal.Clouds, (double)Goal.Wet, (double)Goal.Sheen, (double)Goal.Mud, (double)Goal.Cover, (double)Goal.Banks,
 		(double)HazeNow.R, (double)HazeNow.G, (double)HazeNow.B, (double)HazeGoal.R, (double)HazeGoal.G, (double)HazeGoal.B, *FallNow, FallA, BanksOn ? TEXT("true") : TEXT("false"));
+}
+
+void FTCAtmosphere::TraceView(const APlayerController* PC, FVector2D Focus) const
+{
+	if (!bTraceHistory || !PC || !PC->PlayerCameraManager) return;
+	const APlayerCameraManager& Camera = *PC->PlayerCameraManager;
+	const FVector Eye = Camera.GetCameraLocation();
+	const FRotationMatrix Axes(Camera.GetCameraRotation());
+	const FVector Forward = Axes.GetUnitAxis(EAxis::X), Right = Axes.GetUnitAxis(EAxis::Y), Up = Axes.GetUnitAxis(EAxis::Z);
+	const ATCPlayerController* View = Cast<ATCPlayerController>(PC);
+	int32 Width = 0, Height = 0; PC->GetViewportSize(Width, Height);
+	// Public presentation only. Join to atmos-history by start/frame/engineFrame.
+	// This observes the CPU view, not the eventual native GPU readback frame.
+	UE_LOG(LogTC, Log, TEXT("atmos-view {\"start\":%llu,\"frame\":%llu,\"engineFrame\":%llu,\"eyeCm\":[%.17g,%.17g,%.17g],\"forward\":[%.17g,%.17g,%.17g],\"right\":[%.17g,%.17g,%.17g],\"up\":[%.17g,%.17g,%.17g],\"hFov\":%.17g,\"focus\":[%.17g,%.17g],\"distance\":%.17g,\"yaw\":%.17g,\"viewport\":[%d,%d]}"),
+		(unsigned long long)History.Starts, (unsigned long long)History.Frames, (unsigned long long)GFrameCounter,
+		Eye.X, Eye.Y, Eye.Z, Forward.X, Forward.Y, Forward.Z, Right.X, Right.Y, Right.Z, Up.X, Up.Y, Up.Z,
+		(double)Camera.GetFOVAngle(), Focus.X, Focus.Y, View ? (double)View->ViewDistance() : 0.0, View ? (double)View->ViewYaw() : 0.0, Width, Height);
 }
 
 void FTCAtmosphere::RunChecks(const FTCMatchState& State, APlayerController* PC)

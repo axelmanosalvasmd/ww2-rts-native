@@ -1790,6 +1790,7 @@ void FTCCombatEffects::SpriteDraws(TArray<FTCFxSpriteDraw>& Out) const
 {
 	// fx.js simulate's second pass: what each sprite out now looks like (sorting is the view's)
 	Out.Reset(Live.Num());
+	const bool bBlendFrames = FTCGraphics::Get().Budget().bFlipbookBlend;
 	for (const FTCFxParticle& P : Live)
 	{
 		if (P.Preset == ETCFxPreset::None || P.Age < 0.f) continue;
@@ -1809,7 +1810,7 @@ void FTCCombatEffects::SpriteDraws(TArray<FTCFxSpriteDraw>& Out) const
 			const int32 Fl = FMath::FloorToInt(F);
 			D.CellA = (uint8)(P.Cell + (bLoop ? Fl % P.Flip : FMath::Min(P.Flip - 1, Fl)));
 			D.CellB = (uint8)(P.Cell + (bLoop ? (Fl + 1) % P.Flip : FMath::Min(P.Flip - 1, Fl + 1)));
-			D.Blend = F - Fl;
+			D.Blend = bBlendFrames ? F - Fl : 0.f; // fx.js:353: Low keeps the current cell without interpolation
 		}
 		else { D.CellA = D.CellB = (uint8)P.Cell; D.Blend = 0.f; }
 		D.Rot = P.Rot;

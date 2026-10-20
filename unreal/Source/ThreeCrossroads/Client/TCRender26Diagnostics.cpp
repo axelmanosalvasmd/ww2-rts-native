@@ -1,5 +1,6 @@
 #include "Client/TCRender26Diagnostics.h"
 #include "Client/TCRender26Policy.h"
+#include "Client/TCRender27GpuPolicy.h"
 #include "Client/TCGraphics.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Dom/JsonObject.h"
@@ -113,6 +114,13 @@ void FTCRender26Diagnostics::CaptureTour(UWorld* World, const TCHAR* Pose)
 #if WITH_DUMPGPU
 	FString Filter;
 	const bool Binary = FParse::Param(FCommandLine::Get(), TEXT("TCRender26GpuBinary"));
+	const int32 BufferMode = TCRender27::GpuBufferMode(
+		FParse::Param(FCommandLine::Get(), TEXT("TCRender27GpuBufferDescriptors")), Binary);
+	if (BufferMode < 0)
+	{
+		UE_LOG(LogTCRender26, Error, TEXT("GPU request rejected: buffer descriptors require a separate descriptor-only lane"));
+		return;
+	}
 	FParse::Value(FCommandLine::Get(), TEXT("TCRender26GpuFilter="), Filter, false);
 	if (!Binary) Filter = TEXT("*@*");
 	if (!GEngine || !World || Directory.IsEmpty() || FPaths::IsRelative(Directory)
@@ -126,7 +134,7 @@ void FTCRender26Diagnostics::CaptureTour(UWorld* World, const TCHAR* Pose)
 	}
 	// Dump-only controls. No AA, RHI, viewport, tick rate, model, shadow or water setting is changed.
 	const struct { const TCHAR* Name; int32 Value; } Settings[] = {
-		{TEXT("r.DumpGPU.Texture"), Binary ? 2 : 1}, {TEXT("r.DumpGPU.Buffer"), 0},
+		{TEXT("r.DumpGPU.Texture"), Binary ? 2 : 1}, {TEXT("r.DumpGPU.Buffer"), BufferMode},
 		{TEXT("r.DumpGPU.FrameCount"), 1}, {TEXT("r.DumpGPU.Stream"), 0},
 		{TEXT("r.DumpGPU.MaxStagingSize"), 64}, {TEXT("r.DumpGPU.Upload"), 0},
 		{TEXT("r.DumpGPU.Explore"), 0}, {TEXT("r.DumpGPU.CameraCut"), 0},
@@ -150,6 +158,8 @@ void FTCRender26Diagnostics::CaptureTour(UWorld* World, const TCHAR* Pose)
 	const bool Handled = GEngine->Exec(World, *Command, *GLog);
 	UE_LOG(LogTCRender26, Log, TEXT("GPU request pose %s frame %llu binary %d handled %d path %s filter %s; dispatch is not completed capture"),
 		Pose, static_cast<unsigned long long>(GFrameCounter), Binary, Handled, *Directory, *Filter);
+	if (BufferMode == 1)
+		UE_LOG(LogTCRender26, Log, TEXT("GPU buffer descriptors requested for pose %s; no buffer binaries or visibility conclusion"), Pose);
 #else
 	UE_LOG(LogTCRender26, Warning, TEXT("GPU request unavailable: engine built without WITH_DUMPGPU"));
 #endif

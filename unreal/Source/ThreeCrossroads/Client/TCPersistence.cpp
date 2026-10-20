@@ -1,4 +1,5 @@
 #include "Client/TCPersistence.h"
+#include "Client/TCPlayerController.h"
 #include "Net/TCMatchState.h"
 #include "Net/TCConnection.h"
 #include "Dom/JsonObject.h"
@@ -22,6 +23,16 @@
 bool FTCMatchView::IsValid() const
 {
 	return MatchId >= 0 && FMath::IsFinite(X) && FMath::IsFinite(Z) && FMath::IsFinite(Yaw) && FMath::IsFinite(Dist) && (!bHasY || FMath::IsFinite(Y));
+}
+
+FTCMatchView FTCMatchView::Capture(const ATCPlayerController& Controller, int32 MatchId)
+{
+	FTCMatchView View;
+	View.MatchId = MatchId; View.X = Controller.ViewFocus().X; View.Z = Controller.ViewFocus().Y;
+	View.Yaw = FMath::DegreesToRadians(-90.0 - Controller.ViewYaw()); View.Dist = Controller.ViewDistance();
+	View.Selected = Controller.Selected.Array();
+	for (int32 N = 1; N <= 9; ++N) View.Groups.Add(N, Controller.Groups.Members(N));
+	return View;
 }
 
 TSharedPtr<FJsonObject> FTCMatchView::Json() const

@@ -955,8 +955,14 @@ void ATCGameMode::ControlsMessage(const FString& T, const FJsonObject& M)
 	else if (T == TEXT("start"))
 	{
 		const int32 NextMatch = M.GetIntegerField(TEXT("matchId"));
-		if (State.bHasMatch && State.MatchId == NextMatch) SaveMatchView();
-		Controls.bResumePending = Controls.ViewMemory.Read(Controls.ResumeView) && Controls.ResumeView.MatchId == NextMatch;
+		const ATCPlayerController* PC = Cast<ATCPlayerController>(GetWorld()->GetFirstPlayerController());
+		if (State.bHasMatch && State.MatchId == NextMatch && PC)
+		{
+			// main.js receiveStart takes matchView() directly for the held identity, even when storage fails.
+			Controls.ResumeView = FTCMatchView::Capture(*PC, NextMatch);
+			Controls.bResumePending = Controls.ResumeView.IsValid();
+		}
+		else Controls.bResumePending = Controls.ViewMemory.Read(Controls.ResumeView) && Controls.ResumeView.MatchId == NextMatch;
 		Controls.TerminalNotice.Reset();
 		const TSharedPtr<SWindow> Window = GEngine && GEngine->GameViewport ? GEngine->GameViewport->GetWindow() : nullptr;
 		if (Window && Controls.NormalWindowTitle.IsEmpty()) Controls.NormalWindowTitle = Window->GetTitle().ToString();
@@ -1012,12 +1018,7 @@ void ATCGameMode::SaveMatchView()
 	if (!State.bHasMatch || !Controls.bViewSeatActive || !State.SeatConfirmed() || Controls.bResumePending) return;
 	const ATCPlayerController* PC = Cast<ATCPlayerController>(GetWorld()->GetFirstPlayerController());
 	if (!PC) return;
-	FTCMatchView V;
-	V.MatchId = State.MatchId; V.X = PC->ViewFocus().X; V.Z = PC->ViewFocus().Y;
-	V.Yaw = FMath::DegreesToRadians(-90.0 - PC->ViewYaw()); V.Dist = PC->ViewDistance();
-	V.Selected = PC->Selected.Array();
-	for (int32 N = 1; N <= 9; N++) V.Groups.Add(N, PC->Groups.Members(N));
-	Controls.ViewMemory.Write(V);
+	Controls.ViewMemory.Write(FTCMatchView::Capture(*PC, State.MatchId));
 	Controls.LastViewWrite = FPlatformTime::Seconds();
 }
 
@@ -1140,6 +1141,7 @@ bool ATCGameMode::ControlsEnter(const FTCRoomEntry& E, bool bKeepSeat)
 	if (E.bListingGiven) FTCSettingsStore::Game().Set(TEXT("ww2-name"), S.Name); // public-lobby.js enter() saves the nickname
 	UE_LOG(LogTC, Log, TEXT("lobby controls: %s: leaving room %s for room %s (listing public %s, title '%s', tutorial %s)"), *E.Note, *ControlsRoom(), *S.Room,
 		E.Listing.bPublic ? TEXT("true") : TEXT("false"), *E.Listing.Title, E.Listing.bTutorial ? TEXT("true") : TEXT("false"));
+	SaveMatchView(); // pagehide saves the final old-room view before the new page drops its presentation
 	if (Connection) { Connection->OnMessage = nullptr; Connection->OnOpened = nullptr; Connection->OnText = nullptr; Connection->Stop(); Connection.Reset(); }
 	RustShadow.End();
 	TokenStore.Reset();
@@ -1148,6 +1150,7 @@ bool ATCGameMode::ControlsEnter(const FTCRoomEntry& E, bool bKeepSeat)
 	State.bSpectator = false; State.bAmHost = false; State.LobbySeat = -1;
 	ClearMatchPresentation();
 	Controls.Reset();
+	Lobby.Reset(); Options.Reset(); Persistence.Reset();
 	Controls.SetFieldName(S.Name);
 	Form.RoomCode = S.Room;
 	bRoomBrowserOpen = false;
@@ -1238,6 +1241,34 @@ void ATCGameMode::ControlsFrame()
 				const bool bDrawn = Hud && Hud->CommandCentre(Cmd, At);
 				PC->PressCommand(Cmd);
 				Did = FString::Printf(TEXT("press %s%s (%s)"), *Key, Slot >= 0 ? *FString::Printf(TEXT(" #%d"), Slot) : TEXT(""), bDrawn ? TEXT("through the hit test") : TEXT("not drawn: straight to the command"));
+			}
+			else if (St.Action==TEXT("hudinertclick") && PC)
+			{
+				// Verification only. A command=None slot has no symbolic command-centre target.
+				// Require the fresh observed rectangle and current authority model before held input.
+				TArray<FString> Fields; St.Arg.ParseIntoArray(Fields,TEXT("|"),false);
+				const int32 Producer=Fields.Num()==6?FCString::Atoi(*Fields[0]):0;
+				bool Parsed=Fields.Num()==6 && Fields[0]==FString::FromInt(Producer) && Producer>0;
+				for (int32 I=2; Parsed && I<6; I++) Parsed=Fields[I].IsNumeric();
+				FBox2D Observed(ForceInit);
+				if (Parsed) Observed=FBox2D(FVector2D(FCString::Atod(*Fields[2]),FCString::Atod(*Fields[3])),FVector2D(FCString::Atod(*Fields[4]),FCString::Atod(*Fields[5])));
+				const ATCHUD* Hud=Cast<ATCHUD>(PC->GetHUD()); FVector2D At;
+				if (!Parsed || !Hud || !Hud->ObservedTrainingSlot(Observed,Producer,Fields[1],At))
+				{
+					Did=TEXT("HUD inert-training target is absent, changed, enabled or covered: ")+St.Arg;
+					UE_LOG(LogTC,Error,TEXT("%s"),*Did);
+				}
+				else
+				{
+					PC->SetMouseLocation(FMath::RoundToInt(At.X),FMath::RoundToInt(At.Y));
+					PC->InjectKey(EKeys::LeftMouseButton,true);
+					const TWeakObjectPtr<ATCPlayerController> WeakPC(PC); FTimerHandle Release;
+					GetWorld()->GetTimerManager().SetTimer(Release,FTimerDelegate::CreateLambda([WeakPC]()
+					{
+						if (ATCPlayerController* Controller=WeakPC.Get()) Controller->InjectKey(EKeys::LeftMouseButton,false);
+					}),.1f,false);
+					Did=FString::Printf(TEXT("hudinertclick producer=%d type=%s at observed disabled slot %.1f,%.1f through held engine input; verify no cancel wire or refund and retained active job"),Producer,*Fields[1],At.X,At.Y);
+				}
 			}
 			else if ((St.Action == TEXT("hudhover") || St.Action == TEXT("hudpress") || St.Action == TEXT("hudshift") || St.Action == TEXT("hudclick") || St.Action == TEXT("hudshiftclick") || St.Action == TEXT("hudctrlclick") || St.Action == TEXT("hudrightclick")) && PC)
 			{
@@ -1459,6 +1490,42 @@ void ATCGameMode::ControlsFrame()
 				Did = TEXT("console: ") + Cmd;
 			}
 #if defined(TC_HAS_STATS_GLUE)
+			else if (St.Action == TEXT("statshudclick") && PC)
+			{
+				// Verification only: resolve the last drawn modal hit in PressAt order, then hold real engine input.
+				const FString Tag = St.Arg.StartsWith(TEXT("stats:")) ? St.Arg : TEXT("stats:") + St.Arg;
+				int32 VX = 0, VY = 0; PC->GetViewportSize(VX, VY);
+				FVector2D At; bool bDrawn = false;
+				const TArray<FTCPaintHit>& Hits = StatsSheet.LastHits();
+				if (StatsSheet.IsOpen() && !PC->bControlsSheetOpen && Form.Active == ETCTextField::None)
+					for (const FTCPaintHit& Candidate : Hits)
+					{
+						if (Candidate.Tag != Tag || !Candidate.Rect.bIsValid || Candidate.Rect.GetSize().X <= 0 || Candidate.Rect.GetSize().Y <= 0) continue;
+						const FVector2D Centre = Candidate.Rect.GetCenter();
+						At = FVector2D(FMath::RoundToInt(Centre.X), FMath::RoundToInt(Centre.Y));
+						if (At.X < 0 || At.Y < 0 || At.X >= VX || At.Y >= VY) continue;
+						const FTCPaintHit* First = Hits.FindByPredicate([&At](const FTCPaintHit& Hit) { return Hit.Rect.IsInsideOrOn(At); });
+						bDrawn = First && First->Tag == Tag;
+						if (bDrawn) break;
+					}
+				if (!bDrawn)
+				{
+					Did = TEXT("Stats acceptance target is absent or covered: ") + Tag;
+					UE_LOG(LogTC, Error, TEXT("%s"), *Did);
+				}
+				else
+				{
+					PC->SetMouseLocation(FMath::RoundToInt(At.X), FMath::RoundToInt(At.Y));
+					PC->InjectKey(EKeys::LeftMouseButton, true);
+					const TWeakObjectPtr<ATCPlayerController> WeakPC(PC);
+					FTimerHandle Release;
+					GetWorld()->GetTimerManager().SetTimer(Release, FTimerDelegate::CreateLambda([WeakPC]()
+					{
+						if (ATCPlayerController* Controller = WeakPC.Get()) Controller->InjectKey(EKeys::LeftMouseButton, false);
+					}), .1f, false);
+					Did = FString::Printf(TEXT("statshudclick %s at drawn hit %.1f,%.1f through held engine input; verify the stats sheet event and consumer change"), *Tag, At.X, At.Y);
+				}
+			}
 			else if (St.Action == TEXT("stats") || St.Action == TEXT("statsback"))
 			{
 				// round 16: a control of the stats sheet by its tag ('show', 'pick:worst', 'preset:Everything', 'select:pos',
@@ -1670,6 +1737,7 @@ bool ATCGameMode::RunControl(const FTCUiCommand& Command, bool bBack)
 		if (Rooms.Session.Open(Connection.IsValid(), Room) == FTCDirectorySession::EStep::CloseSocket)
 		{
 			UE_LOG(LogTC, Log, TEXT("room directory: leaving room %s: its socket closes (%s), as the browser's page does when it goes to the directory"), *Room, *ConnectionStatus());
+			SaveMatchView(); // the original pagehide also runs when opening the directory
 			Connection->OnMessage = nullptr; Connection->OnOpened = nullptr; Connection->OnText = nullptr; Connection->Stop(); Connection.Reset();
 			RustShadow.End();
 			TokenStore.Reset();
@@ -1678,6 +1746,7 @@ bool ATCGameMode::RunControl(const FTCUiCommand& Command, bool bBack)
 			State.bSpectator = false; State.bAmHost = false; State.LobbySeat = -1;
 			ClearMatchPresentation();
 			Controls.Reset();
+			Lobby.Reset(); Options.Reset(); Persistence.Reset();
 			Controls.SetFieldName(BaseSettings.Name);
 			BaseSettings.Room = Room;
 			bControlsDeferConnect = true;

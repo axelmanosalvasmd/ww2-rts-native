@@ -58,7 +58,9 @@ git lfs install --local
 
 You need Rust (stable) for `rust/`, Node.js to run the reference game and its tests, Git LFS, and Unreal Engine 5.8 only for `unreal/`.
 
-## Unreal client (slices 1a to 1aa)
+## Unreal client (slices 1a to 1ab)
+
+Slice 1ab fixes source HUD layout, Low flipbook blending, ground-weather layering and room-state isolation. The required-FFI editor passes 213 Intel Vulkan outcomes (209 clean and four warning successes). Linux Development slice27 builds and runs bounded High/Low controls with independent checksums; remaining renderer, R1 and acceptance limits are in [the design note](design.d/2026-10-20-unreal-slice1ab.md).
 
 Built and run on Linux with the installed Unreal 5.8.3; Windows and Mac are not built yet. The project uses the engine's empty Entry map and spawns everything from C++.
 

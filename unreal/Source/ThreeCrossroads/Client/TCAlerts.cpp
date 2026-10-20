@@ -481,11 +481,8 @@ FTCPaint FTCAlerts::Layout(const FTCAlertViewInput& In, const FTCMeasure& Measur
 	// the Alert history box: the summary always, the nav buttons and the list when open
 	{
 		float W = FMath::Min(HistoryW, In.ViewW - BoxSide);
-        // alerts.css keeps the history at the right edge beneath the entire loss/routine stack.
-        // Limit only the expanded list, never the source card typography or the single-line summary.
-        float Before = 0;
-        for (const FBlock& Block : Blocks) Before += Block.H + Gap;
-        const float Available = FMath::Max(0.f, In.MinimapTop - MinimapFrame - MinimapGap - 8 - Before);
+        // alerts.css caps the list independently of the loss/routine stack. place() then
+        // moves the whole column upward, including its deliberate crowded overlaps.
         const bool Expand = bHistoryOpen;
         const TArray<FString> Summary = { TC_T(FString(TEXT("Alert history"))) };
 		const float SumH = Border + HistoryPadY + Summary.Num()*LineBox + HistoryPadY;
@@ -494,10 +491,9 @@ FTCPaint FTCAlerts::Layout(const FTCAlertViewInput& In, const FTCMeasure& Measur
         const float NavW=Measure(TC_T(FString(TEXT("Previous Alert"))),FontPx,false,0)+Measure(TC_T(FString(TEXT("Next Alert"))),FontPx,false,0)+4*ButtonPadX+4*Border+NavGap+2*NavPad;
         if (NavW>W) NavH=0;
 		const TArray<FTCAlertHistoryEntry>& Entries = Hist.Entries();
-        // A short interval retains a readable entry through Alt+Left/Right; the nav buttons give way first.
-        if (Available-SumH-NavH-Border<2*ListPad+2*EntryMargin+2*Border+2*EntryPad+LineBox) NavH=0;
-        const float Room=FMath::Max(0.f,Available-SumH-NavH-2*ListPad-Border);
-		const float ListMaxH = FMath::Min3(ListMax,ListVh*In.ViewH,Room);
+        // CSS vh remains the physical viewport length inside #hud zoom. Border-box
+        // max-height already includes the list's 4px top and bottom padding.
+		const float ListMaxH = FMath::Max(0.f,FMath::Min(ListMax,ListVh*In.ViewH*Scale)-2*ListPad);
 		struct FEntry { const FTCAlertHistoryEntry* E; TArray<FString> Lines; float H; };
 		TArray<FEntry> Rows;
 		float ListH = 2 * ListPad, Content = 0.f;
@@ -1368,17 +1364,18 @@ bool FTCAlertsCrowdedTest::RunTest(const FString&)
   for (int32 I=0; I<P.Panels.Num(); I++)
   {
    const FBox2D& B=P.Panels[I];
-   TestTrue(Case+TEXT("whole panel in viewport"),B.Min.X>=0 && B.Min.Y>=0 && B.Max.X<=View.X+.1 && B.Max.Y<=View.Y+.1);
+   // alerts.js place() can push the loss stack above the viewport when history opens.
+   TestTrue(Case+TEXT("source panel stays horizontally bounded above the minimap"),B.Min.X>=0 && B.Max.X<=View.X+.1 && B.Max.Y<=In.MinimapTop-13+.1);
    TestTrue(Case+TEXT("source right edge"),FMath::IsNearlyEqual(B.Max.X,double(In.Right),.01));
    for (int32 J=I+1; J<P.Panels.Num(); J++) TestFalse(Case+TEXT("cards clear of each other"),Overlap(B,P.Panels[J]));
   }
   TestEqual(Case+TEXT("history summary never wraps"),P.TextsOf(TEXT("alert:history-summary")).Num(),1);
-  float LastLossY=-1;
+  TOptional<double> LastLossY;
   for (const FTCPaintItem& I : P.Items)
   {
    if (I.Role==TEXT("alert:loss-detail")) TestEqual(Case+TEXT("source 20 CSS pixel loss text"),I.FontPx,20.f);
    if (I.Role==TEXT("alert:loss"))
-   { TestEqual(Case+TEXT("source 380 CSS pixel card"),I.Size.X,380.); TestTrue(Case+TEXT("one ordered stack"),I.Pos.Y>LastLossY); LastLossY=I.Pos.Y; }
+   { TestEqual(Case+TEXT("source 380 CSS pixel card"),I.Size.X,380.); if (LastLossY.IsSet()) TestTrue(Case+TEXT("one ordered stack"),I.Pos.Y>LastLossY.GetValue()); LastLossY=I.Pos.Y; }
   }
  }
  return !HasAnyErrors();

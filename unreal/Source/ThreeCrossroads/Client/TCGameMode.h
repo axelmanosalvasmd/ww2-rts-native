@@ -268,6 +268,10 @@ struct FTCAlertEntry
 	double Born = 0.0;       // world seconds
 	int32 Tick = 0;
 };
+#if WITH_DEV_AUTOMATION_TESTS
+namespace TCSession27Lifecycle { struct FAccess; }
+#endif
+
 UCLASS()
 class THREECROSSROADS_API ATCGameMode : public AGameModeBase
 {
@@ -469,6 +473,9 @@ public:
 	int32 FxPrivacyChecked = 0, FxPrivacyViolations = 0;
 
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+	friend struct TCSession27Lifecycle::FAccess;
+#endif
 	void PushAlert(const TCHAR* Kind, const FString& Text, FVector2D At);
 	// client/alerts.js snapshot, the points block: captured, lost, under attack (the shared throttle) and cut off,
 	// from this snapshot's point rows against the last ones

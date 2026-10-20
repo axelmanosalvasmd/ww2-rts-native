@@ -815,26 +815,41 @@ namespace TCHudBottom
 		}
 		L.Hits.Add({B,C});
 	}
+	// CSS 1fr tracks have an automatic minimum. A nowrap value (notably truck Resume)
+	// can widen one column while the remaining tracks share the space left over.
+	TArray<float> FlexTracks(const TArray<float>& Minimum, float Available)
+	{
+		TArray<float> Width; Width.Init(-1.f,Minimum.Num());
+		int32 Flexible=Minimum.Num();
+		while (Flexible>0)
+		{
+			const float Share=Available/Flexible;
+			bool Froze=false;
+			for (int32 I=0; I<Width.Num(); I++) if (Width[I]<0 && Minimum[I]>Share)
+			{ Width[I]=Minimum[I]; Available-=Width[I]; Flexible--; Froze=true; }
+			if (!Froze) { for (float& V : Width) if (V<0) V=FMath::Max(0.f,Share); break; }
+		}
+		return Width;
+	}
 	float Grid(FBottomLayout& L, const TArray<FControl>& Controls, float X, float Y, float W, const FTCMeasure& Measure, float Scale)
 	{
-		const float CellW = (W-3*GridGap)/4;
+		TArray<float> Minimum; Minimum.Init(0.f,4);
+		for (int32 K=0; K<Controls.Num(); K++)
+		{
+			const FControl& C=Controls[K];
+			const float ValueW=Measure(TC_T(C.Value+(C.bSubmenu?TEXT(" ▸"):TEXT(""))),13,false,0);
+			Minimum[K%4]=FMath::Max(Minimum[K%4],FMath::Max(C.Icon.IsEmpty()?0.f:23.f,ValueW)+2+2*Border(Scale));
+		}
+		const TArray<float> Width=FlexTracks(Minimum,W-3*GridGap);
 		for (int32 First=0; First<Controls.Num(); First+=4)
 		{
-			float H = OrderH;
+			float CellX=X;
 			for (int32 K=First; K<FMath::Min(First+4,Controls.Num()); K++)
-				if (!Controls[K].bSubmenu) H=OrderH;
-			for (int32 K=First; K<FMath::Min(First+4,Controls.Num()); K++) GridControl(L,Controls[K],Box(X+(K-First)*(CellW+GridGap),Y,CellW,H),Measure,Scale);
-			Y+=H+GridGap;
+			{ GridControl(L,Controls[K],Box(CellX,Y,Width[K-First],OrderH),Measure,Scale); CellX+=Width[K-First]+GridGap; }
+			Y+=OrderH+GridGap;
 		}
 		return Controls.Num() ? Y-GridGap : Y;
 	}
- float RowHeight(const TArray<FControl>& Controls, int32 First, float W, const FTCMeasure& Measure)
- {
-  float H=OrderH; const float CW=(W-3*GridGap)/4;
-  for (int32 K=First; K<FMath::Min(First+4,Controls.Num()); K++)
-   if (!Controls[K].bSubmenu) H=OrderH;
-  return H;
- }
  void Pager(FBottomLayout& L, const FString& Kind, int32 First, int32 Max, float X, float Y, float W, const FTCMeasure& Measure, float Scale)
  {
   for (int32 I=0; I<2; I++)
@@ -844,28 +859,6 @@ namespace TCHudBottom
    C.bEnabled=I?First<Max:First>0;
    RowButton(L,C,Box(X+I*(W+4)/2,Y,(W-4)/2,24),Measure,Scale);
   }
- }
- float GridWindow(FBottomLayout& L, const TArray<FControl>& Controls, float X, float Y, float W, float MaxH, int32 First,
-  const FTCMeasure& Measure, float Scale)
- {
-  if (Controls.IsEmpty()) return Y;
-  const float Top=Y;
-  float Total=0; for (int32 K=0; K<Controls.Num(); K+=4) Total+=RowHeight(Controls,K,W,Measure)+GridGap;
-  const bool Pages=Total-GridGap>MaxH+.01f;
-  L.MenuMax=Pages?FMath::Max(0,((Controls.Num()-1)/4)*4):0;
-  First=FMath::Clamp(First/4*4,0,L.MenuMax);
-  const float Bottom=Top+MaxH-(Pages?28:0);
-  for (int32 K=First; K<Controls.Num(); K+=4)
-  {
-   const float H=RowHeight(Controls,K,W,Measure);
-   if (Y+H>Bottom+.01) break;
-   TArray<FControl> Row; for (int32 J=K; J<FMath::Min(K+4,Controls.Num()); J++) Row.Add(Controls[J]);
-   Y=Grid(L,Row,X,Y,W,Measure,Scale)+GridGap;
-  }
-  if (Y>Top) Y-=GridGap;
-  if (Pages) { Y+=4; Pager(L,TEXT("menu"),First,L.MenuMax,X,Y,W,Measure,Scale); Y+=24; }
-  L.MenuList=Box(X,Top,W,Y-Top);
-  return Y;
  }
 
  float LogisticsText(FBottomLayout& L, const TArray<FString>& Logistics, float Y, float W, const FTCMeasure& Measure,
@@ -993,7 +986,9 @@ FTCHudFit::FBottomLayout FTCHudFit::LeftPanel(float ViewH, const FString& Title,
 		Text(L,FTCPaint::Ellipsis(TC_T(Title),TitleW,13,true,Measure),X+8,Y+(HeaderH-13)/2,13,true,TCCss::Text,Box(X+8,Y,TitleW,HeaderH),Measure,TEXT("bottom:selection-title")); Y+=HeaderH+6;
         const FBottomLayout OrdersOnly=LeftPanel(ViewH-180,TEXT(""),{},Details,Orders,Menu,Measure,Scale,0,Destination,bTransfer,bDropdown,0,TopLimit,MenuFirst,MenuTabs,Width);
         const float OrdersH=OrdersOnly.Orders.bIsValid?OrdersOnly.Orders.GetSize().Y:0.f;
-        const float ListH=FMath::Max(0.f,FMath::Min(ViewH*.4f,ViewH-ScreenGap-FMath::Max(80.f,TopLimit)-OrdersH-6-Y-6));
+        // #lowerleft max-height: calc(var(--vh) - 64px). The selection list shrinks;
+        // #abil keeps both full grids, even when the column overlaps another source panel.
+        const float ListH=FMath::Max(0.f,FMath::Min(ViewH*.4f,ViewH-64-OrdersH-6-Y-7));
         const float ListTop=Y;
         int32 First=FMath::Clamp(SelectionFirst,0,FMath::Max(0,Selection.Num()-1));
         L.SelectionMax=FMath::Max(0,Selection.Num()-1);
@@ -1075,15 +1070,7 @@ FTCHudFit::FBottomLayout FTCHudFit::LeftPanel(float ViewH, const FString& Title,
 		const float Top=Y;
 		Y+=8;
 		Text(L,TC_T(FString(TEXT("Orders"))),X+7,Y,13,false,TCCss::Dim,Box(X+7,Y,Inner,18),Measure,TEXT("bottom:orders-title")); Y+=19;
-		const float Budget=ViewH-ScreenGap-FMath::Max(80.f,TopLimit)-Top-8;
-        TArray<FControl> VisibleOrders=Orders;
-        if (Menu.Num() && Orders.Num()>4)
-        {
-         VisibleOrders.Reset(); for (const FControl& C : Orders) if (C.bSubmenu) VisibleOrders.Add(C);
-        }
-        float FixedTail=7+(bTransfer?(bDropdown?112.f:34.f):0.f)+(Menu.Num()?90.f+(MenuTabs.Num()?29.f:0.f):0.f);
-        for (const FString& D : Details) FixedTail+=6+FTCPaint::Wrap(TC_T(D),Inner,13,false,Measure).Num()*17.55f;
-        if (!bDropdown) Y=GridWindow(L,VisibleOrders,X+7,Y,Inner,FMath::Max(80.f,ViewH-ScreenGap-FMath::Max(80.f,TopLimit)-Y-FixedTail),MenuFirst,Measure,Scale);
+        if (!bDropdown) Y=Grid(L,Orders,X+7,Y,Inner,Measure,Scale);
 		if (bTransfer)
 		{
 		 Y+=5;
@@ -1110,18 +1097,31 @@ FTCHudFit::FBottomLayout FTCHudFit::LeftPanel(float ViewH, const FString& Title,
 		for (const FString& Detail : Details) { Y+=6; Y+=Wrapped(L,TC_T(Detail),X+7,Y,Inner,13,false,TCCss::Dim,Measure,TEXT("bottom:detail")); }
 		if (Menu.Num() && !bDropdown)
         {
-         Y+=8;
+         Y+=6;
+         const FString Heading=MenuTabs.Num()?TEXT("Build"):Menu[0].Command.Action==ETCUiAction::Entrench?TEXT("Trench patterns"):TEXT("Formation");
+         Text(L,TC_T(Heading),X+7,Y,13,false,TCCss::Dim,Box(X+7,Y,Inner,13),Measure,TEXT("bottom:submenu-title"));
+         L.Paint.Items.Last().Size.Y=13; L.TextBounds.Last().Box.Max.Y=L.TextBounds.Last().Box.Min.Y+13;
+         Y+=19;
          if (MenuTabs.Num())
          {
-          const float TW=(Inner-3*(MenuTabs.Num()-1))/MenuTabs.Num();
+          TArray<float> Minimum;
+          for (const FControl& C : MenuTabs) Minimum.Add(Measure(TC_T(C.Label),12,false,0)+4+2*Border(Scale));
+          const TArray<float> Widths=FlexTracks(Minimum,Inner-3*(MenuTabs.Num()-1));
+          const float TabH=16.2f+8+2*Border(Scale); float TabX=X+7;
           for (int32 I=0; I<MenuTabs.Num(); I++)
           {
-           FControl C=MenuTabs[I]; C.Label=FTCPaint::Ellipsis(TC_T(C.Label),TW-14,13,false,Measure);
-           RowButton(L,C,Box(X+7+I*(TW+3),Y,TW,25),Measure,Scale);
+           const FControl& C=MenuTabs[I]; const FBox2D B=Box(TabX,Y,Widths[I],TabH);
+           L.Paint.Rect(TabX,Y,Widths[I],TabH,C.bOn?TCCss::Rgba(214,178,94,.1f):TCCss::Hex(0x24282b));
+           L.Paint.Frame(TabX,Y,Widths[I],TabH,C.bOn?TCCss::Rgba(214,178,94,.8f):TCCss::LineSoft,Border(Scale));
+           Text(L,TC_T(C.Label),B.GetCenter().X,Y+4+Border(Scale),12,false,C.bOn?TCCss::Brass:TCCss::Text,B,Measure,TEXT("bottom:build-tab"),ETCPaintAlign::Centre);
+           L.Paint.Items.Last().Size.Y=16.2f; L.TextBounds.Last().Box.Max.Y=L.TextBounds.Last().Box.Min.Y+16.2f;
+           L.Hits.Add({B,C}); TabX+=Widths[I]+3;
           }
-          Y+=29;
+          Y+=TabH+3;
          }
-         Y=GridWindow(L,Menu,X+7,Y,Inner,FMath::Max(82.f,Top+Budget-Y-7),MenuFirst,Measure,Scale);
+         const float MenuTop=Y;
+         Y=Grid(L,Menu,X+7,Y,Inner,Measure,Scale);
+         L.MenuList=Box(X+7,MenuTop,Inner,Y-MenuTop);
         }
 		Y+=7;
 		L.Orders=Box(X,Top,W,Y-Top);
@@ -2127,6 +2127,32 @@ bool ATCHUD::CommandCentre(const FTCUiCommand& Command, FVector2D& Out) const
 {
 	for (const FButton& B : Buttons) if (SameTarget(B.Command, Command)) { Out = B.Rect.GetCenter(); return true; }
 	return false;
+}
+
+bool ATCHUD::ObservedTrainingSlot(const FBox2D& Observed, int32 Producer, const FString& Type, FVector2D& Out) const
+{
+ const ATCGameMode* Mode=GetWorld()?GetWorld()->GetAuthGameMode<ATCGameMode>():nullptr;
+ const ATCPlayerController* Controller=Cast<ATCPlayerController>(GetOwningPlayerController());
+ if (!Mode || !Controller || !Canvas || !Observed.bIsValid || Producer<=0 || Type.IsEmpty()) return false;
+ for (double Value : {Observed.Min.X,Observed.Min.Y,Observed.Max.X,Observed.Max.Y}) if (!FMath::IsFinite(Value)) return false;
+ if (Observed.Min.X<0 || Observed.Min.Y<0 || Observed.Max.X>Canvas->ClipX || Observed.Max.Y>Canvas->ClipY
+  || Observed.GetSize().X<=0 || Observed.GetSize().Y<=0) return false;
+ const FTCCommandCard Card=Mode->Recruit.Card(Mode->State,Controller->Selected);
+ if (Card.Kind!=ETCCardKind::Building || Card.Building!=Producer || !Card.bTraining || Card.Slots.IsEmpty()) return false;
+ const FTCQueueSlot& Slot=Card.Slots[0];
+ if (!Slot.bTraining || Slot.Type!=Type || Slot.Job!=0 || Slot.bPending) return false;
+ const FString Name=FTCAlerts::UnitName(Mode->State,&Mode->UnitTable,Type,Mode->State.You);
+ const FButton* Button=Buttons.FindByPredicate([&](const FButton& B)
+ {
+  return B.Command.Action==ETCUiAction::None && !B.bEnabled && B.Label==Name && B.Hover==TEXT("Training: ")+Name
+   && B.Rect.Equals(Observed,.25);
+ });
+ if (!Button) return false;
+ FTCUiCommand Hit;
+ const FVector2D Centre=Button->Rect.GetCenter();
+ if (!CommandAt(Centre,Hit) || Hit.Action!=ETCUiAction::None) return false;
+ Out=Centre;
+ return true;
 }
 
 bool ATCHUD::PanelAt(FVector2D Pixel) const
@@ -4051,8 +4077,10 @@ bool FTCHudLargeListsTest::RunTest(const FString&)
   const TArray<FSelection> Selection={{TEXT("engineer"),TEXT("Engineer Squad"),1,100,100,{TEXT("In cover"),TEXT("Auto-retreat")}}};
   const FBottomLayout First=LeftPanel(View.Y,TEXT("1 unit selected"),Selection,{},Orders,Menu,Measure,Scale,3,1,true,false,0,80,0,MenuTabs);
   const FBottomLayout Last=LeftPanel(View.Y,TEXT("1 unit selected"),Selection,{},Orders,Menu,Measure,Scale,3,1,true,false,0,80,First.MenuMax,MenuTabs);
-  TestTrue(Case+TEXT("first selected type stays visible with a large menu"),First.Paint.TextsOf(TEXT("bottom:selection-name")).Num()>0);
-  TestTrue(Case+TEXT("last submenu row reachable"),Last.Hits.ContainsByPredicate([](const FHit& H) { return H.Control.Command.Unit==TEXT("hudpanel:item:35"); }));
+  // index.html gives #abil no pager or height cap. This deliberately oversized 36-card
+  // fixture can overflow the viewport and shrink the selection list to zero.
+  TestEqual(Case+TEXT("source submenu has no native pager"),First.MenuMax,0);
+  TestTrue(Case+TEXT("every submenu row remains in the full source layout"),First.Hits.ContainsByPredicate([](const FHit& H) { return H.Control.Command.Unit==TEXT("hudpanel:item:0"); }) && Last.Hits.ContainsByPredicate([](const FHit& H) { return H.Control.Command.Unit==TEXT("hudpanel:item:35"); }));
   FControl Mun; Mun.Label=TEXT("Mun"); Mun.Value=TEXT("250"); Mun.Icon=TEXT("resource-mun");
   FControl Fuel; Fuel.Label=TEXT("Fuel"); Fuel.Value=TEXT("75"); Fuel.Icon=TEXT("resource-fuel");
   const FBottomLayout Econ=EconomyPanel(View.X,TEXT("476 MP"),TEXT("+5/s (upkeep −2)"),TEXT("3/24 units"),Support,Measure,Scale,{Mun,Fuel},Air,View.Y-208);
@@ -4064,7 +4092,7 @@ bool FTCHudLargeListsTest::RunTest(const FString&)
   TestTrue(Case+TEXT("last plane row reachable"),EconLast.Hits.ContainsByPredicate([](const FHit& H) { return H.Control.Command.Unit==TEXT("hudpanel:plane:40"); }));
   TestEqual(Case+TEXT("source draws every delivered plane row without a pager"),Econ.Paint.TextsOf(TEXT("bottom:air-state")).Num(),40);
   TestTrue(Case+TEXT("source aircraft list retains viewport overflow"),Econ.AirMax==0 && Econ.AirList.Max.Y>View.Y);
-  for (const FBottomLayout* L : {&First,&Last,&Recruit,&RecruitLast})
+  for (const FBottomLayout* L : {&Recruit,&RecruitLast})
    for (const FString& Error : LayoutErrors(*L,View)) AddError(Case+Error);
   // Removed the former no-minimap-overlap/paging assertions: the original 32-plane DOM fixture overflows here.
 

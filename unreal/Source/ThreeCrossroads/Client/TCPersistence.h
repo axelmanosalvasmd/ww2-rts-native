@@ -49,6 +49,7 @@
 class FJsonObject;
 class FJsonValue;
 class FTCMatchState;
+class ATCPlayerController;
 
 // room-session.js matchStorage: one view per server/room/token, including process restarts.
 // Storage filenames contain only a digest. No token or match view is written to a log.
@@ -60,6 +61,8 @@ struct FTCMatchView
 	TArray<int32> Selected;
 	TMap<int32, TArray<int32>> Groups;
 	bool IsValid() const;
+	// main.js matchView(): capture the live camera, selection and ordered groups before a reconnect or navigation.
+	static FTCMatchView Capture(const ATCPlayerController& Controller, int32 MatchId);
 	TSharedPtr<FJsonObject> Json() const;
 	static bool Parse(const FJsonObject& Object, FTCMatchView& Out);
 };
@@ -178,6 +181,8 @@ struct FTCPersistenceFeedback
 class FTCPersistence
 {
 public:
+	// A new page/room has no old save list, role or pending request receipt.
+	void Reset() { *this = FTCPersistence(); }
 	// The reference commit this module was written from.
 	static const TCHAR* const ReferencePin;
 	// server/saves.js and server.js constants.

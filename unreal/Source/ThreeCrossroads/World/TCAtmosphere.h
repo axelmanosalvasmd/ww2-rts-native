@@ -400,7 +400,9 @@ namespace TCAtmos
 	constexpr const TCHAR* FallPath = TEXT("/Game/Atmosphere/Materials/M_TCAtmosFall.M_TCAtmosFall");
 	constexpr const TCHAR* BirdPath = TEXT("/Game/Atmosphere/Materials/M_TCAtmosBird.M_TCAtmosBird");
 	// the reference's transparent render orders (cover 0.58, clouds 0.6, mist 0.7, banks 0.72, falls 0.8, birds 0.9)
-	constexpr int32 SortGround = 1, SortMist = 2, SortBanks = 3, SortFall = 4, SortBirds = 5;
+	// Ground cover shares the fog overlay's before-DOF pass and must sort below
+	// its priority 1. Equal priorities let component bounds reorder the layers.
+	constexpr int32 SortGround = 0, SortMist = 2, SortBanks = 3, SortFall = 4, SortBirds = 5;
 }
 
 // What atmosphere.js draws. The game mode holds one: Attach once (it spawns an actor of its own for its meshes),
@@ -456,6 +458,8 @@ private:
 #if WITH_DEV_AUTOMATION_TESTS
 	friend class FTCAtmosphereOracleTest;
 	friend class FTCWorld26WeatherHistoryTest;
+	friend class FTCWorld27GroundLayerTest;
+	friend class FTCWorld27GroundPixelsTest;
 #endif
 	void Blend();
 	void ApplyMood();
@@ -469,6 +473,7 @@ private:
 	void UpdateFall(const ATCTerrain* Terrain, APlayerController* PC, FVector2D Focus);
 	void RunChecks(const FTCMatchState& State, APlayerController* PC);
 	void TraceHistory(const TCHAR* Event, double Dt, const FTCMatchState& State, bool bFixedClock) const;
+	void TraceView(const APlayerController* PC, FVector2D Focus) const;
 	UMaterialInstanceDynamic* Mid(const TCHAR* Path, const TCHAR* Name);
 	UProceduralMeshComponent* NewMesh(const TCHAR* Name, int32 Sort, bool bVisible);
 

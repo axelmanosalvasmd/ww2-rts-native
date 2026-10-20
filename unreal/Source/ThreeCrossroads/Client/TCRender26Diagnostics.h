@@ -9,5 +9,6 @@ struct FTCRender26Diagnostics
 	// Add -TCRender26Allocations for two engine allocation inventories. No GPU readback is requested.
 	void Tick(UWorld* World);
 	// Lead tour adapter only: one opt-in stock DumpGPU request at a named, settled camera pose.
+	// -TCRender27GpuBufferDescriptors includes buffer metadata in a descriptor-only capture, never binaries.
 	static void CaptureTour(UWorld* World, const TCHAR* Pose);
 };

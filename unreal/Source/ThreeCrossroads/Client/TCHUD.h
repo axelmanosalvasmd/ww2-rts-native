@@ -222,6 +222,8 @@ public:
 	// in the last frame (verification switches press it there).
 	bool ButtonCentre(ETCUiAction Action, FVector2D& Out) const;
 	bool CommandCentre(const FTCUiCommand& Command, FVector2D& Out) const;
+	// Verification only: require an observed disabled active-training rectangle and the current producer/type.
+	bool ObservedTrainingSlot(const FBox2D& Observed, int32 Producer, const FString& Type, FVector2D& Out) const;
 	// A HUD panel (not the minimap) covers this pixel: a press there must not reach the world.
 	bool PanelAt(FVector2D Pixel) const;
 	// The labels of the buttons drawn in the last frame, for logs.

@@ -34,7 +34,7 @@ except ImportError:
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = '/Game/Atmosphere'
-TOOL_VERSION = 3
+TOOL_VERSION = 4
 
 FOG_HLSL = '''
 float fogK = 1.0;
@@ -301,6 +301,8 @@ class Maker(object):
         P = unreal.MaterialProperty
         T = unreal.CustomMaterialOutputType
         mat = self.base('M_TCAtmosGround', False)
+        # cover/cloud draw before the shared main.js and apron.js fog overlay.
+        mat.set_editor_property('translucency_pass', unreal.MaterialTranslucencyPass.MTP_BEFORE_DOF)
         scalar, vector, texobj, node = self.params(mat, -1600)
         ins = [('WorldPos', node(unreal.MaterialExpressionWorldPosition)), ('Normal', node(unreal.MaterialExpressionVertexNormalWS)),
                ('CamPos', vector('CamPos', (0.0, 0.0, 10000.0))), ('Noise', texobj('Noise', grey)), ('Mask', texobj('Mask', white)),

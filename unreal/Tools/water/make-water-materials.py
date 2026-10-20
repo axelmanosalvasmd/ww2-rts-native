@@ -29,7 +29,7 @@ import sys
 import unreal
 
 ROOT = '/Game/Water'
-TOOL_VERSION = 3
+TOOL_VERSION = 4
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, '..', '..', '..'))
 REF = os.path.join(REPO, 'reference', 'ww2-rts')
@@ -91,7 +91,7 @@ wCol *= 0.93 + 0.14 * nA.r;
 wCol *= 1.0 - 0.2 * ford * smoothstep(0.62, 0.8, Noise.Sample(NoiseSampler, xz / 2.3 + 0.21).a);
 // light dry-brushed ripple crests that ride the flow, more of them over the shallow fords
 float crest = smoothstep(lerp(0.64, 0.56, ford), 0.84, n0.r) * (1.0 - 0.5 * deep) * detail;
-wCol = lerp(wCol, %(foam)s, crest * (0.14 + 0.3 * ford));
+wCol = lerp(wCol, %(foam)s, crest * (0.14 + 0.3 * ford) * FoamOn);
 // a broken pale band where the water meets the bank
 float brk = smoothstep(0.35, 0.75, n0.a * 0.6 + nA.a * 0.6 - 0.1);
 float wFoam = (1.0 - smoothstep(0.31, 0.52, wm.r)) * (0.25 + 0.75 * brk) * 0.8;
@@ -102,7 +102,7 @@ if (Low < 0.5)
 	float up = Mask.SampleLevel(MaskSampler, (xz - Flow * 3.5) / Size.xy, 0).a;
 	ring = max(ring, smoothstep(0.25, 0.65, up) * (1.0 - smoothstep(0.08, 0.35, bridge)) * brk);
 }
-wFoam = max(wFoam, ring * (0.55 + 0.45 * brk));
+wFoam = max(wFoam, ring * (0.55 + 0.45 * brk)) * FoamOn;
 wCol = lerp(wCol, %(foam)s, wFoam);
 float alpha = cover < 0.004 ? 0.0 : cover * max(lerp(0.86, 0.6, ford), wFoam * 0.95);
 float fogK = pow(Fog.SampleLevel(FogSampler, xz / Size.xy, 0).r, FogGamma);
@@ -273,7 +273,7 @@ def water_material():
            ('CamVec', expr(mat, unreal.MaterialExpressionCameraVectorWS, X, row()), ''),
            ('Mask', texobj('Mask'), ''), ('Noise', texobj('Noise'), ''), ('Fog', texobj('Fog'), ''),
            ('Size', expr(mat, unreal.MaterialExpressionVectorParameter, X, row(), parameter_name='Size', default_value=unreal.LinearColor(160, 160, 0, 0)), ''),
-           ('Time', scalar('Time', 0.0), ''), ('Low', scalar('Low', 0.0), ''), ('FogGamma', scalar('FogGamma', 1.0), '')]
+           ('Time', scalar('Time', 0.0), ''), ('FoamOn', scalar('FoamOn', 1.0), ''), ('Low', scalar('Low', 0.0), ''), ('FogGamma', scalar('FogGamma', 1.0), '')]
     outs = []
     for which in range(4):
         k = expr(mat, unreal.MaterialExpressionConstant, X, row(), r=float(which))
