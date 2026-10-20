@@ -336,6 +336,50 @@ void FTCMinimap::DrawUnits(UCanvas* Canvas, const FTCMatchState& State, const FT
  LastStats.UnitsDrawn=Units; LastStats.SelectedDrawn=Ringed;
 }
 
+TArray<FVector2D> FTCMinimap::ClipPolygon(const TArray<FVector2D>& Polygon, const FBox2D& Clip)
+{
+ if (!Clip.bIsValid) return {};
+ TArray<FVector2D> Out=Polygon;
+ for (int32 Side=0;Side<4 && Out.Num();Side++)
+ {
+  const bool X=Side<2, Lower=(Side%2)==0;
+  const double Boundary=X?(Lower?Clip.Min.X:Clip.Max.X):(Lower?Clip.Min.Y:Clip.Max.Y);
+  const auto Axis=[&](FVector2D P) { return X?P.X:P.Y; };
+  const auto Inside=[&](FVector2D P) { return Lower?Axis(P)>=Boundary:Axis(P)<=Boundary; };
+  TArray<FVector2D> Next; FVector2D Previous=Out.Last(); bool WasIn=Inside(Previous);
+  for (const FVector2D& Current : Out)
+  {
+   const bool IsIn=Inside(Current);
+   if (IsIn!=WasIn) Next.Add(Previous+(Current-Previous)*((Boundary-Axis(Previous))/(Axis(Current)-Axis(Previous))));
+   if (IsIn) Next.Add(Current);
+   Previous=Current; WasIn=IsIn;
+  }
+  Out=MoveTemp(Next);
+ }
+ return Out;
+}
+
+void FTCMinimap::DrawPolygon(UCanvas* Canvas, const TArray<FVector2D>& PolygonPixels, FLinearColor Colour) const
+{
+ if (!Canvas || !Canvas->Canvas || Colour.A<=0) return;
+ const TArray<FVector2D> Polygon=ClipPolygon(PolygonPixels,Rect());
+ TArray<FCanvasUVTri> Tris;
+ for (int32 I=1;I+1<Polygon.Num();I++)
+ {
+  FCanvasUVTri T; T.V0_Pos=Polygon[0]; T.V1_Pos=Polygon[I]; T.V2_Pos=Polygon[I+1];
+  T.V0_UV=T.V1_UV=T.V2_UV=FVector2D::ZeroVector;
+  T.V0_Color=T.V1_Color=T.V2_Color=Colour; Tris.Add(T);
+ }
+ if (Tris.Num()) { FCanvasTriangleItem Item(Tris,GWhiteTexture); Item.BlendMode=SE_BLEND_Translucent; Canvas->DrawItem(Item); }
+}
+
+void FTCMinimap::DrawSegment(UCanvas* Canvas, FVector2D A, FVector2D B, FLinearColor Colour, float Width) const
+{
+ const FVector2D D=B-A; const double Length=D.Size(); if (Length<=0) return;
+ const FVector2D N=FVector2D(-D.Y,D.X)*(Width/(2*Length));
+ DrawPolygon(Canvas,{A+N,B+N,B-N,A-N},Colour);
+}
+
 void FTCMinimap::DrawRing(UCanvas* Canvas, FVector2D Ground, float CanvasRadius, float CanvasWidth, FLinearColor Colour)
 {
     FVector2D Centre;
@@ -348,17 +392,15 @@ void FTCMinimap::DrawRing(UCanvas* Canvas, FVector2D Ground, float CanvasRadius,
     {
         const double A=Segment*2*UE_DOUBLE_PI/Segments, B=(Segment+1)*2*UE_DOUBLE_PI/Segments;
         const FVector2D D0(FMath::Cos(A),FMath::Sin(A)), D1(FMath::Cos(B),FMath::Sin(B));
-        const FVector2D P[]={Centre+D0*Inner,Centre+D0*Outer,Centre+D1*Outer,Centre+D1*Inner};
-        for (int32 Face=0; Face<2; Face++)
+        const auto Polygon=ClipPolygon({Centre+D0*Inner,Centre+D0*Outer,Centre+D1*Outer,Centre+D1*Inner},Rect());
+        for (int32 I=1;I+1<Polygon.Num();I++)
         {
-            FCanvasUVTri T;
-            T.V0_Pos=P[0]; T.V1_Pos=P[Face+1]; T.V2_Pos=P[Face+2];
+            FCanvasUVTri T; T.V0_Pos=Polygon[0]; T.V1_Pos=Polygon[I]; T.V2_Pos=Polygon[I+1];
             T.V0_UV=T.V1_UV=T.V2_UV=FVector2D::ZeroVector;
             T.V0_Color=T.V1_Color=T.V2_Color=Colour; Tris.Add(T);
         }
     }
-    // FCanvasLineItem forces opaque blending. Triangles retain the alert pulse's alpha.
-    FCanvasTriangleItem Item(Tris,GWhiteTexture); Item.BlendMode=SE_BLEND_Translucent; Canvas->DrawItem(Item);
+    if (Tris.Num()) { FCanvasTriangleItem Item(Tris,GWhiteTexture); Item.BlendMode=SE_BLEND_Translucent; Canvas->DrawItem(Item); }
 }
 
 bool FTCMinimap::DrawViewOutline(UCanvas* Canvas, const FTCMinimapView& View)

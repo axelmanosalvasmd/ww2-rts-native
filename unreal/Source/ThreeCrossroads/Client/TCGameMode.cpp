@@ -464,6 +464,11 @@ void ATCGameMode::OnMessage(const FJsonObject& M, int32 Bytes)
 		for (const FTCPlan& P : State.Plans) PlanKinds.Add(P.Id, P.Kind);
 		// alerts.js compares points inside OnCombatSnapshot, after unit hits and before losses.
 		OnCombatSnapshot(M); // alerts.js (units, losses, air, ready, say), the combat effects and their sounds (Client/TCAlerts.cpp)
+		if (Units)
+		{
+			if (Effects) Units->NoteKilled(Effects->Fx.TakeKilledGone());
+			Units->ApplySnapshot(State, UnitTable);
+		}
 		TutorialSnapshot(M); // round 14: the goal box, banners, damaged buildings, the Tutorial's progress (Client/TCTutorial.cpp)
 		LogObjectives(false);
 		for (FTCLogisticsAlert& A : Logistics.TakeAlerts())

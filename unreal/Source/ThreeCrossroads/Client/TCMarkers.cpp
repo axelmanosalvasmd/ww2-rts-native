@@ -951,6 +951,18 @@ void TCMarkersHud::DrawHealthBar(UCanvas* Canvas, FVector2D Centre, float Scale,
 	HealthBarLayer(Canvas, Unit, false);
 }
 
+namespace
+{
+	void DrawSupplyFlag(UCanvas* Canvas, const TCMarkersHud::FUnitBillboard& U)
+	{
+		if (!Canvas || U.PxPerMetre <= 0 || U.SupplyColour.A == 0) return;
+		FTCMarkerPainter P(Canvas, nullptr, nullptr, FVector::ZeroVector, FVector::RightVector, FVector::ForwardVector);
+		const FLinearColor Colour = TCMarkersHud::WorldColour(Canvas, FLinearColor(U.SupplyColour), U.World);
+		P.Diamond(U.Centre + FVector2D(MC::SupplyX * U.PxPerMetre, 0),
+			MC::SupplySide * FMath::Sqrt(2.0) / 2.0 * U.PxPerMetre, Colour);
+	}
+}
+
 void TCMarkersHud::DrawUnitBillboards(UCanvas* Canvas, const TArray<FUnitBillboard>& Units)
 {
 	// Three sorts main.js's opaque bars across all units by renderOrder. Drawing a complete group per unit
@@ -964,6 +976,7 @@ void TCMarkersHud::DrawUnitBillboards(UCanvas* Canvas, const TArray<FUnitBillboa
 	}
 	for (const FUnitBillboard& U : Units) DrawCoverShield(Canvas, U.Centre, U.PxPerMetre, U.Cover, U.bGarrisoned, U.World);
 	for (const FUnitBillboard& U : Units) DrawBadge(Canvas, U.Type, U.Owner, U.Centre, U.PxPerMetre);
+	for (const FUnitBillboard& U : Units) DrawSupplyFlag(Canvas, U);
 }
 
 void TCMarkersHud::DrawStars(UCanvas* Canvas, FVector2D BarCentre, float PxPerMetre, int32 Stars)

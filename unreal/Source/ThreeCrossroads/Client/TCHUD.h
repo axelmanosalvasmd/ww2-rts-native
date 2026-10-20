@@ -43,6 +43,7 @@ class UFont;
 class ATCTerrain;
 class FTCBossBar;
 class FTCHudPortraits;
+class FTCLogistics;
 
 // Round 16 (hudfit): the HUD's fit rules at a large UI scale in a small window, pure so tests read them.
 namespace FTCHudFit
@@ -71,6 +72,8 @@ namespace FTCHudFit
 		TArray<FString> Tags;
 		FString Hover;
 		int32 Owner = -1;
+		FString Training;
+		float TrainingProgress = 0;
 	};
 	struct FIcon { FString Key; FBox2D Box; FLinearColor Colour; bool bPortrait = false; int32 Owner = -1; FBox2D Clip = FBox2D(ForceInit); };
 	struct FHit { FBox2D Box; FControl Control; };
@@ -125,7 +128,7 @@ namespace FTCHudFit
 		const TArray<FString>& Logistics = {}, int32 TotalCards = 0, int32 First = 0, float TopLimit = 80.f, const FBox2D& Economy = FBox2D(ForceInit), int32 LogisticsFirst = 0);
 	THREECROSSROADS_API FBottomLayout EconomyPanel(float ViewW, const FString& Money, const FString& Income, const FString& Population,
 		const TArray<FControl>& Support, const FTCMeasure& Measure, float Scale = 1.f, const TArray<FControl>& Resources = {}, const TArray<FControl>& Air = {},
-		float MaxH = 0.f, int32 AirFirst = 0);
+		float MaxH = 0.f, int32 AirFirst = 0, bool bAtCap = false);
 	THREECROSSROADS_API FBottomLayout ProductionPanel(FVector2D View, float Right, const FProductionInfo& Info,
 		const TArray<FString>& GroupNames, const TArray<TArray<FControl>>& Groups, const TArray<FString>& Logistics,
 		const FTCMeasure& Measure, float Scale, FVector2D Pointer = FVector2D(-1,-1), int32 LogisticsFirst = 0);
@@ -136,6 +139,12 @@ namespace FTCHudFit
 		TSet<int32> Press(const class FTCMatchState& State, const TSet<int32>& Current, int32 Id, bool bToggle, double Now);
 	};
 	THREECROSSROADS_API TSet<int32> PlaneSelection(const class FTCMatchState& State, const TSet<int32>& Current, int32 Id, bool bToggle, bool bDouble);
+	inline bool ShowOrderNote(bool bSent, bool bDiagnostics) { return !bSent || bDiagnostics; }
+	THREECROSSROADS_API void StackAbove(FBottomLayout& Child, const TArray<FBox2D>& Panels);
+	THREECROSSROADS_API TArray<FSelection> SelectionRows(const FTCMatchState& State, const FTCUnitTable& Table,
+		const FTCRecruitment& Recruit, const FTCLogistics& Logistics, const TSet<int32>& Selected);
+	struct FThreat { FVector2D At; double Radius = 0; };
+	THREECROSSROADS_API TArray<FThreat> MinimapThreats(const FTCMatchState& State, const FTCUnitTable& Table);
 	// HUD controls keep their complete tooltip even when the visible caption is elided.
 	THREECROSSROADS_API FString ControlTip(const FControl& Control);
 	// A match HUD right press is swallowed, except the ability's separate context action.
@@ -194,6 +203,9 @@ public:
 	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 	// Controller integration is a small lead patch. These local UI commands never cross the wire.
 	bool RunPanelCommand(const FTCUiCommand& Command, bool bShift, bool bCtrl = false);
+	// Called directly by the controller's InputKey, before frame polling can merge/delay aircraft presses.
+	bool HandlePlaneInput(const FInputKeyEventArgs& Params);
+	bool PlanePressAt(FVector2D Pixel, bool bShift, bool bCtrl, double EventTime);
 	bool RecruitKey(const FString& Code, bool bShift, bool bCtrl, bool bAlt);
 	void NoteCardLetter(const FString& Type);
 	bool ScrollSelection(FVector2D Pixel, int32 Notch);
@@ -239,6 +251,7 @@ public:
 
 private:
 	friend struct FTCHud28Access;
+	friend struct FTCHud29Access;
 	// Physical bounds of the retained hit table. Canvas exists only during PostRender.
 	FVector2D DrawnViewport = FVector2D::ZeroVector;
 	struct FButton { FBox2D Rect; FTCUiCommand Command; FString Label; bool bEnabled = true; FString Hover; };
@@ -341,6 +354,8 @@ private:
 	FBox2D ControlsScrollBox = FBox2D(ForceInit);
 	float ControlsScroll = 0, ControlsScrollMax = 0;
 	FTCHudFit::FPlaneInteraction PlaneInteraction;
+	bool bPlanePointerDown = false;
+	double PlaneInputAt = -1;
 	int32 GroupDestination = 1;
 	bool bGroupDropdown = false;
 	FTCRecruitNavigation RecruitNavigation;

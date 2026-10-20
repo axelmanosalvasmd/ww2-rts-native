@@ -21,6 +21,7 @@
 #   TC_PACKAGE_STAGE         UAT stage folder (default <work>/staged)
 #   TC_PACKAGE_CLEAN=1       empty the work folder's project copy first (a build from nothing)
 #   TC_PACKAGE_JOBS          compile processes at once (default: half the logical cores, at most 8)
+#   TC_PACKAGE_NO_UBA=1      run compilers without build acceleration for this package only
 #   TC_PACKAGE_MIN_FREE_GB   free space needed in the work and output folders (default 30)
 #   TC_PACKAGE_DEBUGINFO=1   compile and keep the separate debug files (.debug, .sym; large)
 #   TC_PACKAGE_SKIP_TABLE_CHECK=1   skip the generated-table comparison with the reference (it needs node)
@@ -157,6 +158,7 @@ uat() {
 	export uebp_LogFolder="$logs/uat"
 	local debug=(-nodebuginfo); [[ "${TC_PACKAGE_DEBUGINFO:-0}" == 1 ]] && debug=()
 	local ubt="-MaxParallelActions=$JOBS"
+	[[ "${TC_PACKAGE_NO_UBA:-0}" == 1 ]] && ubt+=" -NoUBA"
 	[[ "${TC_PACKAGE_DEBUGINFO:-0}" == 1 ]] || ubt+=" -NoDebugInfo"
 	local cmd=("$RUNUAT" BuildCookRun -project="$MIRROR/$PROJECT_NAME.uproject" -target="$PROJECT_NAME" -platform=Linux
 		-clientconfig=Development -build -cook -stage -pak -iostore -compressed -package -archive

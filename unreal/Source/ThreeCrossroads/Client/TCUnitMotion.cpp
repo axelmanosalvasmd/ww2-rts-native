@@ -1160,6 +1160,14 @@ void UTCSoldierCrowd::SwapMen(int32 UnitId, int32 A, int32 B)
 	if (R && R->Men.IsValidIndex(A) && R->Men.IsValidIndex(B)) Swap(R->Men[A], R->Men[B]);
 }
 
+void UTCSoldierCrowd::FollowHiddenSquad(int32 UnitId, const FTCInfantrySquadAnimation& Animation, const FTransform& Root)
+{
+	FSquadRecord* R = Squads.Find(UnitId);
+	if (!R) return;
+	for (int32 I = 0; I < R->Men.Num() && I < Animation.Men().Num(); I++)
+		if (R->Men[I].bSet) R->Men[I].Man = Animation.ManTransform(I, Root);
+}
+
 void UTCSoldierCrowd::SquadAlive(int32 UnitId, int32 Alive)
 {
 	FSquadRecord& R = Squads.FindOrAdd(UnitId);

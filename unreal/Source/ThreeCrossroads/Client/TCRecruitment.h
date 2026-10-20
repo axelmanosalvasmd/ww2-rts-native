@@ -172,6 +172,7 @@ public:
 	// The reference commit the built-in recruit table was generated from.
 	static const TCHAR* const ReferencePin;
 	static const FTCRecruitDef* Find(const FString& Type);
+	static int32 SelectionRank(const FString& Type);
 	// client/hud.js unitTip and client/unit-roles.js, before the original English-keyed translation.
 	static FString UnitTip(const FString& Type, const FString& DisplayName, const FString& Extra = FString());
 	FString CardTip(const FTCRecruitCard& Card, const FString& DisplayName) const;

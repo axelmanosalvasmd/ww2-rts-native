@@ -130,8 +130,15 @@ void ATCUnitRenderer::Draw(const FTCMatchState& State, const FTCUnitTable& Table
 		// main.js: v.aim = lerpAngle(v.aim, v.taim, k * 0.6)
 		if (!S.bAimSet) { S.Aim = U.Aim; S.bAimSet = true; }
 		S.Aim += FMath::FindDeltaAngleRadians(S.Aim, U.Aim) * Ease * 0.6f;
-		if (!IsDrawn(U)) continue; // inside a building or a carrier, or a plane parked at its base (client/main.js)
 		const FTCUnitDef* Def = Table.Find(U.Type);
+		if (!IsDrawn(U))
+		{
+			// Hidden planes still remember their heading; carried squads resume without a travel burst.
+			if (UsesModel(U.Type) && Def && !Def->bInfantry && !Def->bStructure)
+				UnitMotion.Update(U.Id, U.Type, ATCTerrain::ToWorld(S.X, S.Z, 0), S.Rot, false, DeltaSeconds, GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0);
+			SuspendSquad(U, S, Terrain ? Terrain->HeightAt(S.X, S.Z) : 0, DeltaSeconds);
+			continue;
+		}
 		if (UsesModel(U.Type) && Library.IsLoaded() && DrawModel(State, U, Def, S, Terrain, Selected.Contains(U.Id), DeltaSeconds, Eye))
 		{
 			Stats.ModelUnits++;

@@ -410,7 +410,16 @@ void FTCAtmosphere::SyncGround(const ATCTerrain* Terrain, bool bForce)
 	GroundSyncAt = Now; LastTerrainChunks = Chunks;
 	TArray<AActor*> Sources;
 	if (Terrain) Sources.Add(const_cast<ATCTerrain*>(Terrain));
+	ExtraGround.RemoveAll([](const TWeakObjectPtr<AActor>& A) { return !A.IsValid(); });
 	for (const TWeakObjectPtr<AActor>& A : ExtraGround) if (A.IsValid()) Sources.Add(A.Get());
+	// The holder actor owns its components. Removing only a weak map entry leaves the old mesh registered,
+	// rendering weather over retired ground and retaining its vertex/index buffers until the whole view detaches.
+	for (auto It = Overlays.CreateIterator(); It; ++It)
+		if (!It.Key().IsValid() || !It.Key()->IsRegistered() || !Sources.Contains(It.Key()->GetOwner()))
+		{
+			if (UProceduralMeshComponent* Old = It.Value().Get()) Old->DestroyComponent();
+			It.RemoveCurrent();
+		}
 	int32 Mirrored = 0;
 	for (AActor* A : Sources)
 	{
@@ -534,7 +543,7 @@ void FTCAtmosphere::Update(float Dt, const FTCMatchState& State, const ATCTerrai
 		if (PC && PC->PlayerCameraManager) GroundMat->SetVectorParameterValue(TEXT("CamPos"), FLinearColor(PC->PlayerCameraManager->GetCameraLocation()));
 	}
 	for (TPair<TWeakObjectPtr<UProceduralMeshComponent>, TWeakObjectPtr<UProceduralMeshComponent>>& O : Overlays)
-		if (UProceduralMeshComponent* C = O.Value.Get()) C->SetVisibility(bCloudsShown || bCoverShown);
+		if (UProceduralMeshComponent* C = O.Value.Get()) C->SetVisibility(O.Key.IsValid() && O.Key->IsVisible() && (bCloudsShown || bCoverShown));
 
 	// the fog of war over these layers (the ground's own dimming: 1, 0.55, 0.32)
 	if (Fog.Update(State, Terrain) || bFogParamsStale)
@@ -1119,6 +1128,17 @@ bool FTCAtmosphereOracleTest::RunTest(const FString& Parameters)
 	View.SyncGround(Terrain, true);
 	Mirrored = Mirror->GetProcMeshSection(0);
 	TestTrue(TEXT("weather overlay follows changed triangle connections"), Mirrored && Mirrored->ProcIndexBuffer == Probe->GetProcMeshSection(0)->ProcIndexBuffer);
+	Probe->SetVisibility(false);
+	View.Update(0.f, State, Terrain, nullptr, FVector2D(90, 100));
+	TestFalse(TEXT("weather does not expose a hidden source mesh"), Mirror->IsVisible());
+	Probe->SetVisibility(true);
+	View.Update(0.f, State, Terrain, nullptr, FVector2D(90, 100));
+	TestTrue(TEXT("weather returns when its source is shown"), Mirror->IsVisible());
+	const TWeakObjectPtr<UProceduralMeshComponent> RetiredSource(Probe);
+	Probe->DestroyComponent();
+	View.SyncGround(Terrain, true);
+	TestFalse(TEXT("retired ground releases the registered weather mirror"), Mirror->IsRegistered());
+	TestFalse(TEXT("retired ground leaves no stale mirror entry"), View.Overlays.Contains(RetiredSource));
 	View.StopMatch();
 	View.Detach();
 	return true;

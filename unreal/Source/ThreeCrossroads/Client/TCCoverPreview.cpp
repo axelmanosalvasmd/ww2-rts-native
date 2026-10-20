@@ -275,13 +275,16 @@ void FTCCoverPreview::Gather(const FTCMatchState& State, const TSet<int32>& Sele
 		return true;
 	};
 
-	TArray<int32> Ids;
-	State.Units.GetKeys(Ids);
-	Ids.Sort();
-	Out.Units.Reserve(Ids.Num());
-	for (const int32 Id : Ids)
+	// scanUnit's first 48 hulls and equal-distance shooter tie follow the recipient Map's insertion order.
+	TArray<int32> Fallback;
+	const TArray<int32>* Ids = &State.UnitOrder;
+	if (Ids->Num() != State.Units.Num()) { State.Units.GetKeys(Fallback); Ids = &Fallback; }
+	Out.Units.Reserve(Ids->Num());
+	for (const int32 Id : *Ids)
 	{
-		const FTCUnit& U = State.Units[Id];
+		const FTCUnit* Held = State.Units.Find(Id);
+		if (!Held) continue;
+		const FTCUnit& U = *Held;
 		FTCCoverUnitFacts F;
 		FVector2D At;
 		if (!Facts(U.Type, F) || !Drawn(U, At)) continue;

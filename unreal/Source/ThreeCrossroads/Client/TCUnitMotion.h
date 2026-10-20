@@ -217,6 +217,7 @@ class THREECROSSROADS_API UTCSoldierCrowd : public USceneComponent
 {
 	GENERATED_BODY()
 	friend class ATCUnitRenderer; // optional recipient-to-instance visibility audit, including submitted crowd keys
+	friend class FTCRender29SnapshotTest; // observe the fallen figure and position without a production debug API
 
 public:
 	UTCSoldierCrowd();
@@ -237,6 +238,8 @@ public:
 	void SquadAlive(int32 UnitId, int32 Alive);
 	// Keep the previous standing records attached to the same models when an operative hits a specific man.
 	void SwapMen(int32 UnitId, int32 A, int32 B);
+	// Hidden squad roots still follow their delivered/eased position, without submitting any figures.
+	void FollowHiddenSquad(int32 UnitId, const FTCInfantrySquadAnimation& Animation, const FTransform& Root);
 	// A squad left the snapshot; when it was killed (main.js removeUnit, v.killed) its men still standing fall.
 	void SquadGone(int32 UnitId, bool bKilled);
 	// unit-models.js bodies.add: a body without a squad (a man given by figure, place and facing).

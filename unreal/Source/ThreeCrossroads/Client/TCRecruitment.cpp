@@ -286,6 +286,8 @@ const FTCRecruitDef* FTCRecruitment::Find(const FString& Type)
 	return At ? &Table().Defs[*At] : nullptr;
 }
 
+int32 FTCRecruitment::SelectionRank(const FString& Type) { return Rank(Type); }
+
 FString FTCRecruitment::UnitTip(const FString& Type, const FString& DisplayName, const FString& Extra)
 {
 	const FTCRecruitDef* D=Find(Type);

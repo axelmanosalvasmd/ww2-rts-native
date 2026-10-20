@@ -559,7 +559,7 @@ void ATCHUD::DrawHealthBars()
 		const float Frac = FMath::Max(0.f, (float)U.Hp / D->MaxHp());
 		const bool bSel = PC->Selected.Contains(U.Id);
 		// round 17 (markers): the veterancy stars sit in the bar group and show whether or not the bar does
-		const bool bBar = TCMarkersCore::HealthBarShown(Frac, U.Supp, bSel, PC->HoverEnemy == U.Id, bGarr);
+		const bool bBar = TCMarkersCore::HealthBarShown(Frac, U.Supp, bSel, PC->HoverUnit == U.Id, bGarr);
 		// The reference role badge remains visible when a healthy unit has no bar.
 		FVector2D At(U.X, U.Z);
 		if (M->Units) M->Units->DrawnAt(U.Id, At);
@@ -576,6 +576,8 @@ void ATCHUD::DrawHealthBars()
 		Billboard.PxPerMetre = PxPerM; Billboard.World = W; Billboard.Health = Frac;
 		Billboard.Suppression = U.Supp; Billboard.Cover = U.Cover; Billboard.Stars = U.Stars;
 		Billboard.bHealthBar = bBar; Billboard.bGarrisoned = bGarr;
+		const FString Supply = M->Logistics.IndicatorFor(U.Id);
+		if (!Supply.IsEmpty()) Billboard.SupplyColour = FTCLogistics::IndicatorColor(Supply);
 	}
 	TCMarkersHud::DrawUnitBillboards(Canvas, Billboards);
 }
@@ -798,19 +800,16 @@ void ATCHUD::DrawMinimapPoints()
 		{
 			const double A0 = 2 * PI * K / Segs, A1 = 2 * PI * (K + 1) / Segs;
 			const FVector2D B0 = Px + FVector2D(FMath::Cos(A0), FMath::Sin(A0)) * Rad, B1 = Px + FVector2D(FMath::Cos(A1), FMath::Sin(A1)) * Rad;
-			FCanvasTriangleItem Tri(Px, B0, B1, GWhiteTexture);
-			Tri.SetColor(Fill);
-			Tri.BlendMode = SE_BLEND_Translucent;
-			Canvas->DrawItem(Tri);
-			DrawLine(B0.X, B0.Y, B1.X, B1.Y, FLinearColor::Black, Cs);
+			Minimap.DrawPolygon(Canvas,{Px,B0,B1},Fill);
+			Minimap.DrawSegment(Canvas,B0,B1,FLinearColor::Black,Cs);
 		}
 		// cut off from its HQ: a red cross through it
 		if (P.bCut)
 		{
 			const float R = Rad * 0.7f;
 			const FLinearColor C(FColor(0xd0, 0x36, 0x2c));
-			DrawLine(Px.X - R, Px.Y - R, Px.X + R, Px.Y + R, C, 3*Cs);
-			DrawLine(Px.X + R, Px.Y - R, Px.X - R, Px.Y + R, C, 3*Cs);
+			Minimap.DrawSegment(Canvas,Px-FVector2D(R,R),Px+FVector2D(R,R),C,3*Cs);
+			Minimap.DrawSegment(Canvas,Px+FVector2D(R,-R),Px+FVector2D(-R,R),C,3*Cs);
 		}
 		// locked for this side: dashed to the point it needs
 		FVector2D To;
@@ -821,7 +820,7 @@ void ATCHUD::DrawMinimapPoints()
 			for (double T = 0; T < L; T += 10.0*Cs)
 			{
 				const FVector2D A = Px + D * T, B = Px + D * FMath::Min(L, T + 6.0*Cs);
-				DrawLine(A.X, A.Y, B.X, B.Y, Brass, 2*Cs);
+				Minimap.DrawSegment(Canvas,A,B,Brass,2*Cs);
 			}
 		}
 	}
@@ -832,8 +831,8 @@ void ATCHUD::DrawMinimapPoints()
 			FVector2D Q[4]; const FVector2D At=S.Spawns[I].GetValue();
 			const FVector2D D[4]={{-5,-5},{5,-5},{5,5},{-5,5}};
 			for (int32 K=0; K<4; K++) Minimap.WorldToPixel(At+D[K],Q[K]);
-			FillQuad(Q,ATCUnitRenderer::SeatColor(I));
-			for (int32 K=0; K<4; K++) DrawLine(Q[K].X,Q[K].Y,Q[(K+1)%4].X,Q[(K+1)%4].Y,FLinearColor::Black,Cs);
+			Minimap.DrawPolygon(Canvas,{Q[0],Q[1],Q[2],Q[3]},ATCUnitRenderer::SeatColor(I));
+			for (int32 K=0; K<4; K++) Minimap.DrawSegment(Canvas,Q[K],Q[(K+1)%4],FLinearColor::Black,Cs);
 		}}
 
 void ATCHUD::DrawMinimapAlertRings()

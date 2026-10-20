@@ -353,6 +353,7 @@ void FTCWorldObjects::RememberLook(int32 Cell, const FJsonObject& Data)
 	const int32 Type = HouseTypeNamed(Kind);
 	if (Type >= 0) Named.Add(Cell, Type);
 	if (Kind.Equals(TEXT("spoil"), ESearchCase::CaseSensitive)) SpoilCells.Add(Cell);
+	if (Kind.Equals(TEXT("stone bridge"), ESearchCase::CaseSensitive)) StoneBridgeSeeds.Add(Cell);
 }
 
 void FTCWorldObjects::ApplySnapshot(const FJsonObject& M)

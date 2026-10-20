@@ -6180,3 +6180,7 @@ R1 remains NOT qualified. The exact approved source is 8f37717cb0b78fca9786ae0bd
 ## Unreal client slice 1ab (2026-10-20)
 
 See [the slice 1ab decisions and measured validation](design.d/2026-10-20-unreal-slice1ab.md). All client status labels and the approved ABI pin remain unchanged.
+
+## Unreal client slice 1ad (2026-10-20)
+
+See [slice 1ad implementation and executed validation](design.d/2026-10-20-unreal-slice1ad.md). The approved ABI pin and R1 refusal remain unchanged.

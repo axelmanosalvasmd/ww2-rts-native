@@ -655,7 +655,7 @@ void ATCPlayerController::PlayerTick(float DeltaTime)
 	CheckIntroSkip();
 	UpdateCamera(DeltaTime, bFocused);
 	ATCGameMode* M = Mode();
-	HoverEnemy = 0;
+	HoverEnemy = 0; HoverUnit = 0;
 	if (M) Groups.Sync(M->State); // a new match or seat empties the groups, a reconnect to the same match keeps them
 	if (M && M->State.bHasMatch && M->Units && M->Terrain)
 	{
@@ -765,6 +765,8 @@ bool ATCPlayerController::InputKey(const FInputKeyEventArgs& Params)
 	if (Params.Event == IE_Pressed || Params.Event == IE_Repeat || Params.Event == IE_Released)
 		if (ATCGameMode* M = Mode())
 			if (M->ControlsKey(Params.Key, Params.Event != IE_Released, IsInputKeyDown(EKeys::LeftShift) || IsInputKeyDown(EKeys::RightShift))) return true;
+	// Aircraft rows consume each delivered press before frame polling can merge fast clicks.
+	if (ATCHUD* Hud=Cast<ATCHUD>(GetHUD()); Hud && Hud->HandlePlaneInput(Params)) return true;
 	return Super::InputKey(Params);
 }
 
@@ -819,7 +821,8 @@ void ATCPlayerController::UpdatePointer(bool bFocused)
 	const bool bCtrl = IsInputKeyDown(EKeys::LeftControl) || IsInputKeyDown(EKeys::RightControl);
 	FVector2D Mouse;
 	const bool bInside = CursorPixels(Mouse, false);
-	if (bInside && M) HoverEnemy = PickAt(Mouse, [M](const FTCUnit& U, const FTCUnitDef&) { return M->State.IsFoe(U.Owner); });
+	HoverUnit = bInside && M ? PickAt(Mouse, [](const FTCUnit&, const FTCUnitDef&) { return true; }) : 0;
+	HoverEnemy = bInside && M ? PickAt(Mouse, [M](const FTCUnit& U, const FTCUnitDef&) { return M->State.IsFoe(U.Owner); }) : 0;
 	if (!bPointerPinned) bPointerGround = bInside && GroundAt(Mouse, PointerGround);
 
 	UpdateCommandKeys();

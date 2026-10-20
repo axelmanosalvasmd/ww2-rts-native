@@ -292,6 +292,7 @@ namespace TCMarkersCore
 		return Selected || Hovered || 2.3 * Fraction < 2.299 || Suppression > 0 || Garrisoned;
 	}
 	struct FBarRect { double X, Y, W, H; };
+	inline constexpr double SupplySide = .4, SupplyX = 2.1;
 	inline constexpr FBarRect HealthBackdrop = { -1.2, -.21, 2.4, .42 };
 	inline FBarRect HealthFill(double Fraction) { return { -1.15, -.17, 2.3 * std::fmax(0.0, Fraction), .2 }; }
 	inline FBarRect SuppressionFill(double Suppression) { return { -1.15, .06, 2.3 * Suppression / 100, .1 }; }
@@ -502,6 +503,7 @@ namespace TCMarkersHud
 	struct FUnitBillboard
 	{
 		FString Type;
+		FColor SupplyColour = FColor::Transparent; // absent unless this recipient has a reserve warning
 		int32 Owner = -1, Suppression = 0, Cover = 0, Stars = 0;
 		FVector2D Centre = FVector2D::ZeroVector;
 		FVector World = FVector::ZeroVector;

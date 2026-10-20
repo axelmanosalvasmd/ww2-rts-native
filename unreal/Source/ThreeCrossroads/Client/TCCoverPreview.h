@@ -230,7 +230,7 @@ public:
 	static const TCHAR* MenuTip();
 
 	// ---------- what the client knows ----------
-	// Reads this client's match state and selection into Out (scan, scanSel): units by ascending id at the caller's
+	// Reads this client's match state and selection into Out (scan, scanSel): units in recipient insertion order at the caller's
 	// drawn positions, judged against this seat (FTCMatchState::IsOwn, IsFoe). Out's views point into State and
 	// Sources: keep both alive and unchanged while Out is used.
 	static void Gather(const FTCMatchState& State, const TSet<int32>& Selected, const FTCCoverSources& Sources, FTCCoverKnown& Out);

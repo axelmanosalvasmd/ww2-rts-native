@@ -1290,7 +1290,7 @@ void ATCGameMode::ControlsFrame()
 					Did=FString::Printf(TEXT("hudinertclick producer=%d type=%s at observed disabled slot %.1f,%.1f through held engine input; %s; clock=%.8f tick=%d; verify consumer input, no cancel wire or refund and retained active job"),Producer,*Fields[1],At.X,At.Y,*Hud->DrawnTargetDescription(At),Now,State.Tick);
 				}
 			}
-			else if ((St.Action == TEXT("hudhover") || St.Action == TEXT("hudpress") || St.Action == TEXT("hudshift") || St.Action == TEXT("hudclick") || St.Action == TEXT("hudshiftclick") || St.Action == TEXT("hudctrlclick") || St.Action == TEXT("hudrightclick")) && PC)
+			else if ((St.Action == TEXT("hudhover") || St.Action == TEXT("hudpress") || St.Action == TEXT("hudshift") || St.Action == TEXT("hudclick") || St.Action == TEXT("huddoubleclick") || St.Action == TEXT("hudshiftclick") || St.Action == TEXT("hudctrlclick") || St.Action == TEXT("hudrightclick")) && PC)
 			{
 				// Verification only: consume command fields from TCHudAudit and require the complete real drawn hit.
 				TArray<FString> Fields; St.Arg.ParseIntoArray(Fields,TEXT("|"),false);
@@ -1304,6 +1304,14 @@ void ATCGameMode::ControlsFrame()
 				else
 				{
 					PC->SetMouseLocation(FMath::RoundToInt(At.X),FMath::RoundToInt(At.Y));
+					if (St.Action==TEXT("huddoubleclick"))
+					{
+						// Two delivered pairs in one frame exercise the real InputKey consumer without a render delay.
+						for (int32 Press=0;Press<2;Press++) { PC->InjectKey(EKeys::LeftMouseButton,true); PC->InjectKey(EKeys::LeftMouseButton,false); }
+						Did=FString::Printf(TEXT("huddoubleclick %s through two delivered engine input pairs; selected=%d"),*Wanted.Describe(),PC->Selected.Num());
+					}
+					else
+					{
 					const bool Click=St.Action.EndsWith(TEXT("click"));
 					if (Click)
 					{
@@ -1328,6 +1336,7 @@ void ATCGameMode::ControlsFrame()
 					{
 						const bool Hover=St.Action==TEXT("hudhover"), Ran=Hover || PC->PressCommand(Wanted,St.Action==TEXT("hudshift"));
 						Did=FString::Printf(TEXT("%s %s at drawn hit %.1f,%.1f, handled=%d"),*St.Action,*Wanted.Describe(),At.X,At.Y,Ran);
+					}
 					}
 				}
 			}
@@ -1379,6 +1388,12 @@ void ATCGameMode::ControlsFrame()
 				for (int32 K = FCString::Atoi(*St.Arg); K > 0; K--) { PC->InjectKey(EKeys::BackSpace, true); PC->InjectKey(EKeys::BackSpace, false); }
 				Did = FString::Printf(TEXT("Backspace x%s (field %s: '%s')"), *St.Arg, LexToString(Form.Active), *Form.Buffer);
 			}
+            else if (St.Action == TEXT("cursor") && PC)
+            {
+             TArray<FString> XY; St.Arg.ParseIntoArray(XY,TEXT("|"));
+             if (XY.Num()==2) PC->SetMouseLocation(FCString::Atoi(*XY[0]),FCString::Atoi(*XY[1]));
+             Did=TEXT("verification cursor ")+St.Arg;
+            }
 			else if (St.Action == TEXT("key") && PC) { const FKey K(*St.Arg); PC->InjectKey(K, true); PC->InjectKey(K, false); Did = TEXT("key ") + St.Arg; }
 			else if ((St.Action == TEXT("keydown") || St.Action == TEXT("keyup")) && PC)
 			{

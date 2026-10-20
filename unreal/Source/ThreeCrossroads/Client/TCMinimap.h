@@ -339,6 +339,10 @@ public:
 	void DrawUnits(UCanvas* Canvas, const FTCMatchState& State, const FTCUnitTable& Table, const TSet<int32>& Selected);
 	// alerts.js radii and stroke widths are in the source 240-pixel canvas, before CSS/UI scaling.
 	void DrawRing(UCanvas* Canvas, FVector2D Ground, float CanvasRadius, float CanvasWidth, FLinearColor Colour);
+	// All overlays share the minimap canvas boundary, including rings centred near an edge.
+	static TArray<FVector2D> ClipPolygon(const TArray<FVector2D>& Polygon, const FBox2D& Clip);
+	void DrawPolygon(UCanvas* Canvas, const TArray<FVector2D>& PolygonPixels, FLinearColor Colour) const;
+	void DrawSegment(UCanvas* Canvas, FVector2D A, FVector2D B, FLinearColor Colour, float Width = 1.f) const;
 	// The camera's view outline over the minimap as last arranged (Draw calls it unless bDeferViewOutline). False when
 	// nothing of it was drawn (no layout, fewer than four corners, or all of it outside the square).
 	bool DrawViewOutline(UCanvas* Canvas, const FTCMinimapView& View);

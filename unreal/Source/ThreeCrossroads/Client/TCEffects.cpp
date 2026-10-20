@@ -1,4 +1,5 @@
 #include "Client/TCEffects.h"
+#include "Client/TCGraphics.h"
 #include "Client/TCAlerts.h"
 #include "Client/TCUnitTable.h"
 #include "Client/TCUnitRenderer.h"
@@ -604,7 +605,7 @@ void FTCCombatEffects::Reset()
 	ShakeAmount = 0.f; WindXZ = FVector2D(0.55, 0.25); TickNow = 0; RefitT = 0.f; SimTick = 0;
 	for (FBlastMark& B : Blasts) B = FBlastMark();
 	BlastNext = 0; DamageCues.Reset(); FrameDt = 0.f;
-	PlaneSmokeWait.Reset();
+	PlaneSmokeWait.Reset(); AircraftDraws.Reset(); NextAircraftSerial = 1;
 	Rng.Initialize(Seed);
 }
 
@@ -1313,14 +1314,14 @@ void FTCCombatEffects::AntiAir(const FTCShot& Sh, const FTCUnit* From, const FTC
 void FTCCombatEffects::AirShot(const FTCShot& Sh, const FTCShotExtra& Ex, const FTCUnit* From, const FTCUnit* To)
 {
 	// client/main.js applySnapshot's air shots, drawn by client/aircraft.js in the browser (its planes and canopies are
-	// models there: placeholder shapes here; its effects are fx.js's: fx.air flak, strafe, smoke, flame, crash)
+	// original catalog models here; its effects are fx.js's: fx.air flak, strafe, smoke, flame, crash)
 	Counters.AirShots++;
 	if (TCFxImpl::IsSupportPlane(Sh.K))
 	{
 		// aircraft.js supportPlane: the plane crosses the map over the spot along its heading; a strafing run walks hits
 		// along the ground; a bombing run's bombs come as their own 'bomb' shots
 		FPass P;
-		P.At = FVector2D(Sh.X, Sh.Z); P.Dir = Ex.bHasDir ? Ex.Dir : 0.0; P.Kind = Sh.K; P.T = 0.f; P.Owner = Sh.bHasShooterOwner ? Sh.Fo : -1;
+		P.At = FVector2D(Sh.X, Sh.Z); P.Dir = Ex.bHasDir ? Ex.Dir : 0.0; P.Kind = Sh.K; P.T = 0.f; P.Owner = Sh.bHasShooterOwner ? Sh.Fo : State_ ? State_->You : -1; P.Serial = NextAircraftSerial++;
 		if (Sh.K == TEXT("strafe")) for (int32 I = 0; I < 10; I++) P.Strafe.Add(1.3f + I * 0.04f);
 		if (Passes.Num() < 16) Passes.Add(MoveTemp(P));
 		Sound(Sh.K == TEXT("bombing") || Sh.K == TEXT("para") ? TEXT("bomber") : TEXT("plane_flyby"));
@@ -1342,8 +1343,12 @@ void FTCCombatEffects::AirShot(const FTCShot& Sh, const FTCShotExtra& Ex, const 
 		if (!Sh.Kind.IsEmpty())
 			for (FPass& P : Passes)
 				if (!P.bDown && P.Kind == Sh.Kind && FVector2D::Distance(P.At, FVector2D(Sh.X, Sh.Z)) < 1.5) { P.bDown = true; return; }
+		if (!To && Sh.bHasTarget) To = PrevHeld.Find(Sh.T);
+		const FString Type = To && FTCUnitMotion::IsPlane(To->Type) ? To->Type : TEXT("fighter");
+		const int32 Owner = To ? To->Owner : Sh.bHasTargetOwner ? Sh.To : State_ ? State_->You : -1;
 		const double G = Ground(Sh.X, Sh.Z), Heading = Ex.bHasDir ? Ex.Dir : To ? To->Rot : 0.0;
-		Falls.Add({ At(Sh.X, G + TCFxRules::AirAltitude, Sh.Z), FVector2D(FMath::Cos(Heading), FMath::Sin(Heading)), 20.f, 0.f, 0.f, 0.f });
+		const double Speed = Type == TEXT("attacker") ? 15.0 : Type == TEXT("bomber") ? 12.0 : 20.0;
+		BeginFall(At(Sh.X, G + TCFxRules::AirAltitude, Sh.Z), Heading, Speed, 0, Type, Owner);
 		Burst(At(Sh.X, G + TCFxRules::AirAltitude, Sh.Z), 1.5); // fx.js fall: burst(x, y, z, 1.5)
 		Sound(TEXT("flak"));
 		return;
@@ -1600,7 +1605,7 @@ void FTCCombatEffects::Frame(const FTCFxContext& Ctx, double Clock, float Dt)
 	Ctx_ = Ctx; ClockNow = Clock;
 	Dt = FMath::Clamp(Dt, 0.f, 0.25f);
 	FrameDt = Dt;
-	FlightDraws.Reset();
+	FlightDraws.Reset(); AircraftDraws.Reset();
 	Projectiles.Frame(Clock);
 	Debris.Frame(Clock);
 	RunEvents(Dt);
@@ -1623,33 +1628,53 @@ void FTCCombatEffects::RunEvents(float Dt)
 	}
 }
 
+void FTCCombatEffects::BeginFall(const FVector& P, double Heading, double Speed, double Vy, const FString& Type, int32 Owner, double Pitch)
+{
+	FFall F;
+	F.Motion.X = P.X; F.Motion.Y = P.Z; F.Motion.Z = P.Y;
+	F.Motion.Heading = Heading; F.Motion.Speed = Speed; F.Motion.Vy = Vy; F.Motion.Pitch = Pitch;
+	F.Motion.RollRate = 2 * (Rng.FRand() < .5 ? -1 : 1);
+	F.Motion.Yaw = (.9 + Rng.FRand() * .8) * (Rng.FRand() < .5 ? -1 : 1);
+	F.ModelType = Type; F.Owner = Owner; F.Serial = NextAircraftSerial++;
+	Falls.Add(MoveTemp(F));
+}
+
 void FTCCombatEffects::UpdateEmitters(float Dt)
 {
 	// fx.js updateFalls (and the support planes' passes), updateSections, updateRockets, updateWrecks, updateColumns,
 	// updateClouds, updateFires, in fx.js update's order
-	// planes going down in flames, a blast where they land (fx.js updateFalls)
+	// aircraft.js fall: turning, accelerating roll, pitch, drag, smoke and the delivered shoot-down lifecycle
 	for (int32 I = Falls.Num() - 1; I >= 0; I--)
 	{
 		FFall& F = Falls[I];
-		F.T += Dt; F.Vy -= 10 * Dt; F.Speed *= FMath::Exp(-0.3f * Dt);
-		F.P += FVector(F.D.X * F.Speed * Dt, F.D.Y * F.Speed * Dt, F.Vy * Dt);
-		const float Gy = Ground(F.P.X, F.P.Y);
-		if (F.P.Z <= Gy + 0.6f || F.T > 8)
+		TCRender29Aircraft::Advance(F.Motion, Dt);
+		const auto& M = F.Motion;
+		const FVector Position(M.X, M.Z, M.Y);
+		const double Gy = Ground(M.X, M.Z);
+		if (TCRender29Aircraft::Landed(M, Gy))
 		{
-			Explode(F.P.X, F.P.Y, 3.6, true, true, ETCFxPreset::Metal, 1.2);
-			Burning(FVector(F.P.X, F.P.Y, Gy + 0.8f), 0.9, 10, 24);
-			Sound(TEXT("vehicle_destroyed"));
-			Falls.RemoveAt(I);
-			continue;
+			Explode(M.X, M.Z, 3.6, true, true, ETCFxPreset::Metal, 1.2);
+			Burning(FVector(M.X, M.Z, Gy + .8), .9, 10, 24);
+			Sound(TEXT("vehicle_destroyed")); Falls.RemoveAt(I); continue;
 		}
-		const int32 O = Shape(ETCFxLook::Plane, F.P, FVector(F.D.X, F.D.Y, F.Vy / FMath::Max(1.f, F.Speed)) * 0.001, 3.f, Dt * 1.5f);
+		FTCFxAircraftDraw& Draw = AircraftDraws.AddDefaulted_GetRef();
+		Draw.Serial = F.Serial; Draw.Owner = F.Owner; Draw.Type = F.ModelType; Draw.P = Position;
+		Draw.Heading = M.Heading; Draw.Roll = M.Roll; Draw.Pitch = M.Pitch; Draw.PropAngle = M.Age * 30;
+		Draw.ShadowScale = 1 + (M.Y - Gy) * .012;
+		// Preserve the legacy shape only as an asset-missing fallback. Normal rendering uses the original model.
+		const int32 O = Shape(ETCFxLook::Plane, Position, FVector(FMath::Cos(M.Heading), FMath::Sin(M.Heading), M.Vy / FMath::Max(1., M.Speed)) * .001, 3.f, Dt * 1.5f);
 		if (O >= 0) Live[O].Stretch = 5.f;
-		for (F.Acc += Dt; F.Acc >= 0.035f; F.Acc -= 0.035f)
+		if ((F.Acc -= Dt) <= 0)
 		{
-			Tint(Emit(ETCFxPreset::WreckSmoke, F.P - FVector(F.D.X, F.D.Y, 0) * 1.5f, FVector(Rr(-0.3, 0.3), Rr(-0.3, 0.3), Rr(0.3, 0.9)), Rr(0.5, 0.8), Rr(2.2, 3.4)), 0.8f);
-			Emit(ETCFxPreset::Burn, F.P + FVector(Rr(-0.4, 0.4), Rr(-0.4, 0.4), Rr(-0.2, 0.3)), FVector(0, 0, Rr(0.5, 1.5)), Rr(0.6, 1.0), Rr(0.25, 0.4));
+			const bool bLow = FTCGraphics::Get().IsLow();
+			F.Acc = bLow ? .07 : .035;
+			const FVector Heading(FMath::Cos(M.Heading), FMath::Sin(M.Heading), 0);
+			Emit(ETCFxPreset::AirSmokeDark, Position - Heading * 3 + FVector(0, 0, .3),
+				At(Rr(-.25, .25), Rr(.6, 1.2), Rr(-.25, .25)), Rr(.55, .8), bLow ? 1.1 : Rr(1.5, 2.1));
+			Emit(ETCFxPreset::Burn, Position + Heading * 2.5, At(0, .8, 0), Rr(.6, .8), Rr(.2, .3));
 		}
 	}
+
 	// support planes crossing (aircraft.js supportPlane tick): the plane, its strafing hits (fx.air 'strafe'), flak
 	// around it (fx.air 'flak'), a fall
 	for (int32 I = Passes.Num() - 1; I >= 0; I--)
@@ -1667,12 +1692,20 @@ void FTCCombatEffects::UpdateEmitters(float Dt)
 		while (P.Flak.Num() && P.Flak[0] <= P.T) { P.Flak.RemoveAt(0); Burst(FVector(X + Dx * 3 + (Rng.FRand() - 0.5) * 5, Z + Dz * 3 + (Rng.FRand() - 0.5) * 5, Y + (Rng.FRand() - 0.5) * 4)); }
 		if (P.bDown && P.T >= 1.3f)
 		{
-			Falls.Add({ FVector(X, Z, Y), FVector2D(Dx, Dz), (float)(TCFxRules::PlaneSpan / TCFxRules::PlaneRun * 0.75), U < 0.5 ? -10.f : 10.f, 0.f, 0.f });
+			const FString Type = P.Kind == TEXT("para") ? TEXT("transport") : P.Kind == TEXT("bombing") ? TEXT("bomber") : P.Kind == TEXT("recon") ? TEXT("fighter") : TEXT("attacker");
+			BeginFall(FVector(X, Z, Y), P.Dir, TCFxRules::PlaneSpan / TCFxRules::PlaneRun * .75, U < .5 ? -10. : 10., Type, P.Owner,
+				FMath::Atan2(U < .5 ? -10. : 10., TCFxRules::PlaneSpan / TCFxRules::PlaneRun));
 			Burst(FVector(X + Dx * 2, Z + Dz * 2, Y + 0.5), 1.5);
 			Passes.RemoveAt(I);
 			continue;
 		}
 		if (U >= 1) { Passes.RemoveAt(I); continue; }
+		FTCFxAircraftDraw& Draw = AircraftDraws.AddDefaulted_GetRef();
+		Draw.Serial = P.Serial; Draw.Owner = P.Owner;
+		Draw.Type = P.Kind == TEXT("para") ? TEXT("transport") : P.Kind == TEXT("bombing") ? TEXT("bomber") : P.Kind == TEXT("recon") ? TEXT("fighter") : TEXT("attacker");
+		Draw.P = FVector(X, Z, Y); Draw.Heading = P.Dir; Draw.PropAngle = P.T * 24;
+		Draw.Pitch = FMath::Atan2(U < .5 ? -10. : 10., TCFxRules::PlaneSpan / TCFxRules::PlaneRun);
+		Draw.ShadowScale = 1 + (Y - Ground(X, Z)) * .012;
 		const int32 O = Shape(ETCFxLook::Plane, FVector(X, Z, Y), FVector(Dx, Dz, 0) * 0.001, 3.f, Dt * 1.5f);
 		if (O >= 0) Live[O].Stretch = 5.f;
 	}
@@ -2181,6 +2214,8 @@ FTCFxContext ATCEffects::MakeContext() const
 void ATCEffects::OnStart(const FTCMatchState& S)
 {
 	Fx.Start(S);
+	AircraftHistory.Reset(); LastAircraftInstances = 0;
+	for (auto& Pair : AircraftBatches) if (Pair.Value) Pair.Value->ClearInstances();
 	RubbleKey = 0; RubbleList.Reset();
 	if (RubbleBatch) RubbleBatch->Publish(FTCFxGroundFrame());
 	SyncRubble();
@@ -2197,6 +2232,8 @@ void ATCEffects::Reset()
 {
 	Fx.Reset();
 	for (auto& Pair : Batches) if (Pair.Value) Pair.Value->ClearInstances();
+	for (auto& Pair : AircraftBatches) if (Pair.Value) Pair.Value->ClearInstances();
+	AircraftHistory.Reset(); LastAircraftInstances = 0;
 	if (SpriteBatch) SpriteBatch->Publish(TArray<FTCFxSpriteDraw>());
 	if (CraterBatch) CraterBatch->Publish(FTCFxGroundFrame());
 	if (RubbleBatch) RubbleBatch->Publish(FTCFxGroundFrame());
@@ -2439,9 +2476,92 @@ void ATCEffects::DamageFrame(float Dt)
 	Fx.RetainDamage(Present);
 }
 
+int32 ATCEffects::DrawAircraftModels()
+{
+	if (Fx.AircraftNow().IsEmpty() && AircraftBatches.IsEmpty()) return 0;
+	if (!bAircraftLibraryTried)
+	{
+		bAircraftLibraryTried = true;
+		FString Error;
+		if (!AircraftLibrary.Load(Error)) UE_LOG(LogTC, Warning, TEXT("effect aircraft use fallback shapes: %s"), *Error);
+	}
+	struct FFrame { TArray<FTransform> Transforms; TArray<uint64> Keys; TArray<float> Data; int32 Floats = 0; };
+	TMap<UInstancedStaticMeshComponent*, FFrame> Frames;
+	int32 Count = 0;
+	for (const FTCFxAircraftDraw& Draw : Fx.AircraftNow())
+	{
+		const int32 Faction = State && State->Factions.IsValidIndex(Draw.Owner) ? State->Factions[Draw.Owner] : Draw.Owner < 0 ? 0 : Draw.Owner % 3;
+		const FTCModelEntry* Entry = AircraftLibrary.Resolve({Draw.Type, Faction, FString()});
+		if (!Entry) continue;
+		const TArray<float> Custom = AircraftLibrary.CustomData(Draw.Owner, Faction, 1.f, 0.f);
+		FTCPartMotion Motion;
+		// Three's ZXY body: Rz(pitch) * Rx(roll), conjugated by the Y/Z axis reflection.
+		Motion.Body = FTransform(FQuat(FVector::RightVector, -Draw.Pitch) * FQuat(FVector::ForwardVector, -Draw.Roll));
+		for (const FTCModelPart& Part : Entry->Parts)
+			if (Part.Name.ToString().StartsWith(TEXT("prop_"))) Motion.Parts.Add(Part.Name, FTransform(FQuat(FVector::ForwardVector, -Draw.PropAngle)));
+		const FTransform Root(FQuat(FVector::UpVector, Draw.Heading), Draw.P * 100., FVector(Draw.Scale));
+		const TMap<FName, FQuat> NoTurns;
+		for (int32 I = 0; I < Entry->Parts.Num(); I++)
+		{
+			const FTCModelPart& Part = Entry->Parts[I];
+			if (Part.bHidden) continue;
+			FString Key = Part.Mesh.ToString();
+			for (const FSoftObjectPath& M : Part.Materials) Key += TEXT("|") + M.ToString();
+			TObjectPtr<UInstancedStaticMeshComponent>* Found = AircraftBatches.Find(Key);
+			if (!Found)
+			{
+				UInstancedStaticMeshComponent* Ism = NewObject<UInstancedStaticMeshComponent>(this);
+				if (!FTCModelLibrary::SetupComponent(Ism, Part, false)) { AircraftBatches.Add(Key, nullptr); continue; }
+				Ism->SetCastShadow(false);
+				if (TCLook::HasUnitSun(GetWorld())) Ism->SetLightingChannels(false, true, false);
+				Ism->SetupAttachment(RootComponent); Ism->RegisterComponent();
+				Found = &AircraftBatches.Add(Key, Ism);
+			}
+			if (!*Found) continue;
+			FFrame& F = Frames.FindOrAdd(*Found); F.Floats = TCModelData::Count;
+			F.Transforms.Add(FTCUnitMotion::PartTransform(*Entry, I, Root, NoTurns, Motion));
+			F.Keys.Add(FTCInstanceHistory::PartKey(-Draw.Serial, I)); F.Data.Append(Custom); Count++;
+		}
+		const FTCAircraftSpec* Spec = FTCUnitMotion::AircraftSpec(Draw.Type, Faction);
+		if (!Spec && Draw.Type == TEXT("transport")) Spec = FTCUnitMotion::AircraftSpec(TEXT("bomber"), Faction);
+		if (!Spec) continue;
+		const FString ShadowKey = TEXT("shadow|") + Draw.Type + FString::FromInt(Faction);
+		TObjectPtr<UInstancedStaticMeshComponent>* Found = AircraftBatches.Find(ShadowKey);
+		if (!Found)
+		{
+			UMaterialInterface* Material = Cast<UMaterialInterface>(Spec->Shadow.TryLoad());
+			if (!Material) { AircraftBatches.Add(ShadowKey, nullptr); continue; }
+			UInstancedStaticMeshComponent* Ism = NewObject<UInstancedStaticMeshComponent>(this);
+			Ism->SetStaticMesh(ATCUnitRenderer::AircraftShadowMesh(this, Material)); Ism->SetMaterial(0, Material);
+			Ism->SetCollisionEnabled(ECollisionEnabled::NoCollision); Ism->SetCastShadow(false);
+			Ism->SetMobility(EComponentMobility::Movable); Ism->SetTranslucentSortPriority(0);
+			Ism->SetupAttachment(RootComponent); Ism->RegisterComponent();
+			Found = &AircraftBatches.Add(ShadowKey, Ism);
+		}
+		if (!*Found) continue;
+		const double Ground = Terrain.IsValid() ? Terrain->HeightAt(Draw.P.X, Draw.P.Y) : 0;
+		FFrame& F = Frames.FindOrAdd(*Found);
+		const double Side = Spec->Ext * 2 * Draw.ShadowScale * Draw.Scale;
+		F.Transforms.Add(FTransform(FQuat(FVector::UpVector, Draw.Heading), FVector(Draw.P.X, Draw.P.Y, Ground + .3) * 100., FVector(Side, Side, 1)));
+		F.Keys.Add(FTCInstanceHistory::PartKey(-Draw.Serial, 60000)); Count++;
+	}
+	for (const auto& Pair : AircraftBatches)
+	{
+		UInstancedStaticMeshComponent* Ism = Pair.Value;
+		if (!Ism) continue;
+		const FFrame* F = Frames.Find(Ism);
+		if (!F && Ism->GetInstanceCount() == 0) continue;
+		AircraftHistory.Write(Ism, F ? F->Transforms : TArray<FTransform>(), F ? F->Keys : TArray<uint64>());
+		if (F && F->Floats > 0 && F->Transforms.Num()) Ism->SetCustomData(0, F->Transforms.Num() - 1, F->Data, false);
+		Ism->MarkRenderStateDirty();
+	}
+	return Count;
+}
+
 void ATCEffects::Draw(double Clock)
 {
 	EnsureComponents();
+	LastAircraftInstances = DrawAircraftModels();
 	if (Clock - LastLightAt > 1.0 || LastLightAt < 0.0) { LastLightAt = Clock; UpdateLight(); }
 	// the sprites (fx.js particles)
 	TArray<FTCFxSpriteDraw> Sprites;
@@ -2483,13 +2603,13 @@ void ATCEffects::Draw(double Clock)
 		}
 		CraterBatch->Publish(MoveTemp(F));
 	}
-	// the placeholder shapes: support planes, canopies, falling sections
+	// Fallback plane shapes and canopies. Original catalog aircraft and delivered sections draw separately.
 	TMap<int32, TArray<FTransform>> Frames;
 	for (const auto& Pair : Batches) Frames.Add(Pair.Key, {});
 	UStaticMesh* Meshes[] = { SphereMesh, CubeMesh, CylinderMesh, ConeMesh };
 	for (const FTCFxParticle& P : Fx.Particles())
 	{
-		if (P.Preset != ETCFxPreset::None) continue;
+		if (P.Preset != ETCFxPreset::None || (P.Look == ETCFxLook::Plane && AircraftLibrary.IsLoaded())) continue;
 		const TCFxImpl::FLookStyle St = TCFxImpl::ShapeStyle(P.Look);
 		const int32 Key = (int32)P.Look;
 		Batch(Key, Meshes[St.Mesh], St.Colour, true);
@@ -2537,7 +2657,7 @@ void ATCEffects::Draw(double Clock)
 		if (Ism->GetInstanceCount() == Pair.Value.Num()) { if (Pair.Value.Num()) Ism->BatchUpdateInstancesTransforms(0, Pair.Value, true, true, true); }
 		else { Ism->ClearInstances(); if (Pair.Value.Num()) Ism->AddInstances(Pair.Value, false, true); }
 	}
-	LastInstances = LastSprites + Decals + RubbleList.Num() + Shapes;
+	LastInstances = LastSprites + Decals + RubbleList.Num() + Shapes + LastAircraftInstances;
 }
 
 // Replay-only capture switch: before, first collapse frame, then 1 and 3 real seconds later.

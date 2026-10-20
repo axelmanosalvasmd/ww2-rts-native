@@ -48,6 +48,8 @@
 #include "Components/PrimitiveComponent.h"
 #include "Commandlets/Commandlet.h"
 #include "Net/TCMatchState.h"
+#include "Client/TCModelLibrary.h"
+#include "Client/TCRender29Aircraft.h"
 #include "TCEffects.generated.h"
 
 class FJsonObject;
@@ -191,6 +193,15 @@ struct FTCFxParticle
 	FRotator ShapeRot = FRotator::ZeroRotator;
 };
 
+// Original catalog aircraft drawn for delivered support passes and shoot-downs, separate from sprite particles.
+struct FTCFxAircraftDraw
+{
+ int32 Serial = 0, Owner = -1;
+ FString Type;
+ FVector P = FVector::ZeroVector; // Unreal axes, metres
+ double Heading = 0, Roll = 0, Pitch = 0, PropAngle = 0, Scale = 1, ShadowScale = 1;
+};
+
 // What the sprite batch draws of one particle this frame: fx.js simulate's instance attributes (iPos, iCol, iMisc,
 // iDir, iExt), in Unreal centimetres. The billboard itself is built per view by the sprite component.
 struct FTCFxSpriteDraw
@@ -332,6 +343,7 @@ public:
 
 	const TArray<FTCFxParticle>& Particles() const { return Live; }
 	const TArray<FTCFlightDraw>& FlightsNow() const { return FlightDraws; }
+	const TArray<FTCFxAircraftDraw>& AircraftNow() const { return AircraftDraws; }
 	// fx.js simulate's draw pass: every sprite out now (held-back ones are not), unsorted (the view sorts them)
 	void SpriteDraws(TArray<FTCFxSpriteDraw>& Out) const;
 	const TArray<FTCFxDecal>& Decals() const { return DecalPool; }
@@ -467,10 +479,13 @@ private:
 	int32 CloudSerial = 0;
 	struct FRocket { FVector P0, V; float G, T, Dur, Acc; };
 	TArray<FRocket> Rockets;
-	struct FPass { FVector2D At; double Dir; FString Kind; float T; int32 Owner; TArray<float> Strafe; TArray<float> Flak; bool bDown = false; };
+	struct FPass { FVector2D At; double Dir; FString Kind; float T; int32 Owner; TArray<float> Strafe; TArray<float> Flak; bool bDown = false; int32 Serial = 0; };
 	TArray<FPass> Passes;
-	struct FFall { FVector P; FVector2D D; float Speed, Vy, T, Acc; };
+	struct FFall { TCRender29Aircraft::FFall Motion; FString ModelType; int32 Owner = -1, Serial = 0; double Acc = 0; };
 	TArray<FFall> Falls;
+	TArray<FTCFxAircraftDraw> AircraftDraws;
+	int32 NextAircraftSerial = 1;
+	void BeginFall(const FVector& P, double Heading, double Speed, double Vy, const FString& Type, int32 Owner, double Pitch = 0);
 	struct FThrow { double X, Z; bool bSatchel; double T; };
 	TArray<FThrow> Throws;
 	struct FSalvoMark { double X, Z, R; bool bMortar; double T; };
@@ -603,6 +618,7 @@ public:
 	// sprites, decal and rubble cells, and shape instances drawn in the last frame
 	int32 InstancesDrawn() const { return LastInstances; }
 	int32 SpritesDrawn() const { return LastSprites; }
+	int32 AircraftInstancesDrawn() const { return LastAircraftInstances; }
 	int32 RubbleCells() const { return RubbleList.Num(); }
 	// the effect materials were found (Content/Effects, unreal/Tools/effects)
 	bool HasLook() const { return SpriteMaterial != nullptr && CraterMaterial != nullptr; }
@@ -614,6 +630,12 @@ private:
 	void UpdateLight();
 	void SyncRubble();
 	void Draw(double Clock);
+	int32 DrawAircraftModels();
+	FTCModelLibrary AircraftLibrary;
+	FTCInstanceHistory AircraftHistory;
+	bool bAircraftLibraryTried = false;
+	int32 LastAircraftInstances = 0;
+	UPROPERTY() TMap<FString, TObjectPtr<UInstancedStaticMeshComponent>> AircraftBatches;
 	void ApplyShake(double Clock);
 	void CaptureBridge(double Clock);
 	// main.js frame loop: vehicleDamageFrame for every held ground vehicle (engine-presentation.js)

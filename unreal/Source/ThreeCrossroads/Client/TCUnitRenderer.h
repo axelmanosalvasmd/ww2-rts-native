@@ -80,6 +80,8 @@ public:
 	static bool IsDrawn(const FTCUnit& U);
 	// How far above the ground a unit is drawn (aircraft fly AirAltitude up), in metres.
 	static float LiftMetres(const FTCUnitDef* Def);
+	// The original soft silhouette mesh, shared by commandable and effect aircraft.
+	static UStaticMesh* AircraftShadowMesh(UObject* Outer, UMaterialInterface* Material);
 	static constexpr float AirAltitude = 20.f; // client/main.js AIR_ALT
 	// client/unit-models.js LOD.high: beyond this camera distance (metres) soldiers and crew guns swap to the far model
 	static constexpr float LodMetres = 110.f;
@@ -90,6 +92,9 @@ public:
 	bool WheelTracksLoaded() const { return WheelTracks.IsLoaded(); }
 	int32 WheelTrackHulls() const { return WheelTracks.NumHulls(); }
 	const FString& WheelTracksError() const { return WheelTracksWhy; }
+
+	// Apply every delivered squad count/targeted casualty, including receipts between rendered frames.
+	void ApplySnapshot(const FTCMatchState& State, const FTCUnitTable& Table);
 
 	// ----- the model path -----
 	// The adoption batches, in the order they were brought in. A type takes the model path when its batch is enabled.
@@ -142,11 +147,11 @@ private:
 	{
 		FTCInfantrySquadAnimation Anim;
 		TArray<FVector2D> TrenchSpots;
-		int32 TrenchSnapshot = -1;
-		int32 AppliedSnapshot = -1, ShotMan = -1;
 	};
 	TSet<FVector2D> TrenchTaken;
 	int32 TrenchSnapshot = -1;
+	FSquad& SetUpSquad(const FTCModelEntry& Entry, const FTCUnit& U, int32 Faction, int32 Men);
+	void SuspendSquad(const FTCUnit& U, const FShown& S, double Ground, float Dt);
 	void PrepareTrenchSeats(const FTCMatchState& State, const FTCUnitTable& Table, const TArray<int32>* SnapshotOrder);
 	// One squad's frame, between its animation (before the parts, so a crew gun and its crew swap level of detail
 	// together) and drawing its men.

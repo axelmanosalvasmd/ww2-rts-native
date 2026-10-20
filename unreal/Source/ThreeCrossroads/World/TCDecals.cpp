@@ -1,5 +1,6 @@
 #include "World/TCDecals.h"
 #include "World/TCGroundPaint.h"
+#include <array>
 
 namespace TCDecals
 {
@@ -34,6 +35,40 @@ namespace TCDecals
 		const bool bCrater = Ground.IsWorld() && CraterSet.Update(CraterLook(CraterCells, W, N),
 			[&](int C) { return Ground.IsKnown(C) && CraterWanted(C, W, H, KnownChar); },
 			[&](int Slot, int C) { CraterQuad(C, W, Height, &CraterSet.Pos[(size_t)Slot * 75]); });
-		return bRubble || bCrater;
+		// Relief is continuous across cell edges. An adjacent dig, collapse or discovery can move the ground
+		// beneath an existing picture without changing its owner cell. Refresh geometry only, retaining slot order
+		// and the recipient's remembered cells. Crater corners can reach two cells beyond their centre.
+		std::unordered_map<int, bool> ChangedSet;
+		for (int C : Changed) if (C >= 0 && C < N) ChangedSet.emplace(C, true);
+		auto Redrape = [&](FDecalSet& Set, bool bIsRubble)
+		{
+			bool bDirty = false;
+			if (ChangedSet.empty() || bHydrate) return bDirty;
+			const int Radius = bIsRubble ? 1 : 2;
+			for (int Slot = 0; Slot < Set.Count(); Slot++)
+			{
+				const int C = Set.Cells[(size_t)Slot], X = C % W, Y = C / W;
+				bool bNear = false;
+				for (int Dy = -Radius; Dy <= Radius && !bNear; Dy++)
+					for (int Dx = -Radius; Dx <= Radius; Dx++)
+						if (X + Dx >= 0 && X + Dx < W && Y + Dy >= 0 && Y + Dy < H
+							&& ChangedSet.find((Y + Dy) * W + X + Dx) != ChangedSet.end()) { bNear = true; break; }
+				if (!bNear || !Ground.IsKnown(C)) continue;
+				std::array<float, 75> Pos;
+				std::array<float, 50> Uv;
+				if (bIsRubble) RubbleQuad(C, W, Ground.MaterialAt(C), Height, Pos.data(), Uv.data());
+				else CraterQuad(C, W, Height, Pos.data());
+				float* Previous = &Set.Pos[(size_t)Slot * 75];
+				if (!std::equal(Pos.begin(), Pos.end(), Previous))
+				{
+					std::copy(Pos.begin(), Pos.end(), Previous);
+					bDirty = true;
+				}
+			}
+			return bDirty;
+		};
+		const bool bRubbleDraped = Redrape(RubbleSet, true);
+		const bool bCraterDraped = Redrape(CraterSet, false);
+		return bRubble || bCrater || bRubbleDraped || bCraterDraped;
 	}
 }

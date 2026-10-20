@@ -260,6 +260,24 @@ namespace TCTerrainFormulas
 		T.Require(D.Craters().Count() == 0, "a flooded crater loses its picture");
 		Map.bWorld = false; G.Start(Map, {}, nullptr); D.Reset(); D.Update(G, true, {}, Height);
 		T.Require(D.Craters().Count() == 0, "authored maps keep painted shell holes without World crater pictures");
+		Map.W = Map.H = 5; Map.bWorld = true; Map.Rows.assign(5, ".....");
+		FCellRow Rubble; Rubble.C = 12; Rubble.Ch = 'R'; Rubble.bData = true; Rubble.Ground = '.'; Rubble.Object = 'R';
+		FCellRow Crater; Crater.C = 6; Crater.Ch = '+';
+		G.Start(Map, { Rubble, Crater }, nullptr); D.Reset();
+		double Lift = 0;
+		auto MovingHeight = [&](double X, double Z) { return Lift + Height(X, Z); };
+		D.Update(G, true, {}, MovingHeight);
+		T.Require(D.Rubble().Count() == 1 && D.Craters().Count() == 1, "delivered decal fixture hydrated");
+		if (D.Rubble().Count() == 1 && D.Craters().Count() == 1)
+		{
+			const float RubbleY = D.Rubble().Pos[1], CraterY = D.Craters().Pos[1];
+			Lift = 2;
+			T.Require(D.Update(G, false, { 18 }, MovingHeight), "neighbor relief dirties existing pictures");
+			T.Near(D.Rubble().Pos[1], RubbleY + 2, 1e-5, "rubble follows adjacent relief");
+			T.Near(D.Craters().Pos[1], CraterY + 2, 1e-5, "crater follows diagonal relief");
+			T.Require(D.Rubble().Count() == 1 && D.Craters().Count() == 1 && !G.IsKnown(18), "redraping preserves knowledge and slots");
+			T.Require(!D.Update(G, false, {}, MovingHeight), "unchanged decals do not upload again");
+		}
 		return T;
 	}
 	// Recorded by reference-contracts.mjs from the unmodified pin. Nine looks, High/Low and four damage footprints.

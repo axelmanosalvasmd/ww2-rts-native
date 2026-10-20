@@ -572,6 +572,11 @@ bool ATCUnitRenderer::DrawModel(const FTCMatchState& State, const FTCUnit& U, co
 	return true;
 }
 
+UStaticMesh* ATCUnitRenderer::AircraftShadowMesh(UObject* Outer, UMaterialInterface* Material)
+{
+	return TCUnitModelsImpl::BuildAircraftShadow(Outer, Material);
+}
+
 void ATCUnitRenderer::DrawAircraftShadow(const FTCUnit& U, int32 Faction, const FShown& S, const FVector& Ground)
 {
 	const FTCAircraftSpec* Spec = FTCUnitMotion::AircraftSpec(U.Type, Faction);
@@ -586,7 +591,7 @@ void ATCUnitRenderer::DrawAircraftShadow(const FTCUnit& U, int32 Faction, const 
 		Material->GetMaterial()->EnsureIsComplete();
 #endif
 		UInstancedStaticMeshComponent* Ism = NewObject<UInstancedStaticMeshComponent>(this);
-		Ism->SetStaticMesh(TCUnitModelsImpl::BuildAircraftShadow(this, Material)); Ism->SetMaterial(0, Material);
+		Ism->SetStaticMesh(AircraftShadowMesh(this, Material)); Ism->SetMaterial(0, Material);
 		Ism->SetCollisionEnabled(ECollisionEnabled::NoCollision); Ism->SetCastShadow(false);
 		Ism->SetMobility(EComponentMobility::Movable); Ism->SetupAttachment(RootComponent);
 		Ism->SetTranslucentSortPriority(0); Ism->RegisterComponent();
@@ -617,13 +622,66 @@ void ATCUnitRenderer::DrawRiders(const FTCModelEntry& Entry, const FTCUnit& U, i
 	}
 }
 
+void ATCUnitRenderer::ApplySnapshot(const FTCMatchState& State, const FTCUnitTable& Table)
+{
+	if (!State.bHasMatch || !FApp::CanEverRender()) return;
+	EnsureModels();
+	PrepareTrenchSeats(State, Table, &State.UnitOrder);
+	for (auto It = Squads.CreateIterator(); It; ++It)
+	{
+		if (State.Units.Contains(It.Key())) continue;
+		if (Crowd) Crowd->SquadGone(It.Key(), KilledIds.Contains(It.Key()));
+		It.RemoveCurrent();
+	}
+	for (auto It = Shown.CreateIterator(); It; ++It)
+		if (!State.Units.Contains(It.Key())) It.RemoveCurrent();
+	TSet<int32> Present;
+	for (const auto& Pair : State.Units) Present.Add(Pair.Key);
+	UnitMotion.Retain(Present);
+	KilledIds.Reset();
+}
+
+ATCUnitRenderer::FSquad& ATCUnitRenderer::SetUpSquad(const FTCModelEntry& Entry, const FTCUnit& U, int32 Faction, int32 Men)
+{
+	FSquad& Sq = Squads.FindOrAdd(U.Id);
+	if (!Sq.Anim.IsSetUp(U.Type, Faction, Men))
+	{
+		TArray<FVector2D> Slots;
+		float Scale = 0.f;
+		for (int32 K = 0; K < Men; K++)
+		{
+			const int32 Part = Entry.FindPart(FName(*FString::Printf(TEXT("man_%d_near"), K)));
+			const FTransform Rest = Part != INDEX_NONE ? Entry.Parts[Part].Rest : FTransform::Identity;
+			Slots.Add(FVector2D(Rest.GetLocation().X, Rest.GetLocation().Y));
+			if (Part != INDEX_NONE && Scale == 0.f) Scale = static_cast<float>(Rest.GetScale3D().X);
+		}
+		Sq.Anim.Setup(U.Type, Faction, Slots, Scale > 0.f ? Scale : 1.1f);
+	}
+	Sq.Anim.SetOperative((U.Flags & TCFlags::Operative) != 0);
+	return Sq;
+}
+
+void ATCUnitRenderer::SuspendSquad(const FTCUnit& U, const FShown& S, double Ground, float Dt)
+{
+	if (FSquad* Sq = Squads.Find(U.Id))
+	{
+		FTCInfantrySquadFrame F;
+		F.Root = FVector(S.X * 100.0, S.Z * 100.0, Ground * 100.0);
+		F.Yaw = -S.Rot; F.bVisible = false;
+		Sq->Anim.Animate(F, Dt);
+		if (Crowd) Crowd->FollowHiddenSquad(U.Id, Sq->Anim, FTransform(FQuat(FVector::UpVector, S.Rot), F.Root));
+	}
+}
+
 void ATCUnitRenderer::PrepareTrenchSeats(const FTCMatchState& State, const FTCUnitTable& Table, const TArray<int32>* SnapshotOrder)
 {
 	if (TrenchSnapshot == State.Snapshots) return;
 	TrenchSnapshot = State.Snapshots;
 	TrenchTaken.Reset();
 	TArray<int32> Fallback;
-	if (!SnapshotOrder) { State.Units.GenerateKeyArray(Fallback); SnapshotOrder = &Fallback; }
+	if (!SnapshotOrder || SnapshotOrder->Num() != State.Units.Num()) { State.Units.GenerateKeyArray(Fallback); SnapshotOrder = &Fallback; }
+	TMap<int32, int32> ShotMen;
+	for (const FTCShot& Shot : State.Shots) if (Shot.bHasTarget && Shot.M >= 0) ShotMen.Add(Shot.T, Shot.M);
 	// main.js claims before visibility filtering, in world-state.js Map insertion order.
 	for (int32 Id : *SnapshotOrder)
 	{
@@ -641,10 +699,14 @@ void ATCUnitRenderer::PrepareTrenchSeats(const FTCMatchState& State, const FTCUn
 		if (!Men) continue;
 		const FTCUnitDef* Def = Table.Find(U->Type);
 		const int32 Alive = UTCInfantryRigLibrary::MenDrawn(U->Hp, Men, Def ? Def->Models * Def->HpPer : 0, (U->Flags & TCFlags::Operative) != 0);
-		FSquad& Sq = Squads.FindOrAdd(Id);
-		Sq.TrenchSnapshot = State.Snapshots;
-		Sq.ShotMan = -1;
-		for (const FTCShot& Shot : State.Shots) if (Shot.bHasTarget && Shot.T == Id && Shot.M >= 0) Sq.ShotMan = Shot.M;
+		FSquad& Sq = SetUpSquad(*Entry, *U, Faction, Men);
+		const int32* Hit = ShotMen.Find(Id);
+		const int32 ShotMan = Hit ? *Hit : -1;
+		const int32 Last = Sq.Anim.HitMan(ShotMan, Alive);
+		if (Crowd && Last != INDEX_NONE) Crowd->SwapMen(Id, ShotMan, Last);
+		// Use the preceding standing records before any survivor overwrites them, once per receipt.
+		if (Crowd) Crowd->SquadAlive(Id, Alive);
+		Sq.Anim.SetAlive(Alive);
 		Sq.TrenchSpots = FTCInfantryTrenches::Claim({U->X, U->Z}, Men, Alive, U->Cover, (U->Flags & TCFlags::Garrisoned) != 0,
 			[&State](int32 X, int32 Z) -> uint8
 			{
@@ -671,29 +733,7 @@ bool ATCUnitRenderer::AnimateSquad(const FTCModelEntry& Entry, const FTCUnit& U,
 	Out.Alive = UTCInfantryRigLibrary::MenDrawn(U.Hp, Out.Men, Total, (U.Flags & TCFlags::Operative) != 0);
 	Out.FigureType = FTCModelLibrary::FigureType(U.Type);
 
-	FSquad& Sq = Squads.FindOrAdd(U.Id);
-	if (!Sq.Anim.IsSetUp(U.Type, Faction, Out.Men))
-	{
-		// unit-models.js man.position: SLOTS * SLOT_SCALE, the catalog's man_K_near rest places; man.scale likewise
-		TArray<FVector2D> Slots;
-		float Scale = 0.f;
-		for (int32 K = 0; K < Out.Men; K++)
-		{
-			const FTransform& Rest = Out.Near[K] != INDEX_NONE ? Entry.Parts[Out.Near[K]].Rest : FTransform::Identity;
-			Slots.Add(FVector2D(Rest.GetLocation().X, Rest.GetLocation().Y));
-			if (Out.Near[K] != INDEX_NONE && Scale == 0.f) Scale = static_cast<float>(Rest.GetScale3D().X);
-		}
-		Sq.Anim.Setup(U.Type, Faction, Slots, Scale > 0.f ? Scale : 1.1f);
-	}
-	Sq.Anim.SetOperative((U.Flags & TCFlags::Operative) != 0);
-	if (Sq.AppliedSnapshot != Sq.TrenchSnapshot)
-	{
-		Sq.AppliedSnapshot = Sq.TrenchSnapshot;
-		const int32 Last = Sq.Anim.HitMan(Sq.ShotMan, Out.Alive);
-		if (Crowd && Last != INDEX_NONE) Crowd->SwapMen(U.Id, Sq.ShotMan, Last);
-		// Bodies must use the previous frame's standing men, before AddMan writes this frame's survivors.
-		if (Crowd) Crowd->SquadAlive(U.Id, Out.Alive);
-	}
+	FSquad& Sq = SetUpSquad(Entry, U, Faction, Out.Men);
 	Sq.Anim.SetAlive(Out.Alive);
 	Sq.Anim.SeatTrench(Sq.TrenchSpots, FVector2D(S.X, S.Z), S.Rot);
 	FTCInfantrySquadFrame F;

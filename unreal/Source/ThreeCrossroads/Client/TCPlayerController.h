@@ -402,6 +402,7 @@ public:
 	bool bPointerPinned = false;
 	// The enemy unit under the pointer this frame (0: none), for the HUD's hover line.
 	int32 HoverEnemy = 0;
+	int32 HoverUnit = 0; // any held unit under the pointer, for its health bar
 	// The point of the last order that was sent (the ground, or the attacked unit), its colour and when (world
 	// seconds), for the HUD's click ring.
 	FVector2D LastOrderAt = FVector2D(-1, -1);
