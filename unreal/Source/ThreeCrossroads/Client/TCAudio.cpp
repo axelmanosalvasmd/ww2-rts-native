@@ -1468,6 +1468,27 @@ void UTCAudio::ReturnedToLobby()
 	Cue.Reset();
 }
 
+UTCAudio::FBankState UTCAudio::BankState() const
+{
+	FBankState State;
+	State.Generation = Mixer.MatchToken();
+	State.bCallbackCompleted = CompletedLoadToken == State.Generation;
+	State.Folder = Mixer.VoiceFolder(); State.Speaker = Mixer.VoiceName();
+	for (const TCAudioRules::FClip& Clip : TCAudioRules::Clips())
+		if (Waves.Contains(Clip.Id) && Mixer.IsLoaded(Clip.Id)) ++State.Effects;
+	if (!State.Speaker.IsEmpty())
+	{
+		const TArray<FString> Stems = TCAudioRules::VoiceStems(State.Speaker);
+		State.ExpectedVoiceLines = Stems.Num();
+		for (const FString& Stem : Stems)
+		{
+			const FString Key = TEXT("voice:") + Stem;
+			if (Waves.Contains(Key) && Mixer.IsLoaded(Key)) ++State.VoiceLines;
+		}
+	}
+	return State;
+}
+
 void UTCAudio::LoadAssets(int32 Token)
 {
 	// the effects load once, at the first match start (never in the lobby), and stay
@@ -1528,6 +1549,10 @@ void UTCAudio::OnVoicesLoaded(int32 Token)
 		Got++;
 	}
 	if (!Speaker.IsEmpty() && Got == 0) UE_LOG(LogTC, Warning, TEXT("audio: no voice lines loaded for %s/%s"), *Folder, *Speaker);
+	CompletedLoadToken = Token;
+	const FBankState Bank = BankState();
+	UE_LOG(LogTC, Log, TEXT("audio: selected bank generation %d, %s/%s, effects %d/%d, voice lines %d/%d, complete %d (resource loading only)"),
+		Bank.Generation, *Bank.Folder, *Bank.Speaker, Bank.Effects, TCAudioRules::Clips().Num(), Bank.VoiceLines, Bank.ExpectedVoiceLines, Bank.FullyLoaded());
 	Mixer.FinishLoading(Token);
 }
 

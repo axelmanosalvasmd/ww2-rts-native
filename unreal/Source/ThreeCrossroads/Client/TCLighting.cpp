@@ -698,6 +698,7 @@ void ATCLighting::CheckSkyCapture()
 void ATCLighting::Tick(float Dt)
 {
 	Super::Tick(Dt);
+	RendererDiagnostics.Tick(GetWorld());
 	CheckSkyCapture();
 	if (bLobbyLook)
 	{

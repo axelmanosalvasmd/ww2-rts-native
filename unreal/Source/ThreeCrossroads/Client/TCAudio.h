@@ -518,10 +518,22 @@ public:
 	FString TakeCueReport();
 	// Components started since this subsystem began (each also logged as "audio: play").
 	int32 StartedCount() const { return Starts; }
+	// Actual async callbacks and loaded waves, separate from mixer started state or audible output.
+	struct FBankState
+	{
+		int32 Generation = 0, Effects = 0, VoiceLines = 0, ExpectedVoiceLines = 0;
+		FString Folder, Speaker;
+		bool bCallbackCompleted = false;
+		bool FullyLoaded() const { return bCallbackCompleted && Effects == TCAudioRules::Clips().Num() && VoiceLines == ExpectedVoiceLines; }
+	};
+	FBankState BankState() const;
 
 	FTCAudioMixer& GetMixer() { return Mixer; }
 
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+	friend class FTCSession26AudioBankCommand;
+#endif
 	void LoadAssets(int32 Token);
 	void OnSfxLoaded(int32 Token);
 	void OnVoicesLoaded(int32 Token);
@@ -541,6 +553,7 @@ private:
 	TSet<int32> Started;
 	TMap<FString, double> FeedLast;
 	double MatchLoadStartedAt = 0.0;
+	int32 CompletedLoadToken = -1;
 	double AmbienceTimer = 0.0;
 	double BattleViewAt = -1e9;
 	bool bWarnedMissing = false;

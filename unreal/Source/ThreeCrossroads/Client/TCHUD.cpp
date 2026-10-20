@@ -301,6 +301,13 @@ bool ATCHUD::ScrollSelection(FVector2D Pixel, int32 Notch)
  return false;
 }
 
+bool ATCHUD::ScrollControls(FVector2D Pixel,int32 Notch)
+{
+ if (!FTCHudFit::Contains(ControlsScrollBox,Pixel)) return false;
+ ControlsScroll=FMath::Clamp(ControlsScroll+Notch*48.f,0.f,ControlsScrollMax);
+ return true;
+}
+
 TSet<int32> FTCHudFit::PlaneSelection(const FTCMatchState& S, const TSet<int32>& Current, int32 Id, bool bToggle, bool bDouble)
 {
  TSet<int32> Next=bToggle && !bDouble?Current:TSet<int32>();
@@ -339,7 +346,7 @@ bool FTCHudFit::RightStepsBack(const FTCUiCommand& C, bool bHasMatch)
 void ATCHUD::OfferTooltip(const FString& Tip, const FBox2D& Box)
 {
  float X=0,Y=0;
- if (!Tip.IsEmpty() && GetOwningPlayerController()->GetMousePosition(X,Y) && Box.IsInsideOrOn(FVector2D(X,Y)) && TooltipInteraction.Allows(FVector2D(X,Y),Box))
+ if (!Tip.IsEmpty() && GetOwningPlayerController()->GetMousePosition(X,Y) && FTCHudFit::Contains(Box,FVector2D(X,Y)) && TooltipInteraction.Allows(FVector2D(X,Y),Box))
  { PendingTooltip=Tip; TooltipAnchor=Box; }
 }
 
@@ -436,6 +443,11 @@ void ATCHUD::UpdateRecruitNavigation()
  bool AllTrucks=false; int32 Held=0;
  for (int32 Id : PC->Selected) if (const FTCUnit* U=M->State.Units.Find(Id))
  { AllTrucks=Held++?AllTrucks && U->Type==TEXT("truck"):U->Type==TEXT("truck"); }
+ const FTCCommandCard PulseCard=M->Recruit.Card(M->State,PC->Selected);
+ // Replacing the source card's DOM drops its callbacks. Free-mode selection/group changes keep the cards.
+ const FString Identity=FString::Printf(TEXT("%d:%d:%d:%d:%d:%d"),M->State.MatchId,M->State.You,
+  int32(PulseCard.Kind),PulseCard.Kind==ETCCardKind::Recruit?0:PulseCard.Building,M->Recruit.FactionOf(M->State.You),M->Recruit.Naval());
+ if (LetterCardIdentity!=Identity) { LetterCardIdentity=Identity; LetterHits.Reset(); }
  const bool Rebuild=RecruitNavigation.bTruckCard && !(AllTrucks && M->Logistics.Enabled());
  RecruitNavigation.ObserveTruckCard(AllTrucks && M->Logistics.Enabled());
  if (RecruitNavigation.bTruckCard || (AllTrucks && !Rebuild)) return;
@@ -448,6 +460,13 @@ void ATCHUD::UpdateRecruitNavigation()
     Key=FString::Printf(TEXT("%d:%d:%d"),U->Id,M->Support.BuiltOf(*U)>=1,M->State.IsOwn(*U));
  RecruitNavigation.ObserveFacility(Key,Card.SuggestedGroup);
  PC->RecruitGroupOpen=RecruitNavigation.Group;
+}
+
+void ATCHUD::NoteCardLetter(const FString& Type)
+{
+ // Classic letters use the controller's building context; both routes share the original card feedback.
+ UpdateRecruitNavigation();
+ LetterHits.FindOrAdd(Type).Press(FPlatformTime::Seconds()*1000.0);
 }
 
 bool ATCHUD::RecruitKey(const FString& Code, bool bShift, bool bCtrl, bool bAlt)
@@ -469,6 +488,8 @@ bool ATCHUD::RecruitKey(const FString& Code, bool bShift, bool bCtrl, bool bAlt)
  PC->RecruitGroupOpen=RecruitNavigation.Group;
  if (Purchase.IsSet())
  {
+  // The original marks the card before _buy checks availability, including a refused purchase.
+  NoteCardLetter(Purchase->Unit);
   FTCUiCommand Buy(ETCUiAction::Recruit); Buy.Unit=Purchase->Unit;
   Buy.Building=Purchase->bHasFrom?Purchase->From:0;
   PC->RunCommand(Buy,bShift);
@@ -479,7 +500,7 @@ bool ATCHUD::RecruitKey(const FString& Code, bool bShift, bool bCtrl, bool bAlt)
 void FTCHudFit::ApplyPointer(FBottomLayout& L, FVector2D Pointer, bool bHeld)
 {
  const FHit* Hit=nullptr;
- for (int32 I=L.Hits.Num()-1; I>=0; I--) if (L.Hits[I].Box.IsInsideOrOn(Pointer)) { Hit=&L.Hits[I]; break; }
+ for (int32 I=L.Hits.Num()-1; I>=0; I--) if (Contains(L.Hits[I].Box,Pointer)) { Hit=&L.Hits[I]; break; }
  if (!Hit || Hit->Control.bPending || Hit->Control.Command.Action==ETCUiAction::None || Hit->Control.Command.Action==ETCUiAction::CancelJob) return;
  const FControl& C=Hit->Control; const FBox2D& B=Hit->Box;
  auto SameBox=[&](const FTCPaintItem& I) { return I.Pos.Equals(B.Min,.01) && I.Size.Equals(B.GetSize(),.01); };
@@ -492,11 +513,11 @@ void FTCHudFit::ApplyPointer(FBottomLayout& L, FVector2D Pointer, bool bHeld)
   if (SameBox(I))
   {
    if (I.Kind==ETCPaintKind::Rect && !C.bOn)
-   { const float Alpha=I.Colour.A; I.Colour=TCCss::Hex(bHeld && !Card?0x15181a:0x2e3337); I.Colour.A=Alpha; }
+   { const float Alpha=I.Colour.A; I.Colour=TCCss::Hex(C.bLetterHit || (bHeld && !Card)?0x15181a:0x2e3337); I.Colour.A=Alpha; }
    if (I.Kind==ETCPaintKind::Frame)
    {
     const float Fade=FMath::Clamp(I.Colour.A/(C.bOn?TCCss::Brass.A:TCCss::LineSoft.A),0.f,1.f);
-    I.Colour=TCCss::Rgba(214,178,94,.8f*Fade);
+    I.Colour=C.bLetterHit?TCCss::Brass:TCCss::Rgba(214,178,94,.8f*Fade);
    }
   }
   if (I.Kind!=ETCPaintKind::Text || !B.IsInsideOrOn(I.Pos)) continue;
@@ -619,6 +640,22 @@ void ATCHUD::WriteAcceptanceAudit()
   Controls.Add(MakeShared<FJsonValueObject>(C));
  }
  Root->SetArrayField(TEXT("controls"),Controls);
+ if (FParse::Param(FCommandLine::Get(),TEXT("TCHudPulseAudit")))
+ {
+  // Opt-in per-frame UI timing. A pulse model receipt is separate from the rendered card pixels.
+  const double NowMs=FPlatformTime::Seconds()*1000.0;
+  Root->SetNumberField(TEXT("uiTimeMs"),NowMs);
+  TArray<FString> Types; LetterHits.GetKeys(Types); Types.Sort();
+  TArray<TSharedPtr<FJsonValue>> Pulses;
+  for (const FString& Type : Types)
+  {
+   const TSharedRef<FJsonObject> Pulse=MakeShared<FJsonObject>();
+   Pulse->SetStringField(TEXT("type"),Type);
+   Pulse->SetBoolField(TEXT("active"),LetterHits.FindChecked(Type).Active(NowMs));
+   Pulses.Add(MakeShared<FJsonValueObject>(Pulse));
+  }
+  Root->SetArrayField(TEXT("letterPulses"),Pulses);
+ }
  FString Signature;
  FJsonSerializer::Serialize(Root,TJsonWriterFactory<TCHAR,TCondensedJsonPrintPolicy<TCHAR>>::Create(&Signature));
  if (AcceptanceSignature==Signature) return;
@@ -691,8 +728,8 @@ namespace TCHudBottom
 	 const float Hair=Border(Scale), W=B.GetSize().X, X=B.Min.X, Y=B.Min.Y;
 	 const bool Narrow=Fit && W<=72;
 	 const float NameH=Narrow?0:31.2f, PictureY=Y+Hair+NameH, PictureH=(W-2*Hair)*.75f;
-	 L.Paint.Rect(X,Y,W,B.GetSize().Y,TCCss::Hex(0x24282b),TEXT("bottom:card"));
-	 L.Paint.Frame(X,Y,W,B.GetSize().Y,TCCss::LineSoft,Hair);
+	 L.Paint.Rect(X,Y,W,B.GetSize().Y,TCCss::Hex(C.bLetterHit?0x15181a:0x24282b),TEXT("bottom:card"));
+	 L.Paint.Frame(X,Y,W,B.GetSize().Y,C.bLetterHit?TCCss::Brass:TCCss::LineSoft,Hair);
 	 auto Put=[&](const FString& Shown,float AtX,float AtY,float Px,float Line,bool Bold,FLinearColor Colour,const FBox2D& Clip,const TCHAR* Role,ETCPaintAlign Align=ETCPaintAlign::Centre)
 	 {
 	  if (Shown.IsEmpty()) return;
@@ -919,10 +956,22 @@ namespace TCHudBottom
 }
 
 FTCHudFit::FBottomLayout FTCHudFit::LeftPanel(float ViewH, const FString& Title, const TArray<FSelection>& Selection,
-	const TArray<FString>& Details, const TArray<FControl>& Orders, const TArray<FControl>& Menu, const FTCMeasure& Measure, float Scale, int32 Idle, int32 Destination, bool bTransfer, bool bDropdown, int32 SelectionFirst, float TopLimit, int32 MenuFirst, const TArray<FControl>& MenuTabs, float Width)
+	const TArray<FString>& Details, const TArray<FControl>& OrdersInput, const TArray<FControl>& MenuInput, const FTCMeasure& Measure, float Scale, int32 Idle, int32 Destination, bool bTransfer, bool bDropdown, int32 SelectionFirst, float TopLimit, int32 MenuFirst, const TArray<FControl>& MenuTabs, float Width)
 {
 	using namespace TCHudBottom;
 	FBottomLayout L;
+	// hud.js:360-379 returns a separate two-button truck layout, and no Orders at all for all buildings.
+	const bool Trucks=Selection.Num()>0 && !Selection.ContainsByPredicate([](const FSelection& S) { return S.Type!=TEXT("truck"); });
+	const bool Buildings=Selection.Num()>0 && !Selection.ContainsByPredicate([](const FSelection& S)
+	{ const FTCRecruitDef* D=FTCRecruitment::Find(S.Type); return !D || !D->bBuilding; });
+	TArray<FControl> Orders=Buildings?TArray<FControl>():OrdersInput;
+	const TArray<FControl> Menu=Buildings || Trucks?TArray<FControl>():MenuInput;
+	if (Buildings || Trucks) { bTransfer=false; bDropdown=false; }
+	if (Trucks)
+	{
+	 Orders.RemoveAll([](const FControl& C) { return C.Command.Action!=ETCUiAction::Stop && C.Command.Action!=ETCUiAction::Resume; });
+	 for (FControl& C : Orders) C.Hover=C.Command.Action==ETCUiAction::Stop?TEXT("Stop selected units"):TEXT("Resume deliveries");
+	}
 	const float X=ScreenGap, W=Width, Inner=W-14;
 	float Y=0;
 	if (!Selection.IsEmpty() || Idle>0)
@@ -1088,8 +1137,21 @@ FTCHudFit::FBottomLayout FTCHudFit::RecruitPanel(float ViewW, float ViewH, float
 {
 	using namespace TCHudBottom;
 	FBottomLayout L;
-	const float Left=LeftWidth(FVector2D(ViewW,ViewH),Scale)+2*ScreenGap, MaxW=FMath::Max(60.f,Right-Left);
-    const float Edge=7+Border(Scale), Inner=MaxW-2*Edge;
+	const float Left=LeftWidth(FVector2D(ViewW,ViewH),Scale)+2*ScreenGap, AvailableW=FMath::Max(60.f,Right-Left);
+    const float Edge=7+Border(Scale);
+    float MaxW=AvailableW;
+    // #buy is width:fit-content. Its embedded .logistics-card contributes max-content, including the 12px hint,
+    // 9px side padding and 240px minimum. An automatic truck must not stretch to the whole recruit column.
+    if (Tabs.IsEmpty() && Lists.IsEmpty() && Headings.IsEmpty() && Above.IsEmpty() && !Logistics.IsEmpty())
+    {
+     float Content=0;
+     for (const FString& Token : Logistics)
+      Content=FMath::Max(Content,Measure(TC_T(Token),Token==FTCLogisticsCard::Hint?12.f:13.f,Token.Contains(TEXT("#")),0));
+     if (Logistics.Contains(FTCLogisticsCard::Hint))
+      Content=FMath::Max(Content,Measure(TC_T(FString(FTCLogisticsCard::ResumeLabel)),14,false,0)+18+2*Border(Scale));
+     MaxW=FMath::Min(AvailableW,FMath::Max(240.f,Content+18)+2*Edge);
+    }
+    const float Inner=MaxW-2*Edge;
 	float Y=Edge;
 	for (const FString& H : Headings) { Y+=Wrapped(L,TC_T(H),8,Y,Inner,13,true,TCCss::Text,Measure,TEXT("bottom:recruit-heading")); Y+=6; }
     const float TabsTop=Y;
@@ -1114,7 +1176,7 @@ FTCHudFit::FBottomLayout FTCHudFit::RecruitPanel(float ViewW, float ViewH, float
  FBottomLayout Footer;
  const bool FloatingLogistics=Tabs.Num()>0 || Lists.ContainsByPredicate([](const TArray<FControl>& Cards)
   { return Cards.ContainsByPredicate([](const FControl& C) { return C.Command.Action==ETCUiAction::Recruit || C.Command.Action==ETCUiAction::Build; }); });
- float LogisticsH=LogisticsText(Footer,Logistics,0,MaxW-(FloatingLogistics?2*Border(Scale):0),Measure,Scale,FloatingLogistics,Tabs.Num()>0,LogisticsFirst);
+ float LogisticsH=LogisticsText(Footer,Logistics,0,MaxW-(FloatingLogistics?2*Border(Scale):2*Edge),Measure,Scale,FloatingLogistics,Tabs.Num()>0,LogisticsFirst);
  const float FooterH=FloatingLogistics?0:LogisticsH;
  auto CardWidth=[&](const TArray<FControl>& Cards)
  {
@@ -1180,7 +1242,12 @@ FTCHudFit::FBottomLayout FTCHudFit::RecruitPanel(float ViewW, float ViewH, float
  if (Pages)
  { Pager(L,TEXT("recruit"),FirstCard,L.RecruitMax,8,Y,Inner,Measure,Scale); Y+=28; }
  if (AllRows) L.RecruitList=Box(8,CardsTop,Inner,Y-CardsTop);
-	if (!FloatingLogistics) Y=LogisticsText(L,Logistics,Y,MaxW,Measure,Scale,false,false,LogisticsFirst);
+	if (!FloatingLogistics && !Logistics.IsEmpty())
+	{
+	 Shift(Footer,FVector2D(Edge,Y)); Y=Footer.Logistics.Max.Y;
+	 L.Paint.Append(Footer.Paint); L.Hits.Append(Footer.Hits); L.TextBounds.Append(Footer.TextBounds);
+	 L.Logistics=Footer.Logistics; L.LogisticsList=Footer.LogisticsList; L.LogisticsMax=Footer.LogisticsMax;
+	}
 	if (Logistics.Num() && !FloatingLogistics) Widest=MaxW;
 	Y+=Edge;
 	float AboveW=16;
@@ -1233,7 +1300,7 @@ FTCHudFit::FBottomLayout FTCHudFit::RecruitPanel(float ViewW, float ViewH, float
   L.Paint.Append(Footer.Paint); L.Icons.Append(Footer.Icons); L.Hits.Append(Footer.Hits); L.TextBounds.Append(Footer.TextBounds);
   L.Logistics=Footer.Logistics; L.LogisticsList=Footer.LogisticsList; L.LogisticsMax=Footer.LogisticsMax;
  }
-	Shift(L,FVector2D(Left+(MaxW-W)/2,ViewH-ScreenGap-Y));
+	Shift(L,FVector2D(Left+(AvailableW-W)/2,ViewH-ScreenGap-Y));
 	if (Overlap(L.Recruit,Economy) && Economy.Min.X-8<Right && Economy.Min.X-8>Left+60)
 		return RecruitPanel(ViewW,ViewH,Economy.Min.X-8,Headings,Tabs,Lists,Above,Measure,Scale,Logistics,TotalCards,FirstCard,TopLimit,FBox2D(ForceInit),LogisticsFirst);
 	return L;
@@ -2046,7 +2113,7 @@ bool ATCHUD::ButtonAt(FVector2D Pixel, ETCUiAction& OutAction) const
 bool ATCHUD::CommandAt(FVector2D Pixel, FTCUiCommand& OutCommand) const
 {
 	// round 16: the last drawn first, so a panel drawn over another (the open match menu) takes the click
-	for (int32 I = Buttons.Num() - 1; I >= 0; I--) if (Buttons[I].Rect.IsInsideOrOn(Pixel)) { OutCommand = Buttons[I].Command; return true; }
+	for (int32 I = Buttons.Num() - 1; I >= 0; I--) if (FTCHudFit::Contains(Buttons[I].Rect,Pixel)) { OutCommand = Buttons[I].Command; return true; }
 	return false;
 }
 
@@ -2064,7 +2131,7 @@ bool ATCHUD::CommandCentre(const FTCUiCommand& Command, FVector2D& Out) const
 
 bool ATCHUD::PanelAt(FVector2D Pixel) const
 {
-	for (const FBox2D& P : Panels) if (P.IsInsideOrOn(Pixel)) return true;
+	for (const FBox2D& P : Panels) if (FTCHudFit::Contains(P,Pixel)) return true;
 	return false;
 }
 
@@ -2673,6 +2740,7 @@ void ATCHUD::DrawRecruitPanel(UFont* Font, float Left, float Bottom)
 				FTCHudFit::FControl C; C.Icon=Unit.Type; C.Label=FTCAlerts::UnitName(S,&M->UnitTable,Unit.Type,S.You);
 				C.Value=Unit.Cost; C.Sub=Unit.Sub; C.Hover=R.CardTip(Unit,C.Label); C.bEnabled=Unit.Check.bOk; C.bBroke=Unit.bBroke;
 				C.Command=FTCUiCommand(ETCUiAction::Recruit); C.Command.Unit=Unit.Type; C.Command.Building=Card.Building;
+				if (TCHud26::FLetterHit* Hit=LetterHits.Find(Unit.Type)) C.bLetterHit=Hit->Active(FPlatformTime::Seconds()*1000.0);
 				if (Letter<15) C.Key=FString::Chr(TEXT("QWERTASDFGZXCVB")[Letter]); Letter++;
 				Cards.Add(C);
 			}
@@ -2850,6 +2918,7 @@ void ATCHUD::DrawRecruitPanel(UFont* Font, float Left, float Bottom)
 			if (I.Command.Action==ETCUiAction::Rally) { C.Label=TEXT("Rally"); C.Key=TEXT("Shift+H"); Above.Add(C); continue; }
 			if (I.Command.Action==ETCUiAction::Recruit)
 			{
+				if (TCHud26::FLetterHit* Hit=LetterHits.Find(I.Command.Unit)) C.bLetterHit=Hit->Active(FPlatformTime::Seconds()*1000.0);
 				C.Label=FTCAlerts::UnitName(S,&M->UnitTable,I.Command.Unit,S.You); C.Icon=I.Command.Unit;
 				const FTCPrice Price=R.PriceOf(I.Command.Unit);
 				C.Value=FString::Printf(TEXT("%d MP%s"),Price.Mp,Price.Fuel?*FString::Printf(TEXT("  %d Fuel"),Price.Fuel):TEXT(""));

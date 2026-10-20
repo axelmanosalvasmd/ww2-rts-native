@@ -36,6 +36,7 @@
 #include "Client/TCEndReport.h"
 #include "Client/TCMatchControls.h"
 #include "Client/TCRecruitment.h"
+#include "Client/TCHUD26Feedback.h"
 #include "TCHUD.generated.h"
 
 class UFont;
@@ -46,6 +47,8 @@ class FTCHudPortraits;
 // Round 16 (hudfit): the HUD's fit rules at a large UI scale in a small window, pure so tests read them.
 namespace FTCHudFit
 {
+	inline bool Contains(const FBox2D& Box,FVector2D Point)
+	{ return Box.bIsValid && TCHud26::Contains(Box.Min.X,Box.Min.Y,Box.Max.X,Box.Max.Y,Point.X,Point.Y); }
 	// index.html's lower-left column and #buy. Drawing and tests consume the same measured boxes.
 	constexpr float LeftW = 248.f, ScreenGap = 8.f, GridGap = 3.f, OrderH = 50.f;
 	// index.html's media query measures the physical viewport, independently of #hud zoom.
@@ -59,6 +62,7 @@ namespace FTCHudFit
 		FString Sub;
 		bool bBroke = false;
 		bool bPending = false;
+		bool bLetterHit = false;
 	};
 	struct FSelection
 	{
@@ -86,14 +90,14 @@ namespace FTCHudFit
 		void Frame(FVector2D Pointer, bool bPointerDown, const FBox2D& PreviousAnchor)
 		{
 			bPressed = bPointerDown;
-			if (Dismissed.bIsValid && !Dismissed.IsInsideOrOn(Pointer)) Dismissed=FBox2D(ForceInit);
-			if (bPointerDown && PreviousAnchor.bIsValid && PreviousAnchor.IsInsideOrOn(Pointer)) Dismissed=PreviousAnchor;
+			if (Dismissed.bIsValid && !Contains(Dismissed,Pointer)) Dismissed=FBox2D(ForceInit);
+			if (bPointerDown && Contains(PreviousAnchor,Pointer)) Dismissed=PreviousAnchor;
 		}
-		bool Allows(FVector2D Pointer) const { return !Dismissed.bIsValid || !Dismissed.IsInsideOrOn(Pointer); }
+		bool Allows(FVector2D Pointer) const { return !Contains(Dismissed,Pointer); }
 		bool Allows(FVector2D Pointer, const FBox2D& Anchor)
 		{
 			// A click can enter a new button before its first tooltip frame.
-			if (bPressed && Anchor.IsInsideOrOn(Pointer)) Dismissed=Anchor;
+			if (bPressed && Contains(Anchor,Pointer)) Dismissed=Anchor;
 			return Allows(Pointer);
 		}
 	};
@@ -137,6 +141,13 @@ namespace FTCHudFit
 	// A match HUD right press is swallowed, except the ability's separate context action.
 	THREECROSSROADS_API bool RightStepsBack(const FTCUiCommand& Command, bool bHasMatch);
 	THREECROSSROADS_API FBottomLayout Tooltip(const FString& Shown, const FBox2D& Anchor, FVector2D View, const FTCMeasure& Measure);
+	struct FControlsLayout
+	{
+		FTCPaint Paint;
+		FBox2D Bounds = FBox2D(ForceInit), Viewport = FBox2D(ForceInit), Close = FBox2D(ForceInit);
+		float ScrollMax = 0;
+	};
+	THREECROSSROADS_API FControlsLayout ControlsDialog(FVector2D View,const FTCMeasure& Measure,float Scroll = 0);
 	THREECROSSROADS_API FBottomLayout IconBar(bool bMenu, bool bCaptured, const FTCMeasure& Measure, float Scale = 1.f,
 		bool bLogistics = false, bool bSupplyOverlay = false, bool bTruckSelect = false);
 	// A source DOM panel painted later also intercepts clicks on the controls underneath it.
@@ -184,7 +195,9 @@ public:
 	// Controller integration is a small lead patch. These local UI commands never cross the wire.
 	bool RunPanelCommand(const FTCUiCommand& Command, bool bShift, bool bCtrl = false);
 	bool RecruitKey(const FString& Code, bool bShift, bool bCtrl, bool bAlt);
+	void NoteCardLetter(const FString& Type);
 	bool ScrollSelection(FVector2D Pixel, int32 Notch);
+	bool ScrollControls(FVector2D Pixel, int32 Notch);
 	bool Recruiting() const { return RecruitNavigation.bLetters; }
 	void StopRecruiting();
 	void ToggleRecruitGroup(int32 Group);
@@ -318,10 +331,14 @@ private:
 	FBox2D MenuScrollBox = FBox2D(ForceInit), AirScrollBox = FBox2D(ForceInit), RecruitScrollBox = FBox2D(ForceInit);
 	FBox2D LogisticsScrollBox = FBox2D(ForceInit);
 	int32 LogisticsFirst = 0, LogisticsMax = 0;
+	FBox2D ControlsScrollBox = FBox2D(ForceInit);
+	float ControlsScroll = 0, ControlsScrollMax = 0;
 	FTCHudFit::FPlaneInteraction PlaneInteraction;
 	int32 GroupDestination = 1;
 	bool bGroupDropdown = false;
 	FTCRecruitNavigation RecruitNavigation;
+	FString LetterCardIdentity;
+	TMap<FString,TCHud26::FLetterHit> LetterHits;
 	void UpdateRecruitNavigation();
 	// A line over the ground through metre points (each leg split every 2 m so it follows the relief), Lift metres up.
 	void GroundLine(const ATCTerrain& T, const TArray<FVector2D>& Points, bool bClosed, const FLinearColor& Colour, float Thickness, float Lift = 0.3f);

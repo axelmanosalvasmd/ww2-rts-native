@@ -25,6 +25,7 @@
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "Misc/Paths.h"
+#include "CoreGlobals.h"
 
 namespace TCAtmosImpl
 {
@@ -109,6 +110,7 @@ bool FTCAtmosphere::Attach(UWorld* World)
 	A->AddInstanceComponent(Root);
 	Root->RegisterComponent();
 	Actor = A;
+	bTraceHistory = FParse::Param(FCommandLine::Get(), TEXT("TCAtmosHistory"));
 	return true;
 }
 
@@ -166,6 +168,7 @@ void FTCAtmosphere::StartMatch(const FTCMatchState& State, const FString& MapKey
 	WxNow = KnownLook(Kind) ? Kind : FString(TEXT("clear"));
 	Blend();
 	Cur = Goal; HazeNow = HazeGoal;
+	History.Start();
 
 	if (!NoiseTex)
 	{
@@ -242,6 +245,7 @@ void FTCAtmosphere::StartMatch(const FTCMatchState& State, const FString& MapKey
 	LoggedState.Reset();
 	UE_LOG(LogTC, Log, TEXT("atmosphere: start on '%s' (key '%s'): mood %s, weather %s; mist %d sheets, fog banks %d, birds %d, fall '%s'; clouds %.3f; reference %hs"),
 		*State.Map.Name, *MapKey, *MoodRow.Name.ToString(), *WxNow, MistSheets(), (int32)BankAt.size(), (int32)Flight.size(), *FallNow, FMath::Min(0.32f, MoodRow.Clouds * Cur.Clouds), ReferencePin);
+	TraceHistory(TEXT("start"), 0, State, false);
 }
 
 void FTCAtmosphere::BuildSheets()
@@ -465,14 +469,15 @@ void FTCAtmosphere::Update(float Dt, const FTCMatchState& State, const ATCTerrai
 	if (!State.Weather.Now.IsEmpty() && State.Weather.Now != WxNow)
 	{
 		const FString Next = KnownLook(State.Weather.Now) ? State.Weather.Now : FString(TEXT("clear"));
-		if (Next != WxNow) { WxNow = Next; Blend(); UE_LOG(LogTC, Log, TEXT("atmosphere: the weather turns to %s; easing (about 8 s)"), *WxNow); }
+		if (Next != WxNow) { WxNow = Next; Blend(); History.GoalChanged(); UE_LOG(LogTC, Log, TEXT("atmosphere: the weather turns to %s; easing (about 8 s)"), *WxNow); }
 	}
 	// main.js applySnapshot: if (s.wx) { setWind(wx[2], wx[3]); atmos.setRain(wx[0], wx[1]) }
 	if (State.Wx.bKnown)
 	{
 		WindNow.Set(State.Wx.WindAngle, State.Wx.WindStrength);
-		if ((float)State.Wx.Rain != ShowerRain || (float)State.Wx.Wet != ShowerWet) { ShowerRain = (float)State.Wx.Rain; ShowerWet = (float)State.Wx.Wet; Blend(); }
+		if ((float)State.Wx.Rain != ShowerRain || (float)State.Wx.Wet != ShowerWet) { ShowerRain = (float)State.Wx.Rain; ShowerWet = (float)State.Wx.Wet; Blend(); History.GoalChanged(); }
 	}
+	History.Frame(Dt);
 	// Comparison-only clock: hold animated weather at a recorded age without changing simulation or easing.
 	// The browser comparison copy holds its atmosphere.js time and accumulated drift at the same values.
 	double LookTime = 0;
@@ -543,6 +548,7 @@ void FTCAtmosphere::Update(float Dt, const FTCMatchState& State, const ATCTerrai
 	UpdateSheets(T);
 	UpdateFall(Terrain, PC, Focus);
 	UpdateBirds(T, Terrain);
+	TraceHistory(TEXT("frame"), Dt, State, bFixedLookTime);
 
 	const FString Line = FString::Printf(TEXT("mood %s, weather %s, shower %.2f wet %.2f, fall '%s', mist %d, banks %s, cover %s"), *MoodRow.Name.ToString(), *WxNow, ShowerRain, ShowerWet,
 		*FallNow, MistSheets(), BanksOn ? TEXT("on") : TEXT("off"), bCoverShown ? TEXT("on") : TEXT("off"));
@@ -645,9 +651,23 @@ void FTCAtmosphere::UpdateBirds(double Time, const ATCTerrain* Terrain)
 
 FString FTCAtmosphere::Describe() const
 {
-	return FString::Printf(TEXT("mood %s, weather %s (shower rain %.2f, wet ground %.2f), wind (%.2f, %.2f); clouds %s strength %.3f, cover %s (wet %.2f, puddles %.2f, mud %.2f, snow %.2f), mist %d, fog banks %s (%.2f), fall '%s' at %.2f, birds %d, ground sections mirrored %d"),
+	return FString::Printf(TEXT("mood %s, weather %s (shower rain %.2f, wet ground %.2f), wind (%.2f, %.2f); clouds %s strength %.3f, cover %s (wet %.2f, puddles %.2f, mud %.2f, snow %.2f), mist %d, fog banks %s (%.2f), fall '%s' at %.2f, birds %d, ground sections mirrored %d; rendered %llu frames %.9f s, current goal %.9f s"),
 		*MoodRow.Name.ToString(), *WxNow, ShowerRain, ShowerWet, WindNow.X, WindNow.Z, bCloudsShown ? TEXT("on") : TEXT("off"), FMath::Min(0.32f, MoodRow.Clouds * Cur.Clouds),
-		bCoverShown ? TEXT("on") : TEXT("off"), Cur.Wet, Cur.Sheen, Cur.Mud, Cur.Cover, MistSheets(), BanksOn ? TEXT("on") : TEXT("off"), Cur.Banks, *FallNow, FallA, (int32)Flight.size(), MirroredSections);
+		bCoverShown ? TEXT("on") : TEXT("off"), Cur.Wet, Cur.Sheen, Cur.Mud, Cur.Cover, MistSheets(), BanksOn ? TEXT("on") : TEXT("off"), Cur.Banks, *FallNow, FallA, (int32)Flight.size(), MirroredSections,
+		(unsigned long long)History.Frames, History.Seconds, History.GoalSeconds);
+}
+
+void FTCAtmosphere::TraceHistory(const TCHAR* Event, double Dt, const FTCMatchState& State, bool bFixedClock) const
+{
+	if (!bTraceHistory) return;
+	// Known weather/fall/mood enums only. No room, identity, receipt, token or seed.
+	// Precision retains the exact input float dt as a double for source replay.
+	UE_LOG(LogTC, Log, TEXT("atmos-history {\"event\":\"%s\",\"start\":%llu,\"frame\":%llu,\"engineFrame\":%llu,\"tick\":%d,\"dt\":%.17g,\"renderSeconds\":%.17g,\"goalSeconds\":%.17g,\"fixedClock\":%s,\"time\":%.17g,\"graphics\":\"%s\",\"mood\":\"%s\",\"weather\":\"%s\",\"rain\":%.17g,\"wet\":%.17g,\"wind\":[%.17g,%.17g],\"drift\":[%.17g,%.17g],\"look\":[%.17g,%.17g,%.17g,%.17g,%.17g,%.17g,%.17g,%.17g,%.17g],\"goal\":[%.17g,%.17g,%.17g,%.17g,%.17g,%.17g,%.17g,%.17g,%.17g],\"haze\":[%.17g,%.17g,%.17g],\"hazeGoal\":[%.17g,%.17g,%.17g],\"fall\":\"%s\",\"fallAlpha\":%.17g,\"banksVisible\":%s}"),
+		Event, (unsigned long long)History.Starts, (unsigned long long)History.Frames, (unsigned long long)GFrameCounter, State.Tick, Dt, History.Seconds, History.GoalSeconds, bFixedClock ? TEXT("true") : TEXT("false"), T,
+		FTCGraphics::Get().IsLow() ? TEXT("low") : TEXT("high"), *MoodRow.Name.ToString(), *WxNow, (double)ShowerRain, (double)ShowerWet, WindNow.X, WindNow.Z, DriftX, DriftY,
+		(double)Cur.Haze, (double)Cur.Sun, (double)Cur.Shadow, (double)Cur.Clouds, (double)Cur.Wet, (double)Cur.Sheen, (double)Cur.Mud, (double)Cur.Cover, (double)Cur.Banks,
+		(double)Goal.Haze, (double)Goal.Sun, (double)Goal.Shadow, (double)Goal.Clouds, (double)Goal.Wet, (double)Goal.Sheen, (double)Goal.Mud, (double)Goal.Cover, (double)Goal.Banks,
+		(double)HazeNow.R, (double)HazeNow.G, (double)HazeNow.B, (double)HazeGoal.R, (double)HazeGoal.G, (double)HazeGoal.B, *FallNow, FallA, BanksOn ? TEXT("true") : TEXT("false"));
 }
 
 void FTCAtmosphere::RunChecks(const FTCMatchState& State, APlayerController* PC)

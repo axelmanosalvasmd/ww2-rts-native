@@ -29,6 +29,7 @@
 #include "Commandlets/Commandlet.h"
 #include "Engine/Scene.h"
 #include "Client/TCLobbyBackdrop.h"
+#include "Client/TCRender26Diagnostics.h"
 #include "TCLighting.generated.h"
 
 class UDirectionalLightComponent;
@@ -206,6 +207,7 @@ public:
 	UPROPERTY() TObjectPtr<UTextureCube> SkyCube;
 
 private:
+	FTCRender26Diagnostics RendererDiagnostics;
 	void Apply(bool bForceSky);
 	void AimSun(float BrowserYaw);
 	void CheckSkyCapture();

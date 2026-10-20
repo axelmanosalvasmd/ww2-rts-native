@@ -20,6 +20,7 @@
 // At each pose the HUD is hidden (unless "hud"), and 2.5 s later (the view settles, the paint and textures stream) <dir>/<name>.png is
 // saved; the log line has the camera as set, the frame times over those 2.5 s and the terrain status.
 #include "Client/TCGameMode.h"
+#include "Client/TCRender26Diagnostics.h"
 #include "Client/TCPlayerController.h"
 #include "Client/TCHUD.h"
 #include "World/TCTerrain.h"
@@ -51,7 +52,7 @@ void ATCGameMode::RunSlice13Switches(double Now)
 		}
 		UE_LOG(LogTC, Log, TEXT("tour: %d poses from %s into %s"), Tour.Num(), *TourFile, *TourDir);
 	}
-	if (TourStep >= Tour.Num()) { TourDone = true; UE_LOG(LogTC, Log, TEXT("tour: done (%d shots)"), TourShots); if (AHUD* Hud = PC->GetHUD()) Hud->bShowHUD = true; return; }
+	if (TourStep >= Tour.Num()) { TourDone = true; UE_LOG(LogTC, Log, TEXT("tour: done (%d shots)"), TourShots); if (!FParse::Param(FCommandLine::Get(), TEXT("TCRender26HoldTourHud"))) { if (AHUD* Hud = PC->GetHUD()) Hud->bShowHUD = true; } return; }
 	const double InMatch = State.bHasMatch && State.Snapshots > 0 ? State.Tick / 20.0 : -1; // shared/sim.js: 20 ticks a second
 	FTourPose& P = Tour[TourStep];
 #if WITH_EDITOR
@@ -142,13 +143,16 @@ void ATCGameMode::RunSlice13Switches(double Now)
 	if (Now < TourShotAt || TourFrames.N < 8) { TourFrames.Add(FApp::GetDeltaTime() * 1000.0); return; }
 	if (FScreenshotRequest::IsScreenshotRequested()) return;
 	const FString File = FPaths::Combine(TourDir, P.Name + TEXT(".png"));
-	FScreenshotRequest::RequestScreenshot(File, false, false);
+	const bool bReadback = !FParse::Param(FCommandLine::Get(), TEXT("TCRender26NoTourReadback"));
+	if (bReadback) FScreenshotRequest::RequestScreenshot(File, false, false);
+	else UE_LOG(LogTC, Log, TEXT("renderer26 tour: screenshot readback suppressed for pose %s"), *P.Name);
 	if (PC->PlayerCameraManager)
 	{
 		const FMinimalViewInfo& V = PC->PlayerCameraManager->GetCameraCacheView();
 		UE_LOG(LogTC, Log, TEXT("look camera: %s camera %s rotation %s fov %.6f"), *P.Name, *V.Location.ToString(), *V.Rotation.ToString(), V.FOV);
 	}
-	TourShots++;
+	FTCRender26Diagnostics::CaptureTour(GetWorld(), *P.Name);
+	if (bReadback) TourShots++;
 	int32 Verts = 0, Unowned = 0;
 	const int32 OnUnknown = Terrain->DrawnOnUnknown(State, &Verts, &Unowned);
 	if (const FTCUnit* U = P.UnitId >= 0 ? State.Units.Find(P.UnitId) : nullptr)

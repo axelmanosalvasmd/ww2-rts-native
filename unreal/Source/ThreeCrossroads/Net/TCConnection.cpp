@@ -220,6 +220,9 @@ void FTCConnection::ReceiveText(const FString& Text, uint64 ExpectedGeneration)
 	const TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Text);
 	FString Type;
 	const bool bParsed = FJsonSerializer::Deserialize(Reader, Message) && Message.IsValid() && Message->TryGetStringField(TEXT("t"), Type);
+	// These retire the socket without needing a host profile. A start buffered while lobby() awaits the map list
+	// must not hide a seat replacement, hand-off, full-room retry or protocol refusal behind a lobby that never comes.
+	const bool bConnectionControl = bParsed && (Type == TEXT("replaced") || Type == TEXT("left") || Type == TEXT("full") || IsVersionDeny(*Message));
 	FString RefusedPendingMatch;
 	if (Host == ETCHostKind::Unknown)
 	{
@@ -238,7 +241,7 @@ void FTCConnection::ReceiveText(const FString& Text, uint64 ExpectedGeneration)
 			}
 			else if (Pending.Num()) RefusedPendingMatch = MoveTemp(Pending[0]);
 		}
-		else if (PendingHostMessages.Num() || (bParsed && (Type == TEXT("start") || Type == TEXT("s"))))
+		else if (!bConnectionControl && (PendingHostMessages.Num() || (bParsed && (Type == TEXT("start") || Type == TEXT("s")))))
 		{
 			// Do not infer a host profile from a start packet. Bound the wait by the existing socket text limit.
 			const int64 Bytes = Utf8Length(Text);

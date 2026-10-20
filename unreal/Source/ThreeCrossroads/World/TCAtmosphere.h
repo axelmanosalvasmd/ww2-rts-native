@@ -360,6 +360,18 @@ namespace TCAtmosCore
 		const double K = (CloudSpeed * Dt) / CloudScale / WL;
 		DX = std::fmod(DX - WindX * K, 1.0); DY = std::fmod(DY - WindZ * K, 1.0);
 	}
+
+	// Observation only. Snapshot ticks and the optional held particle clock do not
+	// advance the weather's easing. A comparison needs the dt actually consumed by
+	// every update since start, including the frames after its last goal change.
+	struct FRenderHistory
+	{
+		uint64_t Starts = 0, Frames = 0;
+		double Seconds = 0, GoalSeconds = 0;
+		void Start() { Starts++; Frames = 0; Seconds = GoalSeconds = 0; }
+		void GoalChanged() { GoalSeconds = 0; }
+		void Frame(double Dt) { Frames++; Seconds += Dt; GoalSeconds += Dt; }
+	};
 }
 
 #ifndef TC_ATMOS_CORE_ONLY
@@ -438,10 +450,12 @@ public:
 	bool MaterialsLoaded() const { return GroundMat.IsValid() && MistMat.IsValid() && BankMat.IsValid() && BirdMat.IsValid() && (FallNow.IsEmpty() || FallMat.IsValid()); }
 	int32 FallPoints() const;
 	FString Describe() const;
+	const TCAtmosCore::FRenderHistory& RenderHistory() const { return History; }
 
 private:
 #if WITH_DEV_AUTOMATION_TESTS
 	friend class FTCAtmosphereOracleTest;
+	friend class FTCWorld26WeatherHistoryTest;
 #endif
 	void Blend();
 	void ApplyMood();
@@ -454,6 +468,7 @@ private:
 	void UpdateBirds(double T, const ATCTerrain* Terrain);
 	void UpdateFall(const ATCTerrain* Terrain, APlayerController* PC, FVector2D Focus);
 	void RunChecks(const FTCMatchState& State, APlayerController* PC);
+	void TraceHistory(const TCHAR* Event, double Dt, const FTCMatchState& State, bool bFixedClock) const;
 	UMaterialInstanceDynamic* Mid(const TCHAR* Path, const TCHAR* Name);
 	UProceduralMeshComponent* NewMesh(const TCHAR* Name, int32 Sort, bool bVisible);
 
@@ -483,6 +498,8 @@ private:
 	double GroundSyncAt = -1.0;
 	TArray<TWeakObjectPtr<AActor>> ExtraGround;
 	FString LoggedState;
+	TCAtmosCore::FRenderHistory History;
+	bool bTraceHistory = false; // -TCAtmosHistory: one JSON log row per consumed frame, disabled by default
 
 	TWeakObjectPtr<AActor> Actor;
 	const FTCRailways* Railways = nullptr;

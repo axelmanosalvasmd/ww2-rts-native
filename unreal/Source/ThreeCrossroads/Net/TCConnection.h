@@ -135,6 +135,7 @@ private:
 	void ReceiveText(const FString& Text, uint64 ExpectedGeneration);
 #if WITH_DEV_AUTOMATION_TESTS
 	friend class FTCSessionRustProfileAdmissionTest;
+	friend class FTCSession26TransportOrderingTest;
 #endif
 	void Open();
 	void Lost();

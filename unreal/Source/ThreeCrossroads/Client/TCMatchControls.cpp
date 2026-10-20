@@ -806,6 +806,7 @@ FTCPaint FTCRoomBanners::Layout(const TArray<FTCRoomBanner>& Banners, float Top,
 #include "Client/TCHUD.h"
 #include "Client/TCPlayerController.h"
 #include "Client/TCPersistence.h"
+#include "Client/TCSession26Diagnostics.h"
 #include "Client/TCLocale.h"
 #include "ThreeCrossroads.h"
 #include "Engine/Canvas.h"
@@ -1510,6 +1511,13 @@ void ATCGameMode::ControlsFrame()
 						if (Values->TryGetStringField(Entry.Reference, Value) && FTCSettingsStore::Game().Set(Entry.Reference, Value)) Written++;
 					}
 				Did = FString::Printf(TEXT("saved preferences written through game store: %d"), Written);
+			}
+			else if (St.Action == TEXT("consumers") && PC)
+			{
+				FString Json;
+				FJsonSerializer::Serialize(TCSession26::ConsumerState(*this, *PC), TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&Json));
+				UE_LOG(LogTC, Log, TEXT("session26 consumers: %s"), *Json);
+				Did = TEXT("consumed settings and current match view inspected");
 			}
 			else if (St.Action == TEXT("prefs"))
 			{

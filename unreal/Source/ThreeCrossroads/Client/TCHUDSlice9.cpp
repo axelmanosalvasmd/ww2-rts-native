@@ -723,36 +723,17 @@ void ATCHUD::DrawEpilogue(UFont* Font, UFont* Big)
 	DrawLabel(E.Why, WithAlpha(TextC, Fade), X + (W - RW) / 2, Y + 22.f + WH, Font, 1.f);
 }
 
-void ATCHUD::DrawControlsSheet(UFont* Font, UFont* Big)
+void ATCHUD::DrawControlsSheet(UFont* Font, UFont*)
 {
-	using namespace TCHudSlice9;
 	ATCPlayerController* PC = Cast<ATCPlayerController>(GetOwningPlayerController());
-	if (!PC || !PC->bControlsSheetOpen) return;
-	// client/index.html #controlsSheet: the four sections, two columns; F1 or Esc closes it
-	const TArray<FTCSheetSection>& Sheet = TCKeys::ControlsSheet();
-	const float W = FMath::Min(1180.f, Canvas->ClipX - 40.f), ColW = W / 2;
-	int32 LeftRows = 0, RightRows = 0;
-	for (int32 I = 0; I < Sheet.Num(); I++) (I < 2 ? LeftRows : RightRows) += Sheet[I].Rows.Num() + 2;
-	const float H = FMath::Min(Canvas->ClipY - 40.f, (FMath::Max(LeftRows, RightRows) + 2) * 14.f + 2 * PadPx + 20.f);
-	const float X0 = (Canvas->ClipX - W) / 2, Y0 = (Canvas->ClipY - H) / 2;
-	AddPanel(X0, Y0, W, H, WithAlpha(Plate, 0.96f));
-	DrawLabel(TEXT("Controls  (F1 or Esc closes)"), Brass, X0 + PadPx, Y0 + PadPx, Big, 1.f);
-	float Yc[2] = { Y0 + PadPx + 26.f, Y0 + PadPx + 26.f };
-	for (int32 I = 0; I < Sheet.Num(); I++)
-	{
-		const int32 Col = I < 2 ? 0 : 1;
-		const float X = X0 + PadPx + Col * ColW;
-		float& Y = Yc[Col];
-		DrawLabel(Sheet[I].Title, Brass, X, Y, Font, 1.f); Y += 15.f;
-		for (const FTCSheetRow& R : Sheet[I].Rows)
-		{
-			if (Y > Y0 + H - 16.f) break;
-			DrawLabel(R.Keys, TextC, X, Y, Font, 1.f);
-			DrawLabel(R.Text, DimC, X + 150.f, Y, Font, 1.f);
-			Y += 14.f;
-		}
-		Y += 8.f;
-	}
+	if (!PC || !PC->bControlsSheetOpen)
+	{ ControlsScrollBox=FBox2D(ForceInit); ControlsScroll=ControlsScrollMax=0; return; }
+	const FTCHudFit::FControlsLayout Sheet=FTCHudFit::ControlsDialog(FVector2D(Canvas->ClipX,Canvas->ClipY),FTCType::IsLoaded()?FTCType::Measure():FTCPaint::CanvasMeasure(Font),ControlsScroll);
+	ControlsScrollMax=Sheet.ScrollMax; ControlsScroll=FMath::Clamp(ControlsScroll,0.f,ControlsScrollMax); ControlsScrollBox=Sheet.Viewport;
+	FTCType::Draw(Sheet.Paint,Canvas,Font,1);
+	// showModal makes only Close an actionable target. Background HUD commands cannot leak through the sheet.
+	Buttons.Reset(); Panels.Reset(); Panels.Append(Sheet.Paint.Panels);
+	Buttons.Add({Sheet.Close,FTCUiCommand(ETCUiAction::ControlsSheet),TEXT("Close controls"),true,TEXT("Close controls")});
 }
 
 float ATCHUD::LobbyWidthBesideReport(UFont* Font) const

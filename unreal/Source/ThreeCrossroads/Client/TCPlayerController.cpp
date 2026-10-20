@@ -558,6 +558,7 @@ void ATCPlayerController::UpdateCamera(float Dt, bool bFocused)
 	// the wheel over the view (the HUD's panels keep their own wheel; a notch that ended the intro is dropped)
 	const int32 Notch = (WasInputKeyJustPressed(EKeys::MouseScrollDown) ? 1 : 0) - (WasInputKeyJustPressed(EKeys::MouseScrollUp) ? 1 : 0);
 	if (Notch && bHasCursor && !bIntroDropWheel && !ModalSheetOpen()) if (ATCHUD* H=Cast<ATCHUD>(GetHUD())) H->ScrollSelection(Mouse,Notch);
+	if (Notch && bHasCursor && bControlsSheetOpen) if (ATCHUD* H=Cast<ATCHUD>(GetHUD())) H->ScrollControls(Mouse,Notch);
 	if (Notch && M->StatsSheet.IsOpen() && !bControlsSheetOpen) M->StatsSheet.Scroll(Notch * 48.f); // round 16: the stats sheet scrolls
 	if (Notch && !bIntroDropWheel && !ModalSheetOpen() && (!bHasCursor || bOverView)) WheelZoom(Notch, bOverView, Mouse, VX, VY);
 
@@ -1167,6 +1168,7 @@ bool ATCPlayerController::KeyChord(const FKey& Key, bool bShift, bool bCtrl, boo
 		if (Cards.IsValidIndex(Index))
 		{
 			UE_LOG(LogTC, Log, TEXT("card letter %s: card %d, %s"), *B->Label, Index + 1, *Cards[Index].Describe());
+			if (ATCHUD* Hud = Cast<ATCHUD>(GetHUD())) Hud->NoteCardLetter(Cards[Index].Unit);
 			RunCommand(Cards[Index], B->bShift); // Shift: cardMany, buy five (as many as the limits allow)
 			return true;
 		}
