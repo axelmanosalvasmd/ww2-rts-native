@@ -270,6 +270,7 @@ struct FTCAlertEntry
 };
 #if WITH_DEV_AUTOMATION_TESTS
 namespace TCSession27Lifecycle { struct FAccess; }
+namespace TCSession28Failure { struct FAccess; }
 #endif
 
 UCLASS()
@@ -475,6 +476,7 @@ public:
 private:
 #if WITH_DEV_AUTOMATION_TESTS
 	friend struct TCSession27Lifecycle::FAccess;
+	friend struct TCSession28Failure::FAccess;
 #endif
 	void PushAlert(const TCHAR* Kind, const FString& Text, FVector2D At);
 	// client/alerts.js snapshot, the points block: captured, lost, under attack (the shared throttle) and cut off,

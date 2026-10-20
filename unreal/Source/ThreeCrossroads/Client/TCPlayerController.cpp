@@ -734,7 +734,10 @@ bool ATCPlayerController::HandleHudPress(bool bLeft, bool bRight, FVector2D Mous
 	FTCUiCommand Command;
 	if (bLeft && Hud->CommandAt(Mouse, Command))
 	{
-		RunCommand(Command, Command.Action != ETCUiAction::Recruit && (IsInputKeyDown(EKeys::LeftShift) || IsInputKeyDown(EKeys::RightShift)));
+		const bool Handled=RunCommand(Command, Command.Action != ETCUiAction::Recruit && (IsInputKeyDown(EKeys::LeftShift) || IsInputKeyDown(EKeys::RightShift)));
+		if (FParse::Param(FCommandLine::Get(),TEXT("TCHudInputAudit")))
+			UE_LOG(LogTC,Log,TEXT("hud28 input: consumed left %.8f,%.8f; %s; handled=%d clock=%.8f tick=%d"),
+				Mouse.X,Mouse.Y,*Hud->DrawnTargetDescription(Mouse),Handled,FPlatformTime::Seconds(),Mode()?Mode()->State.Tick:-1);
 		return true;
 	}
 	// client/hud.js drawOrders: a right click on an ability button switches its autocast (oncontextmenu)

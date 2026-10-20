@@ -1,4 +1,5 @@
 #include "Client/TCMatchControls.h"
+#include "Client/TCSession28Diagnostics.h"
 #include "Client/TCKeys.h"
 #include "Client/TCLocale.h"
 #include "Net/TCConnection.h"
@@ -956,6 +957,7 @@ void ATCGameMode::ControlsMessage(const FString& T, const FJsonObject& M)
 	{
 		const int32 NextMatch = M.GetIntegerField(TEXT("matchId"));
 		const ATCPlayerController* PC = Cast<ATCPlayerController>(GetWorld()->GetFirstPlayerController());
+		if (PC) TCSession28::LogViewSeam(*this, *PC, TEXT("before-start"), NextMatch);
 		if (State.bHasMatch && State.MatchId == NextMatch && PC)
 		{
 			// main.js receiveStart takes matchView() directly for the held identity, even when storage fails.
@@ -963,6 +965,7 @@ void ATCGameMode::ControlsMessage(const FString& T, const FJsonObject& M)
 			Controls.bResumePending = Controls.ResumeView.IsValid();
 		}
 		else Controls.bResumePending = Controls.ViewMemory.Read(Controls.ResumeView) && Controls.ResumeView.MatchId == NextMatch;
+		if (PC) TCSession28::LogViewSeam(*this, *PC, TEXT("prepared"), NextMatch);
 		Controls.TerminalNotice.Reset();
 		const TSharedPtr<SWindow> Window = GEngine && GEngine->GameViewport ? GEngine->GameViewport->GetWindow() : nullptr;
 		if (Window && Controls.NormalWindowTitle.IsEmpty()) Controls.NormalWindowTitle = Window->GetTitle().ToString();
@@ -1018,7 +1021,8 @@ void ATCGameMode::SaveMatchView()
 	if (!State.bHasMatch || !Controls.bViewSeatActive || !State.SeatConfirmed() || Controls.bResumePending) return;
 	const ATCPlayerController* PC = Cast<ATCPlayerController>(GetWorld()->GetFirstPlayerController());
 	if (!PC) return;
-	Controls.ViewMemory.Write(FTCMatchView::Capture(*PC, State.MatchId));
+	const bool bWritten = Controls.ViewMemory.Write(FTCMatchView::Capture(*PC, State.MatchId));
+	TCSession28::LogViewSeam(*this, *PC, TEXT("write"), State.MatchId, bWritten);
 	Controls.LastViewWrite = FPlatformTime::Seconds();
 }
 
@@ -1176,6 +1180,7 @@ void ATCGameMode::ControlsFrame()
 		{
 			PC->RestoreMatchView(Controls.ResumeView, State);
 			Controls.bResumePending = false;
+			TCSession28::LogViewSeam(*this, *PC, TEXT("restored"), State.MatchId);
 			UE_LOG(LogTC, Log, TEXT("match view: restored match %d, %d selected, %d groups after recipient snapshot %d"), State.MatchId, PC->Selected.Num(), Controls.ResumeView.Groups.Num(), State.Tick);
 		}
 	}
@@ -1221,6 +1226,13 @@ void ATCGameMode::ControlsFrame()
 			|| (C == TEXT("rooms") && Rooms.HasAnswer()) || (C == TEXT("offline") && Controls.Seats().ContainsByPredicate([](const FTCMatchControls::FSeat& P) { return !P.bAi && !P.bConnected; }))
 			|| (C == TEXT("left") && Controls.Left()) || (C == TEXT("nolobby") && !Controls.HasLobby())
 			|| (C == TEXT("alert") && AlertFeed.Lines().ContainsByPredicate([](const FTCAlertLine& L) { return L.Alert.bHasAt; }))
+			// Verification only: fixed delays cannot establish that the other input scripts have finished.
+			|| (C == TEXT("hostlobby28") && Controls.InLobby() && Controls.AmHost())
+			|| (C == TEXT("guestlobby28") && Controls.InLobby() && !Controls.AmHost())
+			|| (C == TEXT("weatherclear28") && Options.InLobby() && Options.Control(ETCMatchOption::Weather).CurrentValue == TEXT("clear")
+				&& !Options.Control(ETCMatchOption::Weather).bPending)
+			|| (C == TEXT("viewsettled28") && State.CanOrder() && State.Snapshots >= 3
+				&& (!bGroupCheck || bGroupScriptMade) && Script.IsEmpty() && !OrdersCheck.Active() && Tour.IsEmpty())
 			// round 16: 'humans<N>': at least N connected human seats in the lobby (a host waits for its guests to start)
 			|| (C.StartsWith(TEXT("humans")) && Controls.Seats().FilterByPredicate([](const FTCMatchControls::FSeat& P) { return !P.bAi && P.bConnected; }).Num() >= FCString::Atoi(*C.Mid(6))));
 		if (bReady)
@@ -1252,10 +1264,10 @@ void ATCGameMode::ControlsFrame()
 				for (int32 I=2; Parsed && I<6; I++) Parsed=Fields[I].IsNumeric();
 				FBox2D Observed(ForceInit);
 				if (Parsed) Observed=FBox2D(FVector2D(FCString::Atod(*Fields[2]),FCString::Atod(*Fields[3])),FVector2D(FCString::Atod(*Fields[4]),FCString::Atod(*Fields[5])));
-				const ATCHUD* Hud=Cast<ATCHUD>(PC->GetHUD()); FVector2D At;
-				if (!Parsed || !Hud || !Hud->ObservedTrainingSlot(Observed,Producer,Fields[1],At))
+				const ATCHUD* Hud=Cast<ATCHUD>(PC->GetHUD()); FVector2D At; FString Refusal;
+				if (!Parsed || !Hud || !Hud->ObservedTrainingSlot(Observed,Producer,Fields[1],At,&Refusal))
 				{
-					Did=TEXT("HUD inert-training target is absent, changed, enabled or covered: ")+St.Arg;
+					Did=TEXT("HUD inert-training target refused (")+(Refusal.IsEmpty()?TEXT("invalid request or HUD absent"):Refusal)+TEXT("): ")+St.Arg;
 					UE_LOG(LogTC,Error,TEXT("%s"),*Did);
 				}
 				else
@@ -1265,9 +1277,17 @@ void ATCGameMode::ControlsFrame()
 					const TWeakObjectPtr<ATCPlayerController> WeakPC(PC); FTimerHandle Release;
 					GetWorld()->GetTimerManager().SetTimer(Release,FTimerDelegate::CreateLambda([WeakPC]()
 					{
-						if (ATCPlayerController* Controller=WeakPC.Get()) Controller->InjectKey(EKeys::LeftMouseButton,false);
+						if (ATCPlayerController* Controller=WeakPC.Get())
+						{
+							Controller->InjectKey(EKeys::LeftMouseButton,false);
+							if (FParse::Param(FCommandLine::Get(),TEXT("TCHudInputAudit")))
+							{
+								const ATCGameMode* Mode=Controller->GetWorld()?Controller->GetWorld()->GetAuthGameMode<ATCGameMode>():nullptr;
+								UE_LOG(LogTC,Log,TEXT("hudinertclick: released left clock=%.8f tick=%d"),FPlatformTime::Seconds(),Mode?Mode->State.Tick:-1);
+							}
+						}
 					}),.1f,false);
-					Did=FString::Printf(TEXT("hudinertclick producer=%d type=%s at observed disabled slot %.1f,%.1f through held engine input; verify no cancel wire or refund and retained active job"),Producer,*Fields[1],At.X,At.Y);
+					Did=FString::Printf(TEXT("hudinertclick producer=%d type=%s at observed disabled slot %.1f,%.1f through held engine input; %s; clock=%.8f tick=%d; verify consumer input, no cancel wire or refund and retained active job"),Producer,*Fields[1],At.X,At.Y,*Hud->DrawnTargetDescription(At),Now,State.Tick);
 				}
 			}
 			else if ((St.Action == TEXT("hudhover") || St.Action == TEXT("hudpress") || St.Action == TEXT("hudshift") || St.Action == TEXT("hudclick") || St.Action == TEXT("hudshiftclick") || St.Action == TEXT("hudctrlclick") || St.Action == TEXT("hudrightclick")) && PC)
@@ -1621,6 +1641,7 @@ void ATCGameMode::ControlsFrame()
 #endif
 			else if (St.Action == TEXT("view") && PC)
 			{
+				TCSession28::LogViewSeam(*this, *PC, TEXT("held"), State.MatchId);
 				FString Groups;
 				for (int32 N = 1; N <= 9; N++) if (PC->Groups.Members(N).Num()) Groups += FString::Printf(TEXT(" %d:%s"), N, *FString::JoinBy(PC->Groups.Members(N), TEXT(","), [](int32 Id) { return FString::FromInt(Id); }));
 				Did = FString::Printf(TEXT("view x=%.3f z=%.3f yaw=%.3f dist=%.3f selected=%s groups=%s"), PC->ViewFocus().X, PC->ViewFocus().Y, PC->ViewYaw(), PC->ViewDistance(), *FString::JoinBy(PC->Selected, TEXT(","), [](int32 Id) { return FString::FromInt(Id); }), *Groups);

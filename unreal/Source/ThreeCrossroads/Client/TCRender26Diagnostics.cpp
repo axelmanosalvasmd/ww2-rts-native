@@ -1,6 +1,7 @@
 #include "Client/TCRender26Diagnostics.h"
 #include "Client/TCRender26Policy.h"
 #include "Client/TCRender27GpuPolicy.h"
+#include "Client/TCRender28Diagnostics.h"
 #include "Client/TCGraphics.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Dom/JsonObject.h"
@@ -105,6 +106,7 @@ void FTCRender26Diagnostics::Tick(UWorld* World)
 
 void FTCRender26Diagnostics::CaptureTour(UWorld* World, const TCHAR* Pose)
 {
+	FTCRender28Diagnostics::CaptureTour(World, Pose);
 	FString Directory, Target;
 	if (!FParse::Value(FCommandLine::Get(), TEXT("TCRender26GpuDir="), Directory)
 		|| !FParse::Value(FCommandLine::Get(), TEXT("TCRender26GpuPose="), Target) || Target != Pose) return;

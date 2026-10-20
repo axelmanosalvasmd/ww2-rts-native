@@ -223,7 +223,9 @@ public:
 	bool ButtonCentre(ETCUiAction Action, FVector2D& Out) const;
 	bool CommandCentre(const FTCUiCommand& Command, FVector2D& Out) const;
 	// Verification only: require an observed disabled active-training rectangle and the current producer/type.
-	bool ObservedTrainingSlot(const FBox2D& Observed, int32 Producer, const FString& Type, FVector2D& Out) const;
+	bool ObservedTrainingSlot(const FBox2D& Observed, int32 Producer, const FString& Type, FVector2D& Out, FString* Refusal = nullptr) const;
+	// Opt-in input receipts describe the same topmost hit that CommandAt consumes.
+	FString DrawnTargetDescription(FVector2D Pixel) const;
 	// A HUD panel (not the minimap) covers this pixel: a press there must not reach the world.
 	bool PanelAt(FVector2D Pixel) const;
 	// The labels of the buttons drawn in the last frame, for logs.
@@ -236,6 +238,9 @@ public:
 	FTCMinimap Minimap;
 
 private:
+	friend struct FTCHud28Access;
+	// Physical bounds of the retained hit table. Canvas exists only during PostRender.
+	FVector2D DrawnViewport = FVector2D::ZeroVector;
 	struct FButton { FBox2D Rect; FTCUiCommand Command; FString Label; bool bEnabled = true; FString Hover; };
 	// Opt-in integration evidence from the actual drawn controls. Does not synthesize clicks or purchases.
 	void WriteAcceptanceAudit();

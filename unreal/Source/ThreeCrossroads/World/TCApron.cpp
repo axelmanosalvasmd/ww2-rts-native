@@ -10,6 +10,9 @@
 #include "Materials/MaterialInterface.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "ProceduralMeshComponent.h"
+#include "RenderingThread.h"
+#include "RHI.h"
+#include "TextureResource.h"
 
 const TCHAR* const FTCApron::ReferencePin = TEXT("e4e579a838aabae3b1d9dadbc17a0a87147bc52d");
 const TCHAR* const FTCApron::MaterialPath = TEXT("/Game/Water/M_TCApron.M_TCApron");
@@ -26,6 +29,24 @@ namespace TCApronView
 	const TCHAR* const TileNames[6] = { TEXT("Grass"), TEXT("Dirt"), TEXT("Mud"), TEXT("Field"), TEXT("Road"), TEXT("Water") };
 	inline FVector ToUnreal(const float* P) { return FVector(P[0] * 100.0, P[2] * 100.0, P[1] * 100.0); }
 	inline FVector NormalToUnreal(const float* N) { return FVector(N[0], N[2], N[1]); }
+
+	// apron.js tileTextures: linear mip interpolation, repeat and anisotropy 8.
+	// These transient tiles never stream. Queue after MakeTexture's resource init
+	// and before SetTiles publishes them to the material. Release is ordered later.
+	struct FOriginalTileSampler : FTexture
+	{
+		static void Apply(UTexture2D* Texture)
+		{
+			FTextureResource* Resource = Texture->GetResource();
+			if (!Resource) return;
+			ENQUEUE_RENDER_COMMAND(TCApronOriginalTileSampler)([Resource](FRHICommandListImmediate&)
+			{
+				FRHISamplerState* Sampler = GetOrCreateSamplerState(FSamplerStateInitializerRHI(SF_AnisotropicLinear, AM_Wrap, AM_Wrap, AM_Wrap, 0.f, 8));
+				Resource->SamplerStateRHI = Sampler;
+				Resource->DeferredPassSamplerStateRHI = Sampler;
+			});
+		}
+	};
 }
 
 FTCApron::FTCApron() = default;
@@ -95,6 +116,7 @@ void FTCApron::SetTileBytes(const TArray<TArray<uint8>>& Rgba, const TArray<int3
 		if (Sizes[M] <= 0 || Rgba[M].Num() != Sizes[M] * Sizes[M] * 4) { UE_LOG(LogTC, Warning, TEXT("apron: tile %d has %d bytes for %d px; kept the current ones"), M, Rgba[M].Num(), Sizes[M]); return; }
 		UTexture2D* T = TCWaterView::MakeTexture(Sizes[M], Sizes[M], Rgba[M].GetData(), true, true);
 		if (!T) { UE_LOG(LogTC, Warning, TEXT("apron: tile %d could not be made; kept the current ones"), M); return; }
+		TCApronView::FOriginalTileSampler::Apply(T);
 		Tiles.Add(T);
 		Metres.Add((float)TCApronCore::LookMetres[M]);
 	}

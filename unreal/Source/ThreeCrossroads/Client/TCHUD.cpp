@@ -640,6 +640,14 @@ void ATCHUD::WriteAcceptanceAudit()
   Controls.Add(MakeShared<FJsonValueObject>(C));
  }
  Root->SetArrayField(TEXT("controls"),Controls);
+ if (FParse::Param(FCommandLine::Get(),TEXT("TCHudInputAudit")))
+ {
+  Root->SetNumberField(TEXT("matchId"),M->State.MatchId);
+  Root->SetBoolField(TEXT("paused"),M->State.bPaused);
+  Root->SetNumberField(TEXT("drawFrame"),Frames);
+  Root->SetNumberField(TEXT("uiTimeMs"),FPlatformTime::Seconds()*1000.0);
+  Root->SetBoolField(TEXT("leftDown"),PC->IsInputKeyDown(EKeys::LeftMouseButton));
+ }
  if (FParse::Param(FCommandLine::Get(),TEXT("TCHudPulseAudit")))
  {
   // Opt-in per-frame UI timing. A pulse model receipt is separate from the rendered card pixels.
@@ -789,6 +797,9 @@ namespace TCHudBottom
 		L.Paint.Frame(B.Min.X,B.Min.Y,B.GetSize().X,B.GetSize().Y,C.bOn ? TCCss::Brass : TCCss::LineSoft,Border(Scale));
 		Icon(L,C.Icon,B.GetCenter().X-11.5f,B.Min.Y+6,23,TCCss::Text);
 		KeyBadge(L,C.Key,B.Max.X-3,B.Min.Y+2,B,Measure);
+		// hud.js orderBtn's optional symbolSVG, separate from its primary tool icon.
+		if ((C.Command.Action==ETCUiAction::Build && C.Command.Unit!=TEXT("supplycache")) || C.Command.Action==ETCUiAction::Ability)
+			Icon(L,C.Command.Unit,B.Min.X+3,B.Min.Y+3,15,TCCss::Dim);
 		if (!C.Value.IsEmpty())
         {
             if (C.bSubmenu)
@@ -2129,36 +2140,55 @@ bool ATCHUD::CommandCentre(const FTCUiCommand& Command, FVector2D& Out) const
 	return false;
 }
 
-bool ATCHUD::ObservedTrainingSlot(const FBox2D& Observed, int32 Producer, const FString& Type, FVector2D& Out) const
+bool ATCHUD::ObservedTrainingSlot(const FBox2D& Observed, int32 Producer, const FString& Type, FVector2D& Out, FString* Refusal) const
 {
+ if (Refusal) Refusal->Reset();
+ auto Fail=[&](const TCHAR* Reason) { if (Refusal) *Refusal=Reason; return false; };
  const ATCGameMode* Mode=GetWorld()?GetWorld()->GetAuthGameMode<ATCGameMode>():nullptr;
  const ATCPlayerController* Controller=Cast<ATCPlayerController>(GetOwningPlayerController());
- if (!Mode || !Controller || !Canvas || !Observed.bIsValid || Producer<=0 || Type.IsEmpty()) return false;
- for (double Value : {Observed.Min.X,Observed.Min.Y,Observed.Max.X,Observed.Max.Y}) if (!FMath::IsFinite(Value)) return false;
- if (Observed.Min.X<0 || Observed.Min.Y<0 || Observed.Max.X>Canvas->ClipX || Observed.Max.Y>Canvas->ClipY
-  || Observed.GetSize().X<=0 || Observed.GetSize().Y<=0) return false;
+ if (!Mode || !Controller || !bShowHUD || Controller->ModalSheetOpen()) return Fail(TEXT("HUD context absent, hidden or modal"));
+ // GameViewportClient clears Canvas after PostRender. Input validates the retained hit table's physical bounds.
+ if (DrawnViewport.X<=0 || DrawnViewport.Y<=0) return Fail(TEXT("no retained drawn viewport"));
+ if (!Observed.bIsValid || Producer<=0 || Type.IsEmpty()) return Fail(TEXT("invalid target identity or rectangle"));
+ for (double Value : {Observed.Min.X,Observed.Min.Y,Observed.Max.X,Observed.Max.Y}) if (!FMath::IsFinite(Value)) return Fail(TEXT("nonfinite rectangle"));
+ if (Observed.Min.X<0 || Observed.Min.Y<0 || Observed.Max.X>DrawnViewport.X || Observed.Max.Y>DrawnViewport.Y
+  || Observed.GetSize().X<=0 || Observed.GetSize().Y<=0) return Fail(TEXT("rectangle outside retained physical viewport"));
  const FTCCommandCard Card=Mode->Recruit.Card(Mode->State,Controller->Selected);
- if (Card.Kind!=ETCCardKind::Building || Card.Building!=Producer || !Card.bTraining || Card.Slots.IsEmpty()) return false;
+ if (Card.Kind!=ETCCardKind::Building || Card.Building!=Producer || !Card.bTraining || Card.Slots.IsEmpty()) return Fail(TEXT("current producer or training card changed"));
  const FTCQueueSlot& Slot=Card.Slots[0];
- if (!Slot.bTraining || Slot.Type!=Type || Slot.Job!=0 || Slot.bPending) return false;
+ if (!Slot.bTraining || Slot.Type!=Type || Slot.Job!=0 || Slot.bPending) return Fail(TEXT("current active slot changed"));
  const FString Name=FTCAlerts::UnitName(Mode->State,&Mode->UnitTable,Type,Mode->State.You);
  const FButton* Button=Buttons.FindByPredicate([&](const FButton& B)
  {
   return B.Command.Action==ETCUiAction::None && !B.bEnabled && B.Label==Name && B.Hover==TEXT("Training: ")+Name
    && B.Rect.Equals(Observed,.25);
  });
- if (!Button) return false;
- FTCUiCommand Hit;
+ if (!Button) return Fail(TEXT("drawn disabled slot identity or rectangle changed"));
  const FVector2D Centre=Button->Rect.GetCenter();
- if (!CommandAt(Centre,Hit) || Hit.Action!=ETCUiAction::None) return false;
- Out=Centre;
- return true;
+ for (int32 I=Buttons.Num()-1; I>=0; I--) if (FTCHudFit::Contains(Buttons[I].Rect,Centre))
+ {
+  if (&Buttons[I]!=Button) return Fail(TEXT("another drawn target covers the active slot"));
+  Out=Centre; return true;
+ }
+ return Fail(TEXT("active slot has no topmost drawn hit"));
 }
 
 bool ATCHUD::PanelAt(FVector2D Pixel) const
 {
 	for (const FBox2D& P : Panels) if (FTCHudFit::Contains(P,Pixel)) return true;
 	return false;
+}
+
+FString ATCHUD::DrawnTargetDescription(FVector2D Pixel) const
+{
+ for (int32 I=Buttons.Num()-1; I>=0; I--) if (FTCHudFit::Contains(Buttons[I].Rect,Pixel))
+ {
+  const FButton& B=Buttons[I];
+  return FString::Printf(TEXT("frame=%d label=[%s] enabled=%d action=%d unit=[%s] building=%d job=%d group=%d box=%.8f,%.8f,%.8f,%.8f"),
+   Frames,*B.Label,B.bEnabled,int32(B.Command.Action),*B.Command.Unit,B.Command.Building,B.Command.Job,B.Command.Group,
+   B.Rect.Min.X,B.Rect.Min.Y,B.Rect.Max.X,B.Rect.Max.Y);
+ }
+ return FString::Printf(TEXT("frame=%d no drawn target"),Frames);
 }
 
 FString ATCHUD::ButtonLabels() const
@@ -3256,9 +3286,11 @@ void ATCHUD::DrawHUD()
  MenuScrollBox=AirScrollBox=RecruitScrollBox=LogisticsScrollBox=FBox2D(ForceInit);
 	EndUi(); // a frame starts unscaled
 	Frames++;
+	DrawnViewport=FVector2D::ZeroVector;
 	ATCGameMode* M = GetWorld()->GetAuthGameMode<ATCGameMode>();
 	ATCPlayerController* PC = Cast<ATCPlayerController>(GetOwningPlayerController());
 	if (!M || !PC || !Canvas) return;
+	DrawnViewport=FVector2D(Canvas->ClipX,Canvas->ClipY);
 	UFont* Font = GEngine->GetSmallFont();
 	UFont* Big = GEngine->GetMediumFont() ? GEngine->GetMediumFont() : Font;
 	const FTCMatchState& S = M->State;

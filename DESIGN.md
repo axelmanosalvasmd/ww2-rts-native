@@ -1,4 +1,4 @@
-Current Unreal integration decisions and measurements: [slice 1y](design.d/2026-10-18-unreal-slice-1y.md). This preserves the approved exact-source ABI query boundary and records the current-main R1 profile incompatibility separately from decoder compatibility.
+Current Unreal integration decisions and measurements: [slice 1ac](design.d/2026-10-20-unreal-slice1ac.md). The approved exact-source ABI query boundary and current-main R1 profile incompatibility remain separate from decoder compatibility.
 
 ## Shared authored mission state (2026-10-17)
 

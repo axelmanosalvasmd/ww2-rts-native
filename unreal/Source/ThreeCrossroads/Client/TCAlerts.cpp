@@ -512,7 +512,7 @@ FTCPaint FTCAlerts::Layout(const FTCAlertViewInput& In, const FTCMeasure& Measur
 				R.H = 2 * Border + 2 * EntryPad + R.Lines.Num() * LineBox;
 				Rows.Add(MoveTemp(R));
 			}
-			// the list scrolls (max-height min(30vh, 250px)): this shows a window of whole entries, the selected one in it
+			// the list scrolls (max-height min(30vh, 250px)): keep the selected entry in its visible window
 			for (const FEntry& R : Rows) Content += R.H + EntryMargin;
 			Content += Rows.Num() ? EntryMargin : LineBox;
 			const int32 Sel = Rows.IndexOfByPredicate([this](const FEntry& R) { return R.E->Id == Hist.Selected(); });
@@ -571,10 +571,12 @@ FTCPaint FTCAlerts::Layout(const FTCAlertViewInput& In, const FTCMeasure& Measur
 				return;
 			}
 			float Ey = Top + EntryMargin;
+			const FBox2D Crop(FVector2D(Lx,Top),FVector2D(Lx+Lw,Bottom));
 			for (int32 K = First; K < Rows.Num(); K++)
 			{
 				const FEntry& R = Rows[K];
-				if (Ey + R.H > Bottom + 0.5f) break;
+				if (Ey >= Bottom) break;
+				const int32 FirstPaint=Out.Items.Num();
 				Out.Rect(Lx, Ey, Lw, R.H, TCCss::Rgba(46, 51, 55, 0.94f), TEXT("alert:entry"));
 				Out.Frame(Lx, Ey, Lw, R.H, TCCss::Rgba(176, 164, 122, 0.24f), Border, TEXT("alert:entry-frame"));
 				if (R.E->Id == Selected) Out.Frame(Lx, Ey, Lw, R.H, TCCss::Brass, 2.f, TEXT("alert:entry-current")); // aria-current: the 2 px brass outline inside
@@ -585,7 +587,9 @@ FTCPaint FTCAlerts::Layout(const FTCAlertViewInput& In, const FTCMeasure& Measur
 					T.Size.Y = LineBox;
 					Ty += LineBox;
 				}
-				Out.Hit(FBox2D(FVector2D(Lx, Ey), FVector2D(Lx + Lw, Ey + R.H)), FString::Printf(TEXT("alert:entry:%d"), R.E->Id), R.E->Text);
+				// CSS overflow-y:auto keeps the last partial row, including its clipped text and border.
+				for (int32 I=FirstPaint; I<Out.Items.Num(); I++) Out.Items[I].Clip=Crop;
+				Out.Hit(FBox2D(FVector2D(Lx, Ey), FVector2D(Lx + Lw, Ey + R.H)).Overlap(Crop), FString::Printf(TEXT("alert:entry:%d"), R.E->Id), R.E->Text);
 				Ey += R.H + EntryMargin;
 			}
 			// the list's scrollbar when it overflows
