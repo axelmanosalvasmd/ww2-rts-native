@@ -13,3 +13,4 @@ Evidence images for issue #4 checkpoints. Captured offscreen from local, uncommi
 - slice-1v: round 21 (PR #201 8845b24f): HUD EN/ES 100/150, loss cards, tooltip, cover, look/weather/riders, wrecks and frontier, water, building breach (editor and package), Great Bridge west bank, Tutorial camp. Browser left, Unreal right.
 
 - slice-1y: round 24, approved ABI queries and cooked materials; visual limitations retained.
+- slice-1aa: round 26, letter pulse, Orders/truck panel fixes, Controls scroll, GPU body control, water/camp/motion pairs; HUD gaps retained.
