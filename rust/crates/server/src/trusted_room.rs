@@ -2,11 +2,20 @@
 use serde_json::{Value, json};
 use ww2_core::{match_runtime::Match, random::RANDOM_VERSION, weather::WeatherChoice};
 
+/// Host-only constructor policy. Never selected by client messages.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum TrustedLaunchProfile {
+    #[default]
+    Prototype,
+    OwnerR1,
+}
+
 /// Opt-in hosting for one controlled room. Match seeds never cross the wire.
 #[derive(Clone, Debug)]
 pub struct TrustedRoomConfig {
     pub(crate) code: String,
     pub(crate) seed: u64,
+    pub(crate) profile: TrustedLaunchProfile,
 }
 
 impl TrustedRoomConfig {
@@ -15,7 +24,16 @@ impl TrustedRoomConfig {
         if !(3..=12).contains(&code.len()) || !code.bytes().all(|b| b.is_ascii_alphanumeric()) {
             return Err("trusted room code needs 3-12 ASCII letters or digits".into());
         }
-        Ok(Self { code, seed })
+        Ok(Self {
+            code,
+            seed,
+            profile: TrustedLaunchProfile::Prototype,
+        })
+    }
+
+    pub fn with_profile(mut self, profile: TrustedLaunchProfile) -> Self {
+        self.profile = profile;
+        self
     }
 
     pub(crate) fn receipt(&self, state: &Match, epoch: u64) -> Value {

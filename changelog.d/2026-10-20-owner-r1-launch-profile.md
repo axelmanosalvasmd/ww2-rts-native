@@ -1,0 +1,2 @@
+- Add an explicit host-only `--trusted-profile owner-r1` for private two-human Conquest matches: logistics off, constructor-derived weather, and the configured seed retained across healthy Restart. Keep prototype defaults and existing fault/admission guards unchanged.
+- Correct the server README that described fixed seeds and constructor-derived weather as the default behavior. Add real-executable two-client and sharded-profile regression coverage. Unreal R1 acceptance and saved-game Load qualification remain separate.

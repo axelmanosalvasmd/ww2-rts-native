@@ -114,6 +114,26 @@ impl BinaryServer {
         dir: Option<&std::path::Path>,
         public_url: Option<&str>,
     ) -> Self {
+        Self::start_configured(trusted, seed, dir, public_url, &[], 1)
+    }
+    pub fn start_owner_r1(seed: u64, shards: usize) -> Self {
+        Self::start_configured(
+            true,
+            seed,
+            None,
+            None,
+            &["--trusted-profile", "owner-r1"],
+            shards,
+        )
+    }
+    fn start_configured(
+        trusted: bool,
+        seed: u64,
+        dir: Option<&std::path::Path>,
+        public_url: Option<&str>,
+        args: &[&str],
+        shards: usize,
+    ) -> Self {
         let log = std::env::temp_dir().join(format!(
             "ww2-r1-{}-{}.log",
             std::process::id(),
@@ -122,6 +142,8 @@ impl BinaryServer {
         let mut command = Command::new(env!("CARGO_BIN_EXE_ww2-server"));
         command
             .args(["--bind", "127.0.0.1:0"])
+            .args(args)
+            .env("WW2_SHARDS", shards.to_string())
             .env_remove("PUBLIC_URL")
             .env_remove("WW2_BIND")
             .env_remove("WW2_DIAG")

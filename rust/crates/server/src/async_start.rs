@@ -161,6 +161,18 @@ impl Hub {
         ) {
             return Err("R1 weather choice is unsupported".into());
         }
+        let owner_r1 = trusted.profile == crate::TrustedLaunchProfile::OwnerR1;
+        if owner_r1
+            && (room.mode != "conquest"
+                || room.army != "standard"
+                || room.sandbox
+                || room.players.iter().any(|p| p.ai))
+        {
+            return Err(
+                "owner-r1 requires Conquest, Standard army, sandbox off and two human commanders"
+                    .into(),
+            );
+        }
         let players = room
             .players
             .iter()
@@ -180,12 +192,22 @@ impl Hub {
             .as_ref()
             .and_then(|editor| editor.raw(&room.map));
         // Preserve asynchronous creation failure: raw map loading belongs to generate.
-        let options = room.native_match_options(
-            trusted.seed.wrapping_add(self.next_epoch),
-            weather_seed()?,
+        // Owner R1 deliberately does not sample OS weather entropy. The canonical
+        // constructor derives it from the unchanged explicit match seed.
+        let mut options = room.native_match_options(
+            if owner_r1 {
+                trusted.seed
+            } else {
+                trusted.seed.wrapping_add(self.next_epoch)
+            },
+            if owner_r1 { 0 } else { weather_seed()? },
             players,
             raw_map.as_ref().unwrap_or(&Value::Null),
         )?;
+        if owner_r1 {
+            options.weather_seed = None;
+            options.logistics = false;
+        }
         Ok(StartRequest {
             token: Arc::new(()),
             map: room.map.clone(),
@@ -405,10 +427,11 @@ impl Hub {
     }
 
     pub(crate) fn uses_trusted_start(&self, code: &str) -> bool {
-        self.trusted
-            .as_ref()
-            .is_some_and(|trusted| trusted.code == code)
-            && self.rooms.get(code).is_none_or(|room| room.mode != "horde")
+        self.trusted.as_ref().is_some_and(|trusted| {
+            trusted.code == code
+                && (trusted.profile == crate::TrustedLaunchProfile::OwnerR1
+                    || self.rooms.get(code).is_none_or(|room| room.mode != "horde"))
+        })
     }
 
     pub(super) fn pending_start_command(

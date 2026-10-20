@@ -16,7 +16,7 @@ mod room_helpers;
 mod saves;
 mod static_files;
 mod trusted_room;
-pub use trusted_room::TrustedRoomConfig;
+pub use trusted_room::{TrustedLaunchProfile, TrustedRoomConfig};
 pub mod room_runtime;
 pub mod shards;
 pub mod snapshot_backpressure;
