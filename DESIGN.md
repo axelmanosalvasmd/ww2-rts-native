@@ -6198,3 +6198,7 @@ See [slice 1af implementation and executed validation](design.d/2026-10-20-unrea
 ## Unreal client slice 1ag (2026-10-21)
 
 See [slice 1ag implementation and executed validation](design.d/2026-10-21-unreal-slice1ag.md). The approved FFI pin and owner-r1 Load/World/ingress/fault policies remain unchanged.
+
+## Unreal client slice 1ah (2026-10-21)
+
+See [slice 1ah implementation and bounded verification](design.d/2026-10-21-unreal-slice1ah.md). The approved FFI pin and R1/World/ingress/fault policies remain unchanged.

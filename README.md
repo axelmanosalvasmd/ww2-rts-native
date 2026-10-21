@@ -288,3 +288,7 @@ R1 remains NOT qualified. The exact approved source is 8f37717cb0b78fca9786ae0bd
 ## Unreal slice 1ag
 
 Active-URL R1 approval, crowded labels, World minimap readability and support shoot-down continuity are updated. The final rendered Intel Vulkan suite passes 299 unique tests; ordinary approved two-native R1 and Linux Development slice32 packaging pass their bounded checks. Renderer, presentation and platform limits remain in [the design note](design.d/2026-10-21-unreal-slice1ag.md).
+
+## Unreal slice 1ah
+
+Moved captions retain their ground association, transient notices clear world captions, and graphics/commandable-aircraft integration coverage grows. The final rendered Intel Vulkan suite passes 304 unique tests. R1 motion, automatic Low persistence and Linux Development slice33 pass bounded checks; remaining limits are in [the design note](design.d/2026-10-21-unreal-slice1ah.md).

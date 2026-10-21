@@ -3,6 +3,7 @@
 #include "Client/TCPlayerController.h"
 #include "Client/TCAudio.h"
 #include "Client/TCGraphics.h"
+#include "Client/TCSession33Graphics.h"
 #include "Client/TCLocale.h"
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
@@ -72,5 +73,6 @@ TSharedRef<FJsonObject> TCSession26::ConsumerState(const ATCGameMode& Match, con
 	const auto Groups = MakeShared<FJsonObject>();
 	for (int32 N = 1; N <= 9; ++N) Groups->SetArrayField(FString::FromInt(N), Ids(Controller.Groups.Members(N)));
 	Out->SetObjectField(TEXT("groups"), Groups);
+	TCSession33Graphics::Append(Controller, *Out);
 	return Out;
 }

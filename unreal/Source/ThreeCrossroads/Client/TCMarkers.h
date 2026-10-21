@@ -440,7 +440,7 @@ public:
 	void Diamond(FVector2D Centre, double HalfDiagonal, const FLinearColor& Colour);
 	// markers.js label at (x, z) Lift metres over the ground: Text already translated. Swatch: the hq style's owner
 	// colour. Fade multiplies the depth fade (map-view.js fadeLabels). Returns false when it was not drawn.
-	bool Tag(UFont* Font, const FString& Text, double X, double Z, double Lift, const TCMarkersCore::FTagStyle& Style, float Fade = 1.f, const FLinearColor* Swatch = nullptr);
+	bool Tag(UFont* Font, const FString& Text, double X, double Z, double Lift, const TCMarkersCore::FTagStyle& Style, float Fade = 1.f, const FLinearColor* Swatch = nullptr, bool bGroundAssociation = false);
 	void Flush();
 	void SetWorldScene(TSharedPtr<FTCMarkerScene> InScene) { Scene = MoveTemp(InScene); }
 	void SetBeforeFog(bool bEnabled) { Flush(); bBeforeFog = bEnabled; }

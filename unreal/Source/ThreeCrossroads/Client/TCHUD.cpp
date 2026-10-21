@@ -1950,23 +1950,26 @@ void ATCHUD::EndPlay(const EEndPlayReason::Type Reason)
 	Super::EndPlay(Reason);
 }
 
-void ATCHUD::DrawLabel(const FString& Str, const FLinearColor& Colour, float X, float Y, UFont* Font, float Scale)
+void ATCHUD::DrawLabel(const FString& Str, const FLinearColor& Colour, float X, float Y, UFont* Font, float Scale, const FVector2D* GroundAnchor)
 {
 	const FString Shown = TC_T(Str);
 	NoteKept(Str, Shown);
  if (bCollectWorldLabels)
  {
   float W=0,H=0; LabelSize(Str,W,H,Font,Scale);
-  TCHud31::SubmitWorldLabel(Canvas,FBox2D(FVector2D(X-5,Y-4),FVector2D(X+W+5,Y+H+4)),
-   [this,Shown,Colour,X,Y,W,H,Font,Scale]()
+  const FBox2D Bounds(FVector2D(X-5,Y-4),FVector2D(X+W+5,Y+H+4));
+  auto Paint=[this,Shown,Colour,X,Y,W,H,Font,Scale]()
    {
     const FVector2D Offset=TCHud31::WorldLabelOffset();
     const float Px=X+Offset.X, Py=Y+Offset.Y;
+    TCHud31::DrawWorldLabelAssociation(Canvas,Colour);
     DrawRect(FLinearColor(.025f,.03f,.035f,.96f*Colour.A),Px-5,Py-4,W+10,H+8);
     DrawRect(Colour,Px-5,Py-4,3,H+8);
     FLinearColor Ink=FLinearColor::White; Ink.A=Colour.A;
     DrawShown(Shown,Ink,Px,Py,Font,Scale);
-   });
+   };
+  if (GroundAnchor) TCHud31::SubmitAnchoredWorldLabel(Canvas,Bounds,*GroundAnchor,true,MoveTemp(Paint));
+  else TCHud31::SubmitWorldLabel(Canvas,Bounds,MoveTemp(Paint));
   return;
  }
 	DrawShown(Shown, Colour, X, Y, Font, Scale);
@@ -3243,11 +3246,14 @@ void ATCHUD::DrawWorldOverlays(UFont* Font)
 	if (!M || !PC || !M->Terrain) return;
 	const ATCTerrain& T = *M->Terrain;
 	const FTCMatchState& S = M->State;
-	auto Label = [&](FVector2D At, const FString& L, const FLinearColor& C)
+	auto Label = [&](FVector2D At, const FString& L, const FLinearColor& C, bool bGroundAssociation=false)
 	{
 		const FVector Sc = Project(ATCTerrain::ToWorld(At.X, At.Y, T.HeightAt(At.X, At.Y) + 1.f));
 		FLinearColor Lc = C; Lc.A *= M->WarMap.LabelFade(); // round 14: markers.js fadeLabels while the paper war map comes
-		if (Sc.Z > 0) DrawLabel(L, Lc, Sc.X + 6.f, Sc.Y - 6.f, Font, 1.3f);
+		const FVector Ground=Project(ATCTerrain::ToWorld(At.X,At.Y,T.HeightAt(At.X,At.Y)+.08f));
+  const FVector2D Anchor(Ground.X,Ground.Y);
+  if (Sc.Z > 0) DrawLabel(L, Lc, Sc.X + 6.f, Sc.Y - 6.f, Font, 1.3f,
+   bGroundAssociation && Ground.Z>0 ? &Anchor : nullptr);
 	};
 	// round 17 (markers): buildHQ's reinforce zone, ring, flag and tag and the resource nodes' brackets and tags under
 	// everything else (TCMarkersHud), then World Conquest's regions as world-regions.js draws them: the border, the
@@ -3319,7 +3325,7 @@ void ATCHUD::DrawWorldOverlays(UFont* Font)
 		if (K.bStrip) Strip(K.At, K.Dir, K.Len, K.Width, C, 2.f, false);
 		else GroundRing(T, K.At, (float)K.Radius, C, 2.f);
 		const FTCSupportDef* D = FTCSupportPowers::Find(K.Kind);
-		Label(K.At, K.T > 0 ? FString::Printf(TEXT("%s in %.1f s"), D ? *D->Name : *K.Kind, K.T) : (D ? D->Name : K.Kind), C);
+		Label(K.At, K.T > 0 ? FString::Printf(TEXT("%s in %.1f s"), D ? *D->Name : *K.Kind, K.T) : (D ? D->Name : K.Kind), C, true);
 	}
 	// client/main.js frame with a support kind or 'area' armed: its mesh under the pointer (or on the pinned centre,
 	// turned toward the pointer), a strip with its arrow or a ring
@@ -3804,12 +3810,19 @@ void ATCHUD::DrawHUD()
 					if (!bLoggedDiagDrop) { bLoggedDiagDrop = true; UE_LOG(LogTC, Log, TEXT("hud: no room for the status column's diagnostics at %.0f%% in %.0f x %.0f; they stay in the log"), Ui2 * 100.f, Canvas->ClipX, Canvas->ClipY); }
 				}
 			}
+            TArray<FBox2D> StatusBounds;
 			for (const FStatusLine& L : Col)
             {
                 float W=0,H=0; ShownSize(L.Shown,W,H,Font);
-                if (ClearStatus(Cx,Cy,W,1)) DrawShown(L.Shown,L.Colour,Cx,Cy,Font,1.f);
+                if (ClearStatus(Cx,Cy,W,1))
+                {
+                 DrawShown(L.Shown,L.Colour,Cx,Cy,Font,1.f);
+                 // Deferred world captions must also clear transient notices and refusals.
+                 StatusBounds.Add(FBox2D(FVector2D(Cx,Cy),FVector2D(Cx+W,Cy+H)));
+                }
                 Cy+=Line;
             }
+            Panels.Append(StatusBounds);
 			BeginUi(Ui2);
 		}
 		// client/alerts.js: the alert feed over the minimap and the Alt+H history

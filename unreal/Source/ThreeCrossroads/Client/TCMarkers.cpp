@@ -536,7 +536,7 @@ void FTCMarkerPainter::Diamond(FVector2D C, double H, const FLinearColor& Col)
 	Tri(A, D, E, Col);
 }
 
-bool FTCMarkerPainter::Tag(UFont* Font, const FString& Text, double X, double Z, double Lift, const MC::FTagStyle& St, float Fade, const FLinearColor* Swatch)
+bool FTCMarkerPainter::Tag(UFont* Font, const FString& Text, double X, double Z, double Lift, const MC::FTagStyle& St, float Fade, const FLinearColor* Swatch, bool bGroundAssociation)
 {
 	if (!Canvas || !Canvas->Canvas || !Font || Text.IsEmpty() || !Project) return false;
 	const FVector W = Ground(X, Z, Lift);
@@ -563,14 +563,16 @@ bool FTCMarkerPainter::Tag(UFont* Font, const FString& Text, double X, double Z,
 	{ Px -= 2; TextW = TCMarkerText::Width(Text, Px, Tracking); }
 	const double Bh = St.H - 12, Y0 = 6, Pad = 16, Sw = St.bSwatch && Swatch ? Bh - 22 : 0, LeadIn = Sw > 0 ? Sw + 14 : 0;
 	const double Bw = FMath::Min(Cw - 4, TextW + 2 * Pad + LeadIn), X0 = (Cw - Bw) / 2;
-	// Keep the world anchor, then cull the whole plate against this frame's HUD and tooltip.
+	// Queue the complete plate and, for a known income node, its separately projected ground source.
 	const FVector2D Origin(At.X - Cw * K / 2, At.Y - St.H * K / 2);
 	const FBox2D Bounds(Origin + FVector2D(X0, Y0) * K, Origin + FVector2D(X0 + Bw, Y0 + Bh) * K);
 	UCanvas* TagCanvas = Canvas;
 	const FLinearColor SwatchValue = Swatch ? *Swatch : FLinearColor::Transparent;
-	TCHud31::SubmitWorldLabel(Canvas, Bounds, [=]()
+	auto Paint = [=]()
 	{
 		const FVector2D PlacedOrigin=Origin+TCHud31::WorldLabelOffset();
+  FLinearColor Leader=TCMarkersHud::WorldColour(TagCanvas,TagHairline,W); Leader.A*=Alpha;
+  TCHud31::DrawWorldLabelAssociation(TagCanvas,Leader);
 		auto Rect = [&](double Cx0, double Cy0, double Cw0, double Ch0, FLinearColor C)
 		{
 			C.A *= Alpha;
@@ -609,7 +611,13 @@ bool FTCMarkerPainter::Tag(UFont* Font, const FString& Text, double X, double Z,
 			Item.BlendMode = SE_BLEND_Translucent;
 			TagCanvas->DrawItem(Item);
 		}
-	}, !St.bSwatch);
+	};
+ if (bGroundAssociation)
+ {
+  const FVector GroundAt=Project(Ground(X,Z,.08));
+  TCHud31::SubmitAnchoredWorldLabel(Canvas,Bounds,FVector2D(GroundAt.X,GroundAt.Y),GroundAt.Z>0,MoveTemp(Paint));
+ }
+ else TCHud31::SubmitWorldLabel(Canvas,Bounds,MoveTemp(Paint),!St.bSwatch);
 	Tags++;
 	return true;
 }
@@ -694,7 +702,7 @@ void TCMarkersHud::DrawNodes(FTCMarkerPainter& P, const ATCGameMode& M, UFont* F
 		}
 	}
 	const float Fade = M.WarMap.LabelFade();
-	for (const FTCResourceNode& N : Nodes) Stats().Tags += P.Tag(Font, FTCLocale::T(FTCMarkers::NodeTag(N)), N.X, N.Z, MC::NodeTagLift, MC::TagStyle(), Fade);
+	for (const FTCResourceNode& N : Nodes) Stats().Tags += P.Tag(Font, FTCLocale::T(FTCMarkers::NodeTag(N)), N.X, N.Z, MC::NodeTagLift, MC::TagStyle(), Fade, nullptr, true);
 	Stats().Nodes += Nodes.Num();
 }
 

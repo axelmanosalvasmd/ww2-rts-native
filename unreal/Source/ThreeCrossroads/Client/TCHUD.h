@@ -264,6 +264,7 @@ private:
 	friend struct FTCHud28Access;
 	friend struct FTCHud29Access;
 	friend struct FTCHud30Access;
+	friend struct FTCHud33Access;
 	friend class FTCLook30VolumeHandler;
 	// Physical bounds of the retained hit table. Canvas exists only during PostRender.
 	FVector2D DrawnViewport = FVector2D::ZeroVector;
@@ -325,7 +326,7 @@ private:
 	// Every text the HUD shows is measured and drawn through these two: client/i18n.js t() (TC_T, Client/TCLocale.h) is
 	// applied here, so a Spanish label is measured as it is drawn, while what the HUD stores (button labels for hit tests
 	// and logs), compares and logs stays English.
-	void DrawLabel(const FString& Text, const FLinearColor& Colour, float X, float Y, UFont* Font, float Scale = 1.f);
+	void DrawLabel(const FString& Text, const FLinearColor& Colour, float X, float Y, UFont* Font, float Scale = 1.f, const FVector2D* GroundAnchor = nullptr);
 	void LabelSize(const FString& Text, float& OutWidth, float& OutHeight, UFont* Font, float Scale = 1.f) const;
 	// A text already in the language in use (put together from parts that were each passed through TC_T): drawn and
 	// measured as it is

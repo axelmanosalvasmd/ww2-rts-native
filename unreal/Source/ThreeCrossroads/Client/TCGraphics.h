@@ -190,6 +190,7 @@ public:
 private:
 #if WITH_DEV_AUTOMATION_TESTS
 	friend struct FTCRows30Access;
+	friend struct FTCGraphics33Scope;
 #endif
 	FTCGraphics();
 	void Load();
