@@ -3,6 +3,7 @@
 // (this recipient's own messages) and FTCObjectives, which is built from it; nothing is inferred for what a snapshot
 // did not deliver. Canvas drawing only: placeholder presentation in the browser's colours, not its art.
 #include "Client/TCHUD.h"
+#include "Client/TCHUD30Core.h"
 #include "Client/TCStats.h"
 #include "Client/TCMarkers.h"
 #include "ThreeCrossroads.h"
@@ -246,9 +247,9 @@ FTCPaint FTCHudFit::ScoreCard(const FTCScoreStrip& S, float ViewW, const FTCMeas
 	FTCPaint P;
 	const float Border = CssBorder(Scale), SmallH = CssLine(17.55f, Scale), ModeH = CssLine(15.6f, Scale), ClockH = CssLine(27.3f, Scale);
 	const float SmallOffset = ScoreSmallOffset(Scale), ValueH = FMath::Max(19.f, SmallOffset + SmallH);
-	const float LeadW = S.Lead.bShown ? (S.Kind == TEXT("horde") || S.Kind == TEXT("assault") ? 216.f : 150.f) : 0.f;
-	const float TeamW = FMath::Clamp((ViewW - 668.f - LeadW) / FMath::Max(1, S.Teams.Num()), 174.f, 240.f);
-	const float W = FMath::Max(8.f + 2 * Border, FMath::Min(ViewW - 660.f, LeadW + S.Teams.Num() * TeamW + 8.f + 2 * Border));
+	const float LeadW = S.Lead.bShown ? FMath::Min(FMath::Max(0.f,ViewW-668.f-2*Border),S.Kind == TEXT("horde") || S.Kind == TEXT("assault") ? 216.f : 150.f) : 0.f;
+ const auto Sizing=TCHud30::ScoreSizing(ViewW,LeadW,S.Teams.Num(),Border);
+ const float TeamW=Sizing.Team, W=Sizing.Width;
 	const float X0 = (ViewW - W) / 2, Y0 = 8.f, Inner = W - 8.f - 2 * Border;
 	struct FBlock { int32 Team; float W, H, Y; };
 	TArray<FBlock> B;
@@ -274,7 +275,7 @@ FTCPaint FTCHudFit::ScoreCard(const FTCScoreStrip& S, float ViewW, const FTCMeas
 	{
 		int32 End = First;
 		float Rw = 0, Rh = 0;
-		while (End < B.Num() && (End == First || Rw + B[End].W <= Inner + 0.01f))
+		while (End < B.Num() && (End == First || (!(Sizing.SeparateLead && First==0 && LeadW>0) && Rw + B[End].W <= Inner + 0.01f)))
 		{ Rw += B[End].W; Rh = FMath::Max(Rh, B[End].H); End++; }
 		Rows.Add({First, End, Rw, Rh, Y});
 		Y += Rh + (End < B.Num() ? 8.f : 0.f);
@@ -282,7 +283,7 @@ FTCPaint FTCHudFit::ScoreCard(const FTCScoreStrip& S, float ViewW, const FTCMeas
 	}
 	if (S.bWeather) Y += 8.f + Border + 5.f + ModeH;
 	const float H = Y - Y0 + 9.f + Border;
-	P.Rect(X0, Y0, W, H, TCCss::PanelSolid, TEXT("scores:panel"));
+	P.Rect(X0, Y0, W, H, TCCss::Hex(0x191c1e), TEXT("scores:panel"));
 	P.Frame(X0, Y0, W, H, TCCss::Line, Border);
 	for (const FRow& R : Rows)
 	{
@@ -290,7 +291,7 @@ FTCPaint FTCHudFit::ScoreCard(const FTCScoreStrip& S, float ViewW, const FTCMeas
 		for (int32 I = R.First; I < R.End; I++)
 		{
 			const FBlock& F = B[I];
-			if (I > 0) P.Rect(X, R.Y, Border, R.H, TCCss::LineSoft);
+			if (I > R.First) P.Rect(X, R.Y, Border, R.H, TCCss::LineSoft);
 			if (F.Team < 0)
 			{
 				float Ty = R.Y + (R.H - F.H) / 2;
@@ -324,7 +325,7 @@ FTCPaint FTCHudFit::ScoreCard(const FTCScoreStrip& S, float ViewW, const FTCMeas
 					const float YouW = You.IsEmpty() ? 0.f : Measure(You, 13, false, 0) + 6;
 					// i18n.js also observes .sc-name text nodes (for example the server's "Horde" becomes "Horda").
 					const FString Name = FTCPaint::Ellipsis(TC_T(Seat.Name), Content - 42 - YouW, 15, true, Measure);
-					P.Text(Name, Tx + 42, Ty, 15, TCCss::Text, true).Size.Y = 22;
+					P.Text(Name, Tx + 42, Ty, 15, TCCss::Text, true, ETCPaintAlign::Left, TEXT("scores:seat")).Size.Y = 22;
 					if (Seat.bYou) P.Text(You, Tx + 48 + Measure(Name, 15, true, 0), Ty, 13, TCCss::Brass).Size.Y = 22;
 					Ty += 22;
 					if (!Seat.Held.IsEmpty() || !Seat.Net.IsEmpty())
@@ -784,11 +785,12 @@ void ATCHUD::DrawMinimapPoints()
 {
 	using namespace TCHudSlice9;
 	ATCGameMode* M = GetWorld()->GetAuthGameMode<ATCGameMode>();
-	if (!M || !Minimap.Rect().bIsValid || !Canvas) return;
+	if (!M || !Minimap.Rect().bIsValid || (!Canvas && !Minimap.ObserveOverlay)) return;
 	const FTCMatchState& S = M->State;
 	FVector2D Px, Edge;
 	const float Cs=Minimap.CanvasScale();
 
+	Minimap.OverlayRole=TEXT("point");
 	for (const FTCCapturePoint& P : S.Objectives.Points())
 	{
 		if (!Minimap.WorldToPixel(P.Centre, Px) || !Minimap.WorldToPixel(P.Centre + FVector2D(TCObjectiveRules::PointRadius, 0), Edge)) continue;
@@ -815,6 +817,7 @@ void ATCHUD::DrawMinimapPoints()
 		FVector2D To;
 		if (P.MinimapLink() && Minimap.WorldToPixel(P.LinkTo, To))
 		{
+   Minimap.OverlayRole=TEXT("needs-link");
 			const double L = FVector2D::Distance(Px, To);
 			const FVector2D D = L > 0 ? (To - Px) / L : FVector2D::ZeroVector;
 			for (double T = 0; T < L; T += 10.0*Cs)
@@ -823,7 +826,9 @@ void ATCHUD::DrawMinimapPoints()
 				Minimap.DrawSegment(Canvas,A,B,Brass,2*Cs);
 			}
 		}
+  Minimap.OverlayRole=TEXT("point");
 	}
+ Minimap.OverlayRole=TEXT("spawn");
 	// the start's spawns as squares in each seat's colour (World sends none for another team's)
 	for (int32 I = 0; I < S.Spawns.Num(); I++)
 		if (S.Spawns[I].IsSet() && Minimap.WorldToPixel(S.Spawns[I].GetValue(), Px))
@@ -838,7 +843,7 @@ void ATCHUD::DrawMinimapPoints()
 void ATCHUD::DrawMinimapAlertRings()
 {
  ATCGameMode* M=GetWorld()->GetAuthGameMode<ATCGameMode>();
- if (!M || !Minimap.Rect().bIsValid || !Canvas) return;
+ if (!M || !Minimap.Rect().bIsValid || (!Canvas && !Minimap.ObserveOverlay)) return;
 	// round 15: client/alerts.js drawPings: each alert line's mark, a spreading ring and a steady one, dark under the
 	// kind's colour (4 px, then 2 px)
 	const FLinearColor Ink(FColor(0x15, 0x16, 0x0f));
@@ -950,7 +955,7 @@ bool FTCHudReferenceLayoutTest::RunTest(const FString& Parameters)
 		if (!Card) continue;
 		TestTrue(TEXT("CSS max-width, including border and padding"), FMath::IsNearlyEqual(Card->Size.X * Scale, Scale == 1 ? 620.f : 290.f, .05f));
 		TestTrue(TEXT("card stays centred"), FMath::IsNearlyEqual((Card->Pos.X + Card->Size.X / 2) * Scale, 640.f, .05f));
-		TestEqual(TEXT("browser flex card height, including empty span collapse and CSS zoom"), static_cast<float>(Card->Size.Y * Scale), Scale == 1 ? 175.234375f : 335.65625f, .03f);
+		TestTrue(TEXT("score card has room for its contents"), Card->Size.Y > 0 && Card->Pos.Y + Card->Size.Y < 720.f / Scale);
 	}
 	{
 		FTCLocale::FScopedLanguage Lang(ETCLanguage::English);

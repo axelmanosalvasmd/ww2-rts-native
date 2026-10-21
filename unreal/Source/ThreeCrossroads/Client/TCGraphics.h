@@ -188,6 +188,9 @@ public:
 	static const TCHAR* const ReferencePin;
 
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+	friend struct FTCRows30Access;
+#endif
 	FTCGraphics();
 	void Load();
 	FString Ini;

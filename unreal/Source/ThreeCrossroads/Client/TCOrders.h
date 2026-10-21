@@ -78,6 +78,8 @@ namespace TCOrders
 	FTCOrderPlan Plan(const FTCMatchState& State, const FTCUnitTable& Table, const TSet<int32>& Selected, const FTCCursor& Cursor, bool bAttack, bool bQueue);
 	// client/main.js stop: { t: 'stop', ids: [...selected] } (the server keeps only its own movable units).
 	FTCOrderPlan PlanStop(const TSet<int32>& Selected);
+	FTCOrderPlan PlanDestroy(const TSet<int32>& Selected);
+	TArray<int32> RailUnits(const FTCMatchState& State, const FTCUnitTable& Table, const TSet<int32>& Selected);
 	// client/availability.js denySentence: the sentence the browser shows for a refusal.
 	FString DenySentence(const FString& Reason, const FString& Cmd);
 

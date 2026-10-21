@@ -156,9 +156,8 @@ FTCGroupResult FTCControlGroups::Apply(int32 Group, ETCGroupOp Op, const FTCMatc
 			R.Taken++;
 		}
 		R.Members = G.Num();
-		// The reference compares whole milliseconds (now - lastRecall <= 300, inclusive); seconds in a double can land
-		// a hair past 0.3 for an exact 300 ms gap, so allow a microsecond.
-		if (R.Taken && LastGroup == Group && NowSeconds >= LastRecall && NowSeconds - LastRecall <= DoubleTapSeconds + 1e-6)
+		// Keep the source inclusive 300 ms boundary without extending its deadline.
+		if (R.Taken && LastGroup == Group && NowSeconds >= LastRecall && NowSeconds - LastRecall <= DoubleTapSeconds)
 		{
 			R.bCentre = true;
 			R.Centre = Sum / (double)R.Taken;

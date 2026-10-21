@@ -954,7 +954,21 @@ bool FTCLocaleHudStringsTest::RunTest(const FString&)
  for (const FString& File : Files)
  {
   FString Code; if (!FFileHelper::LoadFileToString(Code,*File)) continue;
-  int32 Tests=Code.Find(TEXT("#if WITH_DEV_AUTOMATION_TESTS")); if (Tests>=0) Code.LeftInline(Tests);
+  // Test access may occur inside a production method. Remove each guarded block, preserving later HUD literals.
+  for (int32 Tests=Code.Find(TEXT("#if WITH_DEV_AUTOMATION_TESTS")); Tests>=0; Tests=Code.Find(TEXT("#if WITH_DEV_AUTOMATION_TESTS")))
+  {
+   int32 End=Tests,Depth=0;
+   do
+   {
+    int32 Next=Code.Find(TEXT("\n"),ESearchCase::CaseSensitive,ESearchDir::FromStart,End);
+    if(Next<0) Next=Code.Len(); else ++Next;
+    const FString Line=Code.Mid(End,Next-End).TrimStart();
+    if(Line.StartsWith(TEXT("#if"))) ++Depth;
+    else if(Line.StartsWith(TEXT("#endif"))) --Depth;
+    End=Next;
+   } while(Depth>0 && End<Code.Len());
+   Code.RemoveAt(Tests,End-Tests);
+  }
   for (int32 At=0; (At=Code.Find(TEXT("TEXT(\""),ESearchCase::CaseSensitive,ESearchDir::FromStart,At))>=0;)
   {
    const int32 Begin=At+6; At=Begin; FString Text;

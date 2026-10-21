@@ -307,6 +307,9 @@ struct FTCMinimapStats
 class THREECROSSROADS_API FTCMinimap
 {
 public:
+	// Optional receipt of the exact clipped overlay polygons submitted by the HUD.
+	FString OverlayRole;
+	TFunction<void(const FString&,const TArray<FVector2D>&,FLinearColor)> ObserveOverlay;
 	FTCMinimap();
 	~FTCMinimap();
 	FTCMinimap(const FTCMinimap&) = delete;

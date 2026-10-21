@@ -652,6 +652,12 @@ void ATCPlayerController::PlayerTick(float DeltaTime)
 			if (FTCGraphics::Get().WatchFps(FTCGraphics::ClampFrame(FApp::GetDeltaTime()), &Notice)) { GraphicsNotice = Notice; GraphicsNoticeAt = GetWorld()->GetRealTimeSeconds(); }
 		}
 	const bool bFocused = WindowFocused();
+	if (ATCHUD* Hud = Cast<ATCHUD>(GetHUD()))
+	{
+		FVector2D VolumePointer;
+		const bool HasVolumePointer = CursorPixels(VolumePointer, true);
+		Hud->VolumeDragFrame(VolumePointer, IsInputKeyDown(EKeys::LeftMouseButton), bFocused && HasVolumePointer && !ModalSheetOpen());
+	}
 	CheckIntroSkip();
 	UpdateCamera(DeltaTime, bFocused);
 	ATCGameMode* M = Mode();
@@ -729,11 +735,12 @@ void ATCPlayerController::PruneSelection(const ATCGameMode& M)
 
 bool ATCPlayerController::HandleHudPress(bool bLeft, bool bRight, FVector2D Mouse)
 {
-	const ATCHUD* Hud = Cast<ATCHUD>(GetHUD());
+	ATCHUD* Hud = Cast<ATCHUD>(GetHUD());
 	if (!Hud || (!bLeft && !bRight)) return false;
 	FTCUiCommand Command;
 	if (bLeft && Hud->CommandAt(Mouse, Command))
 	{
+		if (Command.Action == ETCUiAction::Volume) return Hud->VolumePressAt(Mouse);
 		const bool Handled=RunCommand(Command, Command.Action != ETCUiAction::Recruit && (IsInputKeyDown(EKeys::LeftShift) || IsInputKeyDown(EKeys::RightShift)));
 		if (FParse::Param(FCommandLine::Get(),TEXT("TCHudInputAudit")))
 			UE_LOG(LogTC,Log,TEXT("hud28 input: consumed left %.8f,%.8f; %s; handled=%d clock=%.8f tick=%d"),
@@ -1428,6 +1435,9 @@ bool ATCPlayerController::AimClick(bool bHasGround, FVector2D Ground, bool bShif
 
 bool ATCPlayerController::ScreenPoint(const ATCGameMode& M, const FTCUnit& U, const FTCUnitDef* Def, FVector2D& Out) const
 {
+#if WITH_DEV_AUTOMATION_TESTS
+	if (Rows30Projection) return Rows30Projection(U, Out);
+#endif
 	// client/main.js screenOf: the drawn spot 1 m over the ground, aircraft AIR_ALT higher; only points in front count
 	FVector2D At;
 	if (!M.Units->DrawnAt(U.Id, At)) At = FVector2D(U.X, U.Z);
@@ -1623,16 +1633,8 @@ void ATCPlayerController::ReplaceSelection(const TArray<int32>& Ids, bool bCentr
 
 TArray<int32> ATCPlayerController::Railers() const
 {
-	TArray<int32> Out;
-	const ATCGameMode* M = Mode();
-	if (!M) return Out;
-	for (const int32 Id : Selected)
-	{
-		const FTCUnit* U = M->State.Units.Find(Id);
-		const FTCUnitDef* D = U ? M->UnitTable.Find(U->Type) : nullptr;
-		if (U && D && M->State.IsOwn(*U) && !D->bStructure && !D->bAir && !D->bRail && !IsNaval(U->Type)) Out.Add(Id);
-	}
-	return Out;
+ const ATCGameMode* M=Mode();
+ return M?TCOrders::RailUnits(M->State,M->UnitTable,Selected):TArray<int32>();
 }
 
 FString ATCPlayerController::FollowChip() const
@@ -2146,7 +2148,7 @@ bool ATCPlayerController::RunCommand(const FTCUiCommand& Command, bool bShift)
 	switch (Action)
 	{
 	case ETCUiAction::AddAi:
-		if (!bLobbyHost || S.RoomState != TEXT("lobby")) { NoteOrder(false, TEXT("Add AI: only the host, in the lobby")); return false; }
+		if (!bLobbyHost || S.RoomState != TEXT("lobby") || S.LobbyPlayers >= M->Controls.SeatLimit()) { NoteOrder(false, TEXT("Add AI: only the host, in a lobby with an open seat")); return false; }
 		return Send(Simple(TEXT("addAi")), FString::Printf(TEXT("Add AI sent (room had %d seats)"), S.LobbyPlayers));
 	case ETCUiAction::NextMode:
 	{
@@ -2387,11 +2389,7 @@ bool ATCPlayerController::RunCommand(const FTCUiCommand& Command, bool bShift)
 	{
 		// client/main.js actions.destroy: if (selected.size) sendCmd({ t: 'destroy', ids: [...selected] }) (no refund)
 		if (!S.bHasMatch || !Selected.Num()) return false;
-		TSharedRef<FJsonObject> O = Simple(TEXT("destroy"));
-		O->SetArrayField(TEXT("ids"), IdValues(Selected.Array()));
-		FTCOrderPlan Plan;
-		Plan.Message = O;
-		Plan.Units = Selected.Num();
+		const FTCOrderPlan Plan=TCOrders::PlanDestroy(Selected);
 		bool bSent = false;
 		SendPlan(Plan, TEXT("Destroy (no refund)"), &bSent);
 		if (bSent) Feedback(TEXT("click")); // client/main.js actions.destroy: blip(110)
@@ -2564,12 +2562,10 @@ bool ATCPlayerController::RunCommand(const FTCUiCommand& Command, bool bShift)
 	}
 	case ETCUiAction::Volume:
 	{
-		// client/index.html's Volume slider (0 to 100, audio.setVolume, saved); this HUD steps it by 10 points
+		// Explicit source slider percentage (physical dragging is handled by the HUD).
 		UTCAudio* A = GetWorld() ? GetWorld()->GetSubsystem<UTCAudio>() : nullptr;
 		if (!A) { NoteOrder(false, TEXT("Volume: no sound in this run")); return false; }
-		const int32 Now = FMath::RoundToInt(A->Volume() * 100.0);
-		const int32 Next = Command.Job < 0 ? (Now <= 0 ? 100 : FMath::Max(0, (Now - 1) / 10 * 10)) : (Now >= 100 ? 0 : FMath::Min(100, Now / 10 * 10 + 10));
-		A->SetVolume(Next / 100.0);
+		A->SetVolume(FMath::Clamp(Command.Job, 0, 100) / 100.0);
 		NoteOrder(true, VolumeLabel());
 		return true;
 	}

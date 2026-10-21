@@ -8,6 +8,8 @@
 
 #if WITH_DEV_AUTOMATION_TESTS
 #include "Misc/AutomationTest.h"
+#include "Misc/CommandLine.h"
+#include "Misc/ScopeExit.h"
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
@@ -127,6 +129,35 @@ bool FTCSessionRustProfileAdmissionTest::RunTest(const FString&)
 	TestTrue(TEXT("disabled Restart neither arms nor builds a request"), !Press.bArmed && !Press.Message.IsValid() && Press.Note == Refusal);
 	Lobby->RemoveField(TEXT("proto")); Controls.ApplyLobby(*Lobby);
 	TestTrue(TEXT("reference Restart remains enabled"), Controls.MenuControl(ETCMatchControl::Restart, -1, 1).bEnabled);
+
+	// Approval is a local attestation for this exact endpoint. All ordinary refusal cases above remain required.
+	const FString SavedLine=FCommandLine::Get();
+	const FString SavedApproved=FPlatformMisc::GetEnvironmentVariable(TEXT("TC_OWNER_R1_APPROVED_URL"));
+	ON_SCOPE_EXIT { FCommandLine::Set(*SavedLine); FPlatformMisc::SetEnvironmentVar(TEXT("TC_OWNER_R1_APPROVED_URL"),*SavedApproved); };
+	FCommandLine::Set(TEXT("-TCServer=ws://127.0.0.1:31417/ws"));
+	FPlatformMisc::SetEnvironmentVar(TEXT("TC_OWNER_R1_APPROVED_URL"),TEXT("ws://127.0.0.1:31418/ws"));
+	TestFalse(TEXT("a different endpoint is unapproved"),FTCConnection::OwnerR1AdmissionEnabled());
+	FPlatformMisc::SetEnvironmentVar(TEXT("TC_OWNER_R1_APPROVED_URL"),TEXT("ws://127.0.0.1:31417/ws"));
+	TestTrue(TEXT("the exactly approved endpoint admits R1"),FTCConnection::OwnerR1AdmissionEnabled());
+	TestFalse(TEXT("approved Start passes profile gate"),FTCConnection::RustProfileCommandBlocked(ETCHostKind::Rust,TEXT("start")));
+	TestFalse(TEXT("approved Restart passes profile gate"),FTCConnection::RustProfileCommandBlocked(ETCHostKind::Rust,TEXT("restart")));
+	TestTrue(TEXT("approved Load remains refused"),FTCConnection::RustProfileCommandBlocked(ETCHostKind::Rust,TEXT("loadSave")));
+	TSharedPtr<FJsonObject> ApprovedLobby;
+	FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(RustLobby),ApprovedLobby);
+	FTCLobbySettings ApprovedSettings; ApprovedSettings.ApplyLobby(*ApprovedLobby);
+	TestTrue(TEXT("approved valid roster enables Start"),ApprovedSettings.StartAllowed());
+	ApprovedLobby->SetStringField(TEXT("state"),TEXT("play")); Controls.ApplyLobby(*ApprovedLobby);
+	TestTrue(TEXT("approved Restart is enabled"),Controls.MenuControl(ETCMatchControl::Restart,-1,1).bEnabled);
+	FTCPersistence ApprovedSaves; ApprovedSaves.ApplyLobby(*ApprovedLobby);
+	FTCMatchState ApprovedState; ApprovedState.RoomState=TEXT("lobby"); ApprovedState.bAmHost=true;
+	TestFalse(TEXT("approved persistence never builds Load"),ApprovedSaves.PlanLoad(ApprovedState,TEXT("any-save")).Message.IsValid());
+	for(const FString& BadLobby : {RustLobby.Replace(TEXT("\"proto\":0"),TEXT("\"proto\":1")),RustLobby.Replace(TEXT("\"proto\":0"),TEXT("\"proto\":\"invalid\""))})
+	{
+		const auto C=MakeShared<FTCConnection>(FTCConnection::FSettings()); C->bRunning=true;
+		int32 Publications=0; C->OnText=[&](const FString& Text){if(Text==Start || Text==Snapshot) ++Publications;};
+		C->ReceiveText(BadLobby,C->Generation); C->ReceiveText(Start,C->Generation);
+		TestTrue(TEXT("approval cannot bypass malformed or future protocol"),!C->IsRunning() && Publications==0);
+	}
 	return true;
 }
 

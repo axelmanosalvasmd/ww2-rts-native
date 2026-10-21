@@ -120,9 +120,11 @@ public:
 	// deny {cmd:'join', reason:'version'} (protocol.md addition 1; only a Rust server sends it): the connection stops
 	// for good instead of retrying with the same hello.
 	static bool IsVersionDeny(const FJsonObject& Message);
-	// Owner R1 is unchanged. No supported exact launch is currently verified. Proto, rules and version are not
-	// profile proof. Keep this refusal until the host-private launch/profile check is resolved with the Rust owner.
+	// Proto, rules and version are not profile proof. Production remains refused until native qualification.
 	static const TCHAR* RequiredRustProfileRefusal();
+	// Local development harness only. Requires both an environment opt-in and a loopback command line.
+	static bool OwnerR1Qualification();
+	static bool OwnerR1AdmissionEnabled();
 	static bool RustProfileCommandBlocked(ETCHostKind Kind, const FString& Type);
 	static FString MatchAdmissionRefusal(ETCHostKind Kind, const FString& Type);
 	static bool ValidRoom(const FString& Room);
@@ -131,6 +133,9 @@ public:
 	static TSharedRef<FJsonObject> Hello(const FSettings& Settings, bool bWatching);
 
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+	friend struct FTCRows30Access;
+#endif
 	// Same receive path for the socket and the deterministic admission test. Never feeds a refused match to a view.
 	void ReceiveText(const FString& Text, uint64 ExpectedGeneration);
 #if WITH_DEV_AUTOMATION_TESTS
@@ -161,4 +166,7 @@ private:
 	TArray<FString> PendingHostMessages;
 	int64 PendingHostBytes = 0;
 	FTCConnectionNotice Banner;
+	void TickOwnerR1Qualification(double Now);
+	double QualificationPollAt = 0;
+	int32 QualificationSequence = 0;
 };

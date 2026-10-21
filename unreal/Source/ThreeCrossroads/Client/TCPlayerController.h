@@ -120,7 +120,7 @@ enum class ETCUiAction : uint8
 	PanSpeed,    // the menu's Pan speed: Slow, Normal, Fast, saved (client/camera.js ww2-pan)
 	// Slice 10
 	Language,    // the language picker (client/index.html #langSel, i18n.js setLang): English or Spanish, saved
-	Volume,      // the menu's Volume (client/audio.js bind): left click 10 points up, right click 10 down, saved
+	Volume,      // the menu's continuous Volume slider (client/audio.js bind), percentage in Job, saved
 	// Round 14 (Client/TCGraphics.h, Client/TCPersistence.h FTCSettingsStore)
 	Graphics,    // the menu's Graphics: High or Low (client/light.js gfxBtn, gfx.js set), saved
 	Gore,        // the menu's Gore: On or Off (client/light.js goreBtn, gfx.js setGore), saved
@@ -228,9 +228,8 @@ public:
 	void GatherCover(FTCCoverKnown& Out) const;
 	// A box selection between two viewport pixels (client/selection.js box), as a mouse drag ends it.
 	void BoxSelect(FVector2D A, FVector2D B, bool bAdd);
-	// client/feedback.js show: a sentence over the hint line (the HUD's order note line, which keeps it for its own
-	// 4 s rather than the browser's Seconds), always with the error blip (createFeedback's errorSound).
-	void ShowFeedback(const FString& Sentence, double /*Seconds*/) { NoteOrder(true, Sentence); Feedback(TEXT("error")); }
+	// client/feedback.js show: a refusal over the armed hint for two seconds, with the error blip.
+	void ShowFeedback(const FString& Sentence, double /*Seconds*/) { NoteOrder(false, Sentence); Feedback(TEXT("error")); }
 	// A HUD button or its key. False when it did nothing (the note says why).
 	bool RunUi(ETCUiAction Action) { return RunCommand(FTCUiCommand(Action)); }
 	// A HUD button with what it names (recruit cards, queue places, group tabs). bShift: Shift was held (a recruit card
@@ -414,6 +413,10 @@ public:
 	double LastOrderNoteTime = -100.0;
 
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+	friend struct FTCRows30Access;
+	TFunction<bool(const FTCUnit&, FVector2D&)> Rows30Projection;
+#endif
 	struct FWideView { bool bValid = false; float Dist = 400.f; FVector2D Focus = FVector2D(80, 80); FString Key; };
 
 	ATCGameMode* Mode() const;

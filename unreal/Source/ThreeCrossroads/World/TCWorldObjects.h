@@ -902,6 +902,9 @@ public:
 	int32 LevelSwitches() const { return LevelSwitchCount; }
 
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+	friend struct FTCRows30Access;
+#endif
 	class FSource;
 	class FLive;
 	friend class FTCWorldObjectsView;
@@ -1006,6 +1009,7 @@ private:
 class THREECROSSROADS_API FTCWorldObjectsView
 {
 	friend class FTCWreckPresentationTest;
+	friend class FTCLook30Ghost;
 public:
 	// Spawns the actor that holds the components (once per world) and loads the model catalog and world materials.
 	bool Attach(UWorld* World);

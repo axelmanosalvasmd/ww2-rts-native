@@ -1,4 +1,6 @@
 #include "Client/TCHUD.h"
+#include "Client/TCLook30Cargo.h"
+#include "Client/TCHUD30Core.h"
 #include "Client/TCStats.h"
 #include "Client/TCGraphics.h"
 #include "Client/TCPersistence.h"
@@ -339,7 +341,7 @@ FString FTCHudFit::ControlTip(const FControl& C)
 bool FTCHudFit::RightStepsBack(const FTCUiCommand& C, bool bHasMatch)
 {
  return C.Action==ETCUiAction::LobbySetting || (C.Action==ETCUiAction::MatchControl && !bHasMatch)
-  || C.Action==ETCUiAction::Volume || C.Action==ETCUiAction::UiScale
+  || C.Action==ETCUiAction::UiScale
   || (C.Action==ETCUiAction::MatchOption && C.Unit==LexToString(ETCMatchOption::Weather));
 }
 
@@ -350,15 +352,20 @@ void ATCHUD::OfferTooltip(const FString& Tip, const FBox2D& Box)
  { PendingTooltip=Tip; TooltipAnchor=Box; }
 }
 
+FString FTCHudFit::HintText(bool bArmed,const FString& ArmedHint,bool bSent,const FString& Note,double NoteAge)
+{
+ const auto Layer=TCHud30::HintLayer(bArmed,bSent,NoteAge);
+ return Layer==TCHud30::EHint::Refusal?FTCLocale::OrderNote(Note):Layer==TCHud30::EHint::Armed?ArmedHint:FString();
+}
+
 void ATCHUD::DrawHint(UFont* Font)
 {
  const ATCPlayerController* PC=Cast<ATCPlayerController>(GetOwningPlayerController());
  if (!PC || !Canvas) return;
  const ATCGameMode* M=GetWorld()->GetAuthGameMode<ATCGameMode>();
  if (M && !M->Controls.TerminalNotice.IsEmpty()) return;
- FString Hint=PC->Aim!=ETCAim::None?PC->AimHint:FString();
  const double NoteAge=GetWorld()->GetTimeSeconds()-PC->LastOrderNoteTime;
- if (!PC->bLastOrderSent && NoteAge>=0 && NoteAge<2) Hint=FTCLocale::OrderNote(PC->LastOrderNote);
+ FString Hint=FTCHudFit::HintText(PC->Aim!=ETCAim::None,PC->AimHint,PC->bLastOrderSent,PC->LastOrderNote,NoteAge);
  if (Hint.IsEmpty()) return;
  const FTCMeasure Measure=FTCType::IsLoaded()?FTCType::Measure():FTCPaint::CanvasMeasure(Font);
  const float Left=FTCHudFit::LeftWidth(FVector2D(Canvas->ClipX,Canvas->ClipY),UiNow)+16, Right=Minimap.Rect().bIsValid?Minimap.Rect().Min.X/UiNow-8:Canvas->ClipX-8;
@@ -583,7 +590,7 @@ void ATCHUD::DrawBottomLayout(const FTCHudFit::FBottomLayout& Original, UFont* F
   {
    ATCGameMode* M=GetWorld()->GetAuthGameMode<ATCGameMode>();
    const int32 Owner=I.Owner>=0?I.Owner:M->State.You;
-   const int32 Faction=M->State.Factions.IsValidIndex(Owner)?M->State.Factions[Owner]:Owner<0?0:Owner%3;
+   const int32 Faction=I.Faction>=0?I.Faction:M->State.Factions.IsValidIndex(Owner)?M->State.Factions[Owner]:Owner<0?0:Owner%3;
    if (!Portraits) Portraits=MakeShared<FTCHudPortraits>();
    Image=Portraits->Get(I.Key,Faction,Owner);
    if (M->Units && M->Units->ModelsLoaded()) Portraits->Tick(M->Units->Models());
@@ -669,6 +676,9 @@ void ATCHUD::WriteAcceptanceAudit()
   Controls.Add(MakeShared<FJsonValueObject>(C));
  }
  Root->SetArrayField(TEXT("controls"),Controls);
+ TArray<TSharedPtr<FJsonValue>> TooltipErrors;
+ for (const FString& Error : TooltipInventoryErrors()) TooltipErrors.Add(MakeShared<FJsonValueString>(Error));
+ Root->SetArrayField(TEXT("tooltipInventoryErrors"),TooltipErrors);
  if (FParse::Param(FCommandLine::Get(),TEXT("TCHudInputAudit")))
  {
   Root->SetNumberField(TEXT("matchId"),M->State.MatchId);
@@ -1829,8 +1839,7 @@ namespace
 		if (U.Flags & TCFlags::Riding) T.Add(TEXT("Riding"));
 		if (U.Flags & TCCargo::Flag)
 		{
-			const int32 N = TCCargo::Count(U.Flags), Of = D ? D->Carries : 0;
-			T.Add(Of > 1 && Of <= 3 ? FString::Printf(TEXT("Carrying %d of %d squads"), N, Of) : FString(TEXT("Carrying a squad")));
+			T.Add(TCLook30::CargoLabel(TCCargo::Count(U.Flags), D ? D->Carries : 0));
 		}
 		if (U.Flags & TCFlags::Retreating) T.Add(TEXT("Retreating"));
 		if (U.Flags & 8) T.Add(TEXT("Reinforcing"));
@@ -2104,7 +2113,7 @@ TArray<FTCControlRow> ATCHUD::MenuSettingRows() const
 		Add(PC->PanSpeedLabel(), TEXT("Setting.PanSpeed"), TEXT("Pan speed: Slow, Normal or Fast for the keys and the edges"), false);
 		Add(FTCCoverPreview::MenuLabel(M->Cover.IsEnabled()), TEXT("Setting.Cover"), FTCCoverPreview::MenuTip(), M->Cover.IsEnabled());
 	}
-	Add(PC->VolumeLabel(), TEXT("Setting.Volume"), TEXT("Effects, voices and alerts. M mutes (right click: quieter)"), false);
+	Add(PC->VolumeLabel(), TEXT("Setting.Volume"), TEXT("Effects, voices and alerts. M mutes"), false);
 	Add(PC->UiScaleLabel(), TEXT("Setting.UiScale"), FTCSettingsStore::UIScaleTip(), false);
 	Add(PC->LanguageLabel(), TEXT("Setting.Language"), TEXT("Language"), false);
 	return Rows;
@@ -2169,11 +2178,11 @@ void ATCHUD::LabelSize(const FString& Str, float& OutWidth, float& OutHeight, UF
 	ShownSize(TC_T(Str), OutWidth, OutHeight, Font, Scale);
 }
 
-void ATCHUD::DrawMinimapPings()
+void ATCHUD::DrawMinimapPings(double Now)
 {
 	ATCGameMode* M = GetWorld()->GetAuthGameMode<ATCGameMode>();
-	if (!M || !Minimap.Rect().bIsValid || !Canvas) return;
-	const double Now = FPlatformTime::Seconds(); // the clock the relay was received on (ATCGameMode::OnPingRelay)
+	if (!M || !Minimap.Rect().bIsValid || (!Canvas && !Minimap.ObserveOverlay)) return;
+	if (Now<0) Now = FPlatformTime::Seconds(); // same receive clock, injectable for deterministic overlay fixtures
 	const FLinearColor Ink(FColor(0x15, 0x16, 0x0f)), Chalk(FColor(0xf2, 0xec, 0xdc)); // pings.js stroke and COLOR (markers.js CHALK)
 	for (const FTCPingRing& R : M->AlertFeed.Pings().Rings())
 	{
@@ -2258,6 +2267,46 @@ bool ATCHUD::CommandAt(FVector2D Pixel, FTCUiCommand& OutCommand) const
 	// round 16: the last drawn first, so a panel drawn over another (the open match menu) takes the click
 	for (int32 I = Buttons.Num() - 1; I >= 0; I--) if (FTCHudFit::Contains(Buttons[I].Rect,Pixel)) { OutCommand = Buttons[I].Command; return true; }
 	return false;
+}
+
+FString ATCHUD::TooltipAt(FVector2D Pixel) const
+{
+ const ATCPlayerController* PC=Cast<ATCPlayerController>(GetOwningPlayerController());
+ if (!bShowHUD || (PC && PC->ModalSheetOpen())) return FString();
+ for (int32 I=Buttons.Num()-1; I>=0; I--) if (FTCHudFit::Contains(Buttons[I].Rect,Pixel))
+  return Buttons[I].Hover.IsEmpty()?Buttons[I].Label:Buttons[I].Hover;
+ return FString();
+}
+
+TArray<FString> ATCHUD::TooltipInventoryErrors() const
+{
+ TArray<FString> Errors;
+ const auto* PC=Cast<ATCPlayerController>(GetOwningPlayerController());
+ const auto* M=GetWorld()?GetWorld()->GetAuthGameMode<ATCGameMode>():nullptr;
+ if (!bShowHUD || !PC || PC->ModalSheetOpen()) return Errors;
+ for (int32 Index=0;Index<Buttons.Num();Index++)
+ {
+  const auto& B=Buttons[Index]; const FVector2D At=B.Rect.GetCenter();
+  int32 Top=Buttons.Num()-1; while (Top>=0 && !FTCHudFit::Contains(Buttons[Top].Rect,At)) Top--;
+  if (Top!=Index) continue; // Covered targets are checked by the foreground hit, never the control underneath.
+  if (B.Command.Action==ETCUiAction::None) continue;
+  const FString Expected=B.Hover.IsEmpty()?B.Label:B.Hover;
+  if (Expected.IsEmpty() || TooltipAt(At)!=Expected) Errors.Add(TEXT("Missing topmost tooltip: ")+B.Label);
+  if (!M || B.bEnabled) continue;
+  FString Reason;
+  switch (B.Command.Action)
+  {
+   case ETCUiAction::Recruit:
+   { FTCBuy Buy; Buy.Unit=B.Command.Unit; Buy.From=B.Command.Building; Buy.bHasFrom=Buy.From!=0; Reason=M->Recruit.CheckBuy(M->State,Buy).Reason; break; }
+   case ETCUiAction::Build: Reason=M->Build.CheckBuild(M->State,B.Command.Unit,PC->Selected).Reason; break;
+   case ETCUiAction::Fort: Reason=M->Field.CheckDig(M->State,B.Command.Unit,false,PC->Selected).Reason; break;
+   case ETCUiAction::Ability: Reason=M->Abilities.Check(M->State,M->UnitTable,PC->Selected,B.Command.Unit).Reason; break;
+   case ETCUiAction::Support: Reason=M->Powers.Check(M->State,M->UnitTable,M->Recruit,B.Command.Unit).Reason; break;
+   default: break;
+  }
+  if (!Reason.IsEmpty() && Expected!=Reason) Errors.Add(TEXT("Stale availability tooltip: ")+B.Label+TEXT(" expected ")+Reason+TEXT(" got ")+Expected);
+ }
+ return Errors;
 }
 
 bool ATCHUD::ButtonCentre(ETCUiAction Action, FVector2D& Out) const
@@ -2464,7 +2513,7 @@ float ATCHUD::DrawLobby(UFont* Font, float Y, float LobbyW)
 	{
 		// the Start button's text and enabled state are the browser's (renderLobby); Add AI as before
 		TArray<FItem> Host;
-		if (bHost && !L.IsRustHost()) Host.Add({ TEXT("+ Add AI player"), FTCUiCommand(ETCUiAction::AddAi), true, TEXT("+ Add AI player") }); // lobby-view.js
+		if (bHost && !L.IsRustHost() && S.LobbyPlayers < M->Controls.SeatLimit()) Host.Add({ TEXT("+ Add AI player"), FTCUiCommand(ETCUiAction::AddAi), true, TEXT("+ Add AI player") }); // lobby-view.js
 		const bool bStart = !L.HasLobby() || L.StartAllowed();
 		Host.Add({ L.HasLobby() ? L.StartLabel() : FString(TEXT("Start match")), FTCUiCommand(ETCUiAction::Start), bStart, bStart ? FString(TEXT("Start the match")) : L.StartLine() });
 		AddButtons(Host);
@@ -2516,6 +2565,14 @@ float ATCHUD::DrawLobby(UFont* Font, float Y, float LobbyW)
 	const float RowH = Line + Pad + 4.f;
 	float H = 2 * Pad + Line; // the hover line
 	for (const FLine& Ln : Lines) H += Ln.Items.Num() ? RowH : Line;
+#if WITH_DEV_AUTOMATION_TESTS
+	if (Rows30GatherOnly)
+	{
+		for (const FLine& Ln : Lines) for (const FItem& It : Ln.Items)
+			Buttons.Add({ FBox2D(ForceInit), It.Command, It.Label, It.bEnabled, It.Hover });
+		return Y + H;
+	}
+#endif
 	AddPanel(8.f, Y, W, H, Panel);
 	FVector2D Mouse(-1, -1);
 	float MX, MY;
@@ -3305,7 +3362,7 @@ void ATCHUD::DrawWorldOverlays(UFont* Font)
 	DrawHealthBars();
 }
 
-void ATCHUD::DrawMinimapOverlays()
+void ATCHUD::DrawMinimapOverlays(double Now)
 {
 	// client/main.js drawMinimap's logistics layer while the overlay is on: stores, the selected trucks' routes and
 	// the own units cut off from supply (red rings)
@@ -3330,6 +3387,7 @@ void ATCHUD::DrawMinimapOverlays()
    for (int32 I=0;I<4;I++) if (!Minimap.WorldToPixel(At+D[I],Q[I])) return;
    Minimap.DrawPolygon(Canvas,{Q[0],Q[1],Q[2],Q[3]},C);
   };
+  Minimap.OverlayRole=TEXT("region");
   for (const FTCWorldRegionView& V : M->WorldRec.RegionViews())
   {
    const FLinearColor C(V.TeamColour);
@@ -3345,6 +3403,7 @@ void ATCHUD::DrawMinimapOverlays()
    }
    if (V.bLocked) Minimap.DrawRing(Canvas,V.At,Radius/Cs,1,FLinearColor(FTCWorldRecovery::LockedColour));
   }
+  Minimap.OverlayRole=TEXT("station");
   for (const FTCWorldStationView& V : M->WorldRec.StationViews())
   {
    Square(V.At,7,FLinearColor(FTCWorldRecovery::StationFrameColour));
@@ -3354,6 +3413,7 @@ void ATCHUD::DrawMinimapOverlays()
 
 	DrawMinimapPoints();
 	// client/main.js drawMinimap: the strip strikes' outlines ('#ff3020' for a foe's, else the caller's colour)
+	Minimap.OverlayRole=TEXT("strike");
 	for (const FTCStrikeMark& K : M->Powers.Strikes(S))
 	{
 		if (!K.bMinimap || !K.bStrip) continue;
@@ -3371,12 +3431,14 @@ void ATCHUD::DrawMinimapOverlays()
 	if (M->Logistics.OverlayActive())
 	{
 	const FTCLogisticsOverlay O = M->Logistics.Overlay(S, PC->Selected, [&S](double X, double Z) { return FTCLogistics::KnownByFog(S, X, Z); });
+	Minimap.OverlayRole=TEXT("store");
 	for (const FTCLogisticsStore& St : O.Stores)
 		{
    const FVector2D At(St.X,St.Z); FVector2D Q[4]; const FVector2D D[4]={{-4,-4},{4,-4},{4,4},{-4,4}};
    bool Valid=true; for (int32 I=0;I<4;I++) Valid &= Minimap.WorldToPixel(At+D[I],Q[I]);
    if (Valid) Minimap.DrawPolygon(Canvas,{Q[0],Q[1],Q[2],Q[3]},FLinearColor(FTCLogistics::MinimapStoreColor(St.bSource)));
   }
+	Minimap.OverlayRole=TEXT("route");
 	for (const FTCSupplyRoute& R : O.Routes)
 		for (int32 I = 0; I < R.Points.Num(); I++)
 		{
@@ -3396,8 +3458,9 @@ void ATCHUD::DrawMinimapOverlays()
   Ring(Threat.At,Threat.Radius,FLinearColor(FColor(0xd4,0x57,0x4a,0x66)));
  }
 
-	DrawMinimapAlertRings();
-	DrawMinimapPings();
+	Minimap.OverlayRole=TEXT("alert"); DrawMinimapAlertRings();
+	Minimap.OverlayRole=TEXT("ping"); DrawMinimapPings(Now);
+ Minimap.OverlayRole.Reset();
 }
 
 void ATCHUD::PostRender()
@@ -3420,6 +3483,9 @@ void ATCHUD::PostRender()
 	}
 	Super::PostRender();
 }
+
+// Source continuous Volume slider.
+#include "Client/TCLook30VolumeHud.inl"
 
 void ATCHUD::DrawHUD()
 {
@@ -3760,10 +3826,18 @@ void ATCHUD::DrawHUD()
 		DrawMatchReport(Font, Y + 4.f, LobbyBottom, 8.f + LobbyW + 8.f);
 	}
 	EndUi();
+	DrawVolumeTrack();
 	DrawRoomBanners(Font); // round 16: #roomBanners (z-index 25: over the HUD, under the sheets)
- if (PendingTooltip.IsEmpty()) for (int32 I=Buttons.Num()-1; I>=0; I--)
- { OfferTooltip(Buttons[I].Label,Buttons[I].Rect); if (!PendingTooltip.IsEmpty()) break; }
- if (PendingTooltip.IsEmpty() && Minimap.Rect().bIsValid) OfferTooltip(TEXT("Minimap"),Minimap.Rect());
+ // Resolve again after every foreground panel has installed its hits. A covered control cannot retain a tip.
+ PendingTooltip.Reset(); TooltipAnchor=FBox2D(ForceInit);
+ float TipX=0,TipY=0;
+ if (PC->GetMousePosition(TipX,TipY))
+ {
+  PendingTooltip=TooltipAt(FVector2D(TipX,TipY));
+  for (int32 I=Buttons.Num()-1;I>=0;I--) if (FTCHudFit::Contains(Buttons[I].Rect,FVector2D(TipX,TipY))) { TooltipAnchor=Buttons[I].Rect; break; }
+  if (!TooltipInteraction.Allows(FVector2D(TipX,TipY),TooltipAnchor)) PendingTooltip.Reset();
+  if (PendingTooltip.IsEmpty() && !TooltipAnchor.bIsValid && Minimap.Rect().bIsValid) OfferTooltip(TEXT("Minimap"),Minimap.Rect());
+ }
 	if (!PendingTooltip.IsEmpty() && TooltipAnchor.bIsValid && !PC->ModalSheetOpen())
 	{
 	 const FTCMeasure Measure=FTCType::IsLoaded()?FTCType::Measure():FTCPaint::CanvasMeasure(Font);
@@ -3772,6 +3846,7 @@ void ATCHUD::DrawHUD()
 	}
 	DrawControlsSheet(Font, Big);
 	DrawStatsSheet(Font); // round 16: Menu > Stats overlay
+	DrawPortraitGallery(Font);
 	WriteAcceptanceAudit();
 
 	if (PC->bDragging && PC->bDragMoved)

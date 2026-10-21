@@ -36,8 +36,6 @@
 // between the front pair at -30 and +30 degrees: azimuth = pan * 30 degrees).
 //
 // Differences, recorded:
-//   - no master limiter: the reference puts a DynamicsCompressor (threshold -10 dB, ratio 8) on the master; Unreal's
-//     submix dynamics processor lives in the Synthesis plugin, which this project does not enable (a note to the lead);
 //   - a tracer's flight time (the delay before its impact sound) is measured from the shooter's position at 1 m over
 //     flat ground, not from the drawn muzzle on the terrain: the browser's muzzle and height field are not here;
 //   - the browser's random numbers are Math.random; here an FRandomStream (seeded per run, fixed in tests);
@@ -51,6 +49,7 @@
 #include "TCAudio.generated.h"
 
 class UAudioComponent;
+class USoundSubmix;
 class USoundWaveProcedural;
 class USoundWave;
 class FTCMatchState;
@@ -532,6 +531,9 @@ public:
 
 private:
 #if WITH_DEV_AUTOMATION_TESTS
+	friend struct FTCRows30Access;
+#endif
+#if WITH_DEV_AUTOMATION_TESTS
 	friend class FTCSession26AudioBankCommand;
 #endif
 	void LoadAssets(int32 Token);
@@ -541,6 +543,7 @@ private:
 	UAudioComponent* MakeComponent(USoundBase* Sound);
 	void Place(UAudioComponent* C, double Pan) const;
 
+	UPROPERTY() TObjectPtr<USoundSubmix> MasterDynamics;
 	FTCAudioMixer Mixer;
 	FTCAudioCues Cue;
 	FStreamableManager Streamable;

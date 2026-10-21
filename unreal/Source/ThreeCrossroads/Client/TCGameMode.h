@@ -475,6 +475,9 @@ public:
 
 private:
 #if WITH_DEV_AUTOMATION_TESTS
+	friend struct FTCRows30Access;
+#endif
+#if WITH_DEV_AUTOMATION_TESTS
 	friend struct TCSession27Lifecycle::FAccess;
 	friend struct TCSession28Failure::FAccess;
 #endif

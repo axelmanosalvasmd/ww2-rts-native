@@ -17,7 +17,7 @@ public class ThreeCrossroads : ModuleRules
 		// round 15 (lobby): the invite link's Copy button (the system clipboard, FPlatformApplicationMisc)
 		PrivateDependencyModuleNames.Add("ApplicationCore");
 		// round 15 (alerts): the stats overlay's draw calls and triangles (client/perf.js renderer.info), GNumDrawCallsRHI
-		PrivateDependencyModuleNames.AddRange(new string[] { "RHI" });
+		PrivateDependencyModuleNames.AddRange(new string[] { "RHI", "AudioMixer", "SignalProcessing" });
 		// round 16 (controls): the verification step that types goes through Slate's text input (FSlateApplication)
 		PrivateDependencyModuleNames.Add("Slate");
 		PublicIncludePaths.Add(ModuleDirectory);

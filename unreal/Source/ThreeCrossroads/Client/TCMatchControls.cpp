@@ -477,7 +477,7 @@ FTCControlButton FTCMatchControls::MenuControl(ETCMatchControl Kind, int32 Slot,
 		B.Label = TEXT("Click again to confirm");
 	if (!B.bShown) B.Why = Kind == ETCMatchControl::Leave ? TEXT("a spectator has no army to hand over") : Kind == ETCMatchControl::HandAi ? TEXT("only the host, in a match, for an offline player") : TEXT("only the host");
 	else if (!Sendable(Type)) { B.bEnabled = false; B.Why = TEXT("an operative sends no match controls"); }
-	else if (bRustHost && Kind == ETCMatchControl::Restart)
+	else if (bRustHost && Kind == ETCMatchControl::Restart && !FTCConnection::OwnerR1AdmissionEnabled())
 	{
 		B.bEnabled = false;
 		B.Why = FTCConnection::RequiredRustProfileRefusal();

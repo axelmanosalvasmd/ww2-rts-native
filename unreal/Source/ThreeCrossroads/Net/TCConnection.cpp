@@ -10,6 +10,11 @@
 #include "Policies/CondensedJsonPrintPolicy.h"
 #include "HAL/PlatformTime.h"
 #include "GenericPlatform/GenericPlatformString.h"
+#include "Net/TCSession30Policy.h"
+#include "HAL/PlatformMisc.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
+#include "Misc/FileHelper.h"
 
 const TCHAR* LexToString(ETCSendResult Result)
 {
@@ -57,13 +62,59 @@ const TCHAR* FTCConnection::RequiredRustProfileRefusal()
 
 bool FTCConnection::RustProfileCommandBlocked(ETCHostKind Kind, const FString& Type)
 {
-	return Kind == ETCHostKind::Rust && (Type == TEXT("start") || Type == TEXT("restart") || Type == TEXT("loadSave"));
+	return TCSession30::Blocked(Kind == ETCHostKind::Rust, OwnerR1AdmissionEnabled(), Type == TEXT("start"), Type == TEXT("restart"), Type == TEXT("loadSave"));
+}
+
+bool FTCConnection::OwnerR1AdmissionEnabled()
+{
+	if (OwnerR1Qualification()) return true;
+	FString Url;
+	FParse::Value(FCommandLine::Get(), TEXT("TCServer="), Url);
+	const FString Approved = FPlatformMisc::GetEnvironmentVariable(TEXT("TC_OWNER_R1_APPROVED_URL"));
+	return !Approved.IsEmpty() && Url == Approved;
+}
+
+bool FTCConnection::OwnerR1Qualification()
+{
+#if !UE_BUILD_SHIPPING && !UE_BUILD_TEST
+	FString Url;
+	FParse::Value(FCommandLine::Get(), TEXT("TCServer="), Url);
+	return TCSession30::Enabled(true, FParse::Param(FCommandLine::Get(), TEXT("TCQualifyOwnerR1")),
+		FPlatformMisc::GetEnvironmentVariable(TEXT("TC_R1_QUALIFICATION")) == TEXT("1"), TCSession30::Loopback(TCHAR_TO_UTF8(*Url)));
+#else
+	return false;
+#endif
+}
+
+void FTCConnection::TickOwnerR1Qualification(double Now)
+{
+#if !UE_BUILD_SHIPPING && !UE_BUILD_TEST
+	if (!OwnerR1Qualification() || !TCSession30::Loopback(TCHAR_TO_UTF8(*Settings.Url)) || !IsOpen() || Host != ETCHostKind::Rust || HostProtoValue != ProtocolVersion || Now < QualificationPollAt) return;
+	QualificationPollAt = Now + 0.1;
+	const FString Path = FPlatformMisc::GetEnvironmentVariable(TEXT("TC_R1_INBOX"));
+	FString Text;
+	TSharedPtr<FJsonObject> Envelope;
+	if (Path.IsEmpty() || !FFileHelper::LoadFileToString(Text, *Path) || !FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Envelope) || !Envelope) return;
+	double Sequence = 0;
+	const TSharedPtr<FJsonObject>* Command = nullptr;
+	if (!Envelope->TryGetNumberField(TEXT("seq"), Sequence) || Sequence <= QualificationSequence || Sequence > MAX_int32 || Sequence != FMath::FloorToDouble(Sequence) || !Envelope->TryGetObjectField(TEXT("command"), Command)) return;
+	FString Type;
+	if (!(*Command)->TryGetStringField(TEXT("t"), Type)) return;
+	if (Type != TEXT("start") && Type != TEXT("restart") && Type != TEXT("move") && Type != TEXT("amove") && Type != TEXT("stop") && Type != TEXT("stance") && Type != TEXT("drop")) return;
+	QualificationSequence = (int32)Sequence;
+	if (Type == TEXT("drop")) SimulateDrop();
+	else
+	{
+		const ETCSendResult Result = TrySend(Command->ToSharedRef());
+		UE_LOG(LogTC, Log, TEXT("r1 qualification: seq=%d command=%s result=%s"), QualificationSequence, *Type, LexToString(Result));
+	}
+#endif
 }
 
 FString FTCConnection::MatchAdmissionRefusal(ETCHostKind Kind, const FString& Type)
 {
 	if (Type != TEXT("start") && Type != TEXT("s")) return FString();
-	if (Kind == ETCHostKind::Rust) return RequiredRustProfileRefusal();
+	if (Kind == ETCHostKind::Rust && !OwnerR1AdmissionEnabled()) return RequiredRustProfileRefusal();
 	if (Kind == ETCHostKind::Unknown) return TEXT("Match refused: waiting for the host's lobby.");
 	return FString();
 }
@@ -259,7 +310,8 @@ void FTCConnection::ReceiveText(const FString& Text, uint64 ExpectedGeneration)
 	}
 	if (bParsed)
 	{
-		const FString Refusal = MatchAdmissionRefusal(Host, Type);
+		const FString Refusal = Host == ETCHostKind::Rust && OwnerR1AdmissionEnabled() && HostProtoValue != ProtocolVersion
+			&& (Type == TEXT("start") || Type == TEXT("s")) ? FString(RequiredRustProfileRefusal()) : MatchAdmissionRefusal(Host, Type);
 		if (!Refusal.IsEmpty())
 		{
 			// A remote start or reconnect must not bypass the local Start/Restart gate. Stop before either decoder
@@ -348,6 +400,7 @@ void FTCConnection::Tick(double Now)
 	LastNow = Now;
 	Graveyard.Reset(); // retired sockets, now outside their callbacks
 	if (bRunning && RetryAt >= 0.0 && Now >= RetryAt) { RetryAt = -1.0; Open(); }
+	TickOwnerR1Qualification(Now);
 }
 
 ETCSendResult FTCConnection::TrySend(const TSharedRef<FJsonObject>& Message, int32* OutBytes)

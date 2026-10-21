@@ -621,7 +621,7 @@ FString FTCLobbySettings::RustStartRefusal() const
 	const int32 A = Current.Seats[0].Team, B = Current.Seats[1].Team;
 	if (!((A == 0 && B == 1) || (A == 1 && B == 0))) return TEXT("Rust host: one commander on Team 1 and one on Team 2.");
 	if (!Current.bAmHost || Current.You != Current.Host || !Current.Seats.IsValidIndex(Current.You)) return TEXT("Waiting for the host to start...");
-	return FTCConnection::RequiredRustProfileRefusal();
+	return FTCConnection::OwnerR1AdmissionEnabled() ? FString() : FString(FTCConnection::RequiredRustProfileRefusal());
 }
 
 bool FTCLobbySettings::StartAllowed() const

@@ -1,4 +1,5 @@
 #include "Client/TCOrders.h"
+#include "Client/TCRecruitment.h"
 #include "ThreeCrossroads.h"
 #include "Client/TCFormation.h"
 #include "Client/TCUnitTable.h"
@@ -207,6 +208,29 @@ FTCOrderPlan TCOrders::PlanStop(const TSet<int32>& Selected)
 	Plan.Message = S;
 	Plan.Units = Selected.Num();
 	return Plan;
+}
+
+FTCOrderPlan TCOrders::PlanDestroy(const TSet<int32>& Selected)
+{
+ FTCOrderPlan Plan;
+ if (Selected.IsEmpty()) return Plan;
+ TArray<int32> Ids=Selected.Array(); Ids.Sort();
+ auto M=MakeShared<FJsonObject>(); M->SetStringField(TEXT("t"),TEXT("destroy"));
+ TArray<TSharedPtr<FJsonValue>> Values; for (int32 Id : Ids) Values.Add(MakeShared<FJsonValueNumber>(Id));
+ M->SetArrayField(TEXT("ids"),Values); Plan.Message=M; Plan.Units=Ids.Num();
+ return Plan;
+}
+
+TArray<int32> TCOrders::RailUnits(const FTCMatchState& State,const FTCUnitTable& Table,const TSet<int32>& Selected)
+{
+ TArray<int32> Ids;
+ for (int32 Id : Selected)
+ {
+  const FTCUnit* U=State.Units.Find(Id); const FTCUnitDef* D=U?Table.Find(U->Type):nullptr;
+  const FTCRecruitDef* R=U?FTCRecruitment::Find(U->Type):nullptr;
+  if (U && D && R && State.IsOwn(*U) && !D->bStructure && !D->bAir && !D->bRail && !R->bNaval) Ids.Add(Id);
+ }
+ Ids.Sort(); return Ids;
 }
 
 FString TCOrders::DenySentence(const FString& Reason, const FString& Cmd)

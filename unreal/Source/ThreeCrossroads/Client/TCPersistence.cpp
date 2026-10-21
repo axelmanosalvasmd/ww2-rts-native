@@ -1,4 +1,5 @@
 #include "Client/TCPersistence.h"
+#include "Client/TCRows30SavedDate.h"
 #include "Client/TCPlayerController.h"
 #include "Net/TCMatchState.h"
 #include "Net/TCConnection.h"
@@ -192,7 +193,7 @@ namespace TCPersistenceDetail
 
 	// new Date(value).getTime() for what a JSON value can be: a number (TimeClip: whole milliseconds, at most 8.64e15
 	// from the epoch), null (0), a boolean (0 or 1). A missing value is an Invalid Date; a string, object or array would be
-	// Date.parse'd, which is not ported (the server writes Date.now(), a number).
+	// Date.parse'd. ISO strings with explicit zones and date-only UTC strings are accepted below.
 	bool JsDateMs(const TSharedPtr<FJsonValue>& V, int64& OutMs)
 	{
 		if (!V.IsValid()) return false;
@@ -202,6 +203,13 @@ namespace TCPersistenceDetail
 		case EJson::Null: T = 0; break;
 		case EJson::Boolean: T = V->AsBool() ? 1 : 0; break;
 		case EJson::Number: T = V->AsNumber(); break;
+		case EJson::String:
+		{
+			const FTCHARToUTF8 Utf8(*V->AsString());
+			int64_t Milliseconds = 0;
+			if (!TCRows30SavedDate::ParseIsoUtc(std::string_view(Utf8.Get(), Utf8.Length()), Milliseconds)) return false;
+			OutMs = Milliseconds; return true;
+		}
 		default: return false;
 		}
 		if (!std::isfinite(T) || std::fabs(T) > 8.64e15) return false;

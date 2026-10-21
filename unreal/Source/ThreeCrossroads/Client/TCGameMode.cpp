@@ -625,7 +625,7 @@ void ATCGameMode::OnMessage(const FJsonObject& M, int32 Bytes)
 		Persistence.ApplyDeny(M, FPlatformTime::Seconds());
 		UE_LOG(LogTC, Warning, TEXT("server refused %s (shown as: %s)"), *State.LastDeny, *(Controls.TerminalNotice.IsEmpty() ? TCOrders::DenySentence(State.DenyReason, State.DenyCmd) : Controls.TerminalNotice));
 		// client/main.js: connection.on('deny', m => feedback.show(denySentence(...))): the error blip with the sentence
-		if (ATCPlayerController* DPC = Cast<ATCPlayerController>(GetWorld()->GetFirstPlayerController())) DPC->Feedback(TEXT("error"));
+		if (ATCPlayerController* DPC = Cast<ATCPlayerController>(GetWorld()->GetFirstPlayerController())) DPC->ShowFeedback(TCOrders::DenySentence(State.DenyReason,State.DenyCmd),2);
 	}
 	else if (T == TEXT("saved"))
 	{

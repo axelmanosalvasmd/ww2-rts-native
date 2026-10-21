@@ -28,6 +28,7 @@
 // through TC_T (client/i18n.js: English or Spanish), adds the Language picker (lobby and settings) and the Volume button,
 // and the relayed pings' rings on the minimap (client/pings.js); the combat effects and the world rings are ATCEffects'.
 #pragma once
+#include "Client/TCLook30Controls.h"
 
 #include "CoreMinimal.h"
 #include "GameFramework/HUD.h"
@@ -75,7 +76,7 @@ namespace FTCHudFit
 		FString Training;
 		float TrainingProgress = 0;
 	};
-	struct FIcon { FString Key; FBox2D Box; FLinearColor Colour; bool bPortrait = false; int32 Owner = -1; FBox2D Clip = FBox2D(ForceInit); };
+	struct FIcon { FString Key; FBox2D Box; FLinearColor Colour; bool bPortrait = false; int32 Owner = -1; int32 Faction = -1; FBox2D Clip = FBox2D(ForceInit); };
 	struct FHit { FBox2D Box; FControl Control; };
 	struct FTextFit { FString Text; FBox2D Box, Clip; };
 	struct FProductionInfo
@@ -118,6 +119,7 @@ namespace FTCHudFit
 		FBox2D Logistics = FBox2D(ForceInit), LogisticsList = FBox2D(ForceInit);
 	};
 	// Original index.html button/uc/ob hover rules, applied to the same visible hit boxes as input.
+	THREECROSSROADS_API FBottomLayout PortraitGallery(const FTCMeasure& Measure);
 	THREECROSSROADS_API void ApplyPointer(FBottomLayout& Layout, FVector2D Pointer, bool bHeld = false);
 	THREECROSSROADS_API FBottomLayout LeftPanel(float ViewH, const FString& Title, const TArray<FSelection>& Selection,
 		const TArray<FString>& Details, const TArray<FControl>& Orders, const TArray<FControl>& Menu, const FTCMeasure& Measure, float Scale = 1.f,
@@ -139,6 +141,7 @@ namespace FTCHudFit
 		TSet<int32> Press(const class FTCMatchState& State, const TSet<int32>& Current, int32 Id, bool bToggle, double Now);
 	};
 	THREECROSSROADS_API TSet<int32> PlaneSelection(const class FTCMatchState& State, const TSet<int32>& Current, int32 Id, bool bToggle, bool bDouble);
+	THREECROSSROADS_API FString HintText(bool bArmed,const FString& ArmedHint,bool bSent,const FString& Note,double NoteAge);
 	inline bool ShowOrderNote(bool bSent, bool bDiagnostics) { return !bSent || bDiagnostics; }
 	THREECROSSROADS_API void StackAbove(FBottomLayout& Child, const TArray<FBox2D>& Panels);
 	THREECROSSROADS_API TArray<FSelection> SelectionRows(const FTCMatchState& State, const FTCUnitTable& Table,
@@ -206,6 +209,8 @@ public:
 	// Called directly by the controller's InputKey, before frame polling can merge/delay aircraft presses.
 	bool HandlePlaneInput(const FInputKeyEventArgs& Params);
 	bool PlanePressAt(FVector2D Pixel, bool bShift, bool bCtrl, double EventTime);
+	bool VolumePressAt(FVector2D Pixel);
+	void VolumeDragFrame(FVector2D Pixel, bool Held, bool Focused);
 	bool RecruitKey(const FString& Code, bool bShift, bool bCtrl, bool bAlt);
 	void NoteCardLetter(const FString& Type);
 	bool ScrollSelection(FVector2D Pixel, int32 Notch);
@@ -230,6 +235,8 @@ public:
 	// The button drawn at this viewport pixel in the last frame, if any (the controller sends its click there).
 	bool ButtonAt(FVector2D Pixel, ETCUiAction& OutAction) const;
 	bool CommandAt(FVector2D Pixel, FTCUiCommand& OutCommand) const;
+	FString TooltipAt(FVector2D Pixel) const;
+	TArray<FString> TooltipInventoryErrors() const;
 	// Where the button for Action (or the one matching Command: same action and unit, building, job or group) was drawn
 	// in the last frame (verification switches press it there).
 	bool ButtonCentre(ETCUiAction Action, FVector2D& Out) const;
@@ -250,13 +257,20 @@ public:
 	FTCMinimap Minimap;
 
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+	friend struct FTCRows30Access;
+	bool Rows30GatherOnly = false;
+#endif
 	friend struct FTCHud28Access;
 	friend struct FTCHud29Access;
+	friend struct FTCHud30Access;
+	friend class FTCLook30VolumeHandler;
 	// Physical bounds of the retained hit table. Canvas exists only during PostRender.
 	FVector2D DrawnViewport = FVector2D::ZeroVector;
 	struct FButton { FBox2D Rect; FTCUiCommand Command; FString Label; bool bEnabled = true; FString Hover; };
 	// Opt-in integration evidence from the actual drawn controls. Does not synthesize clicks or purchases.
 	void WriteAcceptanceAudit();
+	void DrawPortraitGallery(UFont* Font);
 	FString AcceptanceSignature;
 	// client/hud.js UI scale (#hud { zoom: var(--ui) }): the panels, buttons and text are drawn at UiNow through a canvas
 	// transform, laid out in a window of ClipX / UiNow by ClipY / UiNow; the world's own overlays, the minimap (drawn
@@ -321,7 +335,7 @@ private:
 	// as it is), logged once each as "locale: kept in English" (CLI-120's capture review reads them)
 	TSet<FString> KeptEnglish;
 	// client/pings.js drawMinimap: each relayed ping's ring on the minimap (dark under chalk, growing and fading)
-	void DrawMinimapPings();
+	void DrawMinimapPings(double Now = -1);
 	float Button(UFont* Font, float X, float Y, const FString& Label, ETCUiAction Action);
 	// MaxWidth (round 15): the button is no wider, its label cut with '...' (the stored label stays whole)
 	float Button(UFont* Font, float X, float Y, const FString& Label, const FTCUiCommand& Command, bool bEnabled, const FLinearColor& Fill, float MinWidth = 0.f, float MaxWidth = 0.f);
@@ -355,6 +369,9 @@ private:
 	float ControlsScroll = 0, ControlsScrollMax = 0;
 	FTCHudFit::FPlaneInteraction PlaneInteraction;
 	bool bPlanePointerDown = false;
+	TCLook30::FVolumeDrag VolumeDrag;
+	FBox2D VolumeDragBox = FBox2D(ForceInit);
+	void DrawVolumeTrack();
 	double PlaneInputAt = -1;
 	int32 GroupDestination = 1;
 	bool bGroupDropdown = false;
@@ -367,7 +384,7 @@ private:
 	void GroundRing(const ATCTerrain& T, FVector2D At, float Radius, const FLinearColor& Colour, float Thickness);
 	// The placement preview, rally markers and logistics overlay in the view; then the logistics overlay on the minimap.
 	void DrawWorldOverlays(UFont* Font);
-	void DrawMinimapOverlays();
+	void DrawMinimapOverlays(double Now = -1);
 	// Slice 9 (see the file comment). Each returns or draws only what this recipient's messages delivered.
 	float DrawScoreStrip(UFont* Font, UFont* Big, FTCHudFit::FBottomLayout Sandbox);
 	// Round 17: the strip's one card in screen pixels as last drawn (invalid without a strip)

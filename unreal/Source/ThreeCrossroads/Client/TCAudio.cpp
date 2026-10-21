@@ -1,4 +1,7 @@
 #include "Client/TCAudio.h"
+#include "Client/TCLook30Dynamics.h"
+#include "AudioDeviceManager.h"
+#include "Engine/Engine.h"
 
 #include "ThreeCrossroads.h"
 #include "Client/TCObjectives.h"
@@ -1418,6 +1421,8 @@ bool UTCAudio::ShouldCreateSubsystem(UObject* Outer) const
 void UTCAudio::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
+	MasterDynamics = TCLook30::CreateMasterDynamics(this);
+	if (GEngine && GEngine->GetAudioDeviceManager()) GEngine->GetAudioDeviceManager()->RegisterSoundSubmix(MasterDynamics);
 	const int32 Seed = (int32)(FPlatformTime::Cycles() & 0x7fffffff);
 	Mixer.Reseed(Seed);
 	Cue.Reseed(Seed ^ 0x2545F491);
@@ -1433,6 +1438,8 @@ void UTCAudio::Deinitialize()
 	for (TPair<int32, TObjectPtr<UAudioComponent>>& C : Components) if (C.Value) { C.Value->Stop(); C.Value->DestroyComponent(); }
 	Components.Reset();
 	Started.Reset();
+	if (MasterDynamics && GEngine && GEngine->GetAudioDeviceManager()) GEngine->GetAudioDeviceManager()->UnregisterSoundSubmix(MasterDynamics);
+	MasterDynamics = nullptr;
 	if (SfxHandle.IsValid()) SfxHandle->CancelHandle();
 	if (VoiceHandle.IsValid()) VoiceHandle->CancelHandle();
 	Super::Deinitialize();
@@ -1667,6 +1674,10 @@ void UTCAudio::Tick(float DeltaTime)
 
 UAudioComponent* UTCAudio::MakeComponent(USoundBase* Sound)
 {
+	if (!Sound || !MasterDynamics) return nullptr;
+	// Every source reaches the same compressor once, after its mixer gain. No parallel dry send.
+	Sound->bEnableBaseSubmix = true;
+	Sound->SoundSubmixObject = MasterDynamics;
 	UAudioComponent* C = UGameplayStatics::CreateSound2D(this, Sound, 1.f, 1.f, 0.f, nullptr, false, false);
 	if (!C) return nullptr;
 	// the reference computes every gain and pan itself: no attenuation, spatialized only to pan

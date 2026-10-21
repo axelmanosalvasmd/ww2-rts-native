@@ -192,6 +192,9 @@ public:
 	FTCDirectorySession Session;
 
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+	friend struct FTCRows30Access;
+#endif
 	TArray<FTCRoomInfo> RoomList;
 	FString Filter;
 	bool bOpenOnly = false, bAnswered = false, bOnline = false, bLoading = false;
