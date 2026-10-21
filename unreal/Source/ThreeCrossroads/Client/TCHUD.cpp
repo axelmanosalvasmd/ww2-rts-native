@@ -76,6 +76,14 @@ namespace
 	}
 }
 
+void ATCHUD::BeginPlay()
+{
+ Super::BeginPlay();
+ // Engine overlays obscure player notices. Keep explicit diagnostic and automation runs available.
+ if (!GIsAutomationTesting && !FParse::Param(FCommandLine::Get(),TEXT("TCNativeDiagnostics")) &&
+     !FParse::Param(FCommandLine::Get(),TEXT("TCScreenMessages"))) GAreScreenMessagesEnabled=false;
+}
+
 float FTCType::HudSymbolAdvance(uint32 CodePoint)
 {
  for (const auto& Glyph : HudGlyphs) if (Glyph.CodePoint==CodePoint) return Glyph.Advance;
@@ -132,7 +140,7 @@ class FTCHudPortraits
  void Studio()
  {
   if (Scene) return;
-  Scene=MakeUnique<FPreviewScene>(FPreviewScene::ConstructionValues().SetEditor(false).SetCreatePhysicsScene(false).SetTransactional(false).SetLightBrightness(1.9f).SetSkyBrightness(.85f));
+  Scene=MakeUnique<FPreviewScene>(FPreviewScene::ConstructionValues().SetEditor(false).SetCreatePhysicsScene(false).SetTransactional(false).SetLightBrightness(2.6f).SetSkyBrightness(1.35f));
   Scene->SetLightColor(FColor(0xff,0xee,0xdb));
   Scene->DirectionalLight->SetMobility(EComponentMobility::Movable);
   Scene->SkyLight->LowerHemisphereColor=FLinearColor(FColor(0x4c,0x42,0x32));
@@ -149,8 +157,8 @@ class FTCHudPortraits
    Scene->GetWorld()->AddParameterCollectionInstance(Collection,true);
    if (UMaterialParameterCollectionInstance* Light=Scene->GetWorld()->GetParameterCollectionInstance(Collection))
    {
-    Light->SetVectorParameterValue(TEXT("HemiTop"),FLinearColor(FColor(0xd0,0xd8,0xe0))*.85f);
-    Light->SetVectorParameterValue(TEXT("HemiBottom"),FLinearColor(FColor(0x4c,0x42,0x32))*.85f);
+    Light->SetVectorParameterValue(TEXT("HemiTop"),FLinearColor(FColor(0xe5,0xeb,0xf2))*1.35f);
+    Light->SetVectorParameterValue(TEXT("HemiBottom"),FLinearColor(FColor(0x9b,0xa6,0xb3))*.95f);
     Light->SetVectorParameterValue(TEXT("Env"),FLinearColor(0,0,1,0));
    }
    // This preview world does not tick. Flush the collection now, as the match world's tick normally does.
@@ -164,7 +172,7 @@ class FTCHudPortraits
   Scene->AddComponent(Floor,FTransform::Identity);
   Floor->SetVisibility(false);
   UDirectionalLightComponent* Rim=NewObject<UDirectionalLightComponent>(GetTransientPackage());
-  Rim->SetIntensity(.7f); Rim->SetLightColor(FLinearColor(FColor(0xbf,0xd0,0xe6))); Rim->SetCastShadows(false);
+  Rim->SetIntensity(1.2f); Rim->SetLightColor(FLinearColor(FColor(0xbf,0xd0,0xe6))); Rim->SetCastShadows(false);
   Scene->AddComponent(Rim,FTransform((-FVector(.4,-1,.8)).Rotation()));
   Capture->ShowFlags.SetFog(false); Capture->ShowFlags.SetAtmosphere(false); Capture->ShowFlags.SetMotionBlur(false);
   Capture->ShowFlags.SetTemporalAA(false); Capture->ShowFlags.SetAntiAliasing(true);
@@ -589,6 +597,8 @@ void ATCHUD::DrawBottomLayout(const FTCHudFit::FBottomLayout& Original, UFont* F
   UTexture2D* Image=nullptr;
   if (I.bPortrait)
   {
+   FCanvasTileItem Backdrop(I.Box.Min,I.Box.GetSize(),FLinearColor(FColor(0x58,0x65,0x72)));
+   Backdrop.BlendMode=SE_BLEND_Opaque; Canvas->DrawItem(Backdrop);
    ATCGameMode* M=GetWorld()->GetAuthGameMode<ATCGameMode>();
    const int32 Owner=I.Owner>=0?I.Owner:M->State.You;
    const int32 Faction=I.Faction>=0?I.Faction:M->State.Factions.IsValidIndex(Owner)?M->State.Factions[Owner]:Owner<0?0:Owner%3;
@@ -597,7 +607,7 @@ void ATCHUD::DrawBottomLayout(const FTCHudFit::FBottomLayout& Original, UFont* F
    if (M->Units && M->Units->ModelsLoaded()) Portraits->Tick(M->Units->Models());
   }
   if (Image && Image->GetResource()) { FCanvasTileItem Tile(I.Box.Min,Image->GetResource(),I.Box.GetSize(),FLinearColor::White); Tile.BlendMode=SE_BLEND_Translucent; Canvas->DrawItem(Tile); }
-  else if (I.bPortrait) { const float Side=I.Box.GetSize().Y*.78f; const FVector2D At=I.Box.GetCenter()-FVector2D(Side/2,Side/2); DrawHudIcon(I.Key,FBox2D(At,At+FVector2D(Side,Side)),TCCss::Dim); }
+  else if (I.bPortrait) { const float Side=I.Box.GetSize().Y*.78f; const FVector2D At=I.Box.GetCenter()-FVector2D(Side/2,Side/2); DrawHudIcon(I.Key,FBox2D(At,At+FVector2D(Side,Side)),TCCss::Text); }
   else DrawHudIcon(I.Key,I.Box,I.Colour,I.Clip);
  }
  if (Over.Items.Num()) FTCType::Draw(Over,Canvas,Font,UiNow);
@@ -2797,7 +2807,7 @@ float ATCHUD::DrawMatchPanel(UFont* Font, float Width, float TopLimit, bool bDra
 		{
 			const FTCAbilityDef* D=FTCAbilities::Find(U); C.Icon=D?(D->Id==TEXT("smoke")?TEXT("smokeab"):D->Id):TEXT("unknown");
 			for (const FTCAbilityButton& B : M->Abilities.Buttons(S,M->UnitTable,PC->Selected))
-				if (B.Type==U) { C.Key=B.Key; C.Value=B.Text; if (B.bAuto) C.Key+=TEXT(" A"); break; }
+				if (B.Type==U) { C.Key=B.Key; C.Value=B.Text; C.bOn=B.bAuto; break; }
 			break;
 		}
 		case ETCUiAction::Formation:
@@ -3608,16 +3618,9 @@ void ATCHUD::DrawHUD()
 	}
 	// Rules compatibility warnings remain visible when native diagnostics are hidden.
 	if (!M->RustRulesWarning.IsEmpty()) Status.Add({ M->RustRulesWarning, Warn, false });
-	if (M->Controls.TerminalNotice.IsEmpty() && (!S.DenyReason.IsEmpty() || !S.DenyCmd.IsEmpty()))
-	{
-		const FString Deny = FString::Printf(TEXT("Refused (%s): %s"), *S.DenyCmd, *(M->Controls.TerminalNotice.IsEmpty() ? TCOrders::DenySentence(S.DenyReason, S.DenyCmd) : M->Controls.TerminalNotice));
-		const FString Shown = TC_T(Deny);
-		NoteKept(Deny, Shown);
-		Status.Add({ Shown, Warn });
-	}
-	// What the last order or button did, for a few seconds: what was sent, or why nothing was (orange)
+	// Successful order details are diagnostic only. DrawHint owns every transient refusal.
 	const double Now = GetWorld()->GetTimeSeconds();
-	if (M->Controls.TerminalNotice.IsEmpty() && !PC->LastOrderNote.IsEmpty() && Now - PC->LastOrderNoteTime < OrderNoteSeconds &&
+	if (M->Controls.TerminalNotice.IsEmpty() && PC->bLastOrderSent && !PC->LastOrderNote.IsEmpty() && Now - PC->LastOrderNoteTime < OrderNoteSeconds &&
         FTCHudFit::ShowOrderNote(PC->bLastOrderSent,FParse::Param(FCommandLine::Get(),TEXT("TCNativeDiagnostics"))))
 	{
 		const FString Shown = FTCLocale::OrderNote(PC->LastOrderNote);

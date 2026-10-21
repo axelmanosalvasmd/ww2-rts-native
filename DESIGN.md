@@ -6206,3 +6206,7 @@ See [slice 1ah implementation and bounded verification](design.d/2026-10-21-unre
 ## Unreal client slice 1ai (2026-10-21)
 
 See [slice 1ai implementation and executed validation](design.d/2026-10-21-unreal-slice1ai.md). Aircraft and HUD acceptance passed; the Islands Low production crash remains unresolved.
+
+## Unreal client slice 1aj result (2026-10-21)
+
+See [slice 1aj executed validation](design.d/2026-10-21-unreal-slice1aj.md). HUD and audio regressions pass; CLI-115 is ported. All five Islands Low candidates fail; no workaround enabled.

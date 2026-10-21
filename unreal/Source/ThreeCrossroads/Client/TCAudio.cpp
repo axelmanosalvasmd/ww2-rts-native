@@ -1720,12 +1720,17 @@ void UTCAudio::Tick(float DeltaTime)
 	Sync();
 }
 
-UAudioComponent* UTCAudio::MakeComponent(USoundBase* Sound)
+void UTCAudio::RouteToMaster(USoundBase* Sound)
 {
-	if (!Sound || !MasterDynamics) return nullptr;
 	// Every source reaches the same compressor once, after its mixer gain. No parallel dry send.
 	Sound->bEnableBaseSubmix = true;
 	Sound->SoundSubmixObject = MasterDynamics;
+}
+
+UAudioComponent* UTCAudio::MakeComponent(USoundBase* Sound)
+{
+	if (!Sound || !MasterDynamics) return nullptr;
+	RouteToMaster(Sound);
 	UAudioComponent* C = UGameplayStatics::CreateSound2D(this, Sound, 1.f, 1.f, 0.f, nullptr, false, false);
 	if (!C) return nullptr;
 	// the reference computes every gain and pan itself: no attenuation, spatialized only to pan

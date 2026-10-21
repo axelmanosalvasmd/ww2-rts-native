@@ -201,6 +201,7 @@ class THREECROSSROADS_API ATCHUD : public AHUD
 	GENERATED_BODY()
 
 public:
+	virtual void BeginPlay() override;
 	virtual void PostRender() override;
 	virtual void DrawHUD() override;
 	virtual void EndPlay(const EEndPlayReason::Type Reason) override;

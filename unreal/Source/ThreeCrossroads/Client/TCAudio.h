@@ -539,11 +539,13 @@ private:
 #endif
 #if WITH_DEV_AUTOMATION_TESTS
 	friend class FTCSession26AudioBankCommand;
+	friend struct FTCAudio35Access;
 #endif
 	void LoadAssets(int32 Token);
 	void OnSfxLoaded(int32 Token);
 	void OnVoicesLoaded(int32 Token);
 	void Sync();
+	void RouteToMaster(USoundBase* Sound);
 	UAudioComponent* MakeComponent(USoundBase* Sound);
 	void Place(UAudioComponent* C, double Pan) const;
 

@@ -21,7 +21,9 @@ namespace TCLook30
  {
   USoundSubmix* Bus=NewObject<USoundSubmix>(Owner);
   USubmixEffectDynamicsProcessorPreset* Compressor=NewObject<USubmixEffectDynamicsProcessorPreset>(Bus);
-  Compressor->SetSettings(MasterDynamicsSettings());
+  // Init copies the stored properties into the audio-thread settings.
+  Compressor->Settings=MasterDynamicsSettings();
+  Compressor->SetSettings(Compressor->Settings);
   Bus->SubmixEffectChain.Add(Compressor);
   return Bus;
  }

@@ -58,9 +58,9 @@ git lfs install --local
 
 You need Rust (stable) for `rust/`, Node.js to run the reference game and its tests, Git LFS, and Unreal Engine 5.8 only for `unreal/`.
 
-## Unreal client (slices 1a to 1ai)
+## Unreal client (slices 1a to 1aj)
 
-Slice 1ai fixes aircraft readability in High and Low, HUD billboard exclusion and flight capture framing. 310 unique rendered Intel UHD 770 Vulkan tests pass (302 clean, 8 warning successes), zero Fail/unrun; all 304 previous names retained. CLI-107 is ported. Linux Development slice34 packages and starts its rendered lobby; the Islands Low production crash remains unresolved after four candidates. See [the design note](design.d/2026-10-21-unreal-slice1ai.md).
+Slice 1aj removes engine screen text and duplicate refusals, improves portrait readability and fixes master compressor initialization. 318 rendered Intel UHD 770 Vulkan successes (310 clean, 8 warning), zero Fail/unrun; all 310 prior names retained. CLI-115 is ported. Linux Development slice35 packages and starts its rendered lobby; Islands Low remains unresolved after five candidates. See [the design note](design.d/2026-10-21-unreal-slice1aj.md).
 
 Built and run on Linux with the installed Unreal 5.8.3; Windows and Mac are not built yet. The project uses the engine's empty Entry map and spawns everything from C++.
 

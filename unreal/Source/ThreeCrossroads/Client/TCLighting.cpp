@@ -1,4 +1,5 @@
 #include "Client/TCLighting.h"
+#include "Client/TCRenderer35.h"
 #include "Client/TCGraphics.h"
 #include "Misc/App.h"
 #include "Client/TCUnitRenderer.h"
@@ -699,6 +700,7 @@ void ATCLighting::Tick(float Dt)
 {
 	Super::Tick(Dt);
 	RendererDiagnostics.Tick(GetWorld());
+	TCRenderer35::Tick(GetWorld());
 	CheckSkyCapture();
 	if (bLobbyLook)
 	{
