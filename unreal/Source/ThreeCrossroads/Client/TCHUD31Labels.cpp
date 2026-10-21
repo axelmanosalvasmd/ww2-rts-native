@@ -7,6 +7,8 @@ namespace
  UCanvas* LabelCanvas = nullptr;
  bool Collecting = false;
  TArray<FLabel> Labels;
+ struct FInformation { FBox2D Bounds; TFunction<void()> Paint; };
+ TArray<FInformation> Information;
  TArray<FBox2D> WorldInformation;
  FBox2D Viewport(FVector2D::ZeroVector,FVector2D::ZeroVector);
  TCHud31::FWorldLabelAssociation Association;
@@ -29,7 +31,7 @@ void TCHud31::BeginWorldLabels(UCanvas* Canvas)
 
 void TCHud31::BeginWorldLabels(UCanvas* Canvas, const FBox2D& InViewport)
 {
- Labels.Reset(); WorldInformation.Reset(); PaintOffset=FVector2D::ZeroVector; Association={};
+ Labels.Reset(); Information.Reset(); WorldInformation.Reset(); PaintOffset=FVector2D::ZeroVector; Association={};
  Viewport=InViewport; LabelCanvas=Canvas; Collecting=true;
 }
 
@@ -39,6 +41,12 @@ void TCHud31::ProtectWorldInformation(UCanvas* Canvas, const FBox2D& Bounds)
 }
 
 FVector2D TCHud31::WorldLabelOffset() { return PaintOffset; }
+
+void TCHud31::SubmitWorldInformation(UCanvas* Canvas, const FBox2D& Bounds, TFunction<void()> Paint)
+{
+ if (Collecting && Canvas==LabelCanvas) Information.Add({Bounds,MoveTemp(Paint)});
+ else Paint();
+}
 
 void TCHud31::SubmitWorldLabel(UCanvas* Canvas, const FBox2D& Bounds, TFunction<void()> Paint, bool bRelocateCovered)
 {
@@ -105,7 +113,11 @@ namespace
 void TCHud31::FinishWorldLabels(const TArray<FBox2D>& Panels)
 {
  Collecting = false; LabelCanvas = nullptr;
+ // Preserve the submitted cross-unit layer order. Covered billboards stay at their world anchors.
+ for (const auto& Item:Information) if (WorldLabelVisible(Item.Bounds,Panels)) Item.Paint();
+ Information.Reset();
  TArray<FBox2D> LinkBlocks=Panels;
+ LinkBlocks.Append(WorldInformation);
  TArray<FBox2D> Occupied = Panels;
  Occupied.Append(WorldInformation);
  TArray<FBox2D> AnchorSpaces;

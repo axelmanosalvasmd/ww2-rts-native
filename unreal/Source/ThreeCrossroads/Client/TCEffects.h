@@ -50,6 +50,7 @@
 #include "Net/TCMatchState.h"
 #include "Client/TCModelLibrary.h"
 #include "Client/TCRender29Aircraft.h"
+#include "Client/TCAircraft34Capture.h"
 #include "TCEffects.generated.h"
 
 class FJsonObject;
@@ -651,6 +652,7 @@ private:
 	FTCInstanceHistory AircraftHistory;
 	bool bAircraftLibraryTried = false;
 	int32 LastAircraftInstances = 0;
+	TCAircraft34::FCapture AircraftCapture;
 	UPROPERTY() TMap<FString, TObjectPtr<UInstancedStaticMeshComponent>> AircraftBatches;
 	void ApplyShake(double Clock);
 	void CaptureBridge(double Clock);

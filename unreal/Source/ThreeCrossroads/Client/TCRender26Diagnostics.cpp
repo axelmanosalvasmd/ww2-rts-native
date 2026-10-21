@@ -1,4 +1,5 @@
 #include "Client/TCRender26Diagnostics.h"
+#include "Client/TCRenderer34.h"
 #include "Client/TCRender26Policy.h"
 #include "Client/TCRender27GpuPolicy.h"
 #include "Client/TCRender28Diagnostics.h"
@@ -28,6 +29,7 @@ DEFINE_LOG_CATEGORY_STATIC(LogTCRender26, Log, All);
 
 void FTCRender26Diagnostics::Tick(UWorld* World)
 {
+	TCRenderer34::Tick(World);
 	static const bool Enabled = FParse::Param(FCommandLine::Get(), TEXT("TCRender26Receipts"));
 	if (!Enabled || !World) return;
 	// Shared across lighting actors and world replacement. A world clock reset cannot extend the process cap.

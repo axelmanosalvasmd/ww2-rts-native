@@ -2584,6 +2584,7 @@ void ATCEffects::Tick(float DeltaSeconds)
 	Draw(Clock);
 	ApplyShake(Clock);
 	CaptureBridge(Clock);
+	AircraftCapture.Frame(GetWorld(), Fx.AircraftNow(), DeltaSeconds);
 }
 
 void ATCEffects::DamageFrame(float Dt)

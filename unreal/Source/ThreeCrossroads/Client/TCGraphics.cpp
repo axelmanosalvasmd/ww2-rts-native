@@ -1,5 +1,7 @@
 // Graphics High or Low (client/gfx.js and its consumers at the pin). See TCGraphics.h.
 #include "Client/TCGraphics.h"
+#include "Client/TCRenderer34.h"
+#include "Client/TCRenderer34Policy.h"
 #include "World/TCWorld31Controls.h"
 #include "Client/TCPersistence.h"
 #include "HAL/IConsoleManager.h"
@@ -211,7 +213,10 @@ TArray<FString> FTCGraphics::ApplyEngine(double DevicePixelRatio) const
 			Lines.Add(Now == Value || FCString::Atod(*Now) == FCString::Atod(*Value) ? FString::Printf(TEXT("%s %s"), Name, *Value) : FString::Printf(TEXT("%s %s (asked %s)"), Name, *Now, *Value));
 		}
 	};
-	SetVar(TEXT("r.ScreenPercentage"), FString::SanitizeFloat(B.ScreenPercentage(DevicePixelRatio)));
+	SetVar(TEXT("r.ScreenPercentage"), FString::SanitizeFloat(TCRenderer34::ScreenPercent(TCRenderer34::FullResolution(), B.ScreenPercentage(DevicePixelRatio))));
+	if (TCRenderer34::FullResolution() || TCRenderer34::HighRelief() || TCRenderer34::NoWeatherMirror())
+		UE_LOG(LogTCGraphics, Log, TEXT("renderer34 controls: fullResolution=%d highRelief=%d noWeatherMirror=%d"),
+			TCRenderer34::FullResolution(), TCRenderer34::HighRelief(), TCRenderer34::NoWeatherMirror());
 	SetVar(TEXT("r.Shadow.MaxResolution"), FString::FromInt(B.ShadowMapSize));
 	SetVar(TEXT("r.Shadow.MaxCSMResolution"), FString::FromInt(B.ShadowMapSize));
 	SetVar(TEXT("r.ShadowQuality"), TCWorld31Controls::NoShadows() ? TEXT("0") : B.bSoftShadows ? TEXT("3") : TEXT("1"));

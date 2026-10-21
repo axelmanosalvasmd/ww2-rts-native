@@ -6202,3 +6202,7 @@ See [slice 1ag implementation and executed validation](design.d/2026-10-21-unrea
 ## Unreal client slice 1ah (2026-10-21)
 
 See [slice 1ah implementation and bounded verification](design.d/2026-10-21-unreal-slice1ah.md). The approved FFI pin and R1/World/ingress/fault policies remain unchanged.
+
+## Unreal client slice 1ai (2026-10-21)
+
+See [slice 1ai implementation and executed validation](design.d/2026-10-21-unreal-slice1ai.md). Aircraft and HUD acceptance passed; the Islands Low production crash remains unresolved.

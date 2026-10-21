@@ -27,6 +27,8 @@ namespace TCHud31
  void BeginWorldLabels(UCanvas* Canvas, const FBox2D& Viewport);
  // Unit information stays in place. Captions find a clear nearby position instead.
  void ProtectWorldInformation(UCanvas* Canvas, const FBox2D& Bounds);
+ // Billboards retain their world position and are culled against this frame's HUD panels.
+ void SubmitWorldInformation(UCanvas* Canvas, const FBox2D& Bounds, TFunction<void()> Paint);
  // Valid only inside the queued paint callback, in physical viewport pixels.
  FVector2D WorldLabelOffset();
  void SubmitWorldLabel(UCanvas* Canvas, const FBox2D& Bounds, TFunction<void()> Paint, bool bRelocateCovered = true);

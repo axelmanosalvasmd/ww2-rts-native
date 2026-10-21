@@ -1,4 +1,6 @@
 #include "World/TCTerrain.h"
+#include "Client/TCRenderer34.h"
+#include "Client/TCRenderer34Policy.h"
 #include "ThreeCrossroads.h"
 #include "Net/TCMatchState.h"
 #include "World/TCFogFrontier.h"
@@ -95,7 +97,7 @@ void ATCTerrain::ResetFrom(const FTCMatchState& State)
 	// client/main.js startGame: createRelief(map, physicalGrid, { low: gfx.low || !!map.world }) (round 15: the Graphics
 	// level, Client/TCGraphics.h; the watch subscribes before the level is read)
 	GfxWatch.TakeChanged();
-	const bool bLowRelief = State.Map.bWorld || FTCGraphics::Get().Budget().bReliefLow;
+	const bool bLowRelief = TCRenderer34::ReliefLow(State.Map.bWorld, FTCGraphics::Get().Budget().bReliefLow, TCRenderer34::HighRelief());
 	EnsureMaterial(bLowRelief);
 	const double T0 = FPlatformTime::Seconds();
 	StartRows = State.Map.Chars;
@@ -211,7 +213,7 @@ void ATCTerrain::Flush(const FTCMatchState& State)
 	// round 15: relief.js gfx.onChange: low = gfx.low || map.world; material.userData.setLow(low); rebuildGeometry()
 	if (GfxWatch.TakeChanged())
 	{
-		const bool bLowRelief = bBuiltWorld || FTCGraphics::Get().Budget().bReliefLow;
+		const bool bLowRelief = TCRenderer34::ReliefLow(bBuiltWorld, FTCGraphics::Get().Budget().bReliefLow, TCRenderer34::HighRelief());
 		const double T0 = FPlatformTime::Seconds();
 		if (ReliefCore.SetLow(bLowRelief))
 		{

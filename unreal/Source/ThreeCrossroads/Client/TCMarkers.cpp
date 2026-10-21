@@ -981,21 +981,30 @@ namespace
 
 void TCMarkersHud::DrawUnitBillboards(UCanvas* Canvas, const TArray<FUnitBillboard>& Units)
 {
+	const auto Bounds=[](const FUnitBillboard& U)
+	{
+		return FBox2D(U.Centre+FVector2D(-2.75,-1.25)*U.PxPerMetre,
+			U.Centre+FVector2D(2.4,.85)*U.PxPerMetre);
+	};
 	for (const FUnitBillboard& U : Units)
-		TCHud31::ProtectWorldInformation(Canvas,FBox2D(U.Centre+FVector2D(-2.75,-1.25)*U.PxPerMetre,
-			U.Centre+FVector2D(2.4,.85)*U.PxPerMetre));
+		TCHud31::ProtectWorldInformation(Canvas,Bounds(U));
 	// Three sorts main.js's opaque bars across all units by renderOrder. Drawing a complete group per unit
-	// lets the next black backdrop erase an earlier fill. Keep these passes at the current HUD sort key,
-	// so the later HTML-equivalent HUD panels still cover every world billboard.
-	for (const FUnitBillboard& U : Units) HealthBarLayer(Canvas, U, true);
+	// lets the next black backdrop erase an earlier fill. Defer these ordered passes until this frame's
+	// panel bounds exist, so icons never paint through translucent HUD cards.
 	for (const FUnitBillboard& U : Units)
+		TCHud31::SubmitWorldInformation(Canvas,Bounds(U),[Canvas,U](){HealthBarLayer(Canvas,U,true);});
+	for (const FUnitBillboard& U : Units)
+		TCHud31::SubmitWorldInformation(Canvas,Bounds(U),[Canvas,U]()
 	{
 		HealthBarLayer(Canvas, U, false);
 		DrawStars(Canvas, U.Centre, U.PxPerMetre, U.Stars);
-	}
-	for (const FUnitBillboard& U : Units) DrawCoverShield(Canvas, U.Centre, U.PxPerMetre, U.Cover, U.bGarrisoned, U.World);
-	for (const FUnitBillboard& U : Units) DrawBadge(Canvas, U.Type, U.Owner, U.Centre, U.PxPerMetre);
-	for (const FUnitBillboard& U : Units) DrawSupplyFlag(Canvas, U);
+	});
+	for (const FUnitBillboard& U : Units)
+		TCHud31::SubmitWorldInformation(Canvas,Bounds(U),[Canvas,U](){DrawCoverShield(Canvas,U.Centre,U.PxPerMetre,U.Cover,U.bGarrisoned,U.World);});
+	for (const FUnitBillboard& U : Units)
+		TCHud31::SubmitWorldInformation(Canvas,Bounds(U),[Canvas,U](){DrawBadge(Canvas,U.Type,U.Owner,U.Centre,U.PxPerMetre);});
+	for (const FUnitBillboard& U : Units)
+		TCHud31::SubmitWorldInformation(Canvas,Bounds(U),[Canvas,U](){DrawSupplyFlag(Canvas,U);});
 }
 
 void TCMarkersHud::DrawStars(UCanvas* Canvas, FVector2D BarCentre, float PxPerMetre, int32 Stars)

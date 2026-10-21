@@ -2,6 +2,7 @@
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Materials/MaterialInterface.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "Misc/CommandLine.h"
@@ -262,7 +263,25 @@ bool FTCModelLibrary::SetupComponent(UInstancedStaticMeshComponent* Component, c
 	Component->SetStaticMesh(Mesh);
 	const TArray<FSoftObjectPath>& Paths = bFaded ? Part.FadedMaterials : Part.Materials;
 	for (int32 I = 0; I < Paths.Num(); I++)
-		if (UMaterialInterface* M = Cast<UMaterialInterface>(Paths[I].TryLoad())) Component->SetMaterial(I, M);
+		if (UMaterialInterface* M = Cast<UMaterialInterface>(Paths[I].TryLoad()))
+		{
+			// Low omits environment reflections. A metallic airframe then loses most of its
+			// visible paint. Keep the original vertex paint, but use a matte skin and a
+			// small rim fill in both tiers, including support passes and falling copies.
+			const FString Path = Paths[I].ToString();
+			if (!Part.Mesh.ToString().Contains(TEXT("/Meshes/bomb/")) &&
+				(Path.Contains(TEXT("MI_TCModel_METAL_MAT")) || Path.Contains(TEXT("MI_TCModel_BODY_MAT"))))
+			{
+				UMaterialInstanceDynamic* Skin = UMaterialInstanceDynamic::Create(M, Component);
+				// The surface table overrides BaseMetalness while ModelTextures is on.
+				Skin->SetScalarParameterValue(TEXT("ModelTextures"), 0.f);
+				Skin->SetScalarParameterValue(TEXT("BaseMetalness"), 0.f);
+				Skin->SetScalarParameterValue(TEXT("BaseRoughness"), .78f);
+				Skin->SetVectorParameterValue(TEXT("RimColor"), FLinearColor(.12f, .14f, .16f));
+				M = Skin;
+			}
+			Component->SetMaterial(I, M);
+		}
 	Component->SetNumCustomDataFloats(TCModelData::Count);
 	Component->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Component->SetMobility(EComponentMobility::Movable);

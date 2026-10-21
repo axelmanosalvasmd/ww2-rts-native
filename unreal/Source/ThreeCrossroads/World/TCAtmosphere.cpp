@@ -1,6 +1,7 @@
 // The atmosphere (client/atmosphere.js, client/wind.js). The port's numbers are in TCAtmosCore (TCAtmosphere.h); this
 // file draws them with the materials of unreal/Tools/atmosphere/make-atmosphere-assets.py.
 #include "World/TCAtmosphere.h"
+#include "Client/TCRenderer34.h"
 #include "World/TCTerrain.h"
 #include "World/TCRailways.h"
 #include "World/TCFogFrontier.h"
@@ -400,6 +401,7 @@ void FTCAtmosphere::BuildFall()
 
 void FTCAtmosphere::SyncGround(const ATCTerrain* Terrain, bool bForce)
 {
+	if (TCRenderer34::NoWeatherMirror()) return;
 	// cloudBoard.geometry = cover.geometry = ground.geometry (and the apron's): the ground's own meshes, 5 cm above them.
 	// Checked at most twice a second and whenever the terrain meshed chunks; a section is copied again only when its
 	// shape changed (fog recolours leave it alone).
