@@ -212,9 +212,9 @@ void FTCMinimap::UploadRows(int32 Y0, int32 Y1)
 
 void FTCMinimap::LayoutIn(float ClipX, float ClipY)
 {
-	// client/index.html: --mm 184 px, 228 px at 1600 x 860 and up; --gap 8 px; bottom right
+	// Give World information the larger square even in a small viewport. Fog and map extent stay exact.
 	const float Scale = FMath::Max(0.01f, UiScale), Margin = Gap * Scale;
-	float Side = (SideOverride > 0.f ? SideOverride : (ClipX >= 1600.f && ClipY >= 860.f ? 228.f : 184.f)) * Scale;
+	float Side = (SideOverride > 0.f ? SideOverride : (Key.bWorld || (ClipX >= 1600.f && ClipY >= 860.f) ? 228.f : 184.f)) * Scale;
 	Side = FMath::Min(Side, FMath::Min(ClipX, ClipY) - 2.f * Margin);
 	if (Side < 16.f) { LayoutSide = 0.f; return; }
 	LayoutSide = Side;
@@ -289,14 +289,13 @@ void FTCMinimap::DrawUnits(UCanvas* Canvas, const FTCMatchState& State, const FT
 {
  if (!Canvas || !Basis.IsValid() || LayoutSide<=0) return;
  const double K=Basis.CanvasScale();
-	// held units: a dot each in the seat's colour (3.5 m for anything not infantry, 2.6 m for infantry), selected ones
-	// ringed white. Every held row and radius matches client/main.js.
+	// Held rows and seat colours stay exact. World symbols have a two UI-pixel radius floor so they remain readable.
 	int32 Units = 0, Ringed = 0;
 	for (const auto& Pair : State.Units)
 	{
 		const FTCUnit& U = Pair.Value;
 		const FTCUnitDef* Def = Table.Find(U.Type);
-		const double R = (Def && Def->bInfantry ? MMCore::InfantryDotMetres : MMCore::VehicleDotMetres) * Basis.S;
+		const double R = MMCore::UnitDotRadius(State.Map.bWorld, Def && Def->bInfantry, Basis.S, UiScale);
 		double PX, PY;
 		Basis.ToPixel(U.X, U.Z, PX, PY);
 		if (!Basis.InSquare(PX, PY)) continue;
@@ -706,10 +705,10 @@ bool FTCMinimapModelTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("still no leak after the end"), Px, ShadeColour);
 	St.Winner = -2;
 
-	// input: 1280 x 720 puts the 184 px square at (1088, 528); Unreal yaw -90 is x right, rows down
+	// World at 1280 x 720 uses 228 px at (1044, 484); Unreal yaw -90 is x right, rows down.
 	TestTrue(TEXT("arranged"), Mm.Arrange(1280.f, 720.f, St, -90.f));
-	TestEqual(TEXT("rect"), Mm.Rect().Min, FVector2D(1088, 528));
-	const FVector2D Mid(1088 + 92, 528 + 92);
+	TestEqual(TEXT("rect"), Mm.Rect().Min, FVector2D(1044, 484));
+	const FVector2D Mid(1044 + 114, 484 + 114);
 	FVector2D G;
 	TestTrue(TEXT("pixel to ground"), Mm.PixelToWorld(Mid, G));
 	TestTrue(TEXT("centre is the map centre"), G.Equals(FVector2D(6, 4), 1e-4));
@@ -726,7 +725,7 @@ bool FTCMinimapModelTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("left press consumed"), Left.bConsumed && Left.Action == ETCMinimapAction::CameraTarget);
 	TestTrue(TEXT("hook got the centre"), Targets.Num() == 1 && Targets[0].Equals(FVector2D(6, 4), 1e-4));
 	TestTrue(TEXT("dragging"), Mm.IsDragging());
-	TestTrue(TEXT("drag moves the camera"), Mm.MouseMove(FVector2D(1088, 528), true));
+	TestTrue(TEXT("drag moves the camera"), Mm.MouseMove(Mm.Rect().Min, true));
 	TestTrue(TEXT("drag target clamped to the map"), Targets.Num() == 2 && Targets[1].Equals(FVector2D(0, 0), 1e-4));
 	TestFalse(TEXT("button up ends the drag"), Mm.MouseMove(Mid, false));
 	TestFalse(TEXT("not dragging"), Mm.IsDragging());

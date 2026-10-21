@@ -139,6 +139,8 @@ public:
 	bool ApplyLobby(const FJsonObject& Message);
 	// Forgets the room (a new server or room): nothing is known until the next lobby.
 	void Reset();
+	// Set only from the connection settings after invite/directory overrides. Reset clears this context.
+	void SetConnectionUrl(const FString& Url) { ConnectionUrl = Url; }
 	// A new socket opened: pending requests are forgotten, since the server may never have read them.
 	void OnSocketOpened() { Pending.Reset(); }
 
@@ -198,6 +200,7 @@ public:
 	static bool IsSeatSetting(ETCLobbySetting Kind) { return Kind == ETCLobbySetting::Team || Kind == ETCLobbySetting::Faction || Kind == ETCLobbySetting::Level; }
 
 private:
+	FString ConnectionUrl;
 	struct FPending
 	{
 		ETCLobbySetting Kind = ETCLobbySetting::Mode;

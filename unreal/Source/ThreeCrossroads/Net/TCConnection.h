@@ -120,13 +120,14 @@ public:
 	// deny {cmd:'join', reason:'version'} (protocol.md addition 1; only a Rust server sends it): the connection stops
 	// for good instead of retrying with the same hello.
 	static bool IsVersionDeny(const FJsonObject& Message);
-	// Proto, rules and version are not profile proof. Production remains refused until native qualification.
+	// Proto, rules and version are not profile proof. Approval belongs to the active connection URL.
 	static const TCHAR* RequiredRustProfileRefusal();
 	// Local development harness only. Requires both an environment opt-in and a loopback command line.
-	static bool OwnerR1Qualification();
-	static bool OwnerR1AdmissionEnabled();
-	static bool RustProfileCommandBlocked(ETCHostKind Kind, const FString& Type);
-	static FString MatchAdmissionRefusal(ETCHostKind Kind, const FString& Type);
+	static bool OwnerR1Qualification(const FString& ActiveUrl = FString());
+	// Missing endpoint context fails closed. Never infer it from the original command line.
+	static bool OwnerR1AdmissionEnabled(const FString& ActiveUrl = FString());
+	static bool RustProfileCommandBlocked(ETCHostKind Kind, const FString& Type, const FString& ActiveUrl = FString());
+	static FString MatchAdmissionRefusal(ETCHostKind Kind, const FString& Type, const FString& ActiveUrl = FString());
 	static bool ValidRoom(const FString& Room);
 	static int32 Utf8Length(const FString& Text);
 	// The initial spectator request is replaced by the server-confirmed role after sit/spectate.

@@ -36,6 +36,12 @@ namespace TCMinimapCore
 	inline constexpr double CanvasPixels = 240.0; // the browser draws into a 240 px canvas, then CSS scales it
 	inline constexpr double PickPixels = 5.0;     // minimapCursor: units within 5 canvas pixels
 	inline constexpr double VehicleDotMetres = 3.5, InfantryDotMetres = 2.6; // drawMinimap unit dots (isVeh: not infantry)
+	// Large World maps otherwise shrink held units below a pixel. This changes only the symbol footprint.
+	inline double UnitDotRadius(bool bWorld, bool bInfantry, double PixelsPerMetre, double UiScale)
+	{
+		const double Radius=(bInfantry ? InfantryDotMetres : VehicleDotMetres)*PixelsPerMetre;
+		return bWorld && Radius<2.0*UiScale ? 2.0*UiScale : Radius;
+	}
 
 	struct FRgb { int R = 0, G = 0, B = 0; };
 
@@ -316,7 +322,7 @@ public:
 	FTCMinimap& operator=(const FTCMinimap&) = delete;
 
 	// Layout, as client/index.html: a square in the bottom-right corner, Gap pixels in, 184 px across, 228 px once
-	// the window is at least 1600 x 860. A positive SideOverride replaces that size (clamped to fit the window).
+	// the window is at least 1600 x 860, or for World. A positive SideOverride replaces that size (clamped to fit).
 	float Gap = 8.f;
 	float UiScale = 1.f; // CSS zoom; the input basis remains in physical viewport pixels
 	float SideOverride = 0.f;

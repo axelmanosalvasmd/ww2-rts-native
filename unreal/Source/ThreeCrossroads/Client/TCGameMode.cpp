@@ -284,6 +284,8 @@ bool ATCGameMode::Connect(FTCConnection::FSettings Settings, const FTCTokenReque
 	Controls.ViewMemory.Open(FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("TCMatchViews")), Settings.Url, Settings.Room, Settings.Token);
 	Controls.bViewSeatActive = true;
 	Connection = MakeShared<FTCConnection>(Settings);
+	Lobby.SetConnectionUrl(Settings.Url);
+	Controls.SetConnectionUrl(Settings.Url);
 	Settings.Token.Reset();
 	Connection->OnOpened = [this](int32)
 	{

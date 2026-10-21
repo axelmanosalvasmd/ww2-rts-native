@@ -111,6 +111,8 @@ public:
 	// closes the menu, clears the pause and disarms the confirms and the spawn aim (renderLobby's reset).
 	bool ApplyLobby(const FJsonObject& Message);
 	void Reset();
+	// Set only from the connection settings after invite/directory overrides. Reset clears this context.
+	void SetConnectionUrl(const FString& Url) { ConnectionUrl = Url; }
 	// A new socket opened: pending requests are forgotten (the server may never have read them).
 	void OnSocketOpened() { bWatchPending = false; PendingName.Reset(); }
 	// The start message: a sandbox match shows the panel unless this client watches (startGame).
@@ -240,6 +242,7 @@ public:
 	static TArray<TSharedPtr<FJsonValue>> PingDiagnostics(const FTCPerfStats& Stats);
 
 private:
+	FString ConnectionUrl;
 	bool bHasLobby = false;
 	FString State, Role, Mode, Code, PublicUrlText;
 	int32 You = -1, Host = -1, Spawns = -1;

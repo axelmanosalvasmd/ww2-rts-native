@@ -60,27 +60,24 @@ const TCHAR* FTCConnection::RequiredRustProfileRefusal()
 	return TEXT("Rust host: required R1 profile unverified. Start, Restart and Load are disabled.");
 }
 
-bool FTCConnection::RustProfileCommandBlocked(ETCHostKind Kind, const FString& Type)
+bool FTCConnection::RustProfileCommandBlocked(ETCHostKind Kind, const FString& Type, const FString& ActiveUrl)
 {
-	return TCSession30::Blocked(Kind == ETCHostKind::Rust, OwnerR1AdmissionEnabled(), Type == TEXT("start"), Type == TEXT("restart"), Type == TEXT("loadSave"));
+	return TCSession30::Blocked(Kind == ETCHostKind::Rust, OwnerR1AdmissionEnabled(ActiveUrl), Type == TEXT("start"), Type == TEXT("restart"), Type == TEXT("loadSave"));
 }
 
-bool FTCConnection::OwnerR1AdmissionEnabled()
+bool FTCConnection::OwnerR1AdmissionEnabled(const FString& ActiveUrl)
 {
-	if (OwnerR1Qualification()) return true;
-	FString Url;
-	FParse::Value(FCommandLine::Get(), TEXT("TCServer="), Url);
+	if (ActiveUrl.IsEmpty()) return false;
+	if (OwnerR1Qualification(ActiveUrl)) return true;
 	const FString Approved = FPlatformMisc::GetEnvironmentVariable(TEXT("TC_OWNER_R1_APPROVED_URL"));
-	return !Approved.IsEmpty() && Url == Approved;
+	return !Approved.IsEmpty() && ActiveUrl.Equals(Approved, ESearchCase::CaseSensitive);
 }
 
-bool FTCConnection::OwnerR1Qualification()
+bool FTCConnection::OwnerR1Qualification(const FString& ActiveUrl)
 {
 #if !UE_BUILD_SHIPPING && !UE_BUILD_TEST
-	FString Url;
-	FParse::Value(FCommandLine::Get(), TEXT("TCServer="), Url);
 	return TCSession30::Enabled(true, FParse::Param(FCommandLine::Get(), TEXT("TCQualifyOwnerR1")),
-		FPlatformMisc::GetEnvironmentVariable(TEXT("TC_R1_QUALIFICATION")) == TEXT("1"), TCSession30::Loopback(TCHAR_TO_UTF8(*Url)));
+		FPlatformMisc::GetEnvironmentVariable(TEXT("TC_R1_QUALIFICATION")) == TEXT("1"), TCSession30::Loopback(TCHAR_TO_UTF8(*ActiveUrl)));
 #else
 	return false;
 #endif
@@ -89,7 +86,15 @@ bool FTCConnection::OwnerR1Qualification()
 void FTCConnection::TickOwnerR1Qualification(double Now)
 {
 #if !UE_BUILD_SHIPPING && !UE_BUILD_TEST
-	if (!OwnerR1Qualification() || !TCSession30::Loopback(TCHAR_TO_UTF8(*Settings.Url)) || !IsOpen() || Host != ETCHostKind::Rust || HostProtoValue != ProtocolVersion || Now < QualificationPollAt) return;
+	if (!OwnerR1AdmissionEnabled(Settings.Url) || !TCSession30::Loopback(TCHAR_TO_UTF8(*Settings.Url)) || !IsOpen() || Host != ETCHostKind::Rust || HostProtoValue != ProtocolVersion || Now < QualificationPollAt) return;
+	// Development evidence probe uses the ordinary transport gate. It never sends a Load.
+	if (QualificationPollAt == 0 && FParse::Param(FCommandLine::Get(), TEXT("TCProbeR1Load")))
+	{
+		const auto Load = MakeShared<FJsonObject>(); Load->SetStringField(TEXT("t"), TEXT("loadSave"));
+		const bool bRefused = TrySend(Load) == ETCSendResult::ProfileRefused;
+		if (bRefused) { UE_LOG(LogTC, Log, TEXT("r1 ordinary Load refusal: PASS")); }
+		else { UE_LOG(LogTC, Error, TEXT("r1 ordinary Load refusal: FAIL")); }
+	}
 	QualificationPollAt = Now + 0.1;
 	const FString Path = FPlatformMisc::GetEnvironmentVariable(TEXT("TC_R1_INBOX"));
 	FString Text;
@@ -111,10 +116,10 @@ void FTCConnection::TickOwnerR1Qualification(double Now)
 #endif
 }
 
-FString FTCConnection::MatchAdmissionRefusal(ETCHostKind Kind, const FString& Type)
+FString FTCConnection::MatchAdmissionRefusal(ETCHostKind Kind, const FString& Type, const FString& ActiveUrl)
 {
 	if (Type != TEXT("start") && Type != TEXT("s")) return FString();
-	if (Kind == ETCHostKind::Rust && !OwnerR1AdmissionEnabled()) return RequiredRustProfileRefusal();
+	if (Kind == ETCHostKind::Rust && !OwnerR1AdmissionEnabled(ActiveUrl)) return RequiredRustProfileRefusal();
 	if (Kind == ETCHostKind::Unknown) return TEXT("Match refused: waiting for the host's lobby.");
 	return FString();
 }
@@ -310,8 +315,8 @@ void FTCConnection::ReceiveText(const FString& Text, uint64 ExpectedGeneration)
 	}
 	if (bParsed)
 	{
-		const FString Refusal = Host == ETCHostKind::Rust && OwnerR1AdmissionEnabled() && HostProtoValue != ProtocolVersion
-			&& (Type == TEXT("start") || Type == TEXT("s")) ? FString(RequiredRustProfileRefusal()) : MatchAdmissionRefusal(Host, Type);
+		const FString Refusal = Host == ETCHostKind::Rust && OwnerR1AdmissionEnabled(Settings.Url) && HostProtoValue != ProtocolVersion
+			&& (Type == TEXT("start") || Type == TEXT("s")) ? FString(RequiredRustProfileRefusal()) : MatchAdmissionRefusal(Host, Type, Settings.Url);
 		if (!Refusal.IsEmpty())
 		{
 			// A remote start or reconnect must not bypass the local Start/Restart gate. Stop before either decoder
@@ -408,7 +413,7 @@ ETCSendResult FTCConnection::TrySend(const TSharedRef<FJsonObject>& Message, int
 	if (OutBytes) *OutBytes = 0;
 	FString Type;
 	Message->TryGetStringField(TEXT("t"), Type);
-	if (RustProfileCommandBlocked(Host, Type)) return ETCSendResult::ProfileRefused;
+	if (RustProfileCommandBlocked(Host, Type, Settings.Url)) return ETCSendResult::ProfileRefused;
 	if (!IsOpen()) return ETCSendResult::NotOpen;
 	FString Out;
 	TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> Writer = TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&Out);

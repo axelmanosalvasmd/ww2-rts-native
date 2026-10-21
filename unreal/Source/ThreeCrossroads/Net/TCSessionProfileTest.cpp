@@ -23,6 +23,74 @@ bool FTCSessionRustProfileAdmissionTest::RunTest(const FString&)
 	const FString Snapshot = TEXT(R"({"t":"s","tick":1})");
 	const FString Refusal = FTCConnection::RequiredRustProfileRefusal();
 
+	// Round32: these use the actual transport boundaries, not a copied approval helper.
+	// This block also compiles against unchanged round31 production for the ordered RED run.
+	{
+		const FString SavedLine32 = FCommandLine::Get();
+		const FString SavedApproval32 = FPlatformMisc::GetEnvironmentVariable(TEXT("TC_OWNER_R1_APPROVED_URL"));
+		const FString SavedQualification32 = FPlatformMisc::GetEnvironmentVariable(TEXT("TC_R1_QUALIFICATION"));
+		ON_SCOPE_EXIT { FCommandLine::Set(*SavedLine32); FPlatformMisc::SetEnvironmentVar(TEXT("TC_OWNER_R1_APPROVED_URL"), *SavedApproval32); FPlatformMisc::SetEnvironmentVar(TEXT("TC_R1_QUALIFICATION"), *SavedQualification32); };
+		FPlatformMisc::SetEnvironmentVar(TEXT("TC_R1_QUALIFICATION"), TEXT(""));
+		struct FEndpointCase { const TCHAR* Name; const TCHAR* Cli; const TCHAR* Active; const TCHAR* Approved; bool bAdmit; };
+		const FEndpointCase Cases[] = {
+			{ TEXT("exact active"), TEXT("ws://127.0.0.1:31417/ws"), TEXT("ws://127.0.0.1:31417/ws"), TEXT("ws://127.0.0.1:31417/ws"), true },
+			{ TEXT("invite overrides stale approved CLI"), TEXT("ws://127.0.0.1:31417/ws"), TEXT("ws://127.0.0.1:31418/ws"), TEXT("ws://127.0.0.1:31417/ws"), false },
+			{ TEXT("absent approval"), TEXT("ws://127.0.0.1:31417/ws"), TEXT("ws://127.0.0.1:31417/ws"), TEXT(""), false },
+			{ TEXT("path case mismatch"), TEXT("ws://127.0.0.1:31417/WS"), TEXT("ws://127.0.0.1:31417/WS"), TEXT("ws://127.0.0.1:31417/ws"), false },
+			{ TEXT("directory replacement approved active"), TEXT("ws://127.0.0.1:31418/ws"), TEXT("ws://127.0.0.1:31417/ws"), TEXT("ws://127.0.0.1:31417/ws"), true },
+		};
+		for (const FEndpointCase& Row : Cases)
+		{
+			FCommandLine::Set(*FString::Printf(TEXT("-TCServer=%s"), Row.Cli));
+			FPlatformMisc::SetEnvironmentVar(TEXT("TC_OWNER_R1_APPROVED_URL"), Row.Approved);
+			TSharedPtr<FJsonObject> UiLobby;
+			FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(RustLobby), UiLobby);
+			FTCLobbySettings UiSettings; UiSettings.SetConnectionUrl(Row.Active); UiSettings.ApplyLobby(*UiLobby);
+			FTCMatchControls UiControls; UiControls.SetConnectionUrl(Row.Active);
+			TestEqual(FString::Printf(TEXT("R32 %s Start UI context"), Row.Name), UiSettings.StartAllowed(), Row.bAdmit);
+			UiLobby->SetStringField(TEXT("state"), TEXT("play")); UiControls.ApplyLobby(*UiLobby);
+			TestEqual(FString::Printf(TEXT("R32 %s Restart UI context"), Row.Name), UiControls.MenuControl(ETCMatchControl::Restart, -1, 1).bEnabled, Row.bAdmit);
+			UiSettings.Reset(); UiControls.Reset();
+			UiLobby->SetStringField(TEXT("state"), TEXT("lobby")); UiSettings.ApplyLobby(*UiLobby);
+			UiLobby->SetStringField(TEXT("state"), TEXT("play")); UiControls.ApplyLobby(*UiLobby);
+			TestFalse(TEXT("R32 reset Start UI cannot inherit approval"), UiSettings.StartAllowed());
+			TestFalse(TEXT("R32 reset Restart UI cannot inherit approval"), UiControls.MenuControl(ETCMatchControl::Restart, -1, 1).bEnabled);
+			// Recreate each connection as directory/room changes do. Reconnect retains the same settings,
+			// while Retire invalidates old socket generations. Neither may inherit another connection's approval.
+			for (const FString& Payload : { Start, Snapshot })
+			{
+				FTCConnection::FSettings Settings32; Settings32.Url = Row.Active;
+				const auto C = MakeShared<FTCConnection>(Settings32); C->bRunning = true;
+				C->ReceiveText(RustLobby, C->Generation);
+				for (const TCHAR* Type : { TEXT("start"), TEXT("restart"), TEXT("loadSave") })
+				{
+					const auto Command = MakeShared<FJsonObject>(); Command->SetStringField(TEXT("t"), Type);
+					const ETCSendResult Expected = Row.bAdmit && FString(Type) != TEXT("loadSave") ? ETCSendResult::NotOpen : ETCSendResult::ProfileRefused;
+					TestTrue(FString::Printf(TEXT("R32 %s command %s gate"), Row.Name, Type), C->TrySend(Command) == Expected);
+				}
+				TArray<FString> Publications;
+				C->OnText = [&](const FString&) { Publications.Add(TEXT("raw")); };
+				C->OnMessage = [&](const FJsonObject&, int32) { Publications.Add(TEXT("parsed")); };
+				const uint64 OldGeneration = C->Generation; C->Retire(false);
+				C->ReceiveText(Payload, OldGeneration);
+				TestEqual(TEXT("R32 retired generation remains unpublished"), Publications.Num(), 0);
+				C->ReceiveText(Payload, C->Generation);
+				TestTrue(FString::Printf(TEXT("R32 %s incoming %s both decoder gates"), Row.Name, *Payload), Row.bAdmit ? Publications == TArray<FString>{TEXT("raw"), TEXT("parsed")} : Publications.IsEmpty());
+				TestEqual(FString::Printf(TEXT("R32 %s running after admission"), Row.Name), C->IsRunning(), Row.bAdmit);
+				// The first match can precede the new connection's lobby on reconnect.
+				const auto Fresh = MakeShared<FTCConnection>(Settings32); Fresh->bRunning = true;
+				int32 HeldRaw = 0, HeldParsed = 0;
+				Fresh->OnText = [&](const FString& Text) { if (Text == Payload) ++HeldRaw; };
+				Fresh->OnMessage = [&](const FJsonObject& M, int32) { if (M.GetStringField(TEXT("t")) == (Payload == Start ? TEXT("start") : TEXT("s"))) ++HeldParsed; };
+				Fresh->ReceiveText(Payload, Fresh->Generation);
+				TestTrue(TEXT("R32 unidentified host holds both decoders"), HeldRaw == 0 && HeldParsed == 0);
+				Fresh->ReceiveText(RustLobby, Fresh->Generation);
+				TestTrue(FString::Printf(TEXT("R32 %s buffered reconnect gates"), Row.Name), HeldRaw == (Row.bAdmit ? 1 : 0) && HeldParsed == HeldRaw);
+			}
+		}
+	}
+
+
 	// Exercise the socket's actual receive method without opening a socket. The callbacks are the two decoder
 	// publication points. Neither may observe a refused remote start, reconnect start or unsolicited snapshot.
 	for (const FString& Payload : { Start, Snapshot })
@@ -136,24 +204,25 @@ bool FTCSessionRustProfileAdmissionTest::RunTest(const FString&)
 	ON_SCOPE_EXIT { FCommandLine::Set(*SavedLine); FPlatformMisc::SetEnvironmentVar(TEXT("TC_OWNER_R1_APPROVED_URL"),*SavedApproved); };
 	FCommandLine::Set(TEXT("-TCServer=ws://127.0.0.1:31417/ws"));
 	FPlatformMisc::SetEnvironmentVar(TEXT("TC_OWNER_R1_APPROVED_URL"),TEXT("ws://127.0.0.1:31418/ws"));
-	TestFalse(TEXT("a different endpoint is unapproved"),FTCConnection::OwnerR1AdmissionEnabled());
+	TestFalse(TEXT("a different endpoint is unapproved"),FTCConnection::OwnerR1AdmissionEnabled(TEXT("ws://127.0.0.1:31417/ws")));
 	FPlatformMisc::SetEnvironmentVar(TEXT("TC_OWNER_R1_APPROVED_URL"),TEXT("ws://127.0.0.1:31417/ws"));
-	TestTrue(TEXT("the exactly approved endpoint admits R1"),FTCConnection::OwnerR1AdmissionEnabled());
-	TestFalse(TEXT("approved Start passes profile gate"),FTCConnection::RustProfileCommandBlocked(ETCHostKind::Rust,TEXT("start")));
-	TestFalse(TEXT("approved Restart passes profile gate"),FTCConnection::RustProfileCommandBlocked(ETCHostKind::Rust,TEXT("restart")));
-	TestTrue(TEXT("approved Load remains refused"),FTCConnection::RustProfileCommandBlocked(ETCHostKind::Rust,TEXT("loadSave")));
+	TestTrue(TEXT("the exactly approved endpoint admits R1"),FTCConnection::OwnerR1AdmissionEnabled(TEXT("ws://127.0.0.1:31417/ws")));
+	TestFalse(TEXT("approved Start passes profile gate"),FTCConnection::RustProfileCommandBlocked(ETCHostKind::Rust,TEXT("start"),TEXT("ws://127.0.0.1:31417/ws")));
+	TestFalse(TEXT("approved Restart passes profile gate"),FTCConnection::RustProfileCommandBlocked(ETCHostKind::Rust,TEXT("restart"),TEXT("ws://127.0.0.1:31417/ws")));
+	TestTrue(TEXT("approved Load remains refused"),FTCConnection::RustProfileCommandBlocked(ETCHostKind::Rust,TEXT("loadSave"),TEXT("ws://127.0.0.1:31417/ws")));
 	TSharedPtr<FJsonObject> ApprovedLobby;
 	FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(RustLobby),ApprovedLobby);
-	FTCLobbySettings ApprovedSettings; ApprovedSettings.ApplyLobby(*ApprovedLobby);
+	FTCLobbySettings ApprovedSettings; ApprovedSettings.SetConnectionUrl(TEXT("ws://127.0.0.1:31417/ws")); ApprovedSettings.ApplyLobby(*ApprovedLobby);
 	TestTrue(TEXT("approved valid roster enables Start"),ApprovedSettings.StartAllowed());
-	ApprovedLobby->SetStringField(TEXT("state"),TEXT("play")); Controls.ApplyLobby(*ApprovedLobby);
+	ApprovedLobby->SetStringField(TEXT("state"),TEXT("play")); Controls.SetConnectionUrl(TEXT("ws://127.0.0.1:31417/ws")); Controls.ApplyLobby(*ApprovedLobby);
 	TestTrue(TEXT("approved Restart is enabled"),Controls.MenuControl(ETCMatchControl::Restart,-1,1).bEnabled);
 	FTCPersistence ApprovedSaves; ApprovedSaves.ApplyLobby(*ApprovedLobby);
 	FTCMatchState ApprovedState; ApprovedState.RoomState=TEXT("lobby"); ApprovedState.bAmHost=true;
 	TestFalse(TEXT("approved persistence never builds Load"),ApprovedSaves.PlanLoad(ApprovedState,TEXT("any-save")).Message.IsValid());
 	for(const FString& BadLobby : {RustLobby.Replace(TEXT("\"proto\":0"),TEXT("\"proto\":1")),RustLobby.Replace(TEXT("\"proto\":0"),TEXT("\"proto\":\"invalid\""))})
 	{
-		const auto C=MakeShared<FTCConnection>(FTCConnection::FSettings()); C->bRunning=true;
+		FTCConnection::FSettings ProtocolSettings; ProtocolSettings.Url=TEXT("ws://127.0.0.1:31417/ws");
+		const auto C=MakeShared<FTCConnection>(ProtocolSettings); C->bRunning=true;
 		int32 Publications=0; C->OnText=[&](const FString& Text){if(Text==Start || Text==Snapshot) ++Publications;};
 		C->ReceiveText(BadLobby,C->Generation); C->ReceiveText(Start,C->Generation);
 		TestTrue(TEXT("approval cannot bypass malformed or future protocol"),!C->IsRunning() && Publications==0);

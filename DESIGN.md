@@ -6194,3 +6194,7 @@ See [slice 1ae implementation and executed validation](design.d/2026-10-20-unrea
 ## Unreal client slice 1af (2026-10-20)
 
 See [slice 1af implementation and executed validation](design.d/2026-10-20-unreal-slice1af.md). The approved FFI pin and owner-r1 endpoint/Load policy remain unchanged.
+
+## Unreal client slice 1ag (2026-10-21)
+
+See [slice 1ag implementation and executed validation](design.d/2026-10-21-unreal-slice1ag.md). The approved FFI pin and owner-r1 Load/World/ingress/fault policies remain unchanged.

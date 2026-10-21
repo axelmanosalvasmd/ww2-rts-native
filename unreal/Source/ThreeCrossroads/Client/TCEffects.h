@@ -498,7 +498,8 @@ private:
 	TArray<FFall> Falls;
 	TArray<FTCFxAircraftDraw> AircraftDraws;
 	int32 NextAircraftSerial = 1;
-	void BeginFall(const FVector& P, double Heading, double Speed, double Vy, const FString& Type, int32 Owner, double Pitch = 0);
+	void BeginFall(const FVector& P, double Heading, double Speed, double Vy, const FString& Type, int32 Owner, double Pitch = 0, int32 Serial = 0);
+	void DrawFall(const FFall& F, float Dt);
 	struct FThrow { double X, Z; bool bSatchel; double T; };
 	TArray<FThrow> Throws;
 	struct FSalvoMark { double X, Z, R; bool bMortar; double T; };

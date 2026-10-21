@@ -570,11 +570,12 @@ bool FTCMarkerPainter::Tag(UFont* Font, const FString& Text, double X, double Z,
 	const FLinearColor SwatchValue = Swatch ? *Swatch : FLinearColor::Transparent;
 	TCHud31::SubmitWorldLabel(Canvas, Bounds, [=]()
 	{
+		const FVector2D PlacedOrigin=Origin+TCHud31::WorldLabelOffset();
 		auto Rect = [&](double Cx0, double Cy0, double Cw0, double Ch0, FLinearColor C)
 		{
 			C.A *= Alpha;
 			C = TCMarkersHud::WorldColour(TagCanvas, C, W);
-			FCanvasTileItem T(Origin + FVector2D(Cx0, Cy0) * K, GWhiteTexture, FVector2D(Cw0, Ch0) * K, C);
+			FCanvasTileItem T(PlacedOrigin + FVector2D(Cx0, Cy0) * K, GWhiteTexture, FVector2D(Cw0, Ch0) * K, C);
 			T.BlendMode = SE_BLEND_Translucent;
 			TagCanvas->DrawItem(T);
 		};
@@ -591,7 +592,7 @@ bool FTCMarkerPainter::Tag(UFont* Font, const FString& Text, double X, double Z,
 			const double Lum = (C.R * 0.2126 + C.G * 0.7152 + C.B * 0.0722) / 255.0;
 			FLinearColor Ink(FColor(Lum > 0.6 ? 0x1a1d1f : 0xf2efe6)); Ink.A = Alpha;
 			Ink = TCMarkersHud::WorldColour(TagCanvas, Ink, W);
-			TCMarkerIcons::Hq(TagCanvas, Origin + FVector2D(X0 + 11 + Sw * 0.07, (St.H - Sw * 0.86) / 2) * K, Sw * 0.86 * K, Ink);
+			TCMarkerIcons::Hq(TagCanvas, PlacedOrigin + FVector2D(X0 + 11 + Sw * 0.07, (St.H - Sw * 0.86) / 2) * K, Sw * 0.86 * K, Ink);
 		}
 		FLinearColor TC = TagText;
 		TC.A *= Alpha;
@@ -599,16 +600,16 @@ bool FTCMarkerPainter::Tag(UFont* Font, const FString& Text, double X, double Z,
 		const double TextCx = X0 + LeadIn + (Bw - LeadIn) / 2, TextCy = St.H / 2 + 2;
 		if (bBarlow)
 		{
-			TCMarkerText::Draw(TagCanvas, Text, Origin + FVector2D(TextCx - TextW / 2, TextCy - Px * 0.6) * K, Px * K, Tracking * K, TC);
+			TCMarkerText::Draw(TagCanvas, Text, PlacedOrigin + FVector2D(TextCx - TextW / 2, TextCy - Px * 0.6) * K, Px * K, Tracking * K, TC);
 		}
 		else
 		{
-			FCanvasTextItem Item(Origin + FVector2D(TextCx * K - TW1 * TextScale / 2, TextCy * K - TH1 * TextScale / 2), FText::FromString(Text), Font, TC);
+			FCanvasTextItem Item(PlacedOrigin + FVector2D(TextCx * K - TW1 * TextScale / 2, TextCy * K - TH1 * TextScale / 2), FText::FromString(Text), Font, TC);
 			Item.Scale = FVector2D(TextScale, TextScale);
 			Item.BlendMode = SE_BLEND_Translucent;
 			TagCanvas->DrawItem(Item);
 		}
-	});
+	}, !St.bSwatch);
 	Tags++;
 	return true;
 }
@@ -972,6 +973,9 @@ namespace
 
 void TCMarkersHud::DrawUnitBillboards(UCanvas* Canvas, const TArray<FUnitBillboard>& Units)
 {
+	for (const FUnitBillboard& U : Units)
+		TCHud31::ProtectWorldInformation(Canvas,FBox2D(U.Centre+FVector2D(-2.75,-1.25)*U.PxPerMetre,
+			U.Centre+FVector2D(2.4,.85)*U.PxPerMetre));
 	// Three sorts main.js's opaque bars across all units by renderOrder. Drawing a complete group per unit
 	// lets the next black backdrop erase an earlier fill. Keep these passes at the current HUD sort key,
 	// so the later HTML-equivalent HUD panels still cover every world billboard.

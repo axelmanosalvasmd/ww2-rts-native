@@ -14,8 +14,8 @@ bool FTCHud31LabelsTest::RunTest(const FString&)
   int32 Painted=0;
   TCHud31::BeginWorldLabels(nullptr);
   // Labels arrive before the HUD measures this frame's score and tooltip.
-  TCHud31::SubmitWorldLabel(nullptr,Box(570,45,140,30),[&]() { Painted+=1; });
-  TCHud31::SubmitWorldLabel(nullptr,Box(570,92,140,30),[&]() { Painted+=10; });
+  TCHud31::SubmitWorldLabel(nullptr,Box(570,45,140,30),[&]() { Painted+=1; },false);
+  TCHud31::SubmitWorldLabel(nullptr,Box(570,92,140,30),[&]() { Painted+=10; },false);
   TCHud31::SubmitWorldLabel(nullptr,Box(400,220,140,30),[&]() { Painted+=100; });
   TestEqual(TEXT("world text is deferred until current panel bounds exist"),Painted,0);
   TCHud31::FinishWorldLabels({Box(500,8,280,70),Box(560,88,160,45)});
@@ -23,18 +23,26 @@ bool FTCHud31LabelsTest::RunTest(const FString&)
   TestFalse(TEXT("world label cannot sit flush on a panel edge"),TCHud31::WorldLabelVisible(Box(500,78,140,30),{Box(500,8,280,70)}));
   TestTrue(TEXT("world label with clear gap survives"),TCHud31::WorldLabelVisible(Box(500,90,140,30),{Box(500,8,280,70)}));
   TCHud31::BeginWorldLabels(nullptr);
-  TCHud31::SubmitWorldLabel(nullptr,Box(570,45,140,30),[&]() { Painted+=1; });
+  TCHud31::SubmitWorldLabel(nullptr,Box(570,45,140,30),[&]() { Painted+=1; },false);
   TCHud31::FinishWorldLabels({});
   TestEqual(TEXT("same anchor is visible immediately after panel disappears"),Painted,101);
   TCHud31::FinishWorldLabels({});
   TestEqual(TEXT("no prior-frame label is replayed"),Painted,101);
   int32 Nearby=0;
+  TArray<FBox2D> PaintedBounds;
+  auto Paint=[&](FBox2D Bounds,int32 Value)
+  {
+   const FVector2D Offset=TCHud31::WorldLabelOffset();
+   const FBox2D Placed(Bounds.Min+Offset,Bounds.Max+Offset);
+   TestTrue(TEXT("nearby world captions keep their exclusion gap"),TCHud31::WorldLabelVisible(Placed,PaintedBounds));
+   PaintedBounds.Add(Placed); Nearby+=Value;
+  };
   TCHud31::BeginWorldLabels(nullptr);
-  TCHud31::SubmitWorldLabel(nullptr,Box(400,220,140,30),[&]() { Nearby+=1; });
-  TCHud31::SubmitWorldLabel(nullptr,Box(410,235,180,30),[&]() { Nearby+=10; });
-  TCHud31::SubmitWorldLabel(nullptr,Box(700,220,140,30),[&]() { Nearby+=100; });
+  TCHud31::SubmitWorldLabel(nullptr,Box(400,220,140,30),[&]() { Paint(Box(400,220,140,30),1); });
+  TCHud31::SubmitWorldLabel(nullptr,Box(410,235,180,30),[&]() { Paint(Box(410,235,180,30),10); });
+  TCHud31::SubmitWorldLabel(nullptr,Box(700,220,140,30),[&]() { Paint(Box(700,220,140,30),100); });
   TCHud31::FinishWorldLabels({});
-  TestEqual(TEXT("nearby world captions never paint over one another"),Nearby,101);
+  TestEqual(TEXT("nearby world captions remain visible without overlap"),Nearby,111);
  }
  const auto Income=TCMarkersCore::TagStyle(), Hq=TCMarkersCore::HqStyle();
  TestTrue(TEXT("world income and secondary tags have at least 18px text at 720p"),Income.Px*Income.Sx/Income.W>=18);

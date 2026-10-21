@@ -1957,8 +1957,16 @@ void ATCHUD::DrawLabel(const FString& Str, const FLinearColor& Colour, float X, 
  if (bCollectWorldLabels)
  {
   float W=0,H=0; LabelSize(Str,W,H,Font,Scale);
-  TCHud31::SubmitWorldLabel(Canvas,FBox2D(FVector2D(X,Y),FVector2D(X+W,Y+H)),
-   [this,Shown,Colour,X,Y,Font,Scale]() { DrawShown(Shown,Colour,X,Y,Font,Scale); });
+  TCHud31::SubmitWorldLabel(Canvas,FBox2D(FVector2D(X-5,Y-4),FVector2D(X+W+5,Y+H+4)),
+   [this,Shown,Colour,X,Y,W,H,Font,Scale]()
+   {
+    const FVector2D Offset=TCHud31::WorldLabelOffset();
+    const float Px=X+Offset.X, Py=Y+Offset.Y;
+    DrawRect(FLinearColor(.025f,.03f,.035f,.96f*Colour.A),Px-5,Py-4,W+10,H+8);
+    DrawRect(Colour,Px-5,Py-4,3,H+8);
+    FLinearColor Ink=FLinearColor::White; Ink.A=Colour.A;
+    DrawShown(Shown,Ink,Px,Py,Font,Scale);
+   });
   return;
  }
 	DrawShown(Shown, Colour, X, Y, Font, Scale);
@@ -3239,7 +3247,7 @@ void ATCHUD::DrawWorldOverlays(UFont* Font)
 	{
 		const FVector Sc = Project(ATCTerrain::ToWorld(At.X, At.Y, T.HeightAt(At.X, At.Y) + 1.f));
 		FLinearColor Lc = C; Lc.A *= M->WarMap.LabelFade(); // round 14: markers.js fadeLabels while the paper war map comes
-		if (Sc.Z > 0) DrawLabel(L, Lc, Sc.X + 6.f, Sc.Y - 6.f, Font, 1.f);
+		if (Sc.Z > 0) DrawLabel(L, Lc, Sc.X + 6.f, Sc.Y - 6.f, Font, 1.3f);
 	};
 	// round 17 (markers): buildHQ's reinforce zone, ring, flag and tag and the resource nodes' brackets and tags under
 	// everything else (TCMarkersHud), then World Conquest's regions as world-regions.js draws them: the border, the
@@ -3616,7 +3624,7 @@ void ATCHUD::DrawHUD()
 		Minimap.ViewFromCanvas(Canvas, M->Terrain, View);
         View.YawDegrees = PC->ViewYaw();
 		TCMarkersHud::Verify(*M, PC->Selected); // round 17: -TCMarkersSelect= and -TCMarkersLog (verification only)
-  TCHud31::BeginWorldLabels(Canvas);
+  TCHud31::BeginWorldLabels(Canvas,FBox2D(FVector2D::ZeroVector,DrawnViewport));
   bCollectWorldLabels=true;
 		DrawWorldOverlays(Font);
   bCollectWorldLabels=false;

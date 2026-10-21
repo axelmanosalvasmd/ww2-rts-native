@@ -1690,15 +1690,28 @@ void FTCCombatEffects::RunEvents(float Dt)
 	}
 }
 
-void FTCCombatEffects::BeginFall(const FVector& P, double Heading, double Speed, double Vy, const FString& Type, int32 Owner, double Pitch)
+void FTCCombatEffects::BeginFall(const FVector& P, double Heading, double Speed, double Vy, const FString& Type, int32 Owner, double Pitch, int32 Serial)
 {
 	FFall F;
 	F.Motion.X = P.X; F.Motion.Y = P.Z; F.Motion.Z = P.Y;
 	F.Motion.Heading = Heading; F.Motion.Speed = Speed; F.Motion.Vy = Vy; F.Motion.Pitch = Pitch;
 	F.Motion.RollRate = 2 * (Rng.FRand() < .5 ? -1 : 1);
 	F.Motion.Yaw = (.9 + Rng.FRand() * .8) * (Rng.FRand() < .5 ? -1 : 1);
-	F.ModelType = Type; F.Owner = Owner; F.Serial = NextAircraftSerial++;
+	F.ModelType = Type; F.Owner = Owner; F.Serial = Serial ? Serial : NextAircraftSerial++;
 	Falls.Add(MoveTemp(F));
+}
+
+void FTCCombatEffects::DrawFall(const FFall& F, float Dt)
+{
+	const auto& M = F.Motion;
+	const FVector Position(M.X, M.Z, M.Y);
+	FTCFxAircraftDraw& Draw = AircraftDraws.AddDefaulted_GetRef();
+	Draw.Serial = F.Serial; Draw.Owner = F.Owner; Draw.Type = F.ModelType; Draw.P = Position;
+	Draw.Heading = M.Heading; Draw.Roll = M.Roll; Draw.Pitch = M.Pitch; Draw.PropAngle = M.Age * 30;
+	Draw.ShadowScale = 1 + (M.Y - Ground(M.X, M.Z)) * .012;
+	// Preserve the legacy shape only as an asset-missing fallback. Normal rendering uses the original model.
+	const int32 O = Shape(ETCFxLook::Plane, Position, FVector(FMath::Cos(M.Heading), FMath::Sin(M.Heading), M.Vy / FMath::Max(1., M.Speed)) * .001, 3.f, Dt * 1.5f);
+	if (O >= 0) Live[O].Stretch = 5.f;
 }
 
 void FTCCombatEffects::UpdateEmitters(float Dt)
@@ -1720,13 +1733,7 @@ void FTCCombatEffects::UpdateEmitters(float Dt)
 			if (Ctx_.TimedSound) { Ctx_.TimedSound(TEXT("vehicle_destroyed"), M.X, M.Z, 0, 0); Ctx_.TimedSound(TEXT("fire_loop"), M.X, M.Z, .5, 9); }
 			Sound(TEXT("vehicle_destroyed")); Falls.RemoveAt(I); continue;
 		}
-		FTCFxAircraftDraw& Draw = AircraftDraws.AddDefaulted_GetRef();
-		Draw.Serial = F.Serial; Draw.Owner = F.Owner; Draw.Type = F.ModelType; Draw.P = Position;
-		Draw.Heading = M.Heading; Draw.Roll = M.Roll; Draw.Pitch = M.Pitch; Draw.PropAngle = M.Age * 30;
-		Draw.ShadowScale = 1 + (M.Y - Gy) * .012;
-		// Preserve the legacy shape only as an asset-missing fallback. Normal rendering uses the original model.
-		const int32 O = Shape(ETCFxLook::Plane, Position, FVector(FMath::Cos(M.Heading), FMath::Sin(M.Heading), M.Vy / FMath::Max(1., M.Speed)) * .001, 3.f, Dt * 1.5f);
-		if (O >= 0) Live[O].Stretch = 5.f;
+		DrawFall(F, Dt);
 		if ((F.Acc -= Dt) <= 0)
 		{
 			const bool bLow = FTCGraphics::Get().IsLow();
@@ -1774,7 +1781,10 @@ void FTCCombatEffects::UpdateEmitters(float Dt)
 		{
 			const FString Type = P.Kind == TEXT("para") ? TEXT("transport") : P.Kind == TEXT("bombing") ? TEXT("bomber") : P.Kind == TEXT("recon") ? TEXT("fighter") : TEXT("attacker");
 			BeginFall(FVector(X, Z, Y), P.Dir, TCFxRules::PlaneSpan / TCFxRules::PlaneRun * .75, U < .5 ? -10. : 10., Type, P.Owner,
-				FMath::Atan2(U < .5 ? -10. : 10., TCFxRules::PlaneSpan / TCFxRules::PlaneRun));
+				FMath::Atan2(U < .5 ? -10. : 10., TCFxRules::PlaneSpan / TCFxRules::PlaneRun), P.Serial);
+			// aircraft.js keeps the same holder and shadow at the hit position. Existing falls already ticked,
+			// so submit this handoff now without advancing its motion a second time.
+			DrawFall(Falls.Last(), Dt);
 			Burst(FVector(X + Dx * 2, Z + Dz * 2, Y + 0.5), 1.3);
 			Passes.RemoveAt(I);
 			continue;
@@ -3003,6 +3013,15 @@ int32 UTCEffectsShotCommandlet::Main(const FString& Params)
 	FTCUnitTable Table;
 	FString Error;
 	if (!Table.Load(Error)) { UE_LOG(LogTC, Error, TEXT("unit table: %s"), *Error); return 1; }
+	// Explicit tier for the round32 lifecycle fixture. This commandlet never saves the player's settings.
+	FString AircraftTier;
+	FParse::Value(*Params, TEXT("TCUnits32Tier="), AircraftTier);
+	if (!AircraftTier.IsEmpty() && AircraftTier != TEXT("high") && AircraftTier != TEXT("low"))
+	{
+		UE_LOG(LogTC, Error, TEXT("aircraft32 capture tier must be high or low")); return 1;
+	}
+	const FTCGraphicsLevelScope AircraftQuality(AircraftTier == TEXT("low") ? ETCGraphicsLevel::Low : AircraftTier == TEXT("high") ? ETCGraphicsLevel::High : FTCGraphics::Get().Level());
+	UE_LOG(LogTC, Log, TEXT("aircraft32 capture tier: %s"), LexToString(FTCGraphics::Get().Level()));
 	constexpr int32 W = 1280, H = 720;
 	const double HFov = FMath::RadiansToDegrees(2.0 * FMath::Atan(FMath::Tan(FMath::DegreesToRadians(42.0) / 2.0) * W / H)); // camera.js: 42 degrees vertical
 
