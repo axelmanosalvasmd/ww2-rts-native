@@ -1,0 +1,17 @@
+# Unreal slice 1ad (2026-10-20)
+
+Logistics docks clear of selection, production, research, score and aircraft panels at English UI100 and Spanish UI150. Normal play hides successful raw order notes and the stray FPS placeholder. Aircraft rows consume delivered presses with the original 0.32-second double-click limit. Grouped training, faction names, cap warnings and scrolling retain the existing purchase and order paths. Minimap overlays clip to the map and expose threat ranges only for currently seen enemies.
+
+Friendly hover health and supply diamonds are restored. Squad casualties apply once per received snapshot, including hidden squads. Support and falling aircraft reuse original models and source flight rules. Known stone bridges retain landmark identity, decals follow relief edits, and retired weather sources release their mirrors. The old panel-overlap and overflow assertions were rewritten for clear, reachable controls; timing thresholds remain unchanged.
+
+Required-FFI Build.sh passes with process-local NoUBA. Seven expected rendered RED regressions turn GREEN; the focused batch passes 20/20. One full Intel UHD 770 Vulkan suite passes 236/236 (230 clean, six warning successes), retaining all 220 previous names and adding 16. Later capture-driven layout and overlay fixes pass 43 focused HUD/recruitment/minimap/alert tests. The collision regression records an expected RED before its fix. Pinned JavaScript HUD checks pass 52/52; the extracted aircraft arithmetic oracle compares 2,442 values in four scenarios with worst difference zero (not compiled C++ evidence).
+
+Two fresh Conquest matches against the pinned original server run two rendered native seats at High and Low. All four processes exit zero. Both matches use explicit 35-second host caps, without natural-win claims. Authored recipient presentation fixtures are separate from those live matches.
+
+The approved linked core remains `8f37717cb0b78fca9786ae0bd1188160504ccdf4`; header SHA256 `bea0cded666523ff88b519fa1eaeeacaa26db0eefd203b87c937e1edb6abef9d` and reference `e4e579a838aabae3b1d9dadbc17a0a87147bc52d` are unchanged. R1 is unqualified: production refuses Rust Start/Restart/Load and incoming matches before both decoders. No wire, ABI, profile, seed or pin change.
+
+No causal Islands renderer repair was supplied or integrated; the conditional Islands Low rerun is omitted. Full aircraft loss, exhaustive hover/cover/minimap stories, physical input, heard audio, Windows/macOS and performance gates remain open with issue #445. No benchmark claim is made.
+
+Linux Development slice29 builds through RunUAT (initial cook 198.29 seconds) with the unchanged 20 GB guard. Independent checks pass all 37 SHA256SUMS entries before and after a successful rendered lobby run. The final refreshed package uses a recorded original lobby; the initial package also ran against the fresh reference server. All 31 published source files included in the cook mirror match the local source and PR copy. Slice24 through slice28 packages are retained.
+
+Independent row review promotes 62 complete rows to ported: 16 to 78 ported, 92 to 41 implemented-unverified, 24 to 13 in progress, eight deferred unchanged. Each promotion cites passing native tests and reference intent or reviewed native captures. CLI-68, CLI-108 and CLI-109 include this round's delivered input, carrier and reconnect checks. CLI-94 stays open. Owner acceptance remains separate.

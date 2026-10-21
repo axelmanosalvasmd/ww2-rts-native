@@ -1,0 +1,177 @@
+[
+  {
+    "delay": 0.3,
+    "action": "hudhover",
+    "target": {
+      "action": "Formation",
+      "unit": "menu"
+    },
+    "condition": "play"
+  },
+  {
+    "delay": 0.3,
+    "action": "shot",
+    "arg": "form-tooltip"
+  },
+  {
+    "delay": 0.3,
+    "action": "hudclick",
+    "target": {
+      "action": "Formation",
+      "unit": "menu"
+    }
+  },
+  {
+    "delay": 0.3,
+    "action": "shot",
+    "arg": "form-open"
+  },
+  {
+    "delay": 0.3,
+    "action": "hudclick",
+    "target": {
+      "action": "Formation",
+      "unit": "menu"
+    }
+  },
+  {
+    "delay": 0.3,
+    "action": "shot",
+    "arg": "form-closed"
+  },
+  {
+    "delay": 0.3,
+    "action": "hudhover",
+    "target": {
+      "action": "BuildMenu",
+      "unit": ""
+    }
+  },
+  {
+    "delay": 0.3,
+    "action": "shot",
+    "arg": "build-tooltip"
+  },
+  {
+    "delay": 0.3,
+    "action": "hudclick",
+    "target": {
+      "action": "BuildMenu",
+      "unit": ""
+    }
+  },
+  {
+    "delay": 0.3,
+    "action": "shot",
+    "arg": "build-open"
+  },
+  {
+    "delay": 0.3,
+    "action": "hudclick",
+    "target": {
+      "action": "MatchControl",
+      "unit": "hudpanel:buildtab:0"
+    }
+  },
+  {
+    "delay": 0.3,
+    "action": "shot",
+    "arg": "build-tab-0"
+  },
+  {
+    "delay": 0.3,
+    "action": "hudclick",
+    "target": {
+      "action": "MatchControl",
+      "unit": "hudpanel:buildtab:1"
+    }
+  },
+  {
+    "delay": 0.3,
+    "action": "shot",
+    "arg": "build-tab-1"
+  },
+  {
+    "delay": 0.3,
+    "action": "hudclick",
+    "target": {
+      "action": "MatchControl",
+      "unit": "hudpanel:buildtab:2"
+    }
+  },
+  {
+    "delay": 0.3,
+    "action": "shot",
+    "arg": "build-tab-2"
+  },
+  {
+    "delay": 0.3,
+    "action": "hudclick",
+    "target": {
+      "action": "MatchControl",
+      "unit": "hudpanel:buildtab:3"
+    }
+  },
+  {
+    "delay": 0.3,
+    "action": "shot",
+    "arg": "build-tab-3"
+  },
+  {
+    "delay": 0.3,
+    "action": "hudclick",
+    "target": {
+      "action": "BuildMenu",
+      "unit": ""
+    }
+  },
+  {
+    "delay": 0.3,
+    "action": "shot",
+    "arg": "build-closed"
+  },
+  {
+    "delay": 0.3,
+    "action": "hudclick",
+    "target": {
+      "action": "TrenchMenu",
+      "unit": ""
+    }
+  },
+  {
+    "delay": 0.3,
+    "action": "shot",
+    "arg": "trench-open"
+  },
+  {
+    "delay": 0.3,
+    "action": "hudclick",
+    "target": {
+      "action": "Entrench",
+      "unit": "ring"
+    }
+  },
+  {
+    "delay": 0.3,
+    "action": "shot",
+    "arg": "trench-stays-armed"
+  },
+  {
+    "delay": 0.3,
+    "action": "key",
+    "arg": "Escape"
+  },
+  {
+    "delay": 0.3,
+    "action": "hudclick",
+    "target": {
+      "action": "TrenchMenu",
+      "unit": ""
+    }
+  },
+  {
+    "delay": 0.3,
+    "action": "shot",
+    "arg": "trench-closed"
+  }
+]

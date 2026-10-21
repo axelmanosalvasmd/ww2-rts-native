@@ -1,0 +1,26 @@
+[
+  {
+    "delay": 1,
+    "action": "hudclick",
+    "target": {
+      "action": "Recruit",
+      "unit": "rifle",
+      "building": "$producer"
+    },
+    "condition": "play"
+  },
+  {
+    "delay": 0.5,
+    "action": "hudclick",
+    "target": {
+      "action": "Recruit",
+      "unit": "rifle",
+      "building": "$producer"
+    }
+  },
+  {
+    "delay": 0.3,
+    "action": "shot",
+    "arg": "active-and-waiting"
+  }
+]

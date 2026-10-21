@@ -1,0 +1,18 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "0.1",
+	"FriendlyName": "WW2 Core",
+	"Description": "Links the Rust rules core (ww2-ffi, C ABI 2) into the Three Crossroads client: version, rules hash, formation spots and the recipient view (ww2_view_*).",
+	"Category": "Three Crossroads",
+	"CanContainContent": false,
+	"EnabledByDefault": true,
+	"Modules": [
+		{
+			"Name": "WW2Core",
+			"Type": "Runtime",
+			"LoadingPhase": "PreDefault",
+			"PlatformAllowList": [ "Linux", "Win64", "Mac" ]
+		}
+	]
+}

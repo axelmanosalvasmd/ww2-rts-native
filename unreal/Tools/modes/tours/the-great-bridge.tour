@@ -1,0 +1,7 @@
+# Round 16 modes: The Great Bridge's scripted blow (maps/the-great-bridge.json triggers: say at 300 s and 400 s, at 420 s
+# destroy box [52,46,66,51] in cells, CELL = 2 m, so x 104..134 m, z 92..104 m; centre (119, 98)).
+# name seconds x z distance|wF yaw [hud]   (match time; reference metres; native degrees, -90 looks north)
+modes-scenario-the-great-bridge-bridge-before    395  119  98  70  -90  hud
+modes-scenario-the-great-bridge-bridge-warning   405  119  98  70  -90  hud
+modes-scenario-the-great-bridge-bridge-down      425  119  98  70  -90  hud
+modes-scenario-the-great-bridge-bridge-down-wide 440  119  98  120 -60  hud

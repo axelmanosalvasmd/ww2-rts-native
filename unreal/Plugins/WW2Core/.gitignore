@@ -1,0 +1,5 @@
+# ww2-ffi build output, installed by unreal/Tools/ww2-ffi.sh (library, header, fixture, STAMP). Never commit it.
+/ThirdParty/ww2_ffi/*
+!/ThirdParty/ww2_ffi/README.md
+/Binaries/
+/Intermediate/

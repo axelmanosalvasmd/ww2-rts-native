@@ -1,0 +1,76 @@
+[
+  {
+    "delay": 1,
+    "action": "hudclick",
+    "target": {
+      "action": "MatchControl",
+      "unit": "$plane1key"
+    },
+    "condition": "play"
+  },
+  {
+    "delay": 0.3,
+    "action": "shot",
+    "arg": "one-plane"
+  },
+  {
+    "delay": 0.3,
+    "action": "hudrightclick",
+    "target": {
+      "action": "MatchControl",
+      "unit": "$plane1key"
+    }
+  },
+  {
+    "delay": 0.3,
+    "action": "shot",
+    "arg": "right-keeps-selection"
+  },
+  {
+    "delay": 0.5,
+    "action": "hudshiftclick",
+    "target": {
+      "action": "MatchControl",
+      "unit": "$plane2key"
+    }
+  },
+  {
+    "delay": 0.3,
+    "action": "shot",
+    "arg": "two-planes"
+  },
+  {
+    "delay": 0.5,
+    "action": "hudctrlclick",
+    "target": {
+      "action": "MatchControl",
+      "unit": "$plane1key"
+    }
+  },
+  {
+    "delay": 0.3,
+    "action": "shot",
+    "arg": "drop-first"
+  },
+  {
+    "delay": 0.5,
+    "action": "hudclick",
+    "target": {
+      "action": "MatchControl",
+      "unit": "$plane2key"
+    }
+  },
+  {
+    "delay": 0.18,
+    "action": "hudclick",
+    "target": {
+      "action": "MatchControl",
+      "unit": "$plane2key"
+    }
+  },
+  {
+    "delay": 0.25,
+    "action": "shot",
+    "arg": "all-planes"
+  }
+]
