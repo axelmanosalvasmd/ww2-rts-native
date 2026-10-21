@@ -1,4 +1,5 @@
 #include "Client/TCGameMode.h"
+#include "Client/TCRustQueries.h"
 #include "RHIStats.h"
 #include "Client/TCGraphics.h"
 #include "Client/TCCameraPawn.h"
@@ -433,6 +434,12 @@ void ATCGameMode::TakeSlice8Notices()
 void ATCGameMode::OnMessage(const FJsonObject& M, int32 Bytes)
 {
 	const FString T = M.GetStringField(TEXT("t"));
+	if (T == TEXT("lobby"))
+	{
+		const FString Warning = FTCRustQueries::RulesWarning(M);
+		if (Warning != RustRulesWarning && !Warning.IsEmpty()) UE_LOG(LogTC, Warning, TEXT("%s"), *Warning);
+		RustRulesWarning = Warning;
+	}
 	ControlsMessage(T, M); // round 15: lobby and match controls (Client/TCMatchControls.cpp)
 	if (T == TEXT("s"))
 	{

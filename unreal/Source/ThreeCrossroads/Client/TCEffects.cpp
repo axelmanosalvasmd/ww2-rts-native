@@ -1,4 +1,6 @@
 #include "Client/TCEffects.h"
+#include "Client/TCFx31Rules.h"
+#include "Client/TCAudio.h"
 #include "Client/TCGraphics.h"
 #include "Client/TCAlerts.h"
 #include "Client/TCUnitTable.h"
@@ -19,6 +21,7 @@
 #include "Materials/MaterialParameterCollection.h"
 #include "Materials/MaterialParameterCollectionInstance.h"
 #include "Engine/StaticMesh.h"
+#include "Engine/StaticMeshSocket.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
 #include "Camera/PlayerCameraManager.h"
@@ -605,7 +608,7 @@ void FTCCombatEffects::Reset()
 	ShakeAmount = 0.f; WindXZ = FVector2D(0.55, 0.25); TickNow = 0; RefitT = 0.f; SimTick = 0;
 	for (FBlastMark& B : Blasts) B = FBlastMark();
 	BlastNext = 0; DamageCues.Reset(); FrameDt = 0.f;
-	PlaneSmokeWait.Reset(); AircraftDraws.Reset(); NextAircraftSerial = 1;
+	PlaneSmokeWait.Reset(); AircraftDraws.Reset(); Covers.Reset(); FixedGunSide.Reset(); SnapshotMuzzles.Reset(); NextAircraftSerial = 1;
 	Rng.Initialize(Seed);
 }
 
@@ -755,6 +758,8 @@ void FTCCombatEffects::Explode(double X, double Z, double S, bool bDecal, bool b
 	// fx.js explode: a brief flash, a fireball that cools into dark smoke, a plume of dirt and clods raining back, dust
 	// rolling out along the ground, a dark smoke column that drifts downwind, and a crater
 	Counters.Blasts++;
+	const bool bLow = FTCGraphics::Get().IsLow();
+	const double Q = bLow ? .5 : 1;
 	const double Gy = Y ? *Y : Ground(X, Z), Rs = FMath::Sqrt(S);
 	Emit(ETCFxPreset::Flash, At(X, Gy + 0.35 * S, Z), FVector::ZeroVector, 0.85 * S, 0.05 + 0.012 * S);
 	const int32 Nf = S >= 4 ? 3 : S >= 2.5 ? 2 : 1;
@@ -768,13 +773,13 @@ void FTCCombatEffects::Explode(double X, double Z, double S, bool bDecal, bool b
 	{
 		for (int32 I = 0, Np = S >= 3.6 ? 2 : 1; I < Np; I++)
 			Emit(ETCFxPreset::Plume, At(X + Rr(-0.12, 0.12) * S, Gy - 0.1, Z + Rr(-0.12, 0.12) * S), FVector::ZeroVector, Rr(0.5, 0.62) * S, Rr(1.1, 1.5) + 0.12 * S);
-		const int32 Nd = FMath::RoundToInt(5 + S * 3);
+		const int32 Nd = FMath::RoundToInt((5 + S * 3) * Q);
 		for (int32 I = 0; I < Nd; I++)
 		{
 			const double A = Rng.FRand() * Tau, H = Rr(1.5, 4.5) * Rs;
 			Emit(ETCFxPreset::Clod, At(X + FMath::Cos(A) * 0.2 * S, Gy + 0.3, Z + FMath::Sin(A) * 0.2 * S), At(FMath::Cos(A) * H, Rr(5, 10) * Rs, FMath::Sin(A) * H), Rr(0.05, 0.13) * FMath::Min(2.0, Rs), Rr(1.2, 2.2));
 		}
-		const int32 Nr = FMath::RoundToInt(4 + 1.2 * S);
+		const int32 Nr = (!bLow || S >= 3) ? FMath::RoundToInt((4 + 1.2 * S) * Q) : 0;
 		for (int32 I = 0; I < Nr; I++)
 		{
 			const double A = (double)I / Nr * Tau + Rng.FRand() * 0.4, Sp = Rr(2.5, 4.5) + 0.8 * S;
@@ -783,14 +788,14 @@ void FTCCombatEffects::Explode(double X, double Z, double S, bool bDecal, bool b
 	}
 	if (DebrisPreset != ETCFxPreset::None && DebrisPreset != ETCFxPreset::Clod)
 	{
-		const int32 Nb = FMath::RoundToInt(3 + 2 * S);
+		const int32 Nb = FMath::RoundToInt((3 + 2 * S) * Q);
 		for (int32 I = 0; I < Nb; I++)
 		{
 			const double A = Rng.FRand() * Tau, H = Rr(1.5, 4) * Rs * 0.7;
 			Emit(DebrisPreset, At(X, Gy + 0.4 * S, Z), At(FMath::Cos(A) * H, Rr(5, 9) * Rs * 0.6, FMath::Sin(A) * H), Rr(0.1, 0.22) * FMath::Min(2.0, Rs), Rr(1.3, 2.4));
 		}
 	}
-	const int32 Ns = FMath::RoundToInt((2 + S * 1.3) * SmokeK);
+	const int32 Ns = FMath::RoundToInt((2 + S * 1.3) * Q * SmokeK);
 	for (int32 I = 0; I < Ns; I++)
 	{
 		const double A = Rng.FRand() * Tau, R = Rng.FRand() * 0.35 * S;
@@ -798,7 +803,7 @@ void FTCCombatEffects::Explode(double X, double Z, double S, bool bDecal, bool b
 		Hold(O, Rr(0.12, 0.4)); Tint(O, Rr(0.85, 1.15));
 	}
 	if (S >= 4 && SmokeK > 0) Column(At(X, Gy, Z), S, 1.2 + 0.25 * S);
-	for (int32 I = 0, Nk = FMath::RoundToInt(1 + S * 0.6); I < Nk; I++)
+	if (!bLow) for (int32 I = 0, Nk = FMath::RoundToInt(1 + S * 0.6); I < Nk; I++)
 	{
 		const double A = Rng.FRand() * Tau, H = Rr(4, 9);
 		Emit(ETCFxPreset::Spark, At(X, Gy + 0.4 * S, Z), At(FMath::Cos(A) * H, Rr(5, 12), FMath::Sin(A) * H), 0.05f, Rr(0.3, 0.6));
@@ -828,7 +833,7 @@ void FTCCombatEffects::Gore(double X, double Z, double K)
 	if (!FTCGraphics::Get().Gore()) return; // round 14 lead glue: fx.js gore returns at once without gfx.gore (the menu's Gore switch)
 	// fx.js gore (gfx.gore, on by default): scraps, a red mist and a stain on the ground. Graphics High: 7 scraps.
 	const double Gy = Ground(X, Z) + 0.6;
-	const int32 N = FMath::RoundToInt(7 * K + 1);
+	const int32 N = FMath::RoundToInt((FTCGraphics::Get().IsLow() ? 3 : 7) * K + 1);
 	for (int32 I = 0; I < N; I++)
 	{
 		const double A = Rng.FRand() * Tau, H = Rr(1, 4);
@@ -849,18 +854,19 @@ void FTCCombatEffects::VehicleDamage(const FVector& P, double Level)
 
 void FTCCombatEffects::Plume(const FString& Kind, double X, double Y, double Z, double Radius)
 {
-	// fx.js plume (High graphics: this client has no Low): smoke or wreck smoke rising from the roof, or three flames
+	// fx.js plume: smoke or wreck smoke rising from the roof, or flame.
+	const bool bLow = FTCGraphics::Get().IsLow();
 	const double Spread = Radius * 0.65;
 	if (Kind != TEXT("fire"))
 	{
 		const bool bDark = Kind == TEXT("dark");
-		for (int32 I = 0; I < 2; I++)
+		for (int32 I = 0; I < (bLow ? 1 : 2); I++)
 			Emit(bDark ? ETCFxPreset::WreckSmoke : ETCFxPreset::Smoke, At(X + Rr(-0.4, 0.4) * Spread, Y + Rr(0, 0.6), Z + Rr(-0.4, 0.4) * Spread),
-				At(Rr(-0.4, 0.4), Rr(2.1, 2.8), Rr(-0.4, 0.4)), Radius * 0.45, bDark ? 4.0 : 4.5);
+				At(Rr(-0.4, 0.4), Rr(2.1, 2.8), Rr(-0.4, 0.4)), Radius * (bLow ? .5 : .45), bDark ? 4.0 : 4.5);
 		return;
 	}
-	for (int32 I = 0; I < 3; I++)
-		Emit(ETCFxPreset::Flame, At(X + Rr(-Spread, Spread), Y - 0.2, Z + Rr(-Spread, Spread)), At(0, Rr(0.1, 0.3), 0), Radius * 0.36, Rr(0.8, 1.1));
+	for (int32 I = 0; I < (bLow ? 1 : 3); I++)
+		Emit(ETCFxPreset::Flame, At(X + Rr(-Spread, Spread), Y - 0.2, Z + Rr(-Spread, Spread)), At(0, Rr(0.1, 0.3), 0), Radius * (bLow ? .42 : .36), Rr(0.8, 1.1));
 }
 
 void FTCCombatEffects::VehicleDamageFrame(int32 Id, double Health, bool bKilled, bool bDetailed, float Dt, TFunctionRef<bool(FVector& OutAt)> Anchor)
@@ -919,6 +925,7 @@ void FTCCombatEffects::Muzzle(const FVector& P, double Dx, double Dz, double S, 
 	const double L = S * (S > 1 ? 1.6 : 1.2);
 	Stretch(Emit(ETCFxPreset::Muzzle, P + D * L, D * 0.5, S * (S > 1 ? 0.75 : 0.5), 0.045 + 0.03 * S), L);
 	Emit(ETCFxPreset::Flash, P + D * 0.3 * S, FVector::ZeroVector, S * 0.6, 0.035 + 0.02 * S);
+	if (FTCGraphics::Get().IsLow()) return;
 	if (St.Smoke > 0)
 		for (int32 I = 0; I < 2 + 3 * St.Smoke; I++)
 			Emit(ETCFxPreset::Gunsmoke, P + FVector(Dx * Rr(0.3, 1.4) * S, Dz * Rr(0.3, 1.4) * S, Rr(-0.1, 0.2)), FVector(Dx * Rr(1.5, 4) + Rr(-0.6, 0.6), Dz * Rr(1.5, 4) + Rr(-0.6, 0.6), Rr(0.2, 0.6)), 0.4 * S, Rr(1.6, 2.6));
@@ -971,14 +978,15 @@ void FTCCombatEffects::Burst(const FVector& P, double S)
 {
 	// fx.js burst: a flak shell bursting in the air: a sharp flash, a few sparks and a black puff that swells and drifts
 	Emit(ETCFxPreset::Flash, P, FVector::ZeroVector, 0.9 * S, 0.06f);
-	for (int32 I = 0; I < 4; I++) Emit(ETCFxPreset::Flak, P + FVector(Rr(-0.4, 0.4) * S, Rr(-0.4, 0.4) * S, Rr(-0.3, 0.3) * S), FVector(Rr(-0.8, 0.8), Rr(-0.8, 0.8), Rr(-0.2, 0.4)), Rr(0.6, 0.9) * S, Rr(2.5, 4));
-	for (int32 I = 0; I < 3; I++) { const double A = Rng.FRand() * Tau, H = Rr(3, 7); Emit(ETCFxPreset::Spark, P, FVector(FMath::Cos(A) * H, FMath::Sin(A) * H, Rr(-2, 4)), 0.05f, Rr(0.25, 0.5)); }
+	for (int32 I = 0; I < (FTCGraphics::Get().IsLow() ? 2 : 4); I++) Emit(ETCFxPreset::Flak, P + FVector(Rr(-0.4, 0.4) * S, Rr(-0.4, 0.4) * S, Rr(-0.3, 0.3) * S), FVector(Rr(-0.8, 0.8), Rr(-0.8, 0.8), Rr(-0.2, 0.4)), Rr(0.6, 0.9) * S, Rr(2.5, 4));
+	if (!FTCGraphics::Get().IsLow()) for (int32 I = 0; I < 3; I++) { const double A = Rng.FRand() * Tau, H = Rr(3, 7); Emit(ETCFxPreset::Spark, P, FVector(FMath::Cos(A) * H, FMath::Sin(A) * H, Rr(-2, 4)), 0.05f, Rr(0.25, 0.5)); }
 }
 
 void FTCCombatEffects::Impact(const FVector& P, const FStyle& St, int32 Flags)
 {
 	// fx.js impact; flags: 1 hit, 2 vehicle target, 4 structure target
 	const bool bHit = Flags & 1, bVeh = Flags & 2, bWall = Flags & 4;
+	const bool bLow = FTCGraphics::Get().IsLow();
 	const double Gy = Ground(P.X, P.Y);
 	if (St.Heavy > 0)
 	{
@@ -987,9 +995,9 @@ void FTCCombatEffects::Impact(const FVector& P, const FStyle& St, int32 Flags)
 			// a shell striking armour: a hard flash, sparks, a puff of black smoke and a few torn bits of metal
 			Emit(ETCFxPreset::Flash, P, FVector::ZeroVector, 0.7 * St.Heavy, 0.07f);
 			Emit(ETCFxPreset::Fireball, P, FVector(0, 0, 0.8), 0.3 * St.Heavy, 0.45f);
-			for (int32 I = 0; I < 8; I++) { const double A = Rng.FRand() * Tau, H = Rr(3, 8); Emit(ETCFxPreset::Spark, P, FVector(FMath::Cos(A) * H, FMath::Sin(A) * H, Rr(2, 8)), 0.06f, Rr(0.3, 0.7)); }
-			for (int32 I = 0; I < 3; I++) Emit(ETCFxPreset::WreckSmoke, P + FVector(Rr(-0.4, 0.4), Rr(-0.4, 0.4), Rr(0, 0.5)), FVector(Rr(-0.5, 0.5), Rr(-0.5, 0.5), Rr(1, 2)), 0.35 * St.Heavy, Rr(2.5, 4));
-			for (int32 I = 0; I < 3; I++) { const double A = Rng.FRand() * Tau, H = Rr(2, 5); Emit(ETCFxPreset::Metal, P, FVector(FMath::Cos(A) * H, FMath::Sin(A) * H, Rr(3, 6)), Rr(0.06, 0.12), Rr(1, 1.8)); }
+			for (int32 I = 0; I < (bLow ? 3 : 8); I++) { const double A = Rng.FRand() * Tau, H = Rr(3, 8); Emit(ETCFxPreset::Spark, P, FVector(FMath::Cos(A) * H, FMath::Sin(A) * H, Rr(2, 8)), 0.06f, Rr(0.3, 0.7)); }
+			for (int32 I = 0; I < (bLow ? 1 : 3); I++) Emit(ETCFxPreset::WreckSmoke, P + FVector(Rr(-0.4, 0.4), Rr(-0.4, 0.4), Rr(0, 0.5)), FVector(Rr(-0.5, 0.5), Rr(-0.5, 0.5), Rr(1, 2)), 0.35 * St.Heavy, Rr(2.5, 4));
+			if (!bLow) for (int32 I = 0; I < 3; I++) { const double A = Rng.FRand() * Tau, H = Rr(2, 5); Emit(ETCFxPreset::Metal, P, FVector(FMath::Cos(A) * H, FMath::Sin(A) * H, Rr(3, 6)), Rr(0.06, 0.12), Rr(1, 1.8)); }
 			Sound(TEXT("blast_small"));
 		}
 		else
@@ -1001,20 +1009,20 @@ void FTCCombatEffects::Impact(const FVector& P, const FStyle& St, int32 Flags)
 	}
 	if (bVeh && bHit && !bWall)
 	{
-		for (int32 I = 0; I < 3; I++) { const double A = Rng.FRand() * Tau, H = Rr(3, 7); Emit(ETCFxPreset::Spark, P, FVector(FMath::Cos(A) * H, FMath::Sin(A) * H, Rr(1, 5)), 0.04f, Rr(0.15, 0.35)); }
+		for (int32 I = 0; I < (bLow ? 1 : 3); I++) { const double A = Rng.FRand() * Tau, H = Rr(3, 7); Emit(ETCFxPreset::Spark, P, FVector(FMath::Cos(A) * H, FMath::Sin(A) * H, Rr(1, 5)), 0.04f, Rr(0.15, 0.35)); }
 		Sound(TEXT("ricochet"));
 	}
 	else if (bWall && bHit)
 	{
 		// chips off a wall: a few bits of brick and stone and a puff of pale dust
-		for (int32 I = 0; I < 3; I++) { const double A = Rng.FRand() * Tau, H = Rr(1.5, 3.5); Emit(ETCFxPreset::Masonry, P, FVector(FMath::Cos(A) * H, FMath::Sin(A) * H, Rr(1, 4)), Rr(0.04, 0.08), Rr(0.8, 1.4)); }
+		for (int32 I = 0; I < (bLow ? 1 : 3); I++) { const double A = Rng.FRand() * Tau, H = Rr(1.5, 3.5); Emit(ETCFxPreset::Masonry, P, FVector(FMath::Cos(A) * H, FMath::Sin(A) * H, Rr(1, 4)), Rr(0.04, 0.08), Rr(0.8, 1.4)); }
 		Tint(Emit(ETCFxPreset::Dust, P, FVector(Rr(-0.4, 0.4), Rr(-0.4, 0.4), Rr(0.2, 0.6)), Rr(0.25, 0.4), Rr(0.9, 1.5)), 1.25f);
 	}
 	else
 	{
 		// a bullet kicking up the dirt: a little spurt of dust and grit standing on the ground
 		Emit(ETCFxPreset::Kick, FVector(P.X + Rr(-0.3, 0.3), P.Y + Rr(-0.3, 0.3), Gy - 0.05), FVector::ZeroVector, Rr(0.32, 0.48), Rr(0.55, 0.85));
-		Emit(ETCFxPreset::Clod, FVector(P.X, P.Y, Gy + 0.1), FVector(Rr(-1, 1), Rr(-1, 1), Rr(2.5, 4.5)), Rr(0.03, 0.05), Rr(0.5, 0.8));
+		if (!bLow) Emit(ETCFxPreset::Clod, FVector(P.X, P.Y, Gy + 0.1), FVector(Rr(-1, 1), Rr(-1, 1), Rr(2.5, 4.5)), Rr(0.03, 0.05), Rr(0.5, 0.8));
 	}
 }
 
@@ -1054,18 +1062,19 @@ void FTCCombatEffects::Collapse(double X, double Z, double R)
 {
 	// fx.js collapse: a house or bunker coming down: rolling pale dust, chunks of brick, stone and timber
 	Counters.Collapses++;
-	const double Gy = Ground(X, Z);
-	for (int32 I = 0; I < 16; I++)
+	const double Gy = Ground(X, Z), Q = FTCGraphics::Get().IsLow() ? .45 : 1.;
+	const int32 RingCount = FMath::RoundToInt(12 * Q);
+	for (int32 I = 0; I < FMath::RoundToInt(16 * Q); I++)
 	{
 		const double A = Rng.FRand() * Tau, D = Rng.FRand() * R;
 		Emit(ETCFxPreset::Collapse, At(X + FMath::Cos(A) * D, Gy + Rr(1, 3.5), Z + FMath::Sin(A) * D), At(FMath::Cos(A) * Rr(1, 3), Rr(0.4, 1.2), FMath::Sin(A) * Rr(1, 3)), Rr(1.6, 2.6), Rr(5, 8));
 	}
-	for (int32 I = 0; I < 12; I++)
+	for (int32 I = 0; I < RingCount; I++)
 	{
-		const double A = I / 12.0 * Tau, Sp = Rr(4, 7);
+		const double A = I / (double)RingCount * Tau, Sp = Rr(4, 7);
 		Emit(ETCFxPreset::Collapse, At(X + FMath::Cos(A) * R * 0.7, Gy + 0.6, Z + FMath::Sin(A) * R * 0.7), At(FMath::Cos(A) * Sp, 0.3, FMath::Sin(A) * Sp), Rr(1, 1.6), Rr(3, 5));
 	}
-	for (int32 I = 0; I < 18; I++)
+	for (int32 I = 0; I < FMath::RoundToInt(18 * Q); I++)
 	{
 		const double A = Rng.FRand() * Tau, H = Rr(1.5, 5);
 		Emit(I % 5 == 4 ? ETCFxPreset::Wood : ETCFxPreset::Masonry, At(X + Rr(-R, R) * 0.5, Gy + Rr(2, 5), Z + Rr(-R, R) * 0.5), At(FMath::Cos(A) * H, Rr(3, 8), FMath::Sin(A) * H), Rr(0.15, 0.32), Rr(1.5, 2.6));
@@ -1133,14 +1142,19 @@ void FTCCombatEffects::LaunchRocket(const FVector& From, const FVector& To, doub
 	if (O >= 0) Live[O].Grav = G;
 	Emit(ETCFxPreset::Flash, From, FVector::ZeroVector, 0.8f, 0.07f);
 	const double Sp = FMath::Max(1e-6, V.Size());
-	for (int32 I = 0; I < 3; I++) Emit(ETCFxPreset::Gunsmoke, From, FVector(-V.X / Sp * Rr(2, 4) + Rr(-0.8, 0.8), -V.Y / Sp * Rr(2, 4) + Rr(-0.8, 0.8), Rr(0.3, 0.9)), 0.5f, Rr(1.4, 2.2));
+	if (!FTCGraphics::Get().IsLow()) for (int32 I = 0; I < 3; I++) Emit(ETCFxPreset::Gunsmoke, From, FVector(-V.X / Sp * Rr(2, 4) + Rr(-0.8, 0.8), -V.Y / Sp * Rr(2, 4) + Rr(-0.8, 0.8), Rr(0.3, 0.9)), 0.5f, Rr(1.4, 2.2));
 }
 
-bool FTCCombatEffects::MuzzleOf(const FTCUnit& U, int32 K, double Tx, double Tz, FVector& Out)
+bool FTCCombatEffects::MuzzleOf(const FTCUnit& U, int32 K, double Tx, double Tz, FVector& Out, bool bBazooka)
 {
-	// Placeholder muzzles (the browser reads barrel tips and soldiers' hands off its models): where this client draws
-	// the unit, toward the target. Only ever called for a held, drawn shooter.
+	// Model sockets and posed weapon points take priority; missing assets use the fallback below.
+	// Only ever called for a held, drawn shooter.
 	if (!ATCUnitRenderer::IsDrawn(U)) return false;
+	if (Ctx_.WeaponMuzzle)
+	{
+		const TOptional<bool> Resolved = Ctx_.WeaponMuzzle(U, K, bBazooka, Out);
+		if (Resolved.IsSet()) return Resolved.GetValue();
+	}
 	FVector2D P(U.X, U.Z);
 	if (Ctx_.DrawnAt) Ctx_.DrawnAt(U.Id, P);
 	const FTCUnitDef* Def = Ctx_.Table ? Ctx_.Table->Find(U.Type) : nullptr;
@@ -1154,10 +1168,22 @@ bool FTCCombatEffects::MuzzleOf(const FTCUnit& U, int32 K, double Tx, double Tz,
 		Out = FVector(P.X + D.X * R, P.Y + D.Y * R, Gy + (U.Type == TEXT("bunker") ? 1.6 : 1.1));
 		return true;
 	}
-	if (Def && Def->bAir)
+	FVector Tip;
+	bool bFixed = true;
+	if (U.Type == TEXT("fighter")) Tip = FVector(1.1, 2.4, -.15);
+	else if (U.Type == TEXT("attacker")) Tip = FVector(1.2, 3, -.4);
+	else if (U.Type == TEXT("flak")) Tip = FVector(1.7, .15, 2);
+	else if (U.Type == TEXT("flakpos")) Tip = FVector(.95, .2, 2.1);
+	else if (U.Type == TEXT("lcvp")) Tip = FVector(-3.7, .8, 2.2);
+	else if (U.Type == TEXT("mg")) Tip = FVector(1.72, 0, .45);
+	else bFixed = false;
+	if (bFixed)
 	{
-		const double Side = (K % 2) ? 1.1 : -1.1;
-		Out = FVector(P.X + D.X * 2.4 - D.Y * Side, P.Y + D.Y * 2.4 + D.X * Side, Gy + TCFxRules::AirAltitude);
+		int32& Side = FixedGunSide.FindOrAdd(U.Id);
+		if (K == 0) Side = (Side + 1) % 2;
+		if ((K + Side) % 2 == 0) Tip.Y *= -1;
+		const FQuat Facing(FVector::UpVector, U.Rot);
+		Out = FVector(P.X, P.Y, Gy + (Def && Def->bAir ? TCFxRules::AirAltitude : 0)) + Facing.RotateVector(Tip);
 		return true;
 	}
 	if (Def && !Def->bInfantry)
@@ -1165,6 +1191,19 @@ bool FTCCombatEffects::MuzzleOf(const FTCUnit& U, int32 K, double Tx, double Tz,
 		const double R = Def->Radius * 0.9;
 		Out = FVector(P.X + D.X * R, P.Y + D.Y * R, Gy + 1.6);
 		return true;
+	}
+	if (Def && Def->bInfantry)
+	{
+		if (U.Flags & TCFlags::Garrisoned) return false;
+		const int32 Alive = Def->HpPer > 0 ? FMath::Clamp(FMath::DivideAndRoundUp(U.Hp, Def->HpPer), 0, Def->Models) : 0;
+		int32 Selected = INDEX_NONE, Count = 0;
+		for (int32 Man = 0; Man < Alive; ++Man)
+		{
+			const bool Pick = bBazooka ? Man % 3 == 1 : U.Type != TEXT("ranger") || Man % 3 != 1;
+			if (Pick && Count++ == K) { Selected = Man; break; }
+		}
+		if (Selected == INDEX_NONE) return false;
+		K = Selected;
 	}
 	// a squad: man K of the ranks ATCUnitRenderer draws (three across the facing)
 	const double Across = ((K % 3) - 1) * 1.3, Behind = (K / 3) * 1.3;
@@ -1201,7 +1240,8 @@ void FTCCombatEffects::DirectFire(const FTCShot& Sh, const FTCUnit* From, const 
 	for (int32 I = 0; I < Men; I++)
 	{
 		FVector M;
-		if (!MuzzleOf(*From, I, Sh.X, Sh.Z, M)) break;
+		if (!MuzzleOf(*From, I, Sh.X, Sh.Z, M, bBazooka)) break;
+		SnapshotMuzzles.Add((int64(From->Id) << 32) | uint32(I), M);
 		const int32 Shots = bBazooka ? 1 : St.Burst;
 		const double T0 = St.N > 1 ? Rng.FRand() * 0.18 : 0.0;
 		for (int32 B = 0; B < Shots; B++)
@@ -1237,15 +1277,18 @@ void FTCCombatEffects::Salvo(const FTCShot& Sh, const FTCShotExtra& Ex, const FT
 	if (From) { FVector2D P(From->X, From->Z); if (Ctx_.DrawnAt) Ctx_.DrawnAt(From->Id, P); Top = FVector(P.X, P.Y, Ground(P.X, P.Y) + 1.12); }
 	if (bMortar)
 	{
-		const int32 Mounts = 2; // a destroyer's gun mounts (unit-models.js), as a placeholder count
+		const int32 Mounts = 4; // navals.js destroyer: four gun mounts, all factions
 		for (int32 I = 0; I < N; I++)
 		{
 			const double D = bShip ? FMath::FloorToDouble(I / (double)Mounts) * 1.2 : I * W->Every;
 			if (From)
 			{
-				const FVector Up = Top + FVector((Sh.X - From->X) * 0.15, (Sh.Z - From->Z) * 0.15, 40.0);
-				if (bShip && I < Mounts) { const FVector2D Dd(Sh.X - Top.X, Sh.Z - Top.Y); const double L = FMath::Max(1e-6, Dd.Size()); FStyle Sm; Sm.Smoke = 1; Muzzle(Top, Dd.X / L, Dd.Y / L, 2.4, Sm); }
-				Later(D, [this, Top, Up]() { LaunchRocket(Top, Up, 0.6, 0); });
+				FVector Launch = Top;
+				if (bShip) MuzzleOf(*From, I % Mounts, Sh.X, Sh.Z, Launch);
+				else Launch += FVector(FMath::Cos(From->Rot), FMath::Sin(From->Rot), 0) * 1.1;
+				const FVector Up = Launch + FVector((Sh.X - From->X) * 0.15, (Sh.Z - From->Z) * 0.15, 40.0);
+				if (bShip && I < Mounts) { const FVector2D Dd(Sh.X - Launch.X, Sh.Z - Launch.Y); const double L = FMath::Max(1e-6, Dd.Size()); FStyle Sm; Sm.Smoke = 1; Muzzle(Launch, Dd.X / L, Dd.Y / L, 2.4, Sm); }
+				Later(D, [this, Launch, Up]() { LaunchRocket(Launch, Up, 0.6, 0); });
 				Sound(bShip ? TEXT("tankgun") : TEXT("mortar"));
 			}
 			Sound(TEXT("whistle"));
@@ -1342,14 +1385,14 @@ void FTCCombatEffects::AirShot(const FTCShot& Sh, const FTCShotExtra& Ex, const 
 		// aircraft.js shotDown: a support plane in its run (found by its spot) or a commandable plane falls from there
 		if (!Sh.Kind.IsEmpty())
 			for (FPass& P : Passes)
-				if (!P.bDown && P.Kind == Sh.Kind && FVector2D::Distance(P.At, FVector2D(Sh.X, Sh.Z)) < 1.5) { P.bDown = true; return; }
+				if (!P.bDown && P.Kind == Sh.Kind && FVector2D::Distance(P.At, FVector2D(Sh.X, Sh.Z)) < 1.5) { P.bDown = true; P.HitAt = TCFx31::DownAt(P.T, P.Kind == TEXT("bombing"), Rng.FRand()); return; }
 		if (!To && Sh.bHasTarget) To = PrevHeld.Find(Sh.T);
 		const FString Type = To && FTCUnitMotion::IsPlane(To->Type) ? To->Type : TEXT("fighter");
 		const int32 Owner = To ? To->Owner : Sh.bHasTargetOwner ? Sh.To : State_ ? State_->You : -1;
 		const double G = Ground(Sh.X, Sh.Z), Heading = Ex.bHasDir ? Ex.Dir : To ? To->Rot : 0.0;
 		const double Speed = Type == TEXT("attacker") ? 15.0 : Type == TEXT("bomber") ? 12.0 : 20.0;
 		BeginFall(At(Sh.X, G + TCFxRules::AirAltitude, Sh.Z), Heading, Speed, 0, Type, Owner);
-		Burst(At(Sh.X, G + TCFxRules::AirAltitude, Sh.Z), 1.5); // fx.js fall: burst(x, y, z, 1.5)
+		Burst(At(Sh.X, G + TCFxRules::AirAltitude, Sh.Z), 1.3); // aircraft.js shotDown
 		Sound(TEXT("flak"));
 		return;
 	}
@@ -1370,7 +1413,7 @@ void FTCCombatEffects::AirShot(const FTCShot& Sh, const FTCShotExtra& Ex, const 
 	if (Sh.K == TEXT("aa"))
 	{
 		// main.js: both ends seen, a burst beside the plane (flak guns only); then the guns' tracers (fx.js aaFire)
-		if (From && To && TCFxImpl::IsFlakType(From->Type))
+		if (From && To && TCFxImpl::IsFlakType(From->Type) && (!FTCGraphics::Get().IsLow() || Rng.FRand() >= .5f))
 		{
 			FVector2D P(To->X, To->Z);
 			if (Ctx_.DrawnAt) Ctx_.DrawnAt(To->Id, P);
@@ -1409,7 +1452,8 @@ void FTCCombatEffects::SyncFires(const FTCMatchState& S)
 void FTCCombatEffects::PuffCloud(int32 Id, float Cx, float Cz, float R, bool bFire, bool bBurst)
 {
 	// fx.js puffCloud: thick smoke that rolls slowly in place, big slowly turning puffs layered up to a few metres
-	const double A = Rng.FRand() * Tau, D = FMath::Sqrt(Rng.FRand()) * R * 0.8, Size = R * Rr(0.46, 0.62);
+	const bool bLow = FTCGraphics::Get().IsLow();
+	const double A = Rng.FRand() * Tau, D = FMath::Sqrt(Rng.FRand()) * R * 0.8, Size = R * (bLow ? Rr(.6, .72) : Rr(.46, .62));
 	const double X = Cx + FMath::Cos(A) * D, Z = Cz + FMath::Sin(A) * D, Y = Ground(X, Z) + Size * Rr(0.35, 0.75) + Rng.FRand() * R * 0.18;
 	const double Out = bBurst ? Rr(1.5, 3.5) : 0.25;
 	// the smoke over a burning hedge or house is grey-black and rises; a smoke screen is white and hangs
@@ -1417,6 +1461,7 @@ void FTCCombatEffects::PuffCloud(int32 Id, float Cx, float Cz, float R, bool bFi
 		bBurst ? Size * 0.55 : Size, bBurst ? Rr(4, 8) : Rr(6, 8.5));
 	if (O < 0) return;
 	Live[O].Group = Id;
+	if (bLow) Live[O].Spin = 0;
 	Tint(O, Rr(0.88, 1.05));
 	if (bBurst) { Live[O].Size1 = Size * 1.35; Live[O].Drag = 1.2f; }
 }
@@ -1432,20 +1477,26 @@ void FTCCombatEffects::SyncClouds(const FJsonObject* Raw)
 		{
 			const TArray<TSharedPtr<FJsonValue>>* R = ArrayOf(V);
 			double X, Z, Rad;
-			if (!R || R->Num() < 3 || !Num((*R)[0], X) || !Num((*R)[1], Z) || !Num((*R)[2], Rad) || Clouds.Num() >= 256) continue;
+			if (!R || R->Num() < 3 || !Num((*R)[0], X) || !Num((*R)[1], Z) || !Num((*R)[2], Rad) ) continue;
 			Rad = FMath::Clamp(Rad, 0.5, 60.0);
-			const FString Key = R->Num() > 3 && (*R)[3].IsValid() && (*R)[3]->Type != EJson::Null ? FString::Printf(TEXT("id:%s"), *(*R)[3]->AsString()) : FString::Printf(TEXT("at:%.3f,%.3f"), X, Z);
+			FString Key = FString::Printf(TEXT("at:%.17g"), X * 100003 + Z);
+			if (R->Num() > 3 && (*R)[3].IsValid())
+			{
+				if ((*R)[3]->Type == EJson::Number) Key = FString::Printf(TEXT("number:%.17g"), (*R)[3]->AsNumber());
+				else if ((*R)[3]->Type == EJson::String) Key = TEXT("string:") + (*R)[3]->AsString();
+			}
 			FCloud* C = Clouds.Find(Key);
 			if (C) { C->X = X; C->Z = Z; C->bKeep = true; continue; } // the wind carries it
+			if (Clouds.Num() >= 256) continue;
 			bool bFire = false;
 			for (const auto& F : Fires) if (F.Value.Kind != '.' && FMath::Sqrt(FMath::Square(F.Value.X - X) + FMath::Square(F.Value.Z - Z)) < Rad * 1.5) { bFire = true; break; }
 			FCloud& N = Clouds.Add(Key, { ++CloudSerial, (float)X, (float)Z, (float)Rad, 0.f, true, bFire });
-			const int32 Puffs = FMath::RoundToInt(16 * FMath::Square(Rad / 7) * (bFire ? 0.4 : 1));
+			const int32 Puffs = TCFx31::CloudBurst(FTCGraphics::Get().IsLow(), Rad, bFire);
 			for (int32 I = 0; I < Puffs; I++) PuffCloud(N.Id, N.X, N.Z, N.R, bFire, true);
 			if (!bFire)
 			{
 				// the smoke shells popping: small flashes low on the ground
-				for (int32 I = 0; I < 4; I++) Emit(ETCFxPreset::Flash, At(X + Rr(-2.5, 2.5), Ground(X, Z) + 0.6, Z + Rr(-2.5, 2.5)), FVector::ZeroVector, 0.9f, 0.07f);
+				for (int32 I = 0; I < (FTCGraphics::Get().IsLow() ? 2 : 4); I++) Emit(ETCFxPreset::Flash, At(X + Rr(-2.5, 2.5), Ground(X, Z) + 0.6, Z + Rr(-2.5, 2.5)), FVector::ZeroVector, 0.9f, 0.07f);
 				Sound(TEXT("smoke"));
 			}
 		}
@@ -1466,16 +1517,16 @@ void FTCCombatEffects::UnitDust(const FTCMatchState& S)
 	{
 		const FTCUnit& U = Pair.Value;
 		if (!ATCUnitRenderer::IsDrawn(U)) continue;
-		if ((U.Flags & 32768) && Rng.FRand() <= 0.6f)
+		if ((U.Flags & 32768) && Rng.FRand() <= TCFx31::DustChance(FTCGraphics::Get().IsLow()))
 		{
 			const double X = U.X - FMath::Cos(U.Rot) * 1.6 + Rr(-0.7, 0.7), Z = U.Z - FMath::Sin(U.Rot) * 1.6 + Rr(-0.7, 0.7);
 			Emit(ETCFxPreset::RoadDust, At(X, Ground(X, Z) + 0.3, Z), At(Rr(-0.3, 0.3), Rr(0.3, 0.8), Rr(-0.3, 0.3)), Rr(0.7, 1.2), Rr(1.4, 2.4));
 		}
 		const bool bDig = U.Flags & 16;
-		if ((bDig || (U.Flags & 128)) && Rng.FRand() <= 0.45f)
+		if ((bDig || (U.Flags & 128)) && Rng.FRand() <= TCFx31::WorkChance(FTCGraphics::Get().IsLow()))
 		{
 			const double X = U.X + Rr(-1.2, 1.2), Z = U.Z + Rr(-1.2, 1.2), Gy = Ground(X, Z);
-			if (bDig) for (int32 I = 0; I < 3; I++) Emit(ETCFxPreset::Clod, At(X, Gy + 0.3, Z), At(Rr(-1.2, 1.2), Rr(2.5, 4), Rr(-1.2, 1.2)), Rr(0.03, 0.06), Rr(0.5, 0.8));
+			if (bDig) for (int32 I = 0; I < (FTCGraphics::Get().IsLow() ? 1 : 3); I++) Emit(ETCFxPreset::Clod, At(X, Gy + 0.3, Z), At(Rr(-1.2, 1.2), Rr(2.5, 4), Rr(-1.2, 1.2)), Rr(0.03, 0.06), Rr(0.5, 0.8));
 			Emit(bDig ? ETCFxPreset::Kick : ETCFxPreset::Dust, At(X, Gy - 0.05, Z), At(Rr(-0.2, 0.2), Rr(0.1, 0.4), Rr(-0.2, 0.2)), Rr(0.3, 0.5), Rr(0.6, 1));
 		}
 	}
@@ -1485,6 +1536,7 @@ void FTCCombatEffects::Snapshot(const FTCMatchState& S, const FJsonObject* Raw, 
 {
 	if (!S.bHasMatch) return;
 	Ctx_ = Ctx; State_ = &S; ClockNow = Clock; TickNow = S.Tick;
+	SnapshotMuzzles.Reset();
 	const TArray<FTCShotExtra> Extras = TCShotExtras::Read(Raw);
 	CurrentExtras = &Extras;
 	// client/wind.js setWind from wx (kept when absent)
@@ -1513,6 +1565,16 @@ void FTCCombatEffects::Snapshot(const FTCMatchState& S, const FJsonObject* Raw, 
 		const FTCUnit* To = Sh.bHasTarget ? Held(Sh.T) : nullptr;
 		AirShot(Sh, TCFxImpl::ExtraAt(Extras, I), From, To);
 	}
+
+	Covers.Reset();
+	if (const auto* Rows = Raw ? TCFxJson::ArrayOf(Raw->TryGetField(TEXT("covers"))) : nullptr)
+		for (const auto& Value : *Rows)
+		{
+			const auto* Row = TCFxJson::ArrayOf(Value);
+			double X, Z, Radius, Seconds;
+			if (!Row || Row->Num() < 4 || Covers.Num() >= 256 || !TCFxJson::Num((*Row)[0], X) || !TCFxJson::Num((*Row)[1], Z) || !TCFxJson::Num((*Row)[2], Radius) || !TCFxJson::Num((*Row)[3], Seconds) || Radius <= 0) continue;
+			Covers.Add({ X, Z, Radius, Seconds });
+		}
 
 	// projectiles.js, then fx.js snapshot for the ground war
 	Projectiles.Snapshot(S, Clock);
@@ -1653,8 +1715,9 @@ void FTCCombatEffects::UpdateEmitters(float Dt)
 		const double Gy = Ground(M.X, M.Z);
 		if (TCRender29Aircraft::Landed(M, Gy))
 		{
-			Explode(M.X, M.Z, 3.6, true, true, ETCFxPreset::Metal, 1.2);
+			Explode(M.X, M.Z, 3.6, true, true, ETCFxPreset::Clod, 1.2);
 			Burning(FVector(M.X, M.Z, Gy + .8), .9, 10, 24);
+			if (Ctx_.TimedSound) { Ctx_.TimedSound(TEXT("vehicle_destroyed"), M.X, M.Z, 0, 0); Ctx_.TimedSound(TEXT("fire_loop"), M.X, M.Z, .5, 9); }
 			Sound(TEXT("vehicle_destroyed")); Falls.RemoveAt(I); continue;
 		}
 		FTCFxAircraftDraw& Draw = AircraftDraws.AddDefaulted_GetRef();
@@ -1681,21 +1744,38 @@ void FTCCombatEffects::UpdateEmitters(float Dt)
 	{
 		FPass& P = Passes[I];
 		P.T += Dt;
-		const double U = P.T / TCFxRules::PlaneRun, A = (U - 0.5) * TCFxRules::PlaneSpan, Dx = FMath::Cos(P.Dir), Dz = FMath::Sin(P.Dir);
+		const double U = TCFx31::PassU(P.T, P.Kind == TEXT("bombing")), A = (U - 0.5) * TCFxRules::PlaneSpan, Dx = FMath::Cos(P.Dir), Dz = FMath::Sin(P.Dir);
 		const double X = P.At.X + Dx * A, Z = P.At.Y + Dz * A, Y = FMath::Max(Ground(P.At.X, P.At.Y), Ground(X, Z)) + TCFxImpl::LowOf(P.Kind) + FMath::Abs(U - 0.5) * 30;
+		if (P.Kind == TEXT("bombing")) for (int32 B = 1; B < 6; ++B)
+		{
+			const double Release = B * .2 - .45, StartAlong = (TCFx31::PassU(Release, true) - .5) * 140;
+			const double StartX = P.At.X + Dx * StartAlong, StartZ = P.At.Y + Dz * StartAlong;
+			const double EndAlong = (B / 5. - .5) * 40;
+			const double EndGround = Ground(P.At.X + Dx * EndAlong, P.At.Y + Dz * EndAlong);
+			const double ReleaseHeight = FMath::Max(Ground(P.At.X, P.At.Y), Ground(StartX, StartZ)) + 18 + FMath::Abs(TCFx31::PassU(Release, true) - .5) * 30;
+			TCFx31::FBomb Bomb;
+			if (!TCFx31::BombAt(P.T, B, ReleaseHeight, EndGround, Bomb)) continue;
+			const int32 O = Shape(ETCFxLook::Grenade, FVector(P.At.X + Dx * Bomb.Along, P.At.Y + Dz * Bomb.Along, Bomb.Height), FVector::ZeroVector, .36f, Dt * 1.5f);
+			if (O >= 0) { Live[O].ShapeRot = FRotationMatrix::MakeFromX(FVector(Dx * Bomb.VAlong, Dz * Bomb.VAlong, Bomb.VHeight)).Rotator(); Live[O].Stretch = 1.5f; }
+		}
 		while (P.Strafe.Num() && P.Strafe[0] <= P.T)
 		{
 			const double Along = (P.Strafe[0] / 0.04 - 1.3 / 0.04) / 9.0 - 0.5; // (i / 9 - 0.5) of the run's ten hits
 			P.Strafe.RemoveAt(0);
+			if (!P.bOpened)
+			{
+				P.bOpened = true;
+				if (Ctx_.TimedSound) Ctx_.TimedSound(TEXT("strafe"), P.At.X + Dx * Along * 36, P.At.Y + Dz * Along * 36, 0, 0);
+			}
 			StrafeHit(P.At.X + Dx * Along * 36 + (Rng.FRand() - 0.5) * 3, P.At.Y + Dz * Along * 36 + (Rng.FRand() - 0.5) * 3);
 		}
 		while (P.Flak.Num() && P.Flak[0] <= P.T) { P.Flak.RemoveAt(0); Burst(FVector(X + Dx * 3 + (Rng.FRand() - 0.5) * 5, Z + Dz * 3 + (Rng.FRand() - 0.5) * 5, Y + (Rng.FRand() - 0.5) * 4)); }
-		if (P.bDown && P.T >= 1.3f)
+		if (P.bDown && P.T >= P.HitAt)
 		{
 			const FString Type = P.Kind == TEXT("para") ? TEXT("transport") : P.Kind == TEXT("bombing") ? TEXT("bomber") : P.Kind == TEXT("recon") ? TEXT("fighter") : TEXT("attacker");
 			BeginFall(FVector(X, Z, Y), P.Dir, TCFxRules::PlaneSpan / TCFxRules::PlaneRun * .75, U < .5 ? -10. : 10., Type, P.Owner,
 				FMath::Atan2(U < .5 ? -10. : 10., TCFxRules::PlaneSpan / TCFxRules::PlaneRun));
-			Burst(FVector(X + Dx * 2, Z + Dz * 2, Y + 0.5), 1.5);
+			Burst(FVector(X + Dx * 2, Z + Dz * 2, Y + 0.5), 1.3);
 			Passes.RemoveAt(I);
 			continue;
 		}
@@ -1716,9 +1796,10 @@ void FTCCombatEffects::UpdateEmitters(float Dt)
 		FRocket& R = Rockets[I];
 		R.T += Dt; R.Acc += Dt;
 		if (R.T >= R.Dur) { Rockets.RemoveAt(I); continue; }
-		while (R.Acc >= 0.03f)
+		const float Every = FTCGraphics::Get().IsLow() ? .07f : .03f;
+		while (R.Acc >= Every)
 		{
-			R.Acc -= 0.03f;
+			R.Acc -= Every;
 			const float T = R.T - R.Acc;
 			Emit(ETCFxPreset::Trail, R.P0 + R.V * T - FVector(0, 0, 0.5f * R.G * T * T), FVector(0, 0, 0.3f), 0.2f, Rr(1.2, 1.8));
 		}
@@ -1731,7 +1812,8 @@ void FTCCombatEffects::UpdateEmitters(float Dt)
 		if (W.T >= W.Dur) { WreckFires.RemoveAt(I); continue; }
 		const float FireK = W.T < W.Fire * 0.5f ? 1.f : FMath::Max(0.f, 1.f - (W.T - W.Fire * 0.5f) / (W.Fire * 0.5f));
 		const float SmokeK = 1.f - 0.65f * (W.T / W.Dur);
-		W.Fa += Dt * FireK * 6; W.Sa += Dt * SmokeK * 4.5f; W.Ea += Dt * FireK * 3;
+		const bool bLow = FTCGraphics::Get().IsLow();
+		W.Fa += Dt * FireK * TCFx31::WreckFlames(bLow); W.Sa += Dt * SmokeK * TCFx31::WreckSmoke(bLow); W.Ea += Dt * FireK * TCFx31::WreckEmbers(bLow);
 		while (W.Fa >= 1)
 		{
 			W.Fa -= 1;
@@ -1751,7 +1833,7 @@ void FTCCombatEffects::UpdateEmitters(float Dt)
 		FColumn& C = Columns[I];
 		if ((C.T += Dt) >= C.Dur) { Columns.RemoveAt(I); continue; }
 		const float K = 1.f - C.T / C.Dur;
-		for (C.Acc += Dt * 5 * K; C.Acc >= 1; C.Acc -= 1)
+		for (C.Acc += Dt * (FTCGraphics::Get().IsLow() ? 2.5 : 5) * K; C.Acc >= 1; C.Acc -= 1)
 		{
 			const double A = Rng.FRand() * Tau, R = Rng.FRand() * 0.25 * C.S;
 			Tint(Emit(ETCFxPreset::Smoke, C.P + FVector(FMath::Cos(A) * R, FMath::Sin(A) * R, Rr(0.3, 0.8) * C.S), FVector(FMath::Cos(A) * 0.4, FMath::Sin(A) * 0.4, Rr(2, 3.2) + 0.2 * C.S), Rr(0.32, 0.42) * C.S, Rr(7, 10) + C.S), Rr(0.8, 1.1));
@@ -1761,13 +1843,14 @@ void FTCCombatEffects::UpdateEmitters(float Dt)
 	for (auto& Pair : Clouds)
 	{
 		FCloud& C = Pair.Value;
-		const float Target = 26.f * FMath::Square(C.R / 7.f);
-		for (C.Acc += Dt * Target / 7.2f; C.Acc >= 1; C.Acc -= 1) PuffCloud(C.Id, C.X, C.Z, C.R, C.bFire, false);
+		const double Rate = TCFx31::CloudRate(FTCGraphics::Get().IsLow(), C.R);
+		for (C.Acc += Dt * Rate; C.Acc >= 1; C.Acc -= 1) PuffCloud(C.Id, C.X, C.Z, C.R, C.bFire, false);
 	}
 	// fires: burning grass, hedges, woods and houses; many share the particle budget (fx.js updateFires)
 	if (Fires.Num())
 	{
-		const float Share = FMath::Min(1.f, 50.f / Fires.Num());
+		const bool bLow = FTCGraphics::Get().IsLow();
+		const float Share = TCFx31::FireShare(bLow, Fires.Num());
 		for (auto& Pair : Fires)
 		{
 			FFire& F = Pair.Value;
@@ -1776,7 +1859,7 @@ void FTCCombatEffects::UpdateEmitters(float Dt)
 			{
 				const int32 O = Emit(ETCFxPreset::Flame, FVector(F.X + Rr(-0.8, 0.8), F.Z + Rr(-0.8, 0.8), F.Y + L.H * Rr(0.6, 1.8)), FVector(0, 0, Rr(0.1, 0.3)), L.Size * Rr(0.8, 1.2), Rr(0.9, 1.4));
 				if (O >= 0) Live[O].Pull = F.Kind == 'B' ? 0.8f : 0.4f; // in front of the walls and the hedge it burns in
-				if (Rng.FRand() < 0.15f) Emit(ETCFxPreset::Ember, FVector(F.X + Rr(-0.6, 0.6), F.Z + Rr(-0.6, 0.6), F.Y + L.H + 0.8f), FVector(Rr(-1, 1), Rr(-1, 1), Rr(2, 4)), 0.05f, Rr(1, 2));
+				if (!bLow && Rng.FRand() < 0.15f) Emit(ETCFxPreset::Ember, FVector(F.X + Rr(-0.6, 0.6), F.Z + Rr(-0.6, 0.6), F.Y + L.H + 0.8f), FVector(Rr(-1, 1), Rr(-1, 1), Rr(2, 4)), 0.05f, Rr(1, 2));
 			}
 			for (F.Sa += Dt * L.Smoke * Share; F.Sa >= 1; F.Sa--)
 				Tint(Emit(F.Kind == '.' ? ETCFxPreset::Smoke : ETCFxPreset::WreckSmoke, FVector(F.X + Rr(-0.6, 0.6), F.Z + Rr(-0.6, 0.6), F.Y + L.H + 1), FVector(Rr(-0.3, 0.3), Rr(-0.3, 0.3), Rr(1.2, 2)), L.Size * Rr(0.8, 1.1), Rr(5, 8)), F.Kind == '.' ? 1.2f : 1.f);
@@ -2153,6 +2236,7 @@ namespace TCFxImpl
 		switch (L)
 		{
 		case ETCFxLook::Plane: return { MCube, FLinearColor(0.24f, 0.26f, 0.21f) };
+		case ETCFxLook::Grenade: return { MCube, FLinearColor(.035f, .04f, .023f) };
 		case ETCFxLook::Canopy: return { MSphere, FLinearColor(0.85f, 0.82f, 0.72f) };
 		case ETCFxLook::Section: return { MCube, FLinearColor(0.54f, 0.49f, 0.42f) };
 		default: return { MSphere, FLinearColor::White };
@@ -2194,6 +2278,56 @@ FTCFxContext ATCEffects::MakeContext() const
 	C.HeightAt = [T](float X, float Z) { return T.IsValid() ? T->HeightAt(X, Z) : 0.f; };
 	TWeakObjectPtr<ATCUnitRenderer> U = UnitView;
 	C.DrawnAt = [U](int32 Id, FVector2D& Out) { return U.IsValid() && U->DrawnAt(Id, Out); };
+	const TWeakObjectPtr<UTCAudio> Audio = GetWorld() ? GetWorld()->GetSubsystem<UTCAudio>() : nullptr;
+	C.TimedSound = [Audio](const FString& Name, double X, double Z, double Delay, double Duration)
+	{
+		if (!Audio.IsValid()) return;
+		FTCAudioPlayOptions Options; Options.Delay = Delay; Options.Dur = Duration;
+		Audio->Play(Name, FVector2D(X, Z), Options);
+	};
+	C.WeaponMuzzle = [U, T, this](const FTCUnit& Unit, int32 K, bool bBazooka, FVector& Out) -> TOptional<bool>
+	{
+		if (!U.IsValid() || !State || !Table) return {};
+		const FTCUnitDef* Def = Table->Find(Unit.Type);
+		if (!Def) return {};
+		const int32 Faction = State->Factions.IsValidIndex(Unit.Owner) ? State->Factions[Unit.Owner] : 0;
+		const FTCModelEntry* Model = U->Models().Resolve({ Unit.Type, Faction, FString() });
+		if (!Model) return {};
+		FVector2D Position(Unit.X, Unit.Z); U->DrawnAt(Unit.Id, Position);
+		const FTCPartMotion* Motion = U->MotionOf(Unit.Id);
+		const double Heading = Motion ? Motion->Heading : Unit.Rot;
+		const double Ground = T.IsValid() ? T->HeightAt(Position.X, Position.Y) : 0;
+		if (Def->bInfantry && Unit.Type != TEXT("mg") && Unit.Type != TEXT("at") && Unit.Type != TEXT("mortar") && Unit.Type != TEXT("howitzer"))
+		{
+			const TOptional<bool> Muzzle = U->InfantryWeaponMuzzle(Unit, K, bBazooka, Ground, Out);
+			if (Muzzle.IsSet()) return Muzzle;
+		}
+
+		const FTransform Root(FQuat(FVector::UpVector, Heading), FVector(Position.X, Position.Y, Ground + (Def->bAir ? TCFxRules::AirAltitude : 0)) * 100);
+		TMap<FName, FQuat> Turns;
+		double Turn = FMath::FindDeltaAngleRadians(Heading, double(Unit.Aim));
+		const double Limit = Unit.Type == TEXT("kaiju") ? 1 : Unit.Type == TEXT("tankdestroyer") && (Model->Faction == 1 || Model->Faction == 2) ? .21 : 0;
+		if (Limit) Turn = FMath::Clamp(Turn, -Limit, Limit);
+		for (const auto& Part : Model->Parts)
+		{
+			const FString Name = Part.Name.ToString();
+			if (Name == TEXT("turret") || Name.StartsWith(TEXT("mount_")) || ((Unit.Type == TEXT("at") || Unit.Type == TEXT("flak")) && Name.StartsWith(TEXT("gun_")))) Turns.Add(Part.Name, FQuat(FVector::UpVector, Turn));
+		}
+		for (int32 I = 0; I < Model->Parts.Num(); ++I)
+		{
+			const auto& Part = Model->Parts[I];
+			if (Unit.Type == TEXT("destroyer") && Part.Name != FName(*FString::Printf(TEXT("mount_%d"), K % 4))) continue;
+			if (!Part.Sockets.Contains(FName(TEXT("fx_tip")))) continue;
+			UStaticMesh* Mesh = Cast<UStaticMesh>(Part.Mesh.TryLoad());
+			const UStaticMeshSocket* Socket = Mesh ? Mesh->FindSocket(FName(TEXT("fx_tip"))) : nullptr;
+			if (!Socket) continue;
+			const FTCPartMotion Still;
+			const FTransform World = FTCUnitMotion::PartTransform(*Model, I, Root, Turns, Motion ? *Motion : Still);
+			Out = World.TransformPosition(Socket->RelativeLocation) / 100;
+			return true;
+		}
+		return {};
+	};
 	C.Table = Table;
 	if (const UWorld* W = GetWorld())
 		if (const APlayerController* PC = W->GetFirstPlayerController())
@@ -2225,6 +2359,11 @@ void ATCEffects::OnSnapshot(const FTCMatchState& S, const FJsonObject& Raw)
 {
 	const double Clock = GetWorld() ? GetWorld()->GetRealTimeSeconds() : 0.0;
 	Fx.Snapshot(S, &Raw, MakeContext(), Clock);
+	if (GetWorld()) if (UTCAudio* Audio = GetWorld()->GetSubsystem<UTCAudio>())
+	{
+		const TWeakObjectPtr<ATCEffects> Self(this);
+		Audio->PrepareSnapshot(Raw, [Self](int32 Id, int32 K, FVector& Out) { return Self.IsValid() && Self->Fx.SnapshotMuzzle(Id, K, Out); }, MakeContext().HeightAt);
+	}
 	SyncRubble();
 }
 
@@ -2407,6 +2546,18 @@ void ATCEffects::Tick(float DeltaSeconds)
 	if (Alerts) Alerts->Frame(FPlatformTime::Seconds()); // alerts.js frame and pings.js frame (the alert clock)
 	if (!State || !State->bHasMatch) { if (LastInstances) Reset(); return; }
 	const double Clock = GetWorld()->GetRealTimeSeconds();
+	// Explicit integration-only audition. Normal play uses only delivered effect cues.
+	static const bool bAudioAudition = FParse::Param(FCommandLine::Get(), TEXT("TCFx31AudioAudition"));
+	if (bAudioAudition && AudioAuditionIndex < TCAudioRules::Clips().Num() && Clock >= AudioAuditionNext)
+		if (UTCAudio* Audio = GetWorld()->GetSubsystem<UTCAudio>())
+			if (Audio->BankState().FullyLoaded() && Audio->GetMixer().IsRunning())
+			{
+				const auto& Clip = TCAudioRules::Clips()[AudioAuditionIndex++];
+				FTCAudioPlayOptions Options; Options.Dur = Clip.bLoop ? 2 : 0;
+				Audio->Play(Clip.Id, TOptional<FVector2D>(), Options);
+				AudioAuditionNext = Clock + (Clip.bLoop ? 2 : Clip.Dur) + .6;
+				UE_LOG(LogTC, Log, TEXT("fx31 audition %d/35: %s duration %.3f boost %.1f loop %d"), AudioAuditionIndex, Clip.Id, Clip.Dur, Clip.Boost, Clip.bLoop);
+			}
 	// The replay's age-zero image matches the browser's controlled presentation clock. A preceding screenshot
 	// hitch must not advance newly received particles before their first captured draw. Ordinary play is unchanged.
 	const bool bCaptureBirth = !BridgeShotPrefix.IsEmpty() && State->Tick >= 8400 && BridgeCollapse < 0;
@@ -2459,7 +2610,7 @@ void ATCEffects::DamageFrame(float Dt)
 			// The model's world heading is the eased root heading, not its bank/wobble.
 			const double Rot = Motion ? Motion->Heading : U.Rot;
 			if (Spec) Fx.PlaneDamageFrame(U.Id, Def->MaxHp() > 0 ? double(U.Hp) / Def->MaxHp() : 1.0, ATCUnitRenderer::IsDrawn(U), Dt,
-				FVector(Position.X, Position.Y, Ground + TCFxRules::AirAltitude), Rot, Spec->Tail, Spec->Nose);
+				FVector(Position.X, Position.Y, Ground + TCFxRules::AirAltitude), Rot, Spec->Tail * TCUnits31::AirframeScale, Spec->Nose * TCUnits31::AirframeScale);
 			continue;
 		}
 		const FTCPartMotion* M = UnitView.IsValid() ? UnitView->MotionOf(U.Id) : nullptr;
@@ -2499,7 +2650,7 @@ int32 ATCEffects::DrawAircraftModels()
 		Motion.Body = FTransform(FQuat(FVector::RightVector, -Draw.Pitch) * FQuat(FVector::ForwardVector, -Draw.Roll));
 		for (const FTCModelPart& Part : Entry->Parts)
 			if (Part.Name.ToString().StartsWith(TEXT("prop_"))) Motion.Parts.Add(Part.Name, FTransform(FQuat(FVector::ForwardVector, -Draw.PropAngle)));
-		const FTransform Root(FQuat(FVector::UpVector, Draw.Heading), Draw.P * 100., FVector(Draw.Scale));
+		const FTransform Root(FQuat(FVector::UpVector, Draw.Heading), Draw.P * 100., FVector(Draw.Scale * TCUnits31::AirframeScale));
 		const TMap<FName, FQuat> NoTurns;
 		for (int32 I = 0; I < Entry->Parts.Num(); I++)
 		{
@@ -2541,7 +2692,7 @@ int32 ATCEffects::DrawAircraftModels()
 		if (!*Found) continue;
 		const double Ground = Terrain.IsValid() ? Terrain->HeightAt(Draw.P.X, Draw.P.Y) : 0;
 		FFrame& F = Frames.FindOrAdd(*Found);
-		const double Side = Spec->Ext * 2 * Draw.ShadowScale * Draw.Scale;
+		const double Side = Spec->Ext * 2 * Draw.ShadowScale * Draw.Scale * TCUnits31::AirframeScale;
 		F.Transforms.Add(FTransform(FQuat(FVector::UpVector, Draw.Heading), FVector(Draw.P.X, Draw.P.Y, Ground + .3) * 100., FVector(Side, Side, 1)));
 		F.Keys.Add(FTCInstanceHistory::PartKey(-Draw.Serial, 60000)); Count++;
 	}
@@ -2616,6 +2767,14 @@ void ATCEffects::Draw(double Clock)
 		const FVector Loc = P.P * 100.0;
 		FTransform T;
 		if (P.Look == ETCFxLook::Plane) T = FTransform(FRotationMatrix::MakeFromX(P.V.GetSafeNormal().IsNearlyZero() ? FVector::ForwardVector : P.V.GetSafeNormal()).ToQuat(), Loc, FVector(P.Stretch, 4.f, 0.6f));
+		else if (P.Look == ETCFxLook::Grenade) T = FTransform(P.ShapeRot.Quaternion(), Loc, FVector(P.Stretch, P.Size, P.Size));
+		else if (P.Look == ETCFxLook::Canopy)
+		{
+			T = FTransform(FQuat::Identity, Loc, FVector(P.Size, P.Size, .6f));
+			constexpr int32 PassengerKey = 310;
+			Batch(PassengerKey, CubeMesh, FLinearColor(.045f, .053f, .021f), false);
+			Frames.FindOrAdd(PassengerKey).Add(FTransform(FQuat::Identity, Loc - FVector(0, 0, 150), FVector(.3f, .3f, 1.f)));
+		}
 		else T = FTransform(FQuat::Identity, Loc, FVector(FMath::Max(P.Size, 0.05f)));
 		Frames.FindOrAdd(Key).Add(T);
 	}
@@ -2645,6 +2804,18 @@ void ATCEffects::Draw(double Clock)
 				const float S = 0.35f * FMath::Max(0.1f, L.Opacity);
 				Frames.FindOrAdd(TCFxImpl::PingKey).Add(FTransform(FQuat(FVector::UpVector, An), P * 100.0, FVector(S, S * 2.f, 0.05f)));
 			}
+		}
+	}
+	// markers.js coverRings: recipient-delivered centre/radius, replaced on every snapshot.
+	constexpr int32 CoverKey = 311;
+	for (const auto& Ring : Fx.CoverRings())
+	{
+		Batch(CoverKey, CubeMesh, FLinearColor(.337f, .631f, 1.f), true);
+		for (int32 I = 0; I < 96; ++I)
+		{
+			const double Angle = I * 2 * PI / 96, X = Ring.X + FMath::Cos(Angle) * Ring.Radius, Z = Ring.Z + FMath::Sin(Angle) * Ring.Radius;
+			const double H = Terrain.IsValid() ? Terrain->HeightAt(X, Z) : 0;
+			Frames.FindOrAdd(CoverKey).Add(FTransform(FQuat(FVector::UpVector, Angle), FVector(X, Z, H + .2) * 100., FVector(.5 * Ring.Opacity(), Ring.Radius * 2 * PI / 96, .025)));
 		}
 	}
 	int32 Shapes = 0;

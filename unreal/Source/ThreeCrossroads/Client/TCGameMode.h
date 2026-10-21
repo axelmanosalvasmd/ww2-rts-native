@@ -288,6 +288,8 @@ public:
 	// Why the last SendCommand returned false (empty after a send that went out), for a log or the HUD.
 	const FString& LastSendProblem() const { return LastSendProblemText; }
 	FString ConnectionStatus() const;
+	// Advisory, persistent across start; replaced by every lobby, including hash absence.
+	FString RustRulesWarning;
 	// Round 17 (hudui): the connection's retry countdown for #connectionBanner (FTCConnection::RetryLeft; -1: none)
 	FTCConnectionNotice ConnectionNotice() const { return Connection ? Connection->Notice() : FTCConnectionNotice(); }
 	void SaveMatchView();

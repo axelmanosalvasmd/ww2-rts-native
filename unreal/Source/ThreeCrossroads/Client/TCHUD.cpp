@@ -1,4 +1,5 @@
 #include "Client/TCHUD.h"
+#include "Client/TCHUD31Labels.h"
 #include "Client/TCLook30Cargo.h"
 #include "Client/TCHUD30Core.h"
 #include "Client/TCStats.h"
@@ -1953,6 +1954,13 @@ void ATCHUD::DrawLabel(const FString& Str, const FLinearColor& Colour, float X, 
 {
 	const FString Shown = TC_T(Str);
 	NoteKept(Str, Shown);
+ if (bCollectWorldLabels)
+ {
+  float W=0,H=0; LabelSize(Str,W,H,Font,Scale);
+  TCHud31::SubmitWorldLabel(Canvas,FBox2D(FVector2D(X,Y),FVector2D(X+W,Y+H)),
+   [this,Shown,Colour,X,Y,Font,Scale]() { DrawShown(Shown,Colour,X,Y,Font,Scale); });
+  return;
+ }
 	DrawShown(Shown, Colour, X, Y, Font, Scale);
 }
 
@@ -3458,7 +3466,7 @@ void ATCHUD::DrawMinimapOverlays(double Now)
   Ring(Threat.At,Threat.Radius,FLinearColor(FColor(0xd4,0x57,0x4a,0x66)));
  }
 
-	Minimap.OverlayRole=TEXT("alert"); DrawMinimapAlertRings();
+	Minimap.OverlayRole=TEXT("alert"); DrawMinimapAlertRings(Now);
 	Minimap.OverlayRole=TEXT("ping"); DrawMinimapPings(Now);
  Minimap.OverlayRole.Reset();
 }
@@ -3584,6 +3592,8 @@ void ATCHUD::DrawHUD()
 		if (!bAsIs) NoteKept(Lines[I], Shown);
 		Status.Add({ Shown, Text, bAsIs });
 	}
+	// Rules compatibility warnings remain visible when native diagnostics are hidden.
+	if (!M->RustRulesWarning.IsEmpty()) Status.Add({ M->RustRulesWarning, Warn, false });
 	if (M->Controls.TerminalNotice.IsEmpty() && (!S.DenyReason.IsEmpty() || !S.DenyCmd.IsEmpty()))
 	{
 		const FString Deny = FString::Printf(TEXT("Refused (%s): %s"), *S.DenyCmd, *(M->Controls.TerminalNotice.IsEmpty() ? TCOrders::DenySentence(S.DenyReason, S.DenyCmd) : M->Controls.TerminalNotice));
@@ -3606,7 +3616,10 @@ void ATCHUD::DrawHUD()
 		Minimap.ViewFromCanvas(Canvas, M->Terrain, View);
         View.YawDegrees = PC->ViewYaw();
 		TCMarkersHud::Verify(*M, PC->Selected); // round 17: -TCMarkersSelect= and -TCMarkersLog (verification only)
+  TCHud31::BeginWorldLabels(Canvas);
+  bCollectWorldLabels=true;
 		DrawWorldOverlays(Font);
+  bCollectWorldLabels=false;
 		// round 14: the paper war map over the world and its markers, under every panel (client/map-view.js)
 		M->WarMap.Draw(Canvas, *M, *PC);
 		BeginUi(FTCSettingsStore::UIScaleFactor(PC->UiScalePercent));
@@ -3838,12 +3851,18 @@ void ATCHUD::DrawHUD()
   if (!TooltipInteraction.Allows(FVector2D(TipX,TipY),TooltipAnchor)) PendingTooltip.Reset();
   if (PendingTooltip.IsEmpty() && !TooltipAnchor.bIsValid && Minimap.Rect().bIsValid) OfferTooltip(TEXT("Minimap"),Minimap.Rect());
  }
+ TArray<FBox2D> LabelBlocks=Panels;
+ if (Minimap.Rect().bIsValid) LabelBlocks.Add(Minimap.Rect());
+ if (PC->ModalSheetOpen()) LabelBlocks.Add(FBox2D(FVector2D::ZeroVector,DrawnViewport));
+ FTCHudFit::FBottomLayout Tip;
 	if (!PendingTooltip.IsEmpty() && TooltipAnchor.bIsValid && !PC->ModalSheetOpen())
 	{
 	 const FTCMeasure Measure=FTCType::IsLoaded()?FTCType::Measure():FTCPaint::CanvasMeasure(Font);
-	 const FTCHudFit::FBottomLayout Tip=FTCHudFit::Tooltip(TC_T(PendingTooltip),TooltipAnchor,FVector2D(Canvas->ClipX,Canvas->ClipY),Measure);
-	 FTCType::Draw(Tip.Paint,Canvas,Font,1);
+	 Tip=FTCHudFit::Tooltip(TC_T(PendingTooltip),TooltipAnchor,FVector2D(Canvas->ClipX,Canvas->ClipY),Measure);
+  LabelBlocks.Append(Tip.Paint.Panels);
 	}
+ TCHud31::FinishWorldLabels(LabelBlocks);
+ FTCType::Draw(Tip.Paint,Canvas,Font,1);
 	DrawControlsSheet(Font, Big);
 	DrawStatsSheet(Font); // round 16: Menu > Stats overlay
 	DrawPortraitGallery(Font);

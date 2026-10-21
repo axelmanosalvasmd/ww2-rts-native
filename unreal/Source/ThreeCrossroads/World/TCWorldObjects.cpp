@@ -1,4 +1,5 @@
 #include "World/TCWorldObjects.h"
+#include "World/TCWorld31Controls.h"
 #include "Client/TCGraphics.h"
 #include "Client/TCLighting.h"
 #include "Client/TCEffects.h"
@@ -501,7 +502,7 @@ void FTCWorldObjects::BuildCandidates()
 	if (Biome.Num()) Map.Biome.assign(Biome.GetData(), Biome.GetData() + Biome.Num());
 	Map.bWorld = bWorld;
 	if (bWorld) Map.Discovered.assign(Discovered.GetData(), Discovered.GetData() + Discovered.Num());
-	Candidates = TCScatterCore::Candidates(Map);
+	Candidates = TCWorld31Controls::NoScatter() ? std::vector<TCScatterCore::FCandidate>() : TCScatterCore::Candidates(Map);
 	Placed.assign(Candidates.size(), TCScatterCore::FPlaced());
 	for (int32& I : CandidateAt) I = -1;
 	for (TArray<int32>& L : ChunkCandidates) L.Reset();
@@ -1128,6 +1129,7 @@ void FTCWorldObjectsView::BuildRegion(const FTCWorldObjects& Model, int32 Region
 			});
 			Model.ForEachProp(Chunk, [&](const FCandidate& C, const FPlaced& P)
 			{
+				if (!bDrawScatter || TCWorld31Controls::NoScatter()) return;
 				// the far level of detail is the reference's Low set: no grass, odd seeds thinned (crops stay whole)
 				const bool bDetail = P.Kind == EProp::Grass || ((C.Seed & 1) && C.Kind != EProp::Crop);
 				FBatch& B = Batches.FindOrAdd(CompKey(Region, bDetail ? LayerPropsDetail : LayerProps, (int32)P.Kind));

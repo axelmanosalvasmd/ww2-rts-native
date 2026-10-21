@@ -1,4 +1,5 @@
 #include "Client/TCMarkers.h"
+#include "Client/TCHUD31Labels.h"
 #include "Client/TCCampModels.h"
 #include "Client/TCWorldRecovery.h"
 #include "ThreeCrossroads.h"
@@ -562,46 +563,52 @@ bool FTCMarkerPainter::Tag(UFont* Font, const FString& Text, double X, double Z,
 	{ Px -= 2; TextW = TCMarkerText::Width(Text, Px, Tracking); }
 	const double Bh = St.H - 12, Y0 = 6, Pad = 16, Sw = St.bSwatch && Swatch ? Bh - 22 : 0, LeadIn = Sw > 0 ? Sw + 14 : 0;
 	const double Bw = FMath::Min(Cw - 4, TextW + 2 * Pad + LeadIn), X0 = (Cw - Bw) / 2;
-	// markers.js screenSized keeps the projected world anchor. The later HUD panels cover it naturally.
+	// Keep the world anchor, then cull the whole plate against this frame's HUD and tooltip.
 	const FVector2D Origin(At.X - Cw * K / 2, At.Y - St.H * K / 2);
-	auto Rect = [&](double Cx0, double Cy0, double Cw0, double Ch0, FLinearColor C)
+	const FBox2D Bounds(Origin + FVector2D(X0, Y0) * K, Origin + FVector2D(X0 + Bw, Y0 + Bh) * K);
+	UCanvas* TagCanvas = Canvas;
+	const FLinearColor SwatchValue = Swatch ? *Swatch : FLinearColor::Transparent;
+	TCHud31::SubmitWorldLabel(Canvas, Bounds, [=]()
 	{
-		C.A *= Alpha;
-		C = TCMarkersHud::WorldColour(Canvas, C, W);
-		FCanvasTileItem T(Origin + FVector2D(Cx0, Cy0) * K, GWhiteTexture, FVector2D(Cw0, Ch0) * K, C);
-		T.BlendMode = SE_BLEND_Translucent;
-		Canvas->DrawItem(T);
-	};
-	// the plate (inset 1.5 canvas px) and its 3 px hairline centred on that edge
-	Rect(X0 + 1.5, Y0 + 1.5, Bw - 3, Bh - 3, TagPlate);
-	Rect(X0, Y0, Bw, 3, TagHairline);
-	Rect(X0, Y0 + Bh - 3, Bw, 3, TagHairline);
-	Rect(X0, Y0 + 3, 3, Bh - 6, TagHairline);
-	Rect(X0 + Bw - 3, Y0 + 3, 3, Bh - 6, TagHairline);
-	if (Sw > 0)
-	{
-		Rect(X0 + 11, (St.H - Sw) / 2, Sw, Sw, *Swatch);
-		const FColor C = Swatch->ToFColor(true);
-		const double Lum = (C.R * 0.2126 + C.G * 0.7152 + C.B * 0.0722) / 255.0;
-		FLinearColor Ink(FColor(Lum > 0.6 ? 0x1a1d1f : 0xf2efe6)); Ink.A = Alpha;
-		Ink = TCMarkersHud::WorldColour(Canvas, Ink, W);
-		TCMarkerIcons::Hq(Canvas, Origin + FVector2D(X0 + 11 + Sw * 0.07, (St.H - Sw * 0.86) / 2) * K, Sw * 0.86 * K, Ink);
-	}
-	FLinearColor TC = TagText;
-	TC.A *= Alpha;
-	TC = TCMarkersHud::WorldColour(Canvas, TC, W);
-	const double TextCx = X0 + LeadIn + (Bw - LeadIn) / 2, TextCy = St.H / 2 + 2;
-	if (bBarlow)
-	{
-		TCMarkerText::Draw(Canvas, Text, Origin + FVector2D(TextCx - TextW / 2, TextCy - Px * 0.6) * K, Px * K, Tracking * K, TC);
-	}
-	else
-	{
-		FCanvasTextItem Item(Origin + FVector2D(TextCx * K - TW1 * TextScale / 2, TextCy * K - TH1 * TextScale / 2), FText::FromString(Text), Font, TC);
-		Item.Scale = FVector2D(TextScale, TextScale);
-		Item.BlendMode = SE_BLEND_Translucent;
-		Canvas->DrawItem(Item);
-	}
+		auto Rect = [&](double Cx0, double Cy0, double Cw0, double Ch0, FLinearColor C)
+		{
+			C.A *= Alpha;
+			C = TCMarkersHud::WorldColour(TagCanvas, C, W);
+			FCanvasTileItem T(Origin + FVector2D(Cx0, Cy0) * K, GWhiteTexture, FVector2D(Cw0, Ch0) * K, C);
+			T.BlendMode = SE_BLEND_Translucent;
+			TagCanvas->DrawItem(T);
+		};
+		// the plate (inset 1.5 canvas px) and its 3 px hairline centred on that edge
+		Rect(X0 + 1.5, Y0 + 1.5, Bw - 3, Bh - 3, TagPlate);
+		Rect(X0, Y0, Bw, 3, TagHairline);
+		Rect(X0, Y0 + Bh - 3, Bw, 3, TagHairline);
+		Rect(X0, Y0 + 3, 3, Bh - 6, TagHairline);
+		Rect(X0 + Bw - 3, Y0 + 3, 3, Bh - 6, TagHairline);
+		if (Sw > 0)
+		{
+			Rect(X0 + 11, (St.H - Sw) / 2, Sw, Sw, SwatchValue);
+			const FColor C = SwatchValue.ToFColor(true);
+			const double Lum = (C.R * 0.2126 + C.G * 0.7152 + C.B * 0.0722) / 255.0;
+			FLinearColor Ink(FColor(Lum > 0.6 ? 0x1a1d1f : 0xf2efe6)); Ink.A = Alpha;
+			Ink = TCMarkersHud::WorldColour(TagCanvas, Ink, W);
+			TCMarkerIcons::Hq(TagCanvas, Origin + FVector2D(X0 + 11 + Sw * 0.07, (St.H - Sw * 0.86) / 2) * K, Sw * 0.86 * K, Ink);
+		}
+		FLinearColor TC = TagText;
+		TC.A *= Alpha;
+		TC = TCMarkersHud::WorldColour(TagCanvas, TC, W);
+		const double TextCx = X0 + LeadIn + (Bw - LeadIn) / 2, TextCy = St.H / 2 + 2;
+		if (bBarlow)
+		{
+			TCMarkerText::Draw(TagCanvas, Text, Origin + FVector2D(TextCx - TextW / 2, TextCy - Px * 0.6) * K, Px * K, Tracking * K, TC);
+		}
+		else
+		{
+			FCanvasTextItem Item(Origin + FVector2D(TextCx * K - TW1 * TextScale / 2, TextCy * K - TH1 * TextScale / 2), FText::FromString(Text), Font, TC);
+			Item.Scale = FVector2D(TextScale, TextScale);
+			Item.BlendMode = SE_BLEND_Translucent;
+			TagCanvas->DrawItem(Item);
+		}
+	});
 	Tags++;
 	return true;
 }

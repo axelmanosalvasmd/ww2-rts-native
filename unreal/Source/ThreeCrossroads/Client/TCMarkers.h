@@ -342,8 +342,8 @@ namespace TCMarkersCore
 	// plate is the canvas height less 12, 6 from the top; pad 16; an hq tag leads with a swatch (plate height - 22)
 	// and 14 px of gap. fade: the depth band (m) over which the tag fades out as the camera comes closer.
 	struct FTagStyle { double W, H, Sx, Px, FadeNear, FadeFar; bool bSwatch; };
-	inline FTagStyle TagStyle() { return { 256, 64, 128, 30, 19, 27, false }; }
-	inline FTagStyle HqStyle() { return { 512, 112, 156, 54, 10, 17, true }; }
+	inline FTagStyle TagStyle() { return { 256, 64, 160, 30, 19, 27, false }; }
+	inline FTagStyle HqStyle() { return { 512, 112, 176, 54, 10, 17, true }; }
 	inline double Smoothstep(double E0, double E1, double X)
 	{
 		const double T = (X - E0) / (E1 - E0), C = T < 0 ? 0 : T > 1 ? 1 : T;

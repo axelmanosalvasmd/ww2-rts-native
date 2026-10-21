@@ -1,4 +1,5 @@
 #include "Client/TCRustQueries.h"
+#include "Client/TCShared31RulesHash.h"
 #include "Net/TCMatchState.h"
 #include "Net/TCRustViewShadow.h"
 #include "Dom/JsonObject.h"
@@ -18,6 +19,22 @@ namespace
 		Out = (int32)N;
 		return true;
 	}
+}
+
+FString FTCRustQueries::RulesWarning(const FJsonObject& Lobby)
+{
+	FString Remote;
+	const bool bPresent = Lobby.HasField(TEXT("rules"));
+	Lobby.TryGetStringField(TEXT("rules"), Remote);
+	const FTCHARToUTF8 Utf8(*Remote, Remote.Len());
+	const uint64 Local = FWW2Core::RulesHash();
+	const auto Check = TCShared31::CompareRulesHash(FWW2Core::IsReady(), Local, bPresent,
+		std::string_view(reinterpret_cast<const char*>(Utf8.Get()), Utf8.Length()));
+	if (Check == TCShared31::EHashCheck::Absent || Check == TCShared31::EHashCheck::Match) return {};
+	if (Check == TCShared31::EHashCheck::Unavailable) return TEXT("Rules warning: linked core unavailable; server rules cannot be checked.");
+	if (Check == TCShared31::EHashCheck::Malformed) return TEXT("Rules warning: invalid lobby.rules hash; server rules cannot be checked.");
+	return FString::Printf(TEXT("Rules warning: server %s differs from client %016llx; previews may disagree."),
+		*Remote, (unsigned long long)Local);
 }
 
 const TCHAR* FTCRustQueries::ReasonCode(ETCRustPlacementReason Reason)

@@ -34,6 +34,9 @@ struct FTCRustPlacement
 class FTCRustQueries
 {
 public:
+	// Advisory lobby hash diagnostic. Empty for an absent reference hash or an exact match.
+	// It covers the provider's formation-only hash, not the unexported static tables.
+	static FString RulesWarning(const FJsonObject& Lobby);
 	static const TCHAR* ReasonCode(ETCRustPlacementReason Reason);
 	// Query the actual adopted client view; no handle escapes. On any failure Out is unchanged, and callers may use
 	// their existing C++ mirror. World is deliberately left on that fallback, preserving its remembered terrain.

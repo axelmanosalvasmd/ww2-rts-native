@@ -194,6 +194,8 @@ void ATCUnitRenderer::EnsureModels()
 
 void ATCUnitRenderer::Reset()
 {
+	SnapshotEase = {};
+	EasedSnapshot = -1;
 	BuildingBreaches.Reset();
 	History.Reset();
 	TwinHistory.Reset();
@@ -489,10 +491,28 @@ bool ATCUnitRenderer::DrawModel(const FTCMatchState& State, const FTCUnit& U, co
 	ETCModelMatch Match = ETCModelMatch::None;
 	const FTCModelEntry* Entry = Library.Resolve({ U.Type, Faction, FString() }, &Match);
 	if (!Entry) return false;
-	const float Ground = Terrain ? Terrain->HeightAt(S.X, S.Z) : 0.f;
+	float Ground = Terrain ? Terrain->HeightAt(S.X, S.Z) : 0.f;
+	if (Terrain && FTCUnitMotion::IsSea(U.Type)) Ground = TCUnits31::Waterline(Ground, Terrain->WaterAt(S.X, S.Z));
 	const FVector At = ATCTerrain::ToWorld(S.X, S.Z, Ground);
 	const FQuat Facing(FVector::UpVector, S.Rot);
 	FTransform Root(Facing, At + FVector(0, 0, LiftMetres(Def) * 100.f));
+	if (Def && Def->bAir) Root.SetScale3D(FVector(TCUnits31::AirframeScale));
+	if (Terrain && Def && !Def->bInfantry && !Def->bStructure && !Def->bAir && !FTCUnitMotion::IsSea(U.Type))
+	{
+		const bool Tracked = U.Type != TEXT("armoredcar") && U.Type != TEXT("halftrack") && U.Type != TEXT("flaktrack") && U.Type != TEXT("truck") && U.Type != TEXT("rocket");
+		// Undelivered World terrain cannot influence the visible hull pose.
+		auto Height = [&](double X, double Z) -> double
+		{
+			const int32 Cx=FMath::FloorToInt(X/2), Cz=FMath::FloorToInt(Z/2), Cell=Cz*State.Map.W+Cx;
+			if (Cx<0 || Cz<0 || Cx>=State.Map.W || Cz>=State.Map.H || (State.Map.bWorld && (!State.Map.Known.IsValidIndex(Cell) || !State.Map.Known[Cell]))) return NAN;
+			return static_cast<double>(Terrain->HeightAt(X,Z));
+		};
+		if (S.GroundPose.Update(S.X,S.Z,S.Rot,Def->Radius,Tracked,Dt,Height))
+		{
+			Root.SetRotation(Facing * FQuat(FVector::RightVector,-S.GroundPose.Pitch) * FQuat(FVector::ForwardVector,-S.GroundPose.Roll));
+			Root.AddToTranslation(FVector(0,0,S.GroundPose.Lift*100));
+		}
+	}
 	// main.js: a structure's body rises from 0.15 of its height as it is built
 	if (Def && Def->bStructure) Root.SetScale3D(FVector(1, 1, 0.15f + 0.85f * FMath::Clamp(U.Built, 0.f, 1.f)));
 	// unit-models.js animate for a squad or crew first: it decides the level of detail of the men and of their gun
@@ -599,8 +619,8 @@ void ATCUnitRenderer::DrawAircraftShadow(const FTCUnit& U, int32 Faction, const 
 	}
 	if (!*Found) return;
 	FFrameBatch& B = Frame.FindOrAdd(*Found);
-	// aircraft.js place: the source outline at ground + 0.3 m, heading only. A commanded plane has scale 1.
-	B.Transforms.Add(FTransform(FQuat(FVector::UpVector, S.Rot), Ground + FVector(0, 0, 30), FVector(Spec->Ext * 2, Spec->Ext * 2, 1)));
+	// The source outline at ground + 0.3 m, heading only, matching the displayed airframe scale.
+	B.Transforms.Add(FTransform(FQuat(FVector::UpVector, S.Rot), Ground + FVector(0, 0, 30), FVector(Spec->Ext * 2 * TCUnits31::AirframeScale, Spec->Ext * 2 * TCUnits31::AirframeScale, 1)));
 	B.Keys.Add(FTCInstanceHistory::PartKey(U.Id, 1000)); Stats.AircraftShadows++;
 }
 
@@ -622,9 +642,14 @@ void ATCUnitRenderer::DrawRiders(const FTCModelEntry& Entry, const FTCUnit& U, i
 	}
 }
 
-void ATCUnitRenderer::ApplySnapshot(const FTCMatchState& State, const FTCUnitTable& Table)
+void ATCUnitRenderer::ApplySnapshot(const FTCMatchState& State, const FTCUnitTable& Table, double ArrivalSeconds)
 {
 	if (!State.bHasMatch || !FApp::CanEverRender()) return;
+	if (EasedSnapshot != State.Snapshots)
+	{
+		SnapshotEase.Arrived(ArrivalSeconds >= 0 ? ArrivalSeconds : FPlatformTime::Seconds());
+		EasedSnapshot = State.Snapshots;
+	}
 	EnsureModels();
 	PrepareTrenchSeats(State, Table, &State.UnitOrder);
 	for (auto It = Squads.CreateIterator(); It; ++It)

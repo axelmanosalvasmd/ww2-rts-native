@@ -1,5 +1,6 @@
 // Graphics High or Low (client/gfx.js and its consumers at the pin). See TCGraphics.h.
 #include "Client/TCGraphics.h"
+#include "World/TCWorld31Controls.h"
 #include "Client/TCPersistence.h"
 #include "HAL/IConsoleManager.h"
 #include "Misc/ConfigCacheIni.h"
@@ -213,7 +214,17 @@ TArray<FString> FTCGraphics::ApplyEngine(double DevicePixelRatio) const
 	SetVar(TEXT("r.ScreenPercentage"), FString::SanitizeFloat(B.ScreenPercentage(DevicePixelRatio)));
 	SetVar(TEXT("r.Shadow.MaxResolution"), FString::FromInt(B.ShadowMapSize));
 	SetVar(TEXT("r.Shadow.MaxCSMResolution"), FString::FromInt(B.ShadowMapSize));
-	SetVar(TEXT("r.ShadowQuality"), B.bSoftShadows ? TEXT("3") : TEXT("1"));
+	SetVar(TEXT("r.ShadowQuality"), TCWorld31Controls::NoShadows() ? TEXT("0") : B.bSoftShadows ? TEXT("3") : TEXT("1"));
+	if (TCWorld31Controls::LightGridCap())
+	{
+		// Bound the actual forward-grid allocation, including NumCulledLightsGrid's cell count.
+		// There are no client point/spot lights to cap. This is an allocation control, not a light-count claim.
+		SetVar(TEXT("r.Forward.LightGridPixelSize"), TEXT("128"));
+		SetVar(TEXT("r.Forward.LightGridSizeZ"), TEXT("8"));
+		SetVar(TEXT("r.Forward.MaxCulledLightsPerCell"), TEXT("4"));
+	}
+	UE_LOG(LogTCGraphics, Log, TEXT("world31 isolation: waterOff=%d lightGridCap=%d scatterOff=%d shadowsOff=%d (startup only)"),
+		TCWorld31Controls::NoWater(), TCWorld31Controls::LightGridCap(), TCWorld31Controls::NoScatter(), TCWorld31Controls::NoShadows());
 	UE_LOG(LogTCGraphics, Log, TEXT("graphics %s: %s"), LexToString(Current), *FString::Join(Lines, TEXT(", ")));
 	return Lines;
 }

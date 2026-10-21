@@ -1,4 +1,5 @@
 #include "World/TCApron.h"
+#include "World/TCWorld31Horizon.h"
 #include "World/TCWater.h"
 #include "World/TCWorldObjects.h"
 #include "World/TCFogFrontier.h"
@@ -231,7 +232,12 @@ void FTCApron::SendMesh(bool bCreate)
 	const int32 NV = (int32)(Core.Position.size() / 3);
 	TArray<FVector> Verts, Normals;
 	Verts.SetNumUninitialized(NV); Normals.SetNumUninitialized(NV);
-	for (int32 V = 0; V < NV; V++) { Verts[V] = TCApronView::ToUnreal(&Core.Position[(size_t)V * 3]); Normals[V] = TCApronView::NormalToUnreal(&Core.Normal[(size_t)V * 3]); }
+	for (int32 V = 0; V < NV; V++)
+	{
+		const auto P = TCApronNative::Position(Core, V);
+		Verts[V] = TCApronView::ToUnreal(P.data());
+		Normals[V] = TCApronView::NormalToUnreal(&Core.Normal[(size_t)V * 3]);
+	}
 	TArray<int32> FogIndices;
 	// The apron overlay includes its narrow strip under the playable edge and its skirt, as apron.js does.
 	for (const uint32_t I : Core.Index) FogIndices.Add((int32)I);

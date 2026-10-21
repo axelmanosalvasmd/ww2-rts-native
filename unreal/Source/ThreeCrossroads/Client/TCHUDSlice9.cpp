@@ -840,14 +840,14 @@ void ATCHUD::DrawMinimapPoints()
 			for (int32 K=0; K<4; K++) Minimap.DrawSegment(Canvas,Q[K],Q[(K+1)%4],FLinearColor::Black,Cs);
 		}}
 
-void ATCHUD::DrawMinimapAlertRings()
+void ATCHUD::DrawMinimapAlertRings(double Now)
 {
  ATCGameMode* M=GetWorld()->GetAuthGameMode<ATCGameMode>();
  if (!M || !Minimap.Rect().bIsValid || (!Canvas && !Minimap.ObserveOverlay)) return;
 	// round 15: client/alerts.js drawPings: each alert line's mark, a spreading ring and a steady one, dark under the
 	// kind's colour (4 px, then 2 px)
 	const FLinearColor Ink(FColor(0x15, 0x16, 0x0f));
-	for (const FTCAlertRing& R : M->AlertFeed.MinimapRings(AlertPresentationTime(M->AlertFeed)))
+	for (const FTCAlertRing& R : M->AlertFeed.MinimapRings(Now >= 0 ? Now : AlertPresentationTime(M->AlertFeed)))
 	{
         FLinearColor Under=Ink, Over=R.Colour; Under.A=Over.A=R.Alpha;
         Minimap.DrawRing(Canvas,R.At,R.RadiusPx,4,Under);

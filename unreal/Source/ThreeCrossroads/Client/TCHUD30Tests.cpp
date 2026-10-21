@@ -3,6 +3,8 @@
 #include "Client/TCHUD30Core.h"
 #include "Client/TCGameMode.h"
 #include "Client/TCUnitTable.h"
+#include "Client/TCUnitRenderer.h"
+#include "World/TCRailways.h"
 #include "Client/TCLogistics.h"
 #include "Client/TCAlerts.h"
 #include "Client/TCLocale.h"
@@ -269,6 +271,7 @@ bool FTCHud30MinimapTest::RunTest(const FString&)
  Hud30::FWorld W; if (!TestTrue(TEXT("overlay world"),W.Ready())) return false;
  FString Error; if (!TestTrue(TEXT("reference table"),W.Mode->UnitTable.Load(Error))) return false;
  auto Start=Hud30::Start();
+ Start->SetArrayField(TEXT("spawns"),{MakeShared<FJsonValueObject>(Hud30::Parse(TEXT(R"({"x":12,"z":12})"))),MakeShared<FJsonValueObject>(Hud30::Parse(TEXT(R"({"x":36,"z":36})"))),MakeShared<FJsonValueNull>()});
  Start->GetObjectField(TEXT("map"))->SetArrayField(TEXT("points"),{MakeShared<FJsonValueObject>(Hud30::Parse(TEXT(R"({"x":10,"y":10})"))),MakeShared<FJsonValueObject>(Hud30::Parse(TEXT(R"({"x":20,"y":10,"needs":0})")))});
  auto& S=W.Mode->State; S.ApplyStart(*Start); Hud30::Confirm(S);
  auto Snap=Hud30::Parse(TEXT(R"({"tick":1,"mode":{"kind":"world"},"mp":200,"units":[[1,"truck",0,20,20,0,0,100,0,0,0,0,0,0,1]],"points":[[0,1,0,0,0,0],[0,1,0,0,0,1]],"strikes":[["strafe",50,50,0,4,1]],"world":{"regions":[{"id":0,"name":"Known station","team":0,"x":20,"z":20,"bounds":[10,10,30,30]}],"stations":[{"region":0,"x":20,"z":20}]},"logistics":{"enabled":true,"trucks":[{"id":1,"route":[{"x":30,"z":20}],"cargo":{}}],"stores":[{"id":"known","owner":0,"x":24,"z":20},{"id":"unknown","owner":0,"x":110,"z":110}]}})"));
@@ -277,20 +280,48 @@ bool FTCHud30MinimapTest::RunTest(const FString&)
  W.Mode->WorldRec.ApplyStart(*Start); W.Mode->WorldRec.ApplySnapshot(*Snap,S); W.Mode->Powers.ApplyStart(*Start); W.Mode->Powers.ApplySnapshot(*Snap);
  W.Mode->Logistics.ApplyStart(); W.Mode->Logistics.ApplySnapshot(*Snap,S); W.Mode->Logistics.ToggleOverlay();
  FTCAlertPush Ping; TestTrue(TEXT("delivered team ping"),W.Mode->AlertFeed.ReceivePing(*Hud30::Parse(TEXT(R"({"t":"ping","from":0,"x":26,"z":22})")),S,99.75,Ping));
- W.PC->Selected={1}; FTCHud30Access::Set(*W.Hud,W.PC,{}); auto& Map=FTCHud30Access::Map(*W.Hud); Map.Refresh(S,W.Mode->UnitTable); TestTrue(TEXT("actual minimap arranged"),Map.Arrange(1280,720,S,0));
- TMap<FString,int32> Counts; Map.ObserveOverlay=[&](const FString& Role,const TArray<FVector2D>& Polygon,FLinearColor)
+ W.Mode->AlertFeed.Mirror(TEXT("base"),TEXT("Base under attack"),FVector2D(24,24),1,99.75);
+ W.Mode->Railways.Reset(S);
+ W.Mode->Railways.ApplyCells(*Hud30::Parse(TEXT(R"({"cells":[[910,".",0,0,{"rail":3}],[3575,".",0,0,{"rail":3}]]})")));
+ W.PC->Selected={1}; FTCHud30Access::Set(*W.Hud,W.PC,{}); auto& Map=FTCHud30Access::Map(*W.Hud); Map.SetRailways(&W.Mode->Railways); Map.Refresh(S,W.Mode->UnitTable); TestTrue(TEXT("actual minimap arranged"),Map.Arrange(1280,720,S,0));
+ TArray<TArray<FVector2D>> Links; TMap<FString,int32> Counts; TMap<FString,TArray<FLinearColor>> Colours; Map.ObserveOverlay=[&](const FString& Role,const TArray<FVector2D>& Polygon,FLinearColor Colour)
  {
-  Counts.FindOrAdd(Role)++; for (auto P : Polygon) TestTrue(TEXT("actual composite primitive clipped to minimap"),Map.Rect().IsInsideOrOn(P));
+  if (Role==TEXT("needs-link")) Links.Add(Polygon);
+  Colours.FindOrAdd(Role).Add(Colour); Counts.FindOrAdd(Role)++; for (auto P : Polygon) TestTrue(TEXT("actual composite primitive clipped to minimap"),Map.Rect().IsInsideOrOn(P));
  };
  FTCHud30Access::DrawOverlays(*W.Hud);
- for (const TCHAR* Role : {TEXT("station"),TEXT("strike"),TEXT("store"),TEXT("route"),TEXT("ping")}) TestTrue(Role,Counts.FindRef(Role)>0);
+ for (const TCHAR* Role : {TEXT("point"),TEXT("region"),TEXT("station"),TEXT("spawn"),TEXT("strike"),TEXT("store"),TEXT("route"),TEXT("ping"),TEXT("alert")}) TestTrue(Role,Counts.FindRef(Role)>0);
+ TestEqual(TEXT("one delivered station submits frame and fill only"),Counts.FindRef(TEXT("station")),2);
+ TestEqual(TEXT("two delivered spawns, absent third seat has no square"),Counts.FindRef(TEXT("spawn")),10);
+ TestTrue(TEXT("other seat spawn retains owner colour"),Colours.FindRef(TEXT("spawn")).Contains(ATCUnitRenderer::SeatColor(1)));
+ FLinearColor PointOwner=ATCUnitRenderer::SeatColor(0); PointOwner.A=0.6f;
+ TestTrue(TEXT("capture point disc retains delivered owner colour"),Colours.FindRef(TEXT("point")).Contains(PointOwner));
  // Delivered points can coexist with World overlays. Force the locked state via the public snapshot rows.
  TestTrue(TEXT("needs-link primitive is part of composite"),Counts.FindRef(TEXT("needs-link"))>0);
+ TestTrue(TEXT("needs link contains separate dashes"),Links.Num()>1);
+ for (int32 I=0;I<Links.Num();I++) if (Links[I].Num()==4)
+ {
+  const auto& Q=Links[I]; const FVector2D A=(Q[0]+Q[3])/2, B=(Q[1]+Q[2])/2;
+  TestTrue(TEXT("needs dash never exceeds six canvas pixels"),FVector2D::Distance(A,B)<=6*Map.CanvasScale()+0.001);
+  if (I>0 && Links[I-1].Num()==4)
+  {
+   const FVector2D PreviousEnd=(Links[I-1][1]+Links[I-1][2])/2;
+   TestTrue(TEXT("needs dashes preserve four canvas pixel gaps"),FMath::IsNearlyEqual(FVector2D::Distance(PreviousEnd,A),4*Map.CanvasScale(),0.001));
+  }
+ }
+ FColor RailPixel,HiddenRailPixel;
+ TestTrue(TEXT("known rail reaches actual minimap image"),Map.PixelOf(910,RailPixel) && RailPixel==FTCMinimap::CellColour(S,910,false,true));
+ TestTrue(TEXT("rail pixel differs from terrain without track"),RailPixel!=FTCMinimap::CellColour(S,910,false,false));
+ TestTrue(TEXT("held track cannot expose an unknown World cell"),Map.PixelOf(3575,HiddenRailPixel) && HiddenRailPixel==FColor(10,10,10,255));
  TestEqual(TEXT("only known store submits a square"),Counts.FindRef(TEXT("store")),1);
  S.FogExplored[10*64+12]=0; // route 20,20 -> 30,20 crosses this cell
  Counts.Reset(); FTCHud30Access::DrawOverlays(*W.Hud); TestEqual(TEXT("route with unknown intermediate segment submits nothing"),Counts.FindRef(TEXT("route")),0);
  const int32 Unknown=55*64+55; TestTrue(TEXT("rail cannot reveal unknown World terrain"),FTCMinimap::CellColour(S,Unknown,false,true)==FColor(10,10,10,255));
  TestTrue(TEXT("known rail is represented in terrain image"),FTCMinimap::CellColour(S,10*64+10,false,true)!=FTCMinimap::CellColour(S,10*64+10,false,false));
+ W.Mode->Logistics.ToggleOverlay(); Counts.Reset(); FTCHud30Access::DrawOverlays(*W.Hud);
+ TestEqual(TEXT("logistics switch hides stores"),Counts.FindRef(TEXT("store")),0);
+ TestEqual(TEXT("logistics switch hides routes"),Counts.FindRef(TEXT("route")),0);
+ TestTrue(TEXT("logistics switch keeps public points"),Counts.FindRef(TEXT("point"))>0);
  Map.ObserveOverlay=nullptr;
  return !HasAnyErrors();
 }

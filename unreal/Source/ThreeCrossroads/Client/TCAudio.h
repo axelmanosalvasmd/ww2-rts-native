@@ -36,8 +36,6 @@
 // between the front pair at -30 and +30 degrees: azimuth = pan * 30 degrees).
 //
 // Differences, recorded:
-//   - a tracer's flight time (the delay before its impact sound) is measured from the shooter's position at 1 m over
-//     flat ground, not from the drawn muzzle on the terrain: the browser's muzzle and height field are not here;
 //   - the browser's random numbers are Math.random; here an FRandomStream (seeded per run, fixed in tests);
 //   - the ambient.mp3 loop is imported (it is in the library) but, as in the reference at the pin, never played.
 #pragma once
@@ -55,6 +53,7 @@ class USoundWave;
 class FTCMatchState;
 class FTCUnitTable;
 class FTCSettingsStore;
+class FJsonObject;
 struct FTCShot;
 struct FTCSoundCue;
 
@@ -389,6 +388,8 @@ struct FTCAudioSnapshot
 	TConstArrayView<FTCAudioStrike> Strikes;
 	TConstArrayView<FTCAudioSmoke> Smokes;
 	TConstArrayView<FTCAudioFire> Fires;
+	TFunction<bool(int32, int32, FVector&)> MuzzleAt; // drawn snapshot muzzle, Unreal metres
+	TFunction<float(float, float)> HeightAt;
 };
 
 class THREECROSSROADS_API FTCAudioCues
@@ -458,6 +459,8 @@ private:
 // The adapters from what Net/TCMatchState decoded (read only).
 namespace TCAudioView
 {
+	// Raw fields omitted by the view decoder, aligned with its delivered shots.
+	THREECROSSROADS_API void Extras(const FJsonObject& Raw, TArray<FTCAudioShot>& Shots, TArray<FTCAudioStrike>& Strikes, TArray<FTCAudioSmoke>& Smokes);
 	// this snapshot's units with their type's flags (shared/sim.js UNITS via the unit table) and alive men
 	THREECROSSROADS_API TMap<int32, FTCAudioUnit> Units(const FTCMatchState& S, const FTCUnitTable& Table);
 	THREECROSSROADS_API TArray<FTCAudioShot> Shots(const FTCMatchState& S);
@@ -494,6 +497,7 @@ public:
 	void ReturnedToLobby();
 	// after FTCMatchState::ApplySnapshot: the sounds of this snapshot's shots, wrecks and smoke
 	void Snapshot(const FTCMatchState& S, const FTCUnitTable& Table);
+	void PrepareSnapshot(const FJsonObject& Raw, TFunction<bool(int32, int32, FVector&)> MuzzleAt = {}, TFunction<float(float, float)> HeightAt = {});
 	// once per frame: the listener (focus in reference metres, distance in metres, this client's yaw in degrees), the
 	// battle beds, the environment every 0.4 s and the delayed effect sounds (Dt: the effects' frame time)
 	void Frame(float Dt, const FTCMatchState& S, const FTCUnitTable& Table, FVector2D Focus, float Distance, float YawDegrees);
@@ -545,6 +549,9 @@ private:
 
 	UPROPERTY() TObjectPtr<USoundSubmix> MasterDynamics;
 	FTCAudioMixer Mixer;
+	TSharedPtr<FJsonObject> SnapshotRaw;
+	TFunction<bool(int32, int32, FVector&)> SnapshotMuzzle;
+	TFunction<float(float, float)> SnapshotHeight;
 	FTCAudioCues Cue;
 	FStreamableManager Streamable;
 	TSharedPtr<FStreamableHandle> SfxHandle, VoiceHandle;

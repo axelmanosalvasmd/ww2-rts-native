@@ -6189,3 +6189,8 @@ See [slice 1ad implementation and executed validation](design.d/2026-10-20-unrea
 ## Unreal client slice 1ae (2026-10-20)
 
 See [slice 1ae implementation and executed validation](design.d/2026-10-20-unreal-slice1ae.md). Owner-r1 qualifies with an explicitly approved server endpoint; Load and the approved ABI pin remain unchanged.
+
+
+## Unreal client slice 1af (2026-10-20)
+
+See [slice 1af implementation and executed validation](design.d/2026-10-20-unreal-slice1af.md). The approved FFI pin and owner-r1 endpoint/Load policy remain unchanged.

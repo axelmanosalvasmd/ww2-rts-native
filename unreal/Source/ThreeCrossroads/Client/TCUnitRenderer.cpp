@@ -108,7 +108,7 @@ void ATCUnitRenderer::Draw(const FTCMatchState& State, const FTCUnitTable& Table
 	History.ResetCounts();
 	Frame.Reset();
 	Stats = FTCUnitModelStats();
-	const float Ease = 1.f - FMath::Exp(-DeltaSeconds * 10.f);
+	const float Ease = SnapshotEase.Factor(DeltaSeconds);
 	// where the camera is, for the soldiers' level of detail (unit-models.js animate eye)
 	FVector Eye = FVector(0, 0, 1e9);
 	if (ViewOverride.IsSet()) Eye = ViewOverride.GetValue();
@@ -133,6 +133,7 @@ void ATCUnitRenderer::Draw(const FTCMatchState& State, const FTCUnitTable& Table
 		const FTCUnitDef* Def = Table.Find(U.Type);
 		if (!IsDrawn(U))
 		{
+			S.GroundPose.Suspended = true;
 			// Hidden planes still remember their heading; carried squads resume without a travel burst.
 			if (UsesModel(U.Type) && Def && !Def->bInfantry && !Def->bStructure)
 				UnitMotion.Update(U.Id, U.Type, ATCTerrain::ToWorld(S.X, S.Z, 0), S.Rot, false, DeltaSeconds, GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0);
@@ -148,7 +149,8 @@ void ATCUnitRenderer::Draw(const FTCMatchState& State, const FTCUnitTable& Table
 		if (UsesModel(U.Type)) Stats.MissingModel++;
 		Stats.PlaceholderUnits++;
 		const float Radius = Def ? Def->Radius : 1.5f;
-		const float Ground = Terrain ? Terrain->HeightAt(S.X, S.Z) : 0.f;
+		float Ground = Terrain ? Terrain->HeightAt(S.X, S.Z) : 0.f;
+		if (Terrain && FTCUnitMotion::IsSea(U.Type)) Ground = TCUnits31::Waterline(Ground, Terrain->WaterAt(S.X, S.Z));
 		const FQuat Facing(FVector::UpVector, S.Rot);
 		const FVector At = ATCTerrain::ToWorld(S.X, S.Z, Ground);
 		const bool bBody = TCBodyControl::Get().Keep(FTCInstanceHistory::PartKey(U.Id, 0));
@@ -668,3 +670,20 @@ bool FTCInfantryNormalAtlasTest::RunTest(const FString&)
 	return true;
 }
 #endif
+
+TOptional<bool> ATCUnitRenderer::InfantryWeaponMuzzle(const FTCUnit& Unit, int32 K, bool bBazooka, double Ground, FVector& Out) const
+	{
+		const FSquad* Squad = Squads.Find(Unit.Id); const FShown* S = Shown.Find(Unit.Id);
+		if (!Squad || !S) return {};
+		const FTransform Root(FQuat(FVector::UpVector, S->Rot), FVector(S->X, S->Z, Ground) * 100.);
+		const auto& Men = Squad->Anim.Men(); int32 Visible = 0;
+		for (int32 I = 0; I < Men.Num(); ++I)
+		{
+			if (!Men[I].bVisible || (bBazooka ? I % 3 != 1 : Unit.Type == TEXT("ranger") && I % 3 == 1)) continue;
+			if (Visible++ != K) continue;
+			FVector World;
+			if (!Squad->Anim.MuzzleWorld(I, Root, World)) return false;
+			Out = World / 100.; return true;
+		}
+		return false;
+	}

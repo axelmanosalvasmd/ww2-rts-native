@@ -30,6 +30,7 @@ public:
 	const FTCUnitDef* Find(const FString& Type) const { return Defs.Find(Type); }
 	FString Reference;
 	int32 Num() const { return Defs.Num(); }
+	TArray<FString> Types() const { TArray<FString> Out; Defs.GetKeys(Out); Out.Sort(); return Out; }
 
 private:
 	TMap<FString, FTCUnitDef> Defs;

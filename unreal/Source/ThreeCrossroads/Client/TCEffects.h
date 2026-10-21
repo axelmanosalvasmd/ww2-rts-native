@@ -320,6 +320,8 @@ struct FTCFxContext
 {
 	TFunction<float(float X, float Z)> HeightAt;          // ground height in metres (0 when absent)
 	TFunction<bool(int32 Id, FVector2D& Out)> DrawnAt;   // where a held unit is drawn (else its row)
+	TFunction<TOptional<bool>(const FTCUnit&, int32, bool, FVector&)> WeaponMuzzle; // authoritative drawn model point, Unreal metres
+	TFunction<void(const FString&, double, double, double, double)> TimedSound; // name, map x/z, delay, duration
 	const FTCUnitTable* Table = nullptr;
 	FVector2D CameraFocus = FVector2D::ZeroVector;        // metres, for the shake's distance falloff
 	float CameraDistance = 60.f;
@@ -357,6 +359,14 @@ public:
 	// Sound names the reference would play now (no audio in this client: logged or ignored by the caller).
 	TArray<FString> TakeSounds() { TArray<FString> Out = MoveTemp(Sounds); Sounds.Reset(); return Out; }
 	FVector2D Wind() const { return WindXZ; }
+	struct FCoverRing { double X, Z, Radius, Seconds; double Opacity() const { return FMath::Min(.85, .4 + Seconds / 150); } };
+	const TArray<FCoverRing>& CoverRings() const { return Covers; }
+	// Positions already resolved for this snapshot. Audio reuses them without advancing model barrel alternation.
+	bool SnapshotMuzzle(int32 Id, int32 Index, FVector& Out) const
+	{
+		const FVector* P = SnapshotMuzzles.Find((int64(Id) << 32) | uint32(Index));
+		if (!P) return false; Out = *P; return true;
+	}
 
 	// Counters for logs and tests, since this object was made (a start or reset does not clear them).
 	struct FStats
@@ -448,7 +458,7 @@ private:
 	void SyncFires(const FTCMatchState& S);
 	void SyncClouds(const FJsonObject* Raw);
 	void UnitDust(const FTCMatchState& S);
-	bool MuzzleOf(const FTCUnit& U, int32 K, double Tx, double Tz, FVector& Out);
+	bool MuzzleOf(const FTCUnit& U, int32 K, double Tx, double Tz, FVector& Out, bool bBazooka = false);
 	void NoteShooter(int32 Id);
 	void Later(double Delay, TFunction<void()> Run);
 	void Sound(const TCHAR* Name) { if (Sounds.Num() < 256) Sounds.Add(Name); }
@@ -479,8 +489,11 @@ private:
 	int32 CloudSerial = 0;
 	struct FRocket { FVector P0, V; float G, T, Dur, Acc; };
 	TArray<FRocket> Rockets;
-	struct FPass { FVector2D At; double Dir; FString Kind; float T; int32 Owner; TArray<float> Strafe; TArray<float> Flak; bool bDown = false; int32 Serial = 0; };
+	struct FPass { FVector2D At; double Dir; FString Kind; float T; int32 Owner; TArray<float> Strafe; TArray<float> Flak; bool bDown = false; int32 Serial = 0; double HitAt = 0; bool bOpened = false; };
 	TArray<FPass> Passes;
+	TArray<FCoverRing> Covers;
+	TMap<int32, int32> FixedGunSide;
+	TMap<int64, FVector> SnapshotMuzzles;
 	struct FFall { TCRender29Aircraft::FFall Motion; FString ModelType; int32 Owner = -1, Serial = 0; double Acc = 0; };
 	TArray<FFall> Falls;
 	TArray<FTCFxAircraftDraw> AircraftDraws;
@@ -625,6 +638,8 @@ public:
 
 private:
 	FTCFxContext MakeContext() const;
+	int32 AudioAuditionIndex = 0;
+	double AudioAuditionNext = 0;
 	UInstancedStaticMeshComponent* Batch(int32 Key, UStaticMesh* Mesh, const FLinearColor& Colour, bool bUnlit);
 	void EnsureComponents();
 	void UpdateLight();

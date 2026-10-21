@@ -4,6 +4,7 @@
 #include "Misc/ScopeExit.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "Engine/StaticMesh.h"
 #include "Client/TCMarkers.h"
 #include "Client/TCLook30Cargo.h"
 #include "World/TCWorldObjects.h"
@@ -150,17 +151,28 @@ bool FTCLook30Ghost::RunTest(const FString&)
  TestTrue(TEXT("last known position is retained"),S.Ghosts[0].X==20 && S.Ghosts[0].Z==30 && !S.Units.Contains(7));
  TestEqual(TEXT("one remembered model is submitted"),View.GhostsDrawn,1);
  int32 Parts=0;
+ const auto* Remembered=View.Library.Resolve({TEXT("barracks"),1,FString()});
+ if (!TestNotNull(TEXT("remembered source building"),Remembered)) return false;
+ const FTransform LastSeen(FVector(2000,3000,0));
  for (const auto& Pair : View.ModelComps) if (const auto* Component=Pair.Value.Get())
   for (int32 I=0; I<Component->GetInstanceCount(); I++)
   {
    const int32 FadeAt=I*Component->NumCustomDataFloats+TCModelData::Fade;
    if (!TestTrue(TEXT("drawn ghost has custom fade"),Component->PerInstanceSMCustomData.IsValidIndex(FadeAt))) return false;
    TestEqual(TEXT("actual remembered-model instance uses source fade"),Component->PerInstanceSMCustomData[FadeAt],.35f);
+   FTransform Drawn; Component->GetInstanceTransform(I,Drawn,true);
+   bool AtLastSeen=false;
+   for (int32 P=0; P<Remembered->Parts.Num(); P++)
+    if (Component->GetStaticMesh()==Remembered->Parts[P].Mesh.TryLoad())
+     AtLastSeen|=Drawn.Equals(FTCModelLibrary::PartTransform(*Remembered,P,LastSeen,{}),.02);
+   TestTrue(TEXT("actual ghost parts stay at delivered last-seen coordinates"),AtLastSeen);
    Parts++;
   }
  TestTrue(TEXT("remembered building has drawn original parts"),Parts>0);
- Send(TEXT("[")+Row+TEXT("]"),TEXT("[[7,\"barracks\",1,20,30,1]]"));
+ const FString Reappeared=TEXT("[7,\"barracks\",1,40,50,0,100,0,0,0,0,0,0,0,0]");
+ Send(TEXT("[")+Reappeared+TEXT("]"),TEXT("[[7,\"barracks\",1,20,30,1]]"));
  TestTrue(TEXT("reappearance replaces the ghost even if both are delivered"),S.Units.Contains(7) && S.Ghosts.IsEmpty() && View.GhostsDrawn==0);
+ TestTrue(TEXT("live replacement uses newly delivered coordinates"),S.Units[7].X==40 && S.Units[7].Z==50);
  Send(TEXT("[]"),TEXT("[]")); TestTrue(TEXT("removal clears both views"),S.Units.IsEmpty() && S.Ghosts.IsEmpty());
  return true;
 }

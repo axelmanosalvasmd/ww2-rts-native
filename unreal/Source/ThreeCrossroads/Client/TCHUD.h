@@ -354,6 +354,7 @@ private:
 	void DrawHint(UFont* Font);
 	TSharedPtr<FTCHudPortraits> Portraits;
 	bool bLossFixtureDrawn = false;
+	bool bCollectWorldLabels = false;
 	FString PendingTooltip;
 	FBox2D TooltipAnchor = FBox2D(ForceInit);
 	FTCHudFit::FTooltipInteraction TooltipInteraction;
@@ -427,7 +428,7 @@ public:
 private:
 	// client/main.js drawMinimap: the capture points (owner discs, the cut cross, the locked link) and the start's spawns
 	void DrawMinimapPoints();
-	void DrawMinimapAlertRings();
+	void DrawMinimapAlertRings(double Now = -1);
 	// ORDER_DASH: 2.2 m period, 1.3 m lit, anchored at the goal (overlay.js uEnd).
 	void GroundDashes(const ATCTerrain& T, FVector2D A, FVector2D B, const FLinearColor& Colour, float Thickness, float Period = 2.2f, float Lit = 1.3f);
 	// A filled screen-space quad (two canvas triangles).

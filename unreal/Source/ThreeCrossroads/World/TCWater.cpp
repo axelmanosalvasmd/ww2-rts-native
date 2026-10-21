@@ -1,4 +1,5 @@
 #include "World/TCWater.h"
+#include "World/TCWorld31Controls.h"
 #include "World/TCFogFrontier.h"
 #include "ThreeCrossroads.h"
 #include "Net/TCMatchState.h"
@@ -167,7 +168,7 @@ FTCWater::~FTCWater() = default;
 
 void FTCWater::Attach(UWorld* World)
 {
-	if (Actor.IsValid() || !World) return;
+	if (TCWorld31Controls::NoWater() || Actor.IsValid() || !World) return;
 	AActor* A = TCWaterView::SpawnHolder(World, TEXT("Water"), Mesh);
 	if (!A) return;
 	Actor = A;
@@ -227,6 +228,7 @@ void FTCWater::ResetFrom(const FTCMatchState& State)
 
 void FTCWater::TryCreate(const FTCMatchState& State)
 {
+	if (TCWorld31Controls::NoWater()) return;
 	Core = TCWaterCore::FWater();
 	Core.Char = [this](int C) { return (uint8_t)Chars[C]; };
 	if (bWorld) Core.Unknown = [this](int C) { return !Known[C]; };

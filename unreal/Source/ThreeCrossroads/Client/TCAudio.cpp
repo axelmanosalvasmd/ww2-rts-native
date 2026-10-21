@@ -1,4 +1,5 @@
 #include "Client/TCAudio.h"
+#include "Client/TCEffects.h"
 #include "Client/TCLook30Dynamics.h"
 #include "AudioDeviceManager.h"
 #include "Engine/Engine.h"
@@ -928,6 +929,8 @@ void FTCAudioCues::DirectFire(const FTCAudioShot& Sh, const FTCAudioUnit* From, 
 	for (int32 I = 0; I < Men; I++)
 	{
 		if (!Muzzle(I)) break;
+		FVector M(From->X, From->Z, 1);
+		if (S.MuzzleAt && !S.MuzzleAt(From->Id, I, M)) break;
 		const int32 Shots = bBazooka ? 1 : St->Burst;
 		const double T0 = St->N > 1 ? Rand() * 0.18 : 0.0;
 		if (FCString::Strcmp(St->Snd, TEXT("rifle")) == 0) Later(T0, TEXT("rifle"), Sx, Sz, 0.0, I ? 0.8 : 0.0);
@@ -936,14 +939,14 @@ void FTCAudioCues::DirectFire(const FTCAudioShot& Sh, const FTCAudioUnit* From, 
 			double Ex = Sh.X + Rr(-0.5, 0.5) * Spread, Ez = Sh.Z + Rr(-0.5, 0.5) * Spread;
 			if (Sh.bHit && bVeh)
 			{
-				const double Dx = Ex - From->X, Dz = Ez - From->Z, Dd = FMath::Max(1e-9, FMath::Sqrt(Dx * Dx + Dz * Dz));
+				const double Dx = Ex - M.X, Dz = Ez - M.Y, Dd = FMath::Max(1e-9, FMath::Sqrt(Dx * Dx + Dz * Dz));
 				const double R = FMath::Min(Dd * 0.5, (double)TDef.Radius * 0.9);
 				Ex -= Dx / Dd * R;
 				Ez -= Dz / Dd * R;
 			}
-			// the tracer's flight: from 1 m over the shooter to the impact's height (flat ground here)
-			const double Ey = Sh.bHit ? Ty : 0.1, Dx = Ex - From->X, Dz = Ez - From->Z;
-			const double T = FMath::Sqrt(Dx * Dx + Dz * Dz + FMath::Square(Ey - 1.0)) / St->Spd;
+			const double Ground = S.HeightAt ? S.HeightAt(Ex, Ez) : 0;
+			const double Ey = Ground + (Sh.bHit ? Ty : 0.1), Dx = Ex - M.X, Dz = Ez - M.Y;
+			const double T = FMath::Sqrt(Dx * Dx + Dz * Dz + FMath::Square(Ey - M.Z)) / St->Spd;
 			LaterImpact(T0 + B * St->Gap + T, Ex, Ez, St, Flags & (B == 0 ? 7 : 6));
 		}
 	}
@@ -1462,6 +1465,7 @@ void UTCAudio::ToggleMute()
 
 void UTCAudio::MatchStarted(int32 Faction, int32 Slot)
 {
+	SnapshotRaw.Reset(); SnapshotMuzzle = {}; SnapshotHeight = {};
 	const int32 Token = Mixer.BeginMatch(Faction, Slot);
 	Cue.Reset();
 	AmbienceTimer = 0.0;
@@ -1471,6 +1475,7 @@ void UTCAudio::MatchStarted(int32 Faction, int32 Slot)
 
 void UTCAudio::ReturnedToLobby()
 {
+	SnapshotRaw.Reset(); SnapshotMuzzle = {}; SnapshotHeight = {};
 	Mixer.End();
 	Cue.Reset();
 }
@@ -1563,16 +1568,60 @@ void UTCAudio::OnVoicesLoaded(int32 Token)
 	Mixer.FinishLoading(Token);
 }
 
+void TCAudioView::Extras(const FJsonObject& Raw, TArray<FTCAudioShot>& Shots, TArray<FTCAudioStrike>& Strikes, TArray<FTCAudioSmoke>& Smokes)
+{
+	Strikes.Reset(); Smokes.Reset();
+	const TArray<FTCShotExtra> Fields = TCShotExtras::Read(&Raw);
+	for (int32 I = 0; I < FMath::Min(Fields.Num(), Shots.Num()); ++I)
+	{
+		Shots[I].bPhysical = Fields[I].bPhysical;
+		Shots[I].bHitPresent = Fields[I].bHasHitField;
+		if (Fields[I].bHasN) Shots[I].N = Fields[I].N;
+	}
+	const TArray<TSharedPtr<FJsonValue>>* Rows = nullptr;
+	if (Raw.TryGetArrayField(TEXT("strikes"), Rows)) for (const auto& Value : *Rows)
+	{
+		const TArray<TSharedPtr<FJsonValue>>* Row = nullptr;
+		if (!Value || !Value->TryGetArray(Row) || Row->Num() < 5 || Strikes.Num() >= TCMatchLimits::Shots) continue;
+		FTCAudioStrike Strike; double Direction;
+		if (!(*Row)[0]->TryGetString(Strike.Kind) || !(*Row)[1]->TryGetNumber(Strike.X) || !(*Row)[2]->TryGetNumber(Strike.Z) || !(*Row)[3]->TryGetNumber(Direction) || !(*Row)[4]->TryGetNumber(Strike.T)) continue;
+		Strikes.Add(MoveTemp(Strike));
+	}
+	if (Raw.TryGetArrayField(TEXT("smokes"), Rows)) for (const auto& Value : *Rows)
+	{
+		const TArray<TSharedPtr<FJsonValue>>* Row = nullptr;
+		if (!Value || !Value->TryGetArray(Row) || Row->Num() < 3 || Smokes.Num() >= 256) continue;
+		FTCAudioSmoke Smoke;
+		if (!(*Row)[0]->TryGetNumber(Smoke.X) || !(*Row)[1]->TryGetNumber(Smoke.Z) || !(*Row)[2]->TryGetNumber(Smoke.R)) continue;
+		double Id;
+		if (Row->Num() > 3 && (*Row)[3]->TryGetNumber(Id) && Id >= MIN_int32 && Id <= MAX_int32) Smoke.Id = int32(Id);
+		Smokes.Add(MoveTemp(Smoke));
+	}
+}
+
+void UTCAudio::PrepareSnapshot(const FJsonObject& Raw, TFunction<bool(int32, int32, FVector&)> MuzzleAt, TFunction<float(float, float)> HeightAt)
+{
+	SnapshotRaw = MakeShared<FJsonObject>(Raw);
+	SnapshotMuzzle = MoveTemp(MuzzleAt); SnapshotHeight = MoveTemp(HeightAt);
+}
+
 void UTCAudio::Snapshot(const FTCMatchState& S, const FTCUnitTable& Table)
 {
 	const TMap<int32, FTCAudioUnit> Units = TCAudioView::Units(S, Table);
-	const TArray<FTCAudioShot> Shots = TCAudioView::Shots(S);
+	TArray<FTCAudioShot> Shots = TCAudioView::Shots(S);
+	TArray<FTCAudioStrike> Strikes;
+	TArray<FTCAudioSmoke> Smokes;
+	if (SnapshotRaw) TCAudioView::Extras(*SnapshotRaw, Shots, Strikes, Smokes);
+	SnapshotRaw.Reset();
 	const TArray<FTCAudioFire> Fires = TCAudioView::Fires(S);
 	FTCAudioSnapshot Snap;
 	Snap.Tick = S.Tick;
 	Snap.Shots = Shots;
 	Snap.Units = &Units;
 	Snap.Fires = Fires;
+	Snap.Strikes = Strikes;
+	Snap.Smokes = Smokes;
+	Snap.MuzzleAt = MoveTemp(SnapshotMuzzle); Snap.HeightAt = MoveTemp(SnapshotHeight);
 	const FTCUnitTable* T = &Table;
 	Snap.TypeOf = [T](const FString& Type, FTCAudioType& Out)
 	{
@@ -1593,7 +1642,6 @@ void UTCAudio::Snapshot(const FTCMatchState& S, const FTCUnitTable& Table)
 		const int32 C = FMath::FloorToInt(Z / TCAudioRules::CellMetres) * M->W + FMath::FloorToInt(X / TCAudioRules::CellMetres);
 		return M->IsValidCell(C) && M->Chars.IsValidIndex(C) && M->Chars[C] == '.';
 	};
-	// strikes and smokes are not decoded by Net/TCMatchState yet: none are heard (a note to the lead)
 	TCAudioDetail::FCountingSink Sink(Mixer, Asked);
 	Cue.Snapshot(Snap, Sink);
 }

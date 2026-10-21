@@ -1011,6 +1011,8 @@ class THREECROSSROADS_API FTCWorldObjectsView
 	friend class FTCWreckPresentationTest;
 	friend class FTCLook30Ghost;
 public:
+	// Set before the first Draw to isolate structures in review fixtures.
+	bool bDrawScatter = true;
 	// Spawns the actor that holds the components (once per world) and loads the model catalog and world materials.
 	bool Attach(UWorld* World);
 	// Destroys that actor (call from the owner's EndPlay; the world's teardown also takes it).

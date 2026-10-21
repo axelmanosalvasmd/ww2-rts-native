@@ -19,6 +19,7 @@
 #include "Client/TCInfantryRig.h"
 #include "Client/TCUnitMotion.h"
 #include "World/TCStructures.h"
+#include "Client/TCUnits31Presentation.h"
 #include "TCUnitRenderer.generated.h"
 
 class UInstancedStaticMeshComponent;
@@ -94,7 +95,7 @@ public:
 	const FString& WheelTracksError() const { return WheelTracksWhy; }
 
 	// Apply every delivered squad count/targeted casualty, including receipts between rendered frames.
-	void ApplySnapshot(const FTCMatchState& State, const FTCUnitTable& Table);
+	void ApplySnapshot(const FTCMatchState& State, const FTCUnitTable& Table, double ArrivalSeconds = -1);
 
 	// ----- the model path -----
 	// The adoption batches, in the order they were brought in. A type takes the model path when its batch is enabled.
@@ -123,13 +124,18 @@ public:
 	const UTCSoldierCrowd* SoldierCrowd() const { return Crowd; }
 	// The motion a unit was drawn with in the last frame (null for squads and units without a model).
 	const FTCPartMotion* MotionOf(int32 Id) const { return UnitMotion.Find(Id); }
+	// fx.js nthVisible and the same posed weapon used to draw this squad. Output is Unreal metres.
+	TOptional<bool> InfantryWeaponMuzzle(const FTCUnit& Unit, int32 K, bool bBazooka, double Ground, FVector& Out) const;
+
 
 private:
 	enum EKind { Man, Vehicle, Structure, Air, Ring, KindCount };
 	UInstancedStaticMeshComponent* Batch(int32 Owner, EKind Kind);
 
-	struct FShown { float X = 0, Z = 0, Rot = 0, Aim = 0; bool bFar = false; bool bAimSet = false; };
+	struct FShown { float X = 0, Z = 0, Rot = 0, Aim = 0; bool bFar = false; bool bAimSet = false; TCUnits31::FGroundPose GroundPose; };
 	TMap<int32, FShown> Shown;
+	TCUnits31::FSnapshotEase SnapshotEase;
+	int32 EasedSnapshot = -1;
 	TMap<int32, TObjectPtr<UInstancedStaticMeshComponent>> Batches; // key: (owner + 2) * KindCount + kind
 
 	UPROPERTY() TObjectPtr<UStaticMesh> CylinderMesh;
